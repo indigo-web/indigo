@@ -10,6 +10,7 @@ I need a NewHTTPProtocol() constructor that will receive a pool of request objec
 how originally), where request object is already cleared (so there will be no difference between
 new instance and already used), settings struct, handler, and... Fuck it, I need some Client{} struct
 that will contain all these values, but also contain some callbacks to send a response. For example:
+
 type Client struct {
 	RequestObjectsPool sync.Pool
 	Settings           webserver.Settings
@@ -27,7 +28,7 @@ const InitialHeadersBufferSize = 5
 
 type httpProtocol struct {
 	dispatcher webserver.Dispatcher
-	requestCtx webserver.RequestCtx
+	client     webserver.Client
 	settings   webserver.Settings
 	// TODO: maybe, there is a better way to keep a writer for each request?
 	bodyWriter *io.PipeWriter
@@ -40,19 +41,19 @@ func (h httpProtocol) OnMessageBegin() error {
 }
 
 func (h *httpProtocol) OnMethod(method []byte) error {
-	h.request.Method = method
+	h.client.Request.Method = method
 
 	return nil
 }
 
 func (h *httpProtocol) OnPath(path []byte) error {
-	h.request.Path = path
+	h.client.Request.Path = path
 
 	return nil
 }
 
 func (h *httpProtocol) OnProtocol(proto []byte) error {
-	h.request.Protocol = proto
+	h.client.Request.Protocol = proto
 
 	return nil
 }
@@ -66,7 +67,7 @@ func (h *httpProtocol) OnHeader(key, value []byte) error {
 		Value: value,
 	}
 
-	if h.request.Headers.AppendAssertDuplicate(header) {
+	if h.client.Request.Headers.AppendAssertDuplicate(header) {
 		// who is that shitbag who sent us a duplicated header?
 		return webserver.ErrDuplicatedHeader
 	}
@@ -76,20 +77,21 @@ func (h *httpProtocol) OnHeader(key, value []byte) error {
 
 func (h *httpProtocol) OnHeadersComplete() error {
 	reader, writer := io.Pipe()
-	h.request.Body = reader
+	h.client.Request.Body = reader
 	h.bodyWriter = writer
 
+	return nil
 }
 
 func (h *httpProtocol) OnBody(piece []byte) error {
-	// TODO: I need an io.Pipe() to set a reader to request
-	//       maybe, create io.Pipe() directly in server, and pass it to the protocol?
-	//       sounds like a good idea. I don't wanna do a lot of optimization stuff here, but in server
+	_, err := h.bodyWriter.Write(piece)
 
-	panic("implement me")
+	return err
 }
 
 func (h httpProtocol) OnMessageComplete() error {
-	//TODO implement me
-	panic("implement me")
+	// TODO: wait until request will be processed
+	return nil
 }
+
+// TODO: in future, I need multiple requests may be processed in parallel
