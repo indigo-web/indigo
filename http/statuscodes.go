@@ -1,4 +1,4 @@
-package httplib
+package http
 
 type StatusCode uint16
 
@@ -62,9 +62,8 @@ const (
 	StatusTooManyRequests             StatusCode = 429
 	StatusRequestHeaderFieldsTooLarge StatusCode = 431
 	StatusRetryWith                   StatusCode = 449
-	// wow, who's gonna use this code in my webserver?
-	StatusUnavailableForLegalReasons StatusCode = 451
-	StatusClientClosedConnection     StatusCode = 499
+	StatusUnavailableForLegalReasons  StatusCode = 451 // wow, who's gonna use this code in my webserver?
+	StatusClientClosedConnection      StatusCode = 499
 
 	// 5xx: server error
 	StatusInternalServerError           = 500
