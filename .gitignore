@@ -91,3 +91,8 @@ fabric.properties
 # Dependency directories (remove the comment below to include it)
 # vendor/
 
+# Manually added local files, used for local stuff
+.DS_Store
+# yes, sometimes I even have such a files for testing local features
+# to decide which is better
+some_test.go
