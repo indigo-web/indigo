@@ -1,4 +1,4 @@
-package webserver
+package internal
 
 /*
 toLowercase does stuff directly on the array, without allocating a new buffer,
