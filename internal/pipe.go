@@ -1,26 +1,30 @@
 package internal
 
 type Pipe struct {
-	Data   chan []byte
-	Errors chan error
+	data  chan []byte
+	error chan error
 }
 
 func NewPipe() Pipe {
 	return Pipe{
-		Data:   make(chan []byte),
-		Errors: make(chan error),
+		data:  make(chan []byte),
+		error: make(chan error),
 	}
 }
 
 func (p *Pipe) Write(b []byte) {
-	p.Data <- b
+	p.data <- b
+}
+
+func (p *Pipe) WriteErr(err error) {
+	p.error <- err
 }
 
 func (p *Pipe) Read() (element []byte, err error) {
 	select {
-	case p.Data <- element:
+	case p.data <- element:
 		return element, nil
-	case p.Errors <- err:
+	case p.error <- err:
 		return nil, err
 	}
 }
