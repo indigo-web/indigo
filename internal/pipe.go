@@ -20,10 +20,10 @@ func (p *Pipe) WriteErr(err error) {
 	p.error <- err
 }
 
-func (p *Pipe) Read() (element []byte, err error) {
+func (p *Pipe) Read() (b []byte, err error) {
 	select {
-	case p.data <- element:
-		return element, nil
+	case p.data <- b:
+		return b, nil
 	case p.error <- err:
 		return nil, err
 	}
