@@ -5,8 +5,8 @@ type Pipe struct {
 	error chan error
 }
 
-func NewPipe() Pipe {
-	return Pipe{
+func NewPipe() *Pipe {
+	return &Pipe{
 		data:  make(chan []byte),
 		error: make(chan error),
 	}
@@ -22,9 +22,9 @@ func (p *Pipe) WriteErr(err error) {
 
 func (p *Pipe) Read() (b []byte, err error) {
 	select {
-	case p.data <- b:
+	case b = <-p.data:
 		return b, nil
-	case p.error <- err:
+	case err = <-p.error:
 		return nil, err
 	}
 }
