@@ -96,3 +96,5 @@ fabric.properties
 # yes, sometimes I even have such a files for testing local features
 # to decide which is better
 some_test.go
+
+linesofcode.py
