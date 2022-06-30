@@ -1,10 +1,9 @@
 package httpserver
 
 import (
-	"indigo/http"
+	"indigo/httpparser"
 	"indigo/router"
 	"indigo/types"
-	"net"
 )
 
 /*
@@ -14,30 +13,98 @@ structure, and then Session struct finally delegates request to a Router
 (if request has been received completely)
 */
 
-type client struct {
-	request types.Request
-	parser  http.Parser
-	router  router.Router
+type poller struct {
+	router        router.Router
+	writeResponse types.ResponseWriter
+
+	requestsChan chan *types.Request
+	errChan      chan error
 }
 
-func (c *client) HandleData(conn net.Conn, data []byte) error {
-	done, err := c.parser.Parse(&c.request, data)
+func (p *poller) Poll() {
+	for {
+		select {
+		case request := <-p.requestsChan:
+			if err := p.router.OnRequest(request, p.writeResponse); err != nil {
+				p.router.OnError(err)
+				p.errChan <- err
+				return
+			}
 
-	if err != nil {
-		c.router.OnError(err)
-		return err
+			// signalize a completion of request handling
+			p.errChan <- nil
+		case err := <-p.errChan:
+			p.router.OnError(err)
+			return
+		}
 	}
+}
 
-	if done {
-		err = c.router.OnRequest(&c.request, func(b []byte) error {
-			_, err = conn.Write(b)
+type HTTPHandler interface {
+	OnData(b []byte) error
+	Poll()
+}
 
-			return err
-		})
+type HTTPHandlerArgs struct {
+	Router           router.Router
+	Request          *types.Request
+	WriteRequestBody types.BodyWriter
+	Parser           httpparser.HTTPRequestsParser
+	RespWriter       types.ResponseWriter
+}
+
+type httpHandler struct {
+	writeResponse types.ResponseWriter
+
+	request *types.Request
+	parser  httpparser.HTTPRequestsParser
+	poller  poller
+
+	requestsChan chan *types.Request
+	errChan      chan error
+}
+
+func NewHTTPHandler(args HTTPHandlerArgs) HTTPHandler {
+	requestsChan, errChan := make(chan *types.Request), make(chan error)
+
+	return &httpHandler{
+		request: args.Request,
+		parser:  args.Parser,
+		poller: poller{
+			router:        args.Router,
+			writeResponse: args.RespWriter,
+			requestsChan:  requestsChan,
+			errChan:       errChan,
+		},
+
+		requestsChan: requestsChan,
+		errChan:      errChan,
+	}
+}
+
+func (c *httpHandler) Poll() {
+	c.poller.Poll()
+}
+
+func (c *httpHandler) OnData(data []byte) (err error) {
+	var done bool
+
+	for len(data) > 0 {
+		done, data, err = c.parser.Parse(data)
 
 		if err != nil {
-			c.router.OnError(err)
+			// TODO: put not err, but ErrParsingRequest (no need for router to know
+			//       what exactly happened)
+			c.poller.errChan <- err
 			return err
+		}
+
+		if done {
+			c.poller.requestsChan <- c.request
+
+			if err = <-c.poller.errChan; err != nil {
+				return err
+			}
 		}
 	}
 
