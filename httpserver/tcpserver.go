@@ -12,11 +12,11 @@ with sockets. All the received data it provides to
 const ReadBytesPerOnce = 2048 // may be even decreased to 1024
 
 type (
-	dataHandler func(net.Conn, []byte) error
-	connHandler func(net.Conn, dataHandler)
+	connHandler func(net.Conn)
+	dataHandler func([]byte) error
 )
 
-func StartTCPServer(sock net.Listener, handleConn connHandler, handleData dataHandler) error {
+func StartTCPServer(sock net.Listener, handleConn connHandler) error {
 	for {
 		conn, err := sock.Accept()
 
@@ -26,7 +26,7 @@ func StartTCPServer(sock net.Listener, handleConn connHandler, handleData dataHa
 			return err
 		}
 
-		go handleConn(conn, handleData)
+		go handleConn(conn)
 	}
 }
 
@@ -37,7 +37,7 @@ func DefaultConnHandler(conn net.Conn, handleData dataHandler) {
 	for {
 		n, err := conn.Read(buff)
 
-		if n == 0 || err != nil || handleData(conn, buff[:n]) != nil {
+		if n == 0 || err != nil || handleData(buff[:n]) != nil {
 			return
 		}
 	}
