@@ -1,10 +1,10 @@
 package internal
 
 /*
-toLowercase does stuff directly on the array, without allocating a new buffer,
-so original buffer will be affected
+ToLowercase applies on source data. So yes, it's dirty function, but does its stuff
+blazingly fast
 */
-func toLowercase(data []byte) {
+func ToLowercase(data []byte) {
 	for i, char := range data {
 		data[i] = char | 0x20
 	}
