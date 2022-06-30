@@ -6,9 +6,9 @@ import (
 )
 
 /*
-https://github.com/valyala/fasthttp#tricks-with-byte-buffers
+S2B https://github.com/valyala/fasthttp#tricks-with-byte-buffers
 */
-func s2b(s string) (b []byte) {
+func S2B(s string) (b []byte) {
 	/* #nosec G103 */
 	bh := (*reflect.SliceHeader)(unsafe.Pointer(&b))
 	/* #nosec G103 */
@@ -21,8 +21,8 @@ func s2b(s string) (b []byte) {
 }
 
 /*
-same as s2b, but does the opposite, also described in link above
+B2S same as B2S, but does the opposite, also described in link above
 */
-func b2s(b []byte) string {
+func B2S(b []byte) string {
 	return *(*string)(unsafe.Pointer(&b))
 }
