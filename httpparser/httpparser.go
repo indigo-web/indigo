@@ -2,6 +2,7 @@ package httpparser
 
 import (
 	"github.com/scott-ainsworth/go-ascii"
+	"indigo/errors"
 	"indigo/http"
 	"indigo/internal"
 	"indigo/types"
@@ -73,7 +74,7 @@ func (p *httpRequestParser) Parse(data []byte) (done bool, extra []byte, err err
 		if p.closeConnection {
 			p.die()
 			// to let server know that we received everything, and it's time to close the connection
-			return true, nil, ErrConnectionClosed
+			return true, nil, errors.ErrConnectionClosed
 		}
 
 		return false, nil, nil
@@ -81,7 +82,7 @@ func (p *httpRequestParser) Parse(data []byte) (done bool, extra []byte, err err
 
 	switch p.state {
 	case dead:
-		return true, nil, ErrParserIsDead
+		return true, nil, errors.ErrParserIsDead
 	case messageBegin:
 		p.state = method
 	case body:
@@ -108,7 +109,7 @@ func (p *httpRequestParser) Parse(data []byte) (done bool, extra []byte, err err
 				if method == 0 {
 					p.die()
 
-					return true, nil, ErrInvalidMethod
+					return true, nil, errors.ErrInvalidMethod
 				}
 
 				p.request.Method = method
@@ -122,14 +123,14 @@ func (p *httpRequestParser) Parse(data []byte) (done bool, extra []byte, err err
 			if len(p.infoLineBuffer) > MaxMethodLength {
 				p.die()
 
-				return true, nil, ErrInvalidMethod
+				return true, nil, errors.ErrInvalidMethod
 			}
 		case path:
 			if data[i] == ' ' {
 				if uint16(len(p.infoLineBuffer)) == p.infoLineOffset {
 					p.die()
 
-					return true, nil, ErrInvalidPath
+					return true, nil, errors.ErrInvalidPath
 				}
 
 				p.request.Path = p.infoLineBuffer[p.infoLineOffset:]
@@ -140,7 +141,7 @@ func (p *httpRequestParser) Parse(data []byte) (done bool, extra []byte, err err
 			} else if !ascii.IsPrint(data[i]) {
 				p.die()
 
-				return true, nil, ErrInvalidPath
+				return true, nil, errors.ErrInvalidPath
 			}
 
 			p.infoLineBuffer = append(p.infoLineBuffer, data[i])
@@ -148,7 +149,7 @@ func (p *httpRequestParser) Parse(data []byte) (done bool, extra []byte, err err
 			if uint16(len(p.infoLineBuffer[p.infoLineOffset:])) > p.settings.MaxPathLength {
 				p.die()
 
-				return true, nil, ErrBufferOverflow
+				return true, nil, errors.ErrBufferOverflow
 			}
 		case protocol:
 			switch data[i] {
@@ -162,14 +163,14 @@ func (p *httpRequestParser) Parse(data []byte) (done bool, extra []byte, err err
 				if len(p.infoLineBuffer[p.infoLineOffset:]) > MaxProtocolLength {
 					p.die()
 
-					return true, nil, ErrBufferOverflow
+					return true, nil, errors.ErrBufferOverflow
 				}
 			}
 		case protocolCR:
 			if data[i] != '\n' {
 				p.die()
 
-				return true, nil, ErrRequestSyntaxError
+				return true, nil, errors.ErrRequestSyntaxError
 			}
 
 			p.state = protocolLF
@@ -178,7 +179,7 @@ func (p *httpRequestParser) Parse(data []byte) (done bool, extra []byte, err err
 			if !ok {
 				p.die()
 
-				return true, nil, ErrProtocolNotSupported
+				return true, nil, errors.ErrProtocolNotSupported
 			}
 
 			p.request.Protocol = *proto
@@ -193,7 +194,7 @@ func (p *httpRequestParser) Parse(data []byte) (done bool, extra []byte, err err
 			} else if !ascii.IsPrint(data[i]) || data[i] == ':' {
 				p.die()
 
-				return true, nil, ErrInvalidHeader
+				return true, nil, errors.ErrInvalidHeader
 			}
 
 			p.headersBuffer = append(p.headersBuffer, data[i])
@@ -206,7 +207,7 @@ func (p *httpRequestParser) Parse(data []byte) (done bool, extra []byte, err err
 			} else if !ascii.IsPrint(data[i]) {
 				p.die()
 
-				return true, nil, ErrInvalidHeader
+				return true, nil, errors.ErrInvalidHeader
 			}
 
 			p.headersBuffer = append(p.headersBuffer, data[i])
@@ -214,7 +215,7 @@ func (p *httpRequestParser) Parse(data []byte) (done bool, extra []byte, err err
 			if uint8(len(p.headersBuffer)) >= p.settings.MaxHeaderLength {
 				p.die()
 
-				return true, nil, ErrBufferOverflow
+				return true, nil, errors.ErrBufferOverflow
 			}
 		case headerColon:
 			p.state = headerValue
@@ -222,7 +223,7 @@ func (p *httpRequestParser) Parse(data []byte) (done bool, extra []byte, err err
 			if !ascii.IsPrint(data[i]) {
 				p.die()
 
-				return true, nil, ErrInvalidHeader
+				return true, nil, errors.ErrInvalidHeader
 			}
 
 			if data[i] != ' ' {
@@ -238,7 +239,7 @@ func (p *httpRequestParser) Parse(data []byte) (done bool, extra []byte, err err
 				if !ascii.IsPrint(data[i]) {
 					p.die()
 
-					return true, nil, ErrInvalidHeader
+					return true, nil, errors.ErrInvalidHeader
 				}
 
 				p.headersBuffer = append(p.headersBuffer, data[i])
@@ -246,14 +247,14 @@ func (p *httpRequestParser) Parse(data []byte) (done bool, extra []byte, err err
 				if uint16(len(p.headersBuffer)) > p.settings.MaxHeaderValueLength {
 					p.die()
 
-					return true, nil, ErrBufferOverflow
+					return true, nil, errors.ErrBufferOverflow
 				}
 			}
 		case headerValueCR:
 			if data[i] != '\n' {
 				p.die()
 
-				return true, nil, ErrRequestSyntaxError
+				return true, nil, errors.ErrRequestSyntaxError
 			}
 
 			p.state = headerValueLF
@@ -276,7 +277,7 @@ func (p *httpRequestParser) Parse(data []byte) (done bool, extra []byte, err err
 					if p.bodyBytesLeft, err = parseUint(value); err != nil {
 						p.die()
 
-						return true, nil, ErrInvalidContentLength
+						return true, nil, errors.ErrInvalidContentLength
 					}
 				}
 			case len(transferEncoding):
@@ -333,7 +334,7 @@ func (p *httpRequestParser) Parse(data []byte) (done bool, extra []byte, err err
 			if data[i] != '\n' {
 				p.die()
 
-				return true, nil, ErrRequestSyntaxError
+				return true, nil, errors.ErrRequestSyntaxError
 			} else if p.closeConnection {
 				p.state = bodyConnectionClose
 				p.bodyBytesLeft = int(p.settings.MaxBodyLength)
@@ -361,7 +362,7 @@ func (p *httpRequestParser) Parse(data []byte) (done bool, extra []byte, err err
 			if p.bodyBytesLeft < 0 {
 				p.die()
 
-				return true, nil, ErrBodyTooBig
+				return true, nil, errors.ErrBodyTooBig
 			}
 
 			p.onBody(data[i:])

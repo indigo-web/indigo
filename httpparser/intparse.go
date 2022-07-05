@@ -1,5 +1,9 @@
 package httpparser
 
+import (
+	"indigo/errors"
+)
+
 /*
 parseUint is a tiny implementation of strconv.Atoi, but using directly bytes array,
 and returning only one error in case of shit - InvalidContentLength
@@ -10,7 +14,7 @@ func parseUint(raw []byte) (num int, err error) {
 		char -= '0'
 
 		if char > 9 {
-			return 0, ErrInvalidContentLength
+			return 0, errors.ErrInvalidContentLength
 		}
 
 		num = num*10 + int(char)
