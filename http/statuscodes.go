@@ -3,13 +3,11 @@ package http
 type StatusCode uint16
 
 const (
-	// 1xx: informational
 	StatusContinue   StatusCode = 100
 	StatusSwitching  StatusCode = 101
 	StatusProcessing StatusCode = 102
 	StatusEarlyHints StatusCode = 103
 
-	// 2xx: success
 	StatusOk                          StatusCode = 200
 	StatusCreated                     StatusCode = 201
 	StatusAccepted                    StatusCode = 202
@@ -21,7 +19,6 @@ const (
 	StatusAlreadyReported             StatusCode = 208
 	StatusIMUsed                      StatusCode = 226
 
-	// 3xx: redirection
 	StatusMultipleChoices   StatusCode = 300
 	StatusMovedPermanently  StatusCode = 301
 	StatusMovedTemporarily  StatusCode = 302
@@ -31,7 +28,6 @@ const (
 	StatusTemporaryRedirect StatusCode = 307
 	StatusPermanentRedirect StatusCode = 308
 
-	// 4xx: client error
 	StatusBadRequest                  StatusCode = 400
 	StatusUnauthorized                StatusCode = 401
 	StatusPaymentRequired             StatusCode = 402
@@ -65,7 +61,6 @@ const (
 	StatusUnavailableForLegalReasons  StatusCode = 451 // wow, who's gonna use this code in my webserver?
 	StatusClientClosedConnection      StatusCode = 499
 
-	// 5xx: server error
 	StatusInternalServerError           = 500
 	StatusNotImplemented                = 501
 	StatusBadGateway                    = 502
