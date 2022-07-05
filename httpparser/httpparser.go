@@ -174,14 +174,14 @@ func (p *httpRequestParser) Parse(data []byte) (done bool, extra []byte, err err
 
 			p.state = protocolLF
 		case protocolLF:
-			proto := http.GetProtocol(p.infoLineBuffer[p.infoLineOffset:])
-			if proto == 0 {
+			proto, ok := http.NewProtocol(p.infoLineBuffer[p.infoLineOffset:])
+			if !ok {
 				p.die()
 
 				return true, nil, ErrProtocolNotSupported
 			}
 
-			p.request.Protocol = proto
+			p.request.Protocol = *proto
 
 			if data[i] == '\r' {
 				p.state = headerValueDoubleCR

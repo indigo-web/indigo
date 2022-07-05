@@ -13,7 +13,7 @@ type Request struct {
 	Method   http.Method
 	Path     []byte
 	Params   Params
-	Protocol http.ProtocolVersion
+	Protocol http.Protocol
 	Headers  http.Headers
 
 	body requestBody
@@ -25,7 +25,7 @@ func NewRequest(pathBuffer []byte, headers http.Headers, params Params) (Request
 	return Request{
 		Path:     pathBuffer,
 		Params:   params,
-		Protocol: 0,
+		Protocol: http.Protocol{},
 		Headers:  headers,
 		body: requestBody{
 			body: pipe,
