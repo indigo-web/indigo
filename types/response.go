@@ -5,28 +5,32 @@ import (
 	"indigo/internal"
 )
 
-type Response struct {
+type ResponseStruct struct {
 	Code    http.StatusCode
 	Headers http.Headers
 	Body    []byte
 }
 
-func (r *Response) WithCode(code http.StatusCode) *Response {
+func Response() *ResponseStruct {
+	return &ResponseStruct{}
+}
+
+func (r *ResponseStruct) WithCode(code http.StatusCode) *ResponseStruct {
 	r.Code = code
 	return r
 }
 
-func (r *Response) WithHeader(key, value string) *Response {
+func (r *ResponseStruct) WithHeader(key, value string) *ResponseStruct {
 	r.Headers[key] = internal.S2B(value)
 	return r
 }
 
-func (r *Response) WithBody(body []byte) *Response {
+func (r *ResponseStruct) WithBody(body []byte) *ResponseStruct {
 	r.Body = body
 	return r
 }
 
-func (r *Response) WithBodyString(body string) *Response {
+func (r *ResponseStruct) WithBodyString(body string) *ResponseStruct {
 	r.Body = internal.S2B(body)
 	return r
 }
