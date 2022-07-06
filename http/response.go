@@ -15,8 +15,11 @@ func RenderHTTPResponse(
 	buff = append(append(append(buff, proto...), code...), status...)
 
 	for key, value := range headers {
-		buff = append(append(buff, internal.S2B(key)...), value...)
+		buff = append(
+			append(append(append(buff, internal.S2B(key)...), ':', ' '), value...),
+			'\r', '\n',
+		)
 	}
 
-	return append(buff, body...)
+	return append(append(buff, '\r', '\n'), body...)
 }
