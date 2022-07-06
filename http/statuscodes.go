@@ -1,59 +1,67 @@
 package http
 
+import (
+	"indigo/internal"
+	"net/http"
+	"strconv"
+)
+
 type StatusCode uint16
 
 const (
-	StatusContinue   StatusCode = 100
-	StatusSwitching  StatusCode = 101
-	StatusProcessing StatusCode = 102
-	StatusEarlyHints StatusCode = 103
+	StatusContinue StatusCode = iota + 100
+	StatusSwitching
+	StatusProcessing
+	StatusEarlyHints
 
-	StatusOk                          StatusCode = 200
-	StatusCreated                     StatusCode = 201
-	StatusAccepted                    StatusCode = 202
-	StatusNonAuthoritativeInformation StatusCode = 203
-	StatusNoContent                   StatusCode = 204
-	StatusResetContent                StatusCode = 205
-	StatusPartialContent              StatusCode = 206
-	StatusMultiStatus                 StatusCode = 207
-	StatusAlreadyReported             StatusCode = 208
-	StatusIMUsed                      StatusCode = 226
+	StatusOk StatusCode = iota + 200
+	StatusCreated
+	StatusAccepted
+	StatusNonAuthoritativeInformation
+	StatusNoContent
+	StatusResetContent
+	StatusPartialContent
+	StatusMultiStatus
+	StatusAlreadyReported
+	StatusIMUsed StatusCode = 226
 
-	StatusMultipleChoices   StatusCode = 300
-	StatusMovedPermanently  StatusCode = 301
-	StatusMovedTemporarily  StatusCode = 302
-	StatusSeeOther          StatusCode = 303
-	StatusNotModified       StatusCode = 304
-	StatusUseProxy          StatusCode = 305
-	StatusTemporaryRedirect StatusCode = 307
-	StatusPermanentRedirect StatusCode = 308
+	StatusMultipleChoices StatusCode = iota + 300
+	StatusMovedPermanently
+	StatusMovedTemporarily
+	StatusSeeOther
+	StatusNotModified
+	StatusUseProxy
+	StatusTemporaryRedirect StatusCode = iota + 307
+	StatusPermanentRedirect
 
-	StatusBadRequest                  StatusCode = 400
-	StatusUnauthorized                StatusCode = 401
-	StatusPaymentRequired             StatusCode = 402
-	StatusForbidden                   StatusCode = 403
-	StatusNotFound                    StatusCode = 404
-	StatusMethodNotAllowed            StatusCode = 405
-	StatusNotAcceptable               StatusCode = 406
-	StatusProxyAuthenticationRequired StatusCode = 407
-	StatusRequestTimeout              StatusCode = 408
-	StatusConflict                    StatusCode = 409
-	StatusGone                        StatusCode = 410
-	StatusLengthRequired              StatusCode = 411
-	StatusPreconditionFailed          StatusCode = 412
-	StatusPayloadTooLarge             StatusCode = 413
-	StatusURITooLong                  StatusCode = 414
-	StatusUnsupportedMediaType        StatusCode = 415
-	StatusRangeNotSatisfiable         StatusCode = 416
-	StatusExpectationFailed           StatusCode = 417
-	StatusImATeapot                   StatusCode = 418
-	StatusAuthenticationTimeout       StatusCode = 419
-	StatusMisdirectedRequest          StatusCode = 421
-	StatusUnprocessableEntity         StatusCode = 422
-	StatusLocked                      StatusCode = 423
-	StatusFailedDependency            StatusCode = 424
-	StatusTooEarly                    StatusCode = 425
-	StatusUpgradeRequired             StatusCode = 426
+	StatusBadRequest StatusCode = iota + 400
+	StatusUnauthorized
+	StatusPaymentRequired
+	StatusForbidden
+	StatusNotFound
+	StatusMethodNotAllowed
+	StatusNotAcceptable
+	StatusProxyAuthenticationRequired
+	StatusRequestTimeout
+	StatusConflict
+	StatusGone
+	StatusLengthRequired
+	StatusPreconditionFailed
+	StatusPayloadTooLarge
+	StatusURITooLong
+	StatusUnsupportedMediaType
+	StatusRangeNotSatisfiable
+	StatusExpectationFailed
+	StatusImATeapot
+	StatusAuthenticationTimeout
+
+	StatusMisdirectedRequest StatusCode = iota + 421
+	StatusUnprocessableEntity
+	StatusLocked
+	StatusFailedDependency
+	StatusTooEarly
+	StatusUpgradeRequired
+
 	StatusPreconditionRequired        StatusCode = 428
 	StatusTooManyRequests             StatusCode = 429
 	StatusRequestHeaderFieldsTooLarge StatusCode = 431
@@ -61,23 +69,53 @@ const (
 	StatusUnavailableForLegalReasons  StatusCode = 451 // wow, who's gonna use this code in my webserver?
 	StatusClientClosedConnection      StatusCode = 499
 
-	StatusInternalServerError           = 500
-	StatusNotImplemented                = 501
-	StatusBadGateway                    = 502
-	StatusServiceUnavailable            = 503
-	StatusGatewayTimeout                = 504
-	StatusHTTPVersionNotSupported       = 505
-	StatusVariantAlsoNegotiates         = 506
-	StatusInsufficientStorage           = 507
-	StatusLoopDetected                  = 508
-	StatusBandwidthLimitExceeded        = 509
-	StatusNotExtended                   = 510
-	StatusNetworkAuthenticationRequired = 511
-	StatusUnknownError                  = 520
-	StatusWebServerIsDown               = 521
-	StatusConnectionTimedOut            = 522
-	StatusOriginIsUnreachable           = 523
-	StatusTimeoutOccurred               = 524
-	StatusSSLHandshakeFailed            = 525
-	StatusInvalidSSLCertificate         = 526
+	StatusInternalServerError StatusCode = iota + 500
+	StatusNotImplemented
+	StatusBadGateway
+	StatusServiceUnavailable
+	StatusGatewayTimeout
+	StatusHTTPVersionNotSupported
+	StatusVariantAlsoNegotiates
+	StatusInsufficientStorage
+	StatusLoopDetected
+	StatusBandwidthLimitExceeded
+	StatusNotExtended
+	StatusNetworkAuthenticationRequired
+
+	StatusUnknownError StatusCode = iota + 520
+	StatusWebServerIsDown
+	StatusConnectionTimedOut
+	StatusOriginIsUnreachable
+	StatusTimeoutOccurred
+	StatusSSLHandshakeFailed
+	StatusInvalidSSLCertificate
 )
+
+var statuscodes = [...]StatusCode{
+	100, 101, 102, 103,
+	200, 201, 202, 203, 204, 205, 206, 207, 208, 226,
+	300, 301, 302, 303, 304, 305, 307, 308,
+	400, 401, 402, 403, 404, 405, 406, 407, 408, 410,
+	411, 412, 413, 414, 415, 416, 417, 418, 419, 421,
+	422, 423, 424, 425, 426, 427, 428, 429, 431, 449,
+	451, 499,
+	500, 501, 502, 503, 504, 505, 506, 507, 508, 509,
+	510, 511, 520, 521, 522, 523, 524, 525, 526,
+}
+
+func genByteStatusCodes() map[StatusCode][]byte {
+	byteStatusMap := make(map[StatusCode][]byte, len(statuscodes))
+
+	for _, code := range statuscodes {
+		byteStatusMap[code] = append(internal.S2B(strconv.Itoa(int(code))), ' ')
+	}
+
+	return byteStatusMap
+}
+
+var ByteStatusCodes = genByteStatusCodes()
+
+// GetStatus TODO: add memoization
+func GetStatus(code StatusCode) []byte {
+	return internal.S2B(http.StatusText(int(code)) + "\r\n")
+}
