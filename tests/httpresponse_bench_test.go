@@ -7,19 +7,19 @@ import (
 )
 
 func RenderHTTPResponse(buff []byte,
-	protocol, code, status []byte,
+	proto, code, status []byte,
 	headers map[string][]byte,
 	body []byte) []byte {
-	buff = append(buff, protocol...)
-	buff = append(buff, code...)
-	buff = append(buff, status...)
+	buff = append(append(append(buff, proto...), code...), status...)
 
 	for key, value := range headers {
-		buff = append(append(append(buff, internal.S2B(key)...), ':', ' '), value...)
-		buff = append(buff, '\n')
+		buff = append(
+			append(append(append(buff, internal.S2B(key)...), ':', ' '), value...),
+			'\r', '\n',
+		)
 	}
 
-	return append(buff, body...)
+	return append(append(buff, '\r', '\n'), body...)
 }
 
 func RenderHTTPResponseGoodHeaders(buff []byte,
@@ -33,6 +33,26 @@ func RenderHTTPResponseGoodHeaders(buff []byte,
 	}
 
 	return append(buff, body...)
+}
+
+func RenderHTTPResponseSetBuff(buff []byte,
+	protocol, code, status []byte,
+	headers map[string][]byte,
+	body []byte) []byte {
+	copy(buff, protocol)
+	copy(buff[len(protocol):], code)
+	copy(buff[len(protocol)+len(code):], status)
+
+	offset := len(protocol) + len(code)
+
+	for key, value := range headers {
+		copy(buff[offset:], internal.S2B(key))
+		offset += len(key)
+		copy(buff[offset:], value)
+		offset += len(value)
+	}
+
+	return append(buff[offset:], body...)
 }
 
 func RenderHTTPResponseBytesBufferMut(buff bytes.Buffer,
@@ -97,6 +117,21 @@ func BenchmarkRenderHTTPResponse(b *testing.B) {
 		for i := 0; i < b.N; i++ {
 			RenderHTTPResponseGoodHeaders(buff, protocol, code, status, headers, body)
 			buff = buff[:0]
+		}
+	})
+
+	buff = make([]byte, 200)
+
+	b.Run("BufferSetInsteadOfAppend", func(b *testing.B) {
+		headers = map[string][]byte{
+			"Authorization: ": []byte("good\n"),
+			"Server: ":        []byte("indigo\n"),
+			"Wassup: ":        []byte("good\n"),
+			"Easter: ":        []byte("egg\n"),
+		}
+
+		for i := 0; i < b.N; i++ {
+			RenderHTTPResponseSetBuff(buff, protocol, code, status, headers, body)
 		}
 	})
 
