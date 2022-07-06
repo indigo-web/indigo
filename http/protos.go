@@ -36,7 +36,7 @@ func NewProtocol(proto []byte) (*Protocol, bool) {
 
 	return &Protocol{
 		enum: protoEnum,
-		raw:  proto,
+		raw:  append(proto, '\r', '\n'),
 	}, true
 }
 
