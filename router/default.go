@@ -5,6 +5,7 @@ import (
 	"indigo/http"
 	"indigo/internal"
 	"indigo/types"
+	"strconv"
 )
 
 const DefaultResponseBufferSize = 1024
@@ -31,8 +32,19 @@ func (d *DefaultRouter) Route(path string, handler Handler) {
 }
 
 func (d DefaultRouter) OnRequest(req *types.Request, writeResponse types.ResponseWriter) error {
-	handler := d.handlers[internal.B2S(req.Path)]
-	resp := handler(req)
+	handler, found := d.handlers[internal.B2S(req.Path)]
+
+	var resp *types.ResponseStruct
+
+	if !found {
+		resp = types.Response().
+			WithCode(http.StatusNotFound).
+			WithBodyString("404 requested page not found")
+	} else {
+		resp = handler(req)
+	}
+
+	resp.Headers["Content-Length"] = internal.S2B(strconv.Itoa(len(resp.Body)))
 
 	return writeResponse(http.RenderHTTPResponse(
 		d.respBuff[:0],
