@@ -9,59 +9,57 @@ import (
 type StatusCode uint16
 
 const (
-	StatusContinue StatusCode = iota + 100
-	StatusSwitching
-	StatusProcessing
-	StatusEarlyHints
+	StatusContinue   StatusCode = 100
+	StatusSwitching  StatusCode = 101
+	StatusProcessing StatusCode = 102
+	StatusEarlyHints StatusCode = 103
 
-	StatusOk StatusCode = iota + 200
-	StatusCreated
-	StatusAccepted
-	StatusNonAuthoritativeInformation
-	StatusNoContent
-	StatusResetContent
-	StatusPartialContent
-	StatusMultiStatus
-	StatusAlreadyReported
-	StatusIMUsed StatusCode = 226
+	StatusOk                          StatusCode = 200
+	StatusCreated                     StatusCode = 201
+	StatusAccepted                    StatusCode = 202
+	StatusNonAuthoritativeInformation StatusCode = 203
+	StatusNoContent                   StatusCode = 204
+	StatusResetContent                StatusCode = 205
+	StatusPartialContent              StatusCode = 206
+	StatusMultiStatus                 StatusCode = 207
+	StatusAlreadyReported             StatusCode = 208
+	StatusIMUsed                      StatusCode = 226
 
-	StatusMultipleChoices StatusCode = iota + 300
-	StatusMovedPermanently
-	StatusMovedTemporarily
-	StatusSeeOther
-	StatusNotModified
-	StatusUseProxy
-	StatusTemporaryRedirect StatusCode = iota + 307
-	StatusPermanentRedirect
+	StatusMultipleChoices   StatusCode = 300
+	StatusMovedPermanently  StatusCode = 301
+	StatusMovedTemporarily  StatusCode = 302
+	StatusSeeOther          StatusCode = 303
+	StatusNotModified       StatusCode = 304
+	StatusUseProxy          StatusCode = 305
+	StatusTemporaryRedirect StatusCode = 307
+	StatusPermanentRedirect StatusCode = 308
 
-	StatusBadRequest StatusCode = iota + 400
-	StatusUnauthorized
-	StatusPaymentRequired
-	StatusForbidden
-	StatusNotFound
-	StatusMethodNotAllowed
-	StatusNotAcceptable
-	StatusProxyAuthenticationRequired
-	StatusRequestTimeout
-	StatusConflict
-	StatusGone
-	StatusLengthRequired
-	StatusPreconditionFailed
-	StatusPayloadTooLarge
-	StatusURITooLong
-	StatusUnsupportedMediaType
-	StatusRangeNotSatisfiable
-	StatusExpectationFailed
-	StatusImATeapot
-	StatusAuthenticationTimeout
-
-	StatusMisdirectedRequest StatusCode = iota + 421
-	StatusUnprocessableEntity
-	StatusLocked
-	StatusFailedDependency
-	StatusTooEarly
-	StatusUpgradeRequired
-
+	StatusBadRequest                  StatusCode = 400
+	StatusUnauthorized                StatusCode = 401
+	StatusPaymentRequired             StatusCode = 402
+	StatusForbidden                   StatusCode = 403
+	StatusNotFound                    StatusCode = 404
+	StatusMethodNotAllowed            StatusCode = 405
+	StatusNotAcceptable               StatusCode = 406
+	StatusProxyAuthenticationRequired StatusCode = 407
+	StatusRequestTimeout              StatusCode = 408
+	StatusConflict                    StatusCode = 409
+	StatusGone                        StatusCode = 410
+	StatusLengthRequired              StatusCode = 411
+	StatusPreconditionFailed          StatusCode = 412
+	StatusPayloadTooLarge             StatusCode = 413
+	StatusURITooLong                  StatusCode = 414
+	StatusUnsupportedMediaType        StatusCode = 415
+	StatusRangeNotSatisfiable         StatusCode = 416
+	StatusExpectationFailed           StatusCode = 417
+	StatusImATeapot                   StatusCode = 418
+	StatusAuthenticationTimeout       StatusCode = 419
+	StatusMisdirectedRequest          StatusCode = 421
+	StatusUnprocessableEntity         StatusCode = 422
+	StatusLocked                      StatusCode = 423
+	StatusFailedDependency            StatusCode = 424
+	StatusTooEarly                    StatusCode = 425
+	StatusUpgradeRequired             StatusCode = 426
 	StatusPreconditionRequired        StatusCode = 428
 	StatusTooManyRequests             StatusCode = 429
 	StatusRequestHeaderFieldsTooLarge StatusCode = 431
@@ -69,26 +67,25 @@ const (
 	StatusUnavailableForLegalReasons  StatusCode = 451 // wow, who's gonna use this code in my webserver?
 	StatusClientClosedConnection      StatusCode = 499
 
-	StatusInternalServerError StatusCode = iota + 500
-	StatusNotImplemented
-	StatusBadGateway
-	StatusServiceUnavailable
-	StatusGatewayTimeout
-	StatusHTTPVersionNotSupported
-	StatusVariantAlsoNegotiates
-	StatusInsufficientStorage
-	StatusLoopDetected
-	StatusBandwidthLimitExceeded
-	StatusNotExtended
-	StatusNetworkAuthenticationRequired
-
-	StatusUnknownError StatusCode = iota + 520
-	StatusWebServerIsDown
-	StatusConnectionTimedOut
-	StatusOriginIsUnreachable
-	StatusTimeoutOccurred
-	StatusSSLHandshakeFailed
-	StatusInvalidSSLCertificate
+	StatusInternalServerError           StatusCode = 500
+	StatusNotImplemented                StatusCode = 501
+	StatusBadGateway                    StatusCode = 502
+	StatusServiceUnavailable            StatusCode = 503
+	StatusGatewayTimeout                StatusCode = 504
+	StatusHTTPVersionNotSupported       StatusCode = 505
+	StatusVariantAlsoNegotiates         StatusCode = 506
+	StatusInsufficientStorage           StatusCode = 507
+	StatusLoopDetected                  StatusCode = 508
+	StatusBandwidthLimitExceeded        StatusCode = 509
+	StatusNotExtended                   StatusCode = 510
+	StatusNetworkAuthenticationRequired StatusCode = 511
+	StatusUnknownError                  StatusCode = 520
+	StatusWebServerIsDown               StatusCode = 521
+	StatusConnectionTimedOut            StatusCode = 522
+	StatusOriginIsUnreachable           StatusCode = 523
+	StatusTimeoutOccurred               StatusCode = 524
+	StatusSSLHandshakeFailed            StatusCode = 525
+	StatusInvalidSSLCertificate         StatusCode = 526
 )
 
 var statuscodes = [...]StatusCode{
