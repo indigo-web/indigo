@@ -18,17 +18,14 @@ type Protocol struct {
 }
 
 func NewProtocol(proto []byte) (*Protocol, bool) {
-	// yes, dirty. Yes, it's bad. But it's fast!
-	internal.ToLowercase(proto)
-
 	var protoEnum protocolVersion
 
 	switch internal.B2S(proto) {
-	case "http/0.9":
+	case "HTTP/0.9":
 		protoEnum = protoHTTP09
-	case "http/1.0":
+	case "HTTP/1.0":
 		protoEnum = protoHTTP10
-	case "http/1.1":
+	case "HTTP/1.1":
 		protoEnum = protoHTTP11
 	default:
 		return nil, false
@@ -36,7 +33,7 @@ func NewProtocol(proto []byte) (*Protocol, bool) {
 
 	return &Protocol{
 		enum: protoEnum,
-		raw:  append(proto, '\r', '\n'),
+		raw:  append(proto, ' '),
 	}, true
 }
 
