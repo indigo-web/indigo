@@ -12,7 +12,9 @@ type ResponseStruct struct {
 }
 
 func Response() *ResponseStruct {
-	return &ResponseStruct{}
+	return &ResponseStruct{
+		Headers: make(http.Headers, 5),
+	}
 }
 
 func (r *ResponseStruct) WithCode(code http.StatusCode) *ResponseStruct {
