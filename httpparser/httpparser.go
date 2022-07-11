@@ -4,7 +4,6 @@ import (
 	"github.com/scott-ainsworth/go-ascii"
 	"indigo/errors"
 	"indigo/http"
-	"indigo/internal"
 	"indigo/types"
 )
 
@@ -260,7 +259,7 @@ func (p *httpRequestParser) Parse(data []byte) (done bool, extra []byte, err err
 			p.state = headerValueLF
 		case headerValueLF:
 			key, value := p.headersBuffer[:p.headerValueBegin], p.headersBuffer[p.headerValueBegin:]
-			p.request.Headers.Set(internal.B2S(key), value)
+			p.request.Headers.Set(key, value)
 
 			switch len(key) {
 			case len(contentLength):
