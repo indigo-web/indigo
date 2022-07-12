@@ -5,7 +5,6 @@ import (
 	"indigo/http"
 	"indigo/internal"
 	"indigo/types"
-	"strconv"
 )
 
 const DefaultResponseBufferSize = 1024
@@ -44,14 +43,12 @@ func (d DefaultRouter) OnRequest(req *types.Request, writeResponse types.Respons
 		resp = handler(req)
 	}
 
-	resp.Headers["Content-Length"] = internal.S2B(strconv.Itoa(len(resp.Body)))
-
 	return writeResponse(http.RenderHTTPResponse(
 		d.respBuff[:0],
 		req.Protocol.Raw(),
 		http.ByteStatusCodes[resp.Code],
 		http.GetStatus(resp.Code),
-		resp.Headers,
+		resp.GetHeaders(),
 		resp.Body,
 	))
 }
