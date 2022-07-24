@@ -1,6 +1,7 @@
 package httpserver
 
 import (
+	"indigo/errors"
 	"indigo/httpparser"
 	"indigo/router"
 	"indigo/types"
@@ -46,16 +47,13 @@ type HTTPHandler interface {
 }
 
 type HTTPHandlerArgs struct {
-	Router           router.Router
-	Request          *types.Request
-	WriteRequestBody types.BodyWriter
-	Parser           httpparser.HTTPRequestsParser
-	RespWriter       types.ResponseWriter
+	Router     router.Router
+	Request    *types.Request
+	Parser     httpparser.HTTPRequestsParser
+	RespWriter types.ResponseWriter
 }
 
 type httpHandler struct {
-	writeResponse types.ResponseWriter
-
 	request *types.Request
 	parser  httpparser.HTTPRequestsParser
 	poller  poller
@@ -93,9 +91,7 @@ func (c *httpHandler) OnData(data []byte) (err error) {
 		done, data, err = c.parser.Parse(data)
 
 		if err != nil {
-			// TODO: put not err, but ErrParsingRequest (no need for router to know
-			//       what exactly happened)
-			c.poller.errChan <- err
+			c.poller.errChan <- errors.ErrParsingRequest
 			return err
 		}
 
