@@ -6,34 +6,34 @@ type (
 )
 
 const (
-	messageBegin parsingState = iota + 1
-	method
-	path
-	protocol
-	protocolCR
-	protocolLF
-	headerKey
-	headerColon
-	headerValue
-	headerValueCR
-	headerValueLF
-	headerValueDoubleCR
-	body
-	bodyConnectionClose
+	eMessageBegin parsingState = iota + 1
+	eMethod
+	ePath
+	eProtocol
+	eProtocolCR
+	eProtocolLF
+	eHeaderKey
+	eHeaderColon
+	eHeaderValue
+	eHeaderValueCR
+	eHeaderValueLF
+	eHeaderValueDoubleCR
+	eBody
+	eBodyConnectionClose
 
-	dead
+	eDead
 )
 
 const (
-	chunkLength chunkedBodyState = iota + 1
-	chunkLengthCR
+	eChunkLength chunkedBodyState = iota + 1
+	eChunkLengthCR
 
-	chunkBody
-	chunkBodyEnd
-	chunkBodyCR
+	eChunkBody
+	eChunkBodyEnd
+	eChunkBodyCR
 
-	lastChunk
-	lastChunkCR
+	eLastChunk
+	eLastChunkCR
 
-	transferCompleted
+	eTransferCompleted
 )
