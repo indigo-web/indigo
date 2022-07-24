@@ -4,6 +4,12 @@ import "indigo/internal"
 
 type protocolVersion uint8
 
+var (
+	BytesHTTP09 = []byte("HTTP/0.9")
+	BytesHTTP10 = []byte("HTTP/1.0")
+	BytesHTTP11 = []byte("HTTP/1.1")
+)
+
 const (
 	protoHTTP09 protocolVersion = iota + 1
 	protoHTTP10
