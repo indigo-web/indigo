@@ -3,7 +3,14 @@ package tests
 import (
 	"bytes"
 	"indigo/internal"
+	"strconv"
 	"testing"
+)
+
+var (
+	crlf          = []byte("\r\n")
+	space         = []byte(" ")
+	contentLength = []byte("Content-Length: ")
 )
 
 func RenderHTTPResponse(buff []byte,
@@ -70,6 +77,26 @@ func RenderHTTPResponseBytesBufferMut(buff bytes.Buffer,
 	}
 
 	buff.Write(body)
+}
+
+func RenderHTTPResponseDataArr(buff []byte,
+	protocol, code, status []byte,
+	headers map[string][]byte,
+	body []byte) ([]byte, []byte) {
+	dataArr := [][]byte{
+		protocol, space, code, space, status, crlf,
+		contentLength, internal.S2B(strconv.Itoa(len(body))), crlf,
+	}
+
+	for _, data := range dataArr {
+		buff = append(buff, data...)
+	}
+
+	for key, value := range headers {
+		buff = append(append(append(append(buff, internal.S2B(key)...), ':', ' '), value...), crlf...)
+	}
+
+	return append(append(buff, crlf...), body...), buff
 }
 
 func BenchmarkRenderHTTPResponse(b *testing.B) {
@@ -142,6 +169,13 @@ func BenchmarkRenderHTTPResponse(b *testing.B) {
 		for i := 0; i < b.N; i++ {
 			RenderHTTPResponseBytesBufferMut(bytesBuff, protocol, code, status, headers, body)
 			bytesBuff.Reset()
+		}
+	})
+
+	b.Run("arrLine", func(b *testing.B) {
+		for i := 0; i < b.N; i++ {
+			_, buff = RenderHTTPResponseDataArr(buff, protocol, code, status, headers, body)
+			buff = buff[:0]
 		}
 	})
 }
