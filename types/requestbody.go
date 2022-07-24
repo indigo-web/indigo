@@ -12,16 +12,12 @@ type (
 
 type requestBody struct {
 	body internal.Pipe
-
-	Completed bool
 }
 
 func (r *requestBody) Read(bodyCb onBodyCallback, completeCb onBodyCompleteCallback) error {
 	// actually, we can set r.Completed to true right here as we
 	// can guarantee that this function will complete reading anyway
 	// But it won't be that beautiful solution
-	defer r.complete()
-
 	for {
 		piece, err := r.body.Read()
 
@@ -46,6 +42,8 @@ func (r *requestBody) Write(b []byte) {
 	r.body.Write(b)
 }
 
-func (r *requestBody) complete() {
-	r.Completed = true
+func (r *requestBody) Reset() {
+	for r.body.Readable() {
+		_, _ = r.body.Read()
+	}
 }
