@@ -2,11 +2,12 @@ package httpparser
 
 import (
 	"indigo/errors"
-	"indigo/types"
+	"indigo/internal"
+	"io"
 )
 
 type chunkedBodyParser struct {
-	callback       types.BodyWriter
+	pipe           internal.Pipe
 	state          chunkedBodyState
 	chunkLength    int
 	chunkBodyBegin int
@@ -14,10 +15,10 @@ type chunkedBodyParser struct {
 	maxChunkSize int
 }
 
-func NewChunkedBodyParser(writeBody types.BodyWriter, maxChunkSize uint) *chunkedBodyParser {
+func NewChunkedBodyParser(pipe internal.Pipe, maxChunkSize uint) *chunkedBodyParser {
 	return &chunkedBodyParser{
-		callback: writeBody,
-		state:    chunkLength,
+		pipe:  pipe,
+		state: eChunkLength,
 		// as chunked requests aren't obligatory, we better keep the buffer unallocated until
 		// we'll need it
 		maxChunkSize: int(maxChunkSize),
@@ -25,12 +26,12 @@ func NewChunkedBodyParser(writeBody types.BodyWriter, maxChunkSize uint) *chunke
 }
 
 func (p *chunkedBodyParser) Clear() {
-	p.state = chunkLength
+	p.state = eChunkLength
 	p.chunkLength = 0
 }
 
 func (p *chunkedBodyParser) Feed(data []byte) (done bool, extraBytes []byte, err error) {
-	if p.state == transferCompleted {
+	if p.state == eTransferCompleted {
 		/*
 			It returns extra-bytes as parser must know, that it's his job now
 
@@ -45,23 +46,24 @@ func (p *chunkedBodyParser) Feed(data []byte) (done bool, extraBytes []byte, err
 
 	for i, char := range data {
 		switch p.state {
-		case chunkLength:
+		case eChunkLength:
 			switch char {
 			case '\r':
-				p.state = chunkLengthCR
+				p.state = eChunkLengthCR
 			case '\n':
 				if p.chunkLength == 0 {
-					p.state = lastChunk
+					p.state = eLastChunk
 					break
 				}
 
 				p.chunkBodyBegin = i + 1
-				p.state = chunkBody
+				p.state = eChunkBody
 			default:
 				// TODO: add support of trailers
 				if (char < '0' && char > '9') && (char < 'a' && char > 'f') && (char < 'A' && char > 'F') {
 					// non-printable ascii-character
 					p.complete()
+					p.pipe.WriteErr(errors.ErrParsingRequest)
 
 					return true, nil, errors.ErrInvalidChunkSize
 				}
@@ -70,81 +72,89 @@ func (p *chunkedBodyParser) Feed(data []byte) (done bool, extraBytes []byte, err
 
 				if p.chunkLength > p.maxChunkSize {
 					p.complete()
+					p.pipe.WriteErr(errors.ErrParsingRequest)
 
 					return true, nil, errors.ErrTooBigChunkSize
 				}
 			}
-		case chunkLengthCR:
+		case eChunkLengthCR:
 			if char != '\n' {
 				p.complete()
+				p.pipe.WriteErr(errors.ErrParsingRequest)
 
 				return true, nil, errors.ErrInvalidChunkSplitter
 			}
 
 			if p.chunkLength == 0 {
-				p.state = lastChunk
+				p.state = eLastChunk
 				break
 			}
 
 			p.chunkBodyBegin = i + 1
-			p.state = chunkBody
-		case chunkBody:
+			p.state = eChunkBody
+		case eChunkBody:
 			p.chunkLength--
 
 			if p.chunkLength == 0 {
-				p.state = chunkBodyEnd
+				p.state = eChunkBodyEnd
 			}
-		case chunkBodyEnd:
-			p.callback(data[p.chunkBodyBegin:i])
+		case eChunkBodyEnd:
+			p.pipe.Write(data[p.chunkBodyBegin:i])
 
 			switch char {
 			case '\r':
-				p.state = chunkBodyCR
+				p.state = eChunkBodyCR
 			case '\n':
-				p.state = chunkLength
+				p.state = eChunkLength
 			default:
 				p.complete()
+				p.pipe.WriteErr(errors.ErrParsingRequest)
 
 				return true, nil, errors.ErrInvalidChunkSplitter
 			}
-		case chunkBodyCR:
+		case eChunkBodyCR:
 			if char != '\n' {
 				p.complete()
+				p.pipe.WriteErr(errors.ErrParsingRequest)
 
 				return true, nil, errors.ErrInvalidChunkSplitter
 			}
 
-			p.state = chunkLength
-		case lastChunk:
+			p.state = eChunkLength
+		case eLastChunk:
 			switch char {
 			case '\r':
-				p.state = lastChunkCR
+				p.state = eLastChunkCR
 			case '\n':
 				p.complete()
+				p.pipe.WriteErr(io.EOF)
 
 				return true, data[i+1:], nil
 			default:
 				// looks sad, received everything, and fucked up in the end
 				// or this was made for special? Oh god
 				p.complete()
+				p.pipe.WriteErr(errors.ErrParsingRequest)
 
 				return true, nil, errors.ErrInvalidChunkSplitter
 			}
-		case lastChunkCR:
+		case eLastChunkCR:
 			if char != '\n' {
 				p.complete()
+				p.pipe.WriteErr(errors.ErrParsingRequest)
 
 				return true, nil, errors.ErrInvalidChunkSplitter
 			}
 
 			p.complete()
+			p.pipe.WriteErr(io.EOF)
 
 			return true, data[i+1:], nil
 		}
 	}
 
-	if p.state == chunkBody {
-		p.callback(data[p.chunkBodyBegin:])
+	if p.state == eChunkBody {
+		p.pipe.Write(data[p.chunkBodyBegin:])
 	}
 
 	p.chunkBodyBegin = 0
@@ -153,5 +163,5 @@ func (p *chunkedBodyParser) Feed(data []byte) (done bool, extraBytes []byte, err
 }
 
 func (p *chunkedBodyParser) complete() {
-	p.state = transferCompleted
+	p.state = eTransferCompleted
 }
