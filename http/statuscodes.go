@@ -88,7 +88,7 @@ const (
 	StatusInvalidSSLCertificate         StatusCode = 526
 )
 
-var statuscodes = [...]StatusCode{
+var statuscodes = []StatusCode{
 	100, 101, 102, 103,
 	200, 201, 202, 203, 204, 205, 206, 207, 208, 226,
 	300, 301, 302, 303, 304, 305, 307, 308,
@@ -100,19 +100,24 @@ var statuscodes = [...]StatusCode{
 	510, 511, 520, 521, 522, 523, 524, 525, 526,
 }
 
-func genByteStatusCodes() map[StatusCode][]byte {
-	byteStatusMap := make(map[StatusCode][]byte, len(statuscodes))
+var byteStatusCodes = genStatuscodesBytesTrailingSpaces(statuscodes)
 
-	for _, code := range statuscodes {
-		byteStatusMap[code] = append(internal.S2B(strconv.Itoa(int(code))), ' ')
+func genStatuscodesBytesTrailingSpaces(statusCodes []StatusCode) map[StatusCode][]byte {
+	statusCodesBytesMap := make(map[StatusCode][]byte, len(statuscodes))
+
+	for _, statuscode := range statusCodes {
+		statusCodesBytesMap[statuscode] = internal.S2B(strconv.Itoa(int(statuscode)) + " ")
 	}
 
-	return byteStatusMap
+	return statusCodesBytesMap
 }
 
-var ByteStatusCodes = genByteStatusCodes()
-
-// GetStatus TODO: add memoization
-func GetStatus(code StatusCode) []byte {
+// GetStatusTrailingCRLF TODO: add memoization
+func GetStatusTrailingCRLF(code StatusCode) []byte {
 	return internal.S2B(http.StatusText(int(code)) + "\r\n")
+}
+
+// GetByteCodeTrailingSpace TODO: add memoization
+func GetByteCodeTrailingSpace(code StatusCode) []byte {
+	return byteStatusCodes[code]
 }
