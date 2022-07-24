@@ -5,12 +5,13 @@ import (
 	"indigo/http"
 	"indigo/internal"
 	"indigo/types"
+	"strconv"
 )
 
 const DefaultResponseBufferSize = 1024
 
 type (
-	Handler  func(request *types.Request) *types.ResponseStruct
+	Handler  func(request *types.Request) types.Response
 	Handlers map[string]Handler
 )
 
@@ -20,9 +21,12 @@ type DefaultRouter struct {
 }
 
 func NewDefaultRouter() *DefaultRouter {
+	respBuffWithProto := make([]byte, len(http.BytesHTTP11), DefaultResponseBufferSize)
+	copy(respBuffWithProto, http.BytesHTTP11)
+
 	return &DefaultRouter{
 		handlers: make(Handlers, 5),
-		respBuff: make([]byte, 0, DefaultResponseBufferSize),
+		respBuff: append(respBuffWithProto, ' '),
 	}
 }
 
@@ -30,29 +34,45 @@ func (d *DefaultRouter) Route(path string, handler Handler) {
 	d.handlers[path] = handler
 }
 
-func (d DefaultRouter) OnRequest(req *types.Request, writeResponse types.ResponseWriter) error {
+func (d DefaultRouter) OnRequest(req *types.Request, writeResponse types.ResponseWriter) (err error) {
 	handler, found := d.handlers[internal.B2S(req.Path)]
 
-	var resp *types.ResponseStruct
+	var resp types.Response
 
 	if !found {
-		resp = types.Response().
-			WithCode(http.StatusNotFound).
-			WithBodyString("404 requested page not found")
+		resp = types.Response{
+			Code: http.StatusNotFound,
+			Body: []byte("404 requested page not found"),
+		}
 	} else {
 		resp = handler(req)
 	}
 
-	return writeResponse(http.RenderHTTPResponse(
-		d.respBuff[:0],
-		req.Protocol.Raw(),
-		http.ByteStatusCodes[resp.Code],
-		http.GetStatus(resp.Code),
-		resp.GetHeaders(),
-		resp.Body,
-	))
+	resp = prepareResponse(resp)
+	err, d.respBuff = types.WriteResponse(d.respBuff[:len(http.BytesHTTP11)+1], resp, writeResponse)
+
+	return err
 }
 
 func (d DefaultRouter) OnError(err error) {
 	fmt.Println("fatal: got err:", err)
+}
+
+func prepareResponse(response types.Response) types.Response {
+	if response.Code == 0 {
+		response.Code = http.StatusOk
+	}
+
+	bodyLen := strconv.Itoa(len(response.Body))
+
+	if response.Headers == nil {
+		response.Headers = [][]byte{
+			[]byte("Server: indigo"),
+			[]byte("Content-Length: " + bodyLen),
+		}
+	} else {
+		response.Headers = append(response.Headers, []byte("Content-Length: "+bodyLen))
+	}
+
+	return response
 }
