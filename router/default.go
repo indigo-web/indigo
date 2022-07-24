@@ -5,7 +5,6 @@ import (
 	"indigo/http"
 	"indigo/internal"
 	"indigo/types"
-	"strconv"
 )
 
 const DefaultResponseBufferSize = 1024
@@ -64,16 +63,11 @@ func prepareResponse(response types.Response) types.Response {
 		response.Code = http.StatusOk
 	}
 
-	bodyLen := strconv.Itoa(len(response.Body))
-
 	if response.Headers == nil {
 		response.Headers = [][]byte{
 			[]byte("Server: indigo"),
 			[]byte("Connection: keep-alive"),
-			[]byte("Content-Length: " + bodyLen),
 		}
-	} else {
-		response.Headers = append(response.Headers, []byte("Content-Length: "+bodyLen))
 	}
 
 	return response
