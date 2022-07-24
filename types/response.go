@@ -3,6 +3,7 @@ package types
 import (
 	"indigo/http"
 	"indigo/internal"
+	"strconv"
 )
 
 var (
@@ -63,7 +64,7 @@ func (r Response) render(buff []byte, writer ResponseWriter) (err error, modifie
 		buff = append(append(buff, header...), crlf...)
 	}
 
-	buff = append(buff, crlf...)
+	buff = append(buff, []byte("Content-Length: "+strconv.Itoa(len(r.Body))+"\r\n\r\n")...)
 
 	return writer(append(buff, r.Body...)), buff
 }
