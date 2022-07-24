@@ -28,7 +28,7 @@ type HTTPRequestsParser interface {
 
 type httpRequestParser struct {
 	request *types.Request
-	pipe    internal.Pipe
+	pipe    *internal.Pipe
 
 	settings Settings
 
@@ -45,7 +45,7 @@ type httpRequestParser struct {
 	chunksParser    *chunkedBodyParser
 }
 
-func NewHTTPParser(request *types.Request, pipe internal.Pipe, settings Settings) HTTPRequestsParser {
+func NewHTTPParser(request *types.Request, pipe *internal.Pipe, settings Settings) HTTPRequestsParser {
 	settings = PrepareSettings(settings)
 
 	return &httpRequestParser{

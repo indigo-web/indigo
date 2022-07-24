@@ -7,7 +7,7 @@ import (
 )
 
 type chunkedBodyParser struct {
-	pipe           internal.Pipe
+	pipe           *internal.Pipe
 	state          chunkedBodyState
 	chunkLength    int
 	chunkBodyBegin int
@@ -15,7 +15,7 @@ type chunkedBodyParser struct {
 	maxChunkSize int
 }
 
-func NewChunkedBodyParser(pipe internal.Pipe, maxChunkSize uint) *chunkedBodyParser {
+func NewChunkedBodyParser(pipe *internal.Pipe, maxChunkSize uint) *chunkedBodyParser {
 	return &chunkedBodyParser{
 		pipe:  pipe,
 		state: eChunkLength,

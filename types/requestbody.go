@@ -11,7 +11,7 @@ type (
 )
 
 type requestBody struct {
-	body internal.Pipe
+	body *internal.Pipe
 }
 
 func (r *requestBody) Read(bodyCb onBodyCallback, completeCb onBodyCompleteCallback) error {

@@ -22,10 +22,10 @@ type Request struct {
 	body requestBody
 }
 
-func NewRequest(pathBuffer []byte, headers http.Headers, params Params) (Request, internal.Pipe) {
+func NewRequest(pathBuffer []byte, headers http.Headers, params Params) (Request, *internal.Pipe) {
 	// pipe is sized chan because parser can write an error even before
 	// handler will be called
-	pipe := *internal.NewChanSizedPipe(0, 1)
+	pipe := internal.NewChanSizedPipe(0, 1)
 
 	return Request{
 		Path:     pathBuffer,

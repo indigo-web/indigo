@@ -53,7 +53,7 @@ func quote(data []byte) string {
 	return strconv.Quote(string(data))
 }
 
-func newRequest() (types.Request, internal.Pipe) {
+func newRequest() (types.Request, *internal.Pipe) {
 	return types.NewRequest(nil, make(http.Headers, 5), nil)
 }
 
