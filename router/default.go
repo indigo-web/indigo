@@ -35,6 +35,7 @@ func (d *DefaultRouter) Route(path string, handler Handler) {
 }
 
 func (d DefaultRouter) OnRequest(req *types.Request, writeResponse types.ResponseWriter) (err error) {
+	defer req.Reset()
 	handler, found := d.handlers[internal.B2S(req.Path)]
 
 	var resp types.Response
@@ -68,6 +69,7 @@ func prepareResponse(response types.Response) types.Response {
 	if response.Headers == nil {
 		response.Headers = [][]byte{
 			[]byte("Server: indigo"),
+			[]byte("Connection: keep-alive"),
 			[]byte("Content-Length: " + bodyLen),
 		}
 	} else {
