@@ -5,7 +5,7 @@ import "errors"
 type Error error
 
 var (
-	ErrDuplicatedHeader = errors.New("found a duplicated header")
+	ErrDuplicatedHeader = errors.New("ErrDuplicatedHeader: found a duplicated header")
 
 	ErrInvalidMethod        = errors.New("ErrInvalidMethod: invalid method")
 	ErrInvalidPath          = errors.New("ErrInvalidPath: path is empty or contains disallowed characters")
@@ -22,4 +22,6 @@ var (
 
 	ErrConnectionClosed = errors.New("ErrConnectionClosed: connection is closed, body has been received")
 	ErrParserIsDead     = errors.New("ErrParserIsDead: BUG: once error occurred, parser cannot be used anymore")
+
+	ErrParsingRequest = errors.New("ErrParsingRequest: error occurred during request parsing")
 )
