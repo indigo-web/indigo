@@ -23,15 +23,14 @@ func (r *requestBody) Read(bodyCb onBodyCallback, completeCb onBodyCompleteCallb
 
 		switch err {
 		case nil:
+			if err = bodyCb(piece); err != nil {
+				completeCb(err)
+				return err
+			}
 		case io.EOF:
 			completeCb(nil)
 			return nil
 		default:
-			completeCb(err)
-			return err
-		}
-
-		if err = bodyCb(piece); err != nil {
 			completeCb(err)
 			return err
 		}
