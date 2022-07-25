@@ -93,12 +93,17 @@ func (p *httpRequestParser) Parse(data []byte) (done bool, extra []byte, err err
 
 		if err != nil {
 			p.die()
-			p.pipe.WriteErr(err)
+			// do not write err because the only thing can return error is chunked
+			// body parser. But chunked body parser anyway writes error by its own.
+			// So we don't care about it
 
 			return true, extra, err
 		} else if done {
+			if !p.isChunked {
+				p.pipe.WriteErr(io.EOF)
+			}
+
 			p.Clear()
-			p.pipe.WriteErr(io.EOF)
 		}
 
 		return done, extra, nil
