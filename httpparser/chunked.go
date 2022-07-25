@@ -132,7 +132,7 @@ func (p *chunkedBodyParser) Feed(data []byte) (done bool, extraBytes []byte, err
 				return true, data[i+1:], nil
 			default:
 				// looks sad, received everything, and fucked up in the end
-				// or this was made for special? Oh god
+				// or this was made for special? Oh, god
 				p.complete()
 				p.pipe.WriteErr(errors.ErrParsingRequest)
 
@@ -153,7 +153,7 @@ func (p *chunkedBodyParser) Feed(data []byte) (done bool, extraBytes []byte, err
 		}
 	}
 
-	if p.state == eChunkBody {
+	if p.state == eChunkBody && p.chunkBodyBegin+1 < len(data) {
 		p.pipe.Write(data[p.chunkBodyBegin:])
 	}
 
