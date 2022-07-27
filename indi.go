@@ -2,8 +2,8 @@ package indigo
 
 import (
 	"fmt"
-	"indigo/httpparser"
-	"indigo/httpserver"
+	"indigo/http/parser"
+	"indigo/http/server"
 	"indigo/router"
 	"indigo/types"
 	"net"
@@ -31,11 +31,11 @@ func (a Application) Serve(router router.Router) error {
 	}
 	defer sock.Close()
 
-	return httpserver.StartTCPServer(sock, func(conn net.Conn) {
+	return server.StartTCPServer(sock, func(conn net.Conn) {
 		request, pipe := types.NewRequest(make([]byte, 10), make(map[string][]byte), nil)
-		parser := httpparser.NewHTTPParser(&request, pipe, httpparser.Settings{})
+		parser := parser.NewHTTPParser(&request, pipe, parser.Settings{})
 
-		handler := httpserver.NewHTTPHandler(httpserver.HTTPHandlerArgs{
+		handler := server.NewHTTPHandler(server.HTTPHandlerArgs{
 			Router:  router,
 			Request: &request,
 			Parser:  parser,
@@ -46,6 +46,6 @@ func (a Application) Serve(router router.Router) error {
 		})
 
 		go handler.Poll()
-		httpserver.DefaultConnHandler(conn, handler.OnData)
+		server.DefaultConnHandler(conn, handler.OnData)
 	})
 }
