@@ -3,6 +3,7 @@ package parser
 import (
 	"bytes"
 	"fmt"
+	"github.com/stretchr/testify/require"
 	"indigo/errors"
 	"indigo/http"
 	"indigo/internal"
@@ -131,13 +132,9 @@ func testOrdinaryGETRequestParse(t *testing.T, chunkSize int) {
 	go readBody(request, bodyChan)
 	err, extra := FeedParser(parser, ordinaryGetRequest, chunkSize)
 
-	if err != nil {
-		t.Fatal("parser returned error:", err)
-	} else if len(extra) != 0 {
-		t.Fatal("unwanted extra-bytes")
-	} else if err = compareRequests(wantedRequest, <-bodyChan, *request); err != nil {
-		t.Fatal(err)
-	}
+	require.Nil(t, err, "unwanted error from parser")
+	require.Empty(t, extra, "unwanted extra")
+	require.Nil(t, compareRequests(wantedRequest, <-bodyChan, *request))
 }
 
 func TestOrdinaryGETRequestParse1Char(t *testing.T) {
@@ -160,13 +157,8 @@ func testInvalidGETRequest(t *testing.T, rawRequest []byte, errorWanted error) {
 	parser, _ := getParser()
 	err, extra := FeedParser(parser, rawRequest, 5)
 
-	if len(extra) != 0 {
-		t.Fatalf("unwanted extra-bytes: %s", quote(extra))
-	} else if err != errorWanted {
-		t.Fatalf(`wanted "%s" error, got "%s" instead`, errorWanted, err)
-	} else if err == nil {
-		t.Fatal("parser didn't return an error")
-	}
+	require.Empty(t, extra, "unwanted extra")
+	require.Error(t, err, errorWanted)
 }
 
 func TestInvalidGETRequestMissingMethod(t *testing.T) {
@@ -190,11 +182,8 @@ func TestInvalidPOSTRequestExtraBody(t *testing.T) {
 	go readBody(request, make(chan []byte, 1))
 	err, extra := FeedParser(parser, rawRequest, 5)
 
-	if len(extra) != 0 {
-		t.Fatalf("unwanted extra-bytes: %s", quote(extra))
-	} else if err != errors.ErrInvalidMethod {
-		t.Fatalf("unwanted error: %s", err)
-	}
+	require.Empty(t, extra, "unwanted extra")
+	require.Error(t, err, errors.ErrInvalidMethod)
 }
 
 func TestInvalidGETRequestUnknownProtocol(t *testing.T) {
@@ -244,7 +233,6 @@ func TestInvalidGETRequestNoSpaces(t *testing.T) {
 
 func testOrdinaryPOSTRequestParse(t *testing.T, chunkSize int) {
 	parser, request := getParser()
-
 	ordinaryGetRequest := []byte("POST / HTTP/1.1\r\nContent-Type: some content type\r\nHost: indigo.dev" +
 		"\r\nContent-Length: 13\r\n\r\nHello, world!")
 
@@ -269,13 +257,9 @@ func testOrdinaryPOSTRequestParse(t *testing.T, chunkSize int) {
 	go readBody(request, bodyChan)
 	err, extra := FeedParser(parser, ordinaryGetRequest, chunkSize)
 
-	if err != nil {
-		t.Fatalf("parser returned error: %s\n", err)
-	} else if err = compareRequests(wantedRequest, <-bodyChan, *request); err != nil {
-		t.Fatal(err)
-	} else if len(extra) != 0 {
-		t.Fatalf("unwanted extra-bytes: %s", quote(extra))
-	}
+	require.Nil(t, err)
+	require.Empty(t, extra, "unwanted extra")
+	require.Nil(t, compareRequests(wantedRequest, <-bodyChan, *request))
 }
 
 func TestOrdinaryPOSTRequestParse1Char(t *testing.T) {
@@ -324,15 +308,10 @@ func TestChromeGETRequest(t *testing.T) {
 		StrictHeadersCompare: false,
 	}
 
-	if err != nil {
-		t.Fatalf("error while parsing: %s", err)
-	} else if !done {
-		t.Fatal("wanted completion flag to true")
-	} else if len(extra) != 0 {
-		t.Fatalf("unwanted extra-bytes: %s", quote(extra))
-	} else if err = compareRequests(wantedRequest, <-bodyChan, *request); err != nil {
-		t.Fatal(err)
-	}
+	require.Nil(t, err)
+	require.True(t, done, "wanted completion flag")
+	require.Empty(t, extra, "unwanted extra")
+	require.Nil(t, compareRequests(wantedRequest, <-bodyChan, *request))
 }
 
 func TestParserReuseAbility(t *testing.T) {
@@ -356,23 +335,16 @@ func TestParserReuseAbility(t *testing.T) {
 		StrictHeadersCompare: true,
 	}
 
-	if err != nil {
-		t.Fatalf("unwanted error: %s", err)
-	} else if err = compareRequests(wantedRequest, body, *request); err != nil {
-		t.Fatal(err)
-	} else if len(extra) != 0 {
-		t.Fatalf("unwanted extra-bytes: %s", quote(extra))
-	}
+	require.Nil(t, err)
+	require.Nil(t, compareRequests(wantedRequest, body, *request))
+	require.Empty(t, extra, "unwanted extra")
 
 	go readBody(request, bodyChan)
 	err, extra = FeedParser(parser, rawRequest, 5)
 	body = <-bodyChan
 
-	if err != nil {
-		t.Fatalf("unwanted error: %s", err)
-	} else if err = compareRequests(wantedRequest, body, *request); err != nil {
-		t.Fatal(err)
-	}
+	require.Nil(t, err)
+	require.Nil(t, compareRequests(wantedRequest, body, *request))
 }
 
 func testOnlyLFGETRequest(t *testing.T, n int) {
@@ -399,13 +371,9 @@ func testOnlyLFGETRequest(t *testing.T, n int) {
 	go readBody(request, bodyChan)
 	err, extra := FeedParser(parser, rawRequest, n)
 
-	if err != nil {
-		t.Fatal(err)
-	} else if len(extra) != 0 {
-		t.Fatalf("unwanted extra-bytes: %s", quote(extra))
-	} else if err = compareRequests(wantedRequest, <-bodyChan, *request); err != nil {
-		t.Fatal(err)
-	}
+	require.Nil(t, err)
+	require.Empty(t, extra, "unwanted extra")
+	require.Nil(t, compareRequests(wantedRequest, <-bodyChan, *request))
 }
 
 func TestOnlyLFGETRequestFull(t *testing.T) {
@@ -442,11 +410,8 @@ func TestConnectionClose(t *testing.T) {
 	go readBody(request, bodyChan)
 	err, extra := FeedParser(parser, rawRequest, 5)
 
-	if err != nil {
-		t.Fatalf("unwanted error: %s", err)
-	} else if len(extra) != 0 {
-		t.Fatalf("unwanted extra-bytes: %s", quote(extra))
-	}
+	require.Nil(t, err)
+	require.Empty(t, extra, "unwanted extra")
 
 	// on Connection: close header, the finish is connection close
 	// in this case, reading from socket returns empty byte
@@ -454,13 +419,8 @@ func TestConnectionClose(t *testing.T) {
 	var done bool
 	done, extra, err = parser.Parse(nil)
 
-	if !done {
-		t.Fatal("wanted completion flag to true")
-	} else if err != errors.ErrConnectionClosed {
-		t.Fatal("wanted ErrConnectionClosed error, got", err.Error())
-	} else if len(extra) != 0 {
-		t.Fatalf("unwanted extra-bytes: %s", quote(extra))
-	} else if err = compareRequests(wantedRequest, <-bodyChan, *request); err != nil {
-		t.Fatal(err)
-	}
+	require.True(t, done, "wanted completion flag")
+	require.Empty(t, extra, "unwanted extra")
+	require.Error(t, err, errors.ErrConnectionClosed)
+	require.Nil(t, compareRequests(wantedRequest, <-bodyChan, *request))
 }
