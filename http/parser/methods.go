@@ -1,4 +1,4 @@
-package httpparser
+package parser
 
 const (
 	MaxMethodLength   = len("CONNECT")

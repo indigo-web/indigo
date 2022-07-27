@@ -1,4 +1,4 @@
-package httpparser
+package parser
 
 import (
 	"indigo/errors"

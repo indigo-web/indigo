@@ -1,4 +1,4 @@
-package httpparser
+package parser
 
 type (
 	parsingState     uint8
