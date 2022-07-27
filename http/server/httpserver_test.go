@@ -4,6 +4,8 @@ import (
 	"indigo/tests"
 	"indigo/types"
 	"testing"
+
+	"github.com/stretchr/testify/require"
 )
 
 var (
@@ -37,20 +39,14 @@ func TestHTTPServerRunAbility(t *testing.T) {
 			RespWriter: nil,
 		}, reqChan, errChan)
 
-		if err := handler.OnData(simpleRequest); err != nil {
-			t.Fatalf("unwanted error: %s", err)
-		} else if callsCount := mockedParser.CallsCount(); callsCount != 1 {
-			t.Fatalf("wanted exactly 1 call, got %d", callsCount)
-		} else if err = mockedParser.GetError(); err != nil {
-			t.Fatalf("unwanted error from mocked parser: %s", err)
-		}
+		err := handler.OnData(simpleRequest)
+		require.Nilf(t, err, "unwanted error")
+		require.Equalf(t, 1, mockedParser.CallsCount(), "too much parser calls")
+		require.Nilf(t, mockedParser.GetError(), "unwanted error")
 
 		req, reqErr := getPollerOutput(reqChan, errChan)
-		if reqErr != nil {
-			t.Fatalf("unwanted error in errChan: %s", reqErr)
-		} else if req != nilRequest {
-			t.Fatalf("mismatching wanted and got request objects")
-		}
+		require.Nilf(t, reqErr, "unwanted error")
+		require.Equalf(t, req, nilRequest, "must be equal")
 	})
 
 	t.Run("SplitRequestInto2Parts", func(t *testing.T) {
@@ -73,28 +69,19 @@ func TestHTTPServerRunAbility(t *testing.T) {
 			RespWriter: nil,
 		}, reqChan, errChan)
 
-		if err := handler.OnData(firstPart); err != nil {
-			t.Fatalf("unwanted error: %s", err)
-		} else if callsCount := mockedParser.CallsCount(); callsCount != 1 {
-			t.Fatalf("wanted exactly 1 call, got %d", callsCount)
-		} else if err = mockedParser.GetError(); err != nil {
-			t.Fatalf("unwanted error from mocked parser: %s", err)
-		}
+		err := handler.OnData(firstPart)
+		require.Nilf(t, err, "unwanted error")
+		require.Equalf(t, 1, mockedParser.CallsCount(), "too much parser calls")
+		require.Nilf(t, mockedParser.GetError(), "unwanted error")
 
-		if err := handler.OnData(secondPart); err != nil {
-			t.Fatalf("unwanted error: %s", err)
-		} else if callsCount := mockedParser.CallsCount(); callsCount != 2 {
-			t.Fatalf("wanted already 2 calls, got %d", callsCount)
-		} else if err = mockedParser.GetError(); err != nil {
-			t.Fatalf("unwanted error from mocked parser: %s", err)
-		}
+		err = handler.OnData(secondPart)
+		require.Nilf(t, err, "unwanted error")
+		require.Equalf(t, 2, mockedParser.CallsCount(), "too much parser calls")
+		require.Nilf(t, mockedParser.GetError(), "unwanted error")
 
 		req, reqErr := getPollerOutput(reqChan, errChan)
-		if reqErr != nil {
-			t.Fatalf("unwanted error in errChan: %s", reqErr)
-		} else if req != nilRequest {
-			t.Fatalf("mismatching wanted and got request objects")
-		}
+		require.Nilf(t, reqErr, "unwanted error")
+		require.Equalf(t, req, nilRequest, "must be equal")
 	})
 
 }
@@ -118,37 +105,23 @@ func TestHTTPServer2Requests(t *testing.T) {
 		}, reqChan, errChan)
 
 		err := handler.OnData(simpleRequest)
-		if err != nil {
-			t.Fatalf("unwanted error: %s", err)
-		} else if callsCount := mockedParser.CallsCount(); callsCount != 1 {
-			t.Fatalf("wanted exactly 1 call, got %d", callsCount)
-		} else if err = mockedParser.GetError(); err != nil {
-			t.Fatalf("unwanted error from mocked parser: %s", err)
-		}
+		require.Nilf(t, err, "unwanted error")
+		require.Equalf(t, 1, mockedParser.CallsCount(), "too much parser calls")
+		require.Nilf(t, mockedParser.GetError(), "unwanted error")
 
 		req, reqErr := getPollerOutput(reqChan, errChan)
-		if reqErr != nil {
-			t.Fatalf("unwanted error in errChan: %s", reqErr)
-		} else if req != nilRequest {
-			t.Fatalf("mismatching wanted and got request objects")
-		}
+		require.Nilf(t, reqErr, "unwanted error")
+		require.Equalf(t, req, nilRequest, "must be equal")
 
 		errChan <- nil
 		err = handler.OnData(simpleRequest)
-		if err != nil {
-			t.Fatalf("unwanted error: %s", err)
-		} else if callsCount := mockedParser.CallsCount(); callsCount != 2 {
-			t.Fatalf("wanted already 2 calls, got %d", callsCount)
-		} else if err = mockedParser.GetError(); err != nil {
-			t.Fatalf("unwanted error from mocked parser: %s", err)
-		}
+		require.Nilf(t, err, "unwanted error")
+		require.Equalf(t, 2, mockedParser.CallsCount(), "too much parser calls")
+		require.Nilf(t, mockedParser.GetError(), "unwanted error")
 
 		req, reqErr = getPollerOutput(reqChan, errChan)
-		if reqErr != nil {
-			t.Fatalf("unwanted error in errChan: %s", reqErr)
-		} else if req != nilRequest {
-			t.Fatalf("mismatching wanted and got request objects")
-		}
+		require.Nilf(t, reqErr, "unwanted error")
+		require.Equalf(t, req, nilRequest, "must be equal")
 	})
 
 	t.Run("2RequestsWithExtra", func(t *testing.T) {
@@ -174,36 +147,22 @@ func TestHTTPServer2Requests(t *testing.T) {
 		}, reqChan, errChan)
 
 		err := handler.OnData(firstRequest)
-		if err != nil {
-			t.Fatalf("unwanted error: %s", err)
-		} else if callsCount := mockedParser.CallsCount(); callsCount != 1 {
-			t.Fatalf("wanted exactly 1 call, got %d", callsCount)
-		} else if err = mockedParser.GetError(); err != nil {
-			t.Fatalf("unwanted error from mocked parser: %s", err)
-		}
+		require.Nilf(t, err, "unwanted error")
+		require.Equalf(t, 1, mockedParser.CallsCount(), "too much parser calls")
+		require.Nilf(t, mockedParser.GetError(), "unwanted error")
 
 		req, reqErr := getPollerOutput(reqChan, errChan)
-		if reqErr != nil {
-			t.Fatalf("unwanted error in errChan: %s", reqErr)
-		} else if req != nilRequest {
-			t.Fatalf("mismatching wanted and got request objects")
-		}
+		require.Nilf(t, reqErr, "unwanted error")
+		require.Equalf(t, req, nilRequest, "must be equal")
 
 		errChan <- nil
 		err = handler.OnData(secondRequest)
-		if err != nil {
-			t.Fatalf("unwanted error: %s", err)
-		} else if callsCount := mockedParser.CallsCount(); callsCount != 2 {
-			t.Fatalf("wanted already 2 calls, got %d", callsCount)
-		} else if err = mockedParser.GetError(); err != nil {
-			t.Fatalf("unwanted error from mocked parser: %s", err)
-		}
+		require.Nilf(t, err, "unwanted error")
+		require.Equalf(t, 2, mockedParser.CallsCount(), "too much parser calls")
+		require.Nilf(t, mockedParser.GetError(), "unwanted error")
 
 		req, reqErr = getPollerOutput(reqChan, errChan)
-		if reqErr != nil {
-			t.Fatalf("unwanted error in errChan: %s", reqErr)
-		} else if req != nilRequest {
-			t.Fatalf("mismatching wanted and got request objects")
-		}
+		require.Nilf(t, reqErr, "unwanted error")
+		require.Equalf(t, req, nilRequest, "must be equal")
 	})
 }
