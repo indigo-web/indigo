@@ -1,8 +1,8 @@
-package httpserver
+package server
 
 import (
 	"indigo/errors"
-	"indigo/httpparser"
+	"indigo/http/parser"
 	"indigo/router"
 	"indigo/types"
 )
@@ -54,14 +54,14 @@ type HTTPHandler interface {
 type HTTPHandlerArgs struct {
 	Router     router.Router
 	Request    *types.Request
-	Parser     httpparser.HTTPRequestsParser
+	Parser     parser.HTTPRequestsParser
 	RespWriter types.ResponseWriter
 	poller     *poller
 }
 
 type httpHandler struct {
 	request *types.Request
-	parser  httpparser.HTTPRequestsParser
+	parser  parser.HTTPRequestsParser
 	poller  poller
 
 	reqChan requestsChan
