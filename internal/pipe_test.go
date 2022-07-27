@@ -1,7 +1,7 @@
 package internal
 
 import (
-	"bytes"
+	"github.com/stretchr/testify/require"
 	"io"
 	"testing"
 	"time"
@@ -9,7 +9,6 @@ import (
 
 func TestPipeReadWrite(t *testing.T) {
 	wantedData := []byte("Hello!")
-
 	pipe := NewPipe()
 
 	go func() {
@@ -17,20 +16,12 @@ func TestPipeReadWrite(t *testing.T) {
 	}()
 
 	data, err := pipe.Read()
-
-	if err != nil {
-		t.Errorf("got error: %s", err.Error())
-		return
-	}
-
-	if !bytes.Equal(data, wantedData) {
-		t.Errorf("got invalid data from pipe (wanted %s, got %s)", string(wantedData), string(data))
-	}
+	require.Nil(t, err)
+	require.Equal(t, wantedData, data, "invalid data from pipe")
 }
 
 func TestPipeWriteErr(t *testing.T) {
 	wantedErr := io.EOF
-
 	pipe := NewPipe()
 
 	go func() {
@@ -38,16 +29,12 @@ func TestPipeWriteErr(t *testing.T) {
 	}()
 
 	_, err := pipe.Read()
-
-	if err != wantedErr {
-		t.Fatalf("wanted: %s, got: %s", wantedErr.Error(), err.Error())
-	}
+	require.Error(t, err, wantedErr)
 }
 
 func TestPipeErrAfterWrite(t *testing.T) {
 	wantedData := []byte("Hello!")
 	wantedErr := io.EOF
-
 	pipe := NewPipe()
 
 	go func() {
@@ -56,30 +43,16 @@ func TestPipeErrAfterWrite(t *testing.T) {
 	}()
 
 	data, err := pipe.Read()
-
-	if err != nil {
-		t.Fatalf("unexpected error: %s", err.Error())
-		return
-	}
-
-	if !bytes.Equal(data, wantedData) {
-		t.Fatalf("data wanted: %s, got: %s", string(wantedData), string(data))
-		return
-	}
+	require.Nil(t, err)
+	require.Equal(t, wantedData, data, "invalid data from pipe")
 
 	data, err = pipe.Read()
-
-	if err != wantedErr {
-		t.Fatalf("wanted error: %s, got: %s", wantedErr.Error(), err.Error())
-	}
+	require.Error(t, err, wantedErr)
 }
 
 func TestPipeReadable(t *testing.T) {
 	pipe := NewPipe()
-
-	if pipe.Readable() {
-		t.Fatal("empty pipe but readable, wanted to be false")
-	}
+	require.False(t, pipe.Readable(), "empty pipe but readable")
 
 	go func() {
 		pipe.Write([]byte("Hello, world!"))
@@ -88,13 +61,8 @@ func TestPipeReadable(t *testing.T) {
 	// oh fuck, how dirty... But I really don't know how else to notify
 	<-time.After(50 * time.Millisecond)
 
-	if !pipe.Readable() {
-		t.Fatal("pipe is not empty but not readable, wanted to be true")
-	}
+	require.True(t, pipe.Readable(), "pipe is not empty but not readable")
 
 	_, _ = pipe.Read()
-
-	if pipe.Readable() {
-		t.Fatal("pipe is now again empty but readable, wanted to be false")
-	}
+	require.False(t, pipe.Readable(), "pipe is now again empty but readable")
 }
