@@ -1,2 +1,16 @@
 # IndiGo
-IndiGo is a golang webserver focusing on performance and simplicity. Currently in state of active alpha-version development, so nothing is ready yet. After alpha-version will be released, the development will be moved from master to a dev-branch, and instead of this text some docs will appear here
+Web-server in the middle of std and fasthttp.
+
+Implemented:
+- Stream-based request body processing
+- Convinient response constructor
+- I don't know what else to write here
+
+TODO:
+- Finish implementing server settings
+- Parse request params
+- Add request context
+- Fix bug with saving headers from previous request if were not used in a new one
+- Add connection hijacking
+
+As you can see, TODO list is bigger than implemented list. This means this project is a piece of shit (at least currently). So welcome if you wanna do it a bit better!
