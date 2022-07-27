@@ -33,12 +33,12 @@ func (a Application) Serve(router router.Router) error {
 
 	return server.StartTCPServer(sock, func(conn net.Conn) {
 		request, pipe := types.NewRequest(make([]byte, 10), make(map[string][]byte), nil)
-		parser := parser.NewHTTPParser(&request, pipe, parser.Settings{})
+		httpParser := parser.NewHTTPParser(&request, pipe, parser.Settings{})
 
 		handler := server.NewHTTPHandler(server.HTTPHandlerArgs{
 			Router:  router,
 			Request: &request,
-			Parser:  parser,
+			Parser:  httpParser,
 			RespWriter: func(b []byte) error {
 				_, err = conn.Write(b)
 				return err
