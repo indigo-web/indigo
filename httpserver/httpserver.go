@@ -14,18 +14,23 @@ structure, and then Session struct finally delegates request to a Router
 (if request has been received completely)
 */
 
+type (
+	requestsChan chan *types.Request
+	errorsChan   chan error
+)
+
 type poller struct {
 	router        router.Router
 	writeResponse types.ResponseWriter
 
-	requestsChan chan *types.Request
-	errChan      chan error
+	reqChan requestsChan
+	errChan errorsChan
 }
 
 func (p *poller) Poll() {
 	for {
 		select {
-		case request := <-p.requestsChan:
+		case request := <-p.reqChan:
 			if err := p.router.OnRequest(request, p.writeResponse); err != nil {
 				p.router.OnError(err)
 				p.errChan <- err
@@ -51,6 +56,7 @@ type HTTPHandlerArgs struct {
 	Request    *types.Request
 	Parser     httpparser.HTTPRequestsParser
 	RespWriter types.ResponseWriter
+	poller     *poller
 }
 
 type httpHandler struct {
@@ -58,25 +64,28 @@ type httpHandler struct {
 	parser  httpparser.HTTPRequestsParser
 	poller  poller
 
-	requestsChan chan *types.Request
-	errChan      chan error
+	reqChan requestsChan
+	errChan errorsChan
 }
 
 func NewHTTPHandler(args HTTPHandlerArgs) HTTPHandler {
-	requestsChan, errChan := make(chan *types.Request), make(chan error)
+	reqChan, errChan := make(requestsChan), make(errorsChan)
 
+	return newHTTPHandler(args, reqChan, errChan)
+}
+
+func newHTTPHandler(args HTTPHandlerArgs, reqChan requestsChan, errChan errorsChan) *httpHandler {
 	return &httpHandler{
 		request: args.Request,
 		parser:  args.Parser,
 		poller: poller{
 			router:        args.Router,
 			writeResponse: args.RespWriter,
-			requestsChan:  requestsChan,
+			reqChan:       reqChan,
 			errChan:       errChan,
 		},
-
-		requestsChan: requestsChan,
-		errChan:      errChan,
+		reqChan: reqChan,
+		errChan: errChan,
 	}
 }
 
@@ -96,7 +105,7 @@ func (c *httpHandler) OnData(data []byte) (err error) {
 		}
 
 		if done {
-			c.poller.requestsChan <- c.request
+			c.poller.reqChan <- c.request
 
 			if err = <-c.poller.errChan; err != nil {
 				return err
