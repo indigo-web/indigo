@@ -40,13 +40,13 @@ func TestHTTPServerRunAbility(t *testing.T) {
 		}, reqChan, errChan)
 
 		err := handler.OnData(simpleRequest)
-		require.Nilf(t, err, "unwanted error")
-		require.Equalf(t, 1, mockedParser.CallsCount(), "too much parser calls")
-		require.Nilf(t, mockedParser.GetError(), "unwanted error")
+		require.Nil(t, err, "unwanted error")
+		require.Equal(t, 1, mockedParser.CallsCount(), "too much parser calls")
+		require.Nil(t, mockedParser.GetError(), "unwanted error")
 
 		req, reqErr := getPollerOutput(reqChan, errChan)
-		require.Nilf(t, reqErr, "unwanted error")
-		require.Equalf(t, req, nilRequest, "must be equal")
+		require.Nil(t, reqErr, "unwanted error")
+		require.Equal(t, req, nilRequest, "must be equal")
 	})
 
 	t.Run("SplitRequestInto2Parts", func(t *testing.T) {
@@ -70,18 +70,18 @@ func TestHTTPServerRunAbility(t *testing.T) {
 		}, reqChan, errChan)
 
 		err := handler.OnData(firstPart)
-		require.Nilf(t, err, "unwanted error")
-		require.Equalf(t, 1, mockedParser.CallsCount(), "too much parser calls")
-		require.Nilf(t, mockedParser.GetError(), "unwanted error")
+		require.Nil(t, err, "unwanted error")
+		require.Equal(t, 1, mockedParser.CallsCount(), "too much parser calls")
+		require.Nil(t, mockedParser.GetError(), "unwanted error")
 
 		err = handler.OnData(secondPart)
-		require.Nilf(t, err, "unwanted error")
-		require.Equalf(t, 2, mockedParser.CallsCount(), "too much parser calls")
-		require.Nilf(t, mockedParser.GetError(), "unwanted error")
+		require.Nil(t, err, "unwanted error")
+		require.Equal(t, 2, mockedParser.CallsCount(), "too much parser calls")
+		require.Nil(t, mockedParser.GetError(), "unwanted error")
 
 		req, reqErr := getPollerOutput(reqChan, errChan)
-		require.Nilf(t, reqErr, "unwanted error")
-		require.Equalf(t, req, nilRequest, "must be equal")
+		require.Nil(t, reqErr, "unwanted error")
+		require.Equal(t, req, nilRequest, "must be equal")
 	})
 
 }
@@ -105,23 +105,23 @@ func TestHTTPServer2Requests(t *testing.T) {
 		}, reqChan, errChan)
 
 		err := handler.OnData(simpleRequest)
-		require.Nilf(t, err, "unwanted error")
-		require.Equalf(t, 1, mockedParser.CallsCount(), "too much parser calls")
-		require.Nilf(t, mockedParser.GetError(), "unwanted error")
+		require.Nil(t, err, "unwanted error")
+		require.Equal(t, 1, mockedParser.CallsCount(), "too much parser calls")
+		require.Nil(t, mockedParser.GetError(), "unwanted error")
 
 		req, reqErr := getPollerOutput(reqChan, errChan)
-		require.Nilf(t, reqErr, "unwanted error")
-		require.Equalf(t, req, nilRequest, "must be equal")
+		require.Nil(t, reqErr, "unwanted error")
+		require.Equal(t, req, nilRequest, "must be equal")
 
 		errChan <- nil
 		err = handler.OnData(simpleRequest)
-		require.Nilf(t, err, "unwanted error")
-		require.Equalf(t, 2, mockedParser.CallsCount(), "too much parser calls")
-		require.Nilf(t, mockedParser.GetError(), "unwanted error")
+		require.Nil(t, err, "unwanted error")
+		require.Equal(t, 2, mockedParser.CallsCount(), "too much parser calls")
+		require.Nil(t, mockedParser.GetError(), "unwanted error")
 
 		req, reqErr = getPollerOutput(reqChan, errChan)
-		require.Nilf(t, reqErr, "unwanted error")
-		require.Equalf(t, req, nilRequest, "must be equal")
+		require.Nil(t, reqErr, "unwanted error")
+		require.Equal(t, req, nilRequest, "must be equal")
 	})
 
 	t.Run("2RequestsWithExtra", func(t *testing.T) {
@@ -147,22 +147,22 @@ func TestHTTPServer2Requests(t *testing.T) {
 		}, reqChan, errChan)
 
 		err := handler.OnData(firstRequest)
-		require.Nilf(t, err, "unwanted error")
-		require.Equalf(t, 1, mockedParser.CallsCount(), "too much parser calls")
-		require.Nilf(t, mockedParser.GetError(), "unwanted error")
+		require.Nil(t, err, "unwanted error")
+		require.Equal(t, 1, mockedParser.CallsCount(), "too much parser calls")
+		require.Nil(t, mockedParser.GetError(), "unwanted error")
 
 		req, reqErr := getPollerOutput(reqChan, errChan)
-		require.Nilf(t, reqErr, "unwanted error")
-		require.Equalf(t, req, nilRequest, "must be equal")
+		require.Nil(t, reqErr, "unwanted error")
+		require.Equal(t, req, nilRequest, "must be equal")
 
 		errChan <- nil
 		err = handler.OnData(secondRequest)
-		require.Nilf(t, err, "unwanted error")
-		require.Equalf(t, 2, mockedParser.CallsCount(), "too much parser calls")
-		require.Nilf(t, mockedParser.GetError(), "unwanted error")
+		require.Nil(t, err, "unwanted error")
+		require.Equal(t, 2, mockedParser.CallsCount(), "too much parser calls")
+		require.Nil(t, mockedParser.GetError(), "unwanted error")
 
 		req, reqErr = getPollerOutput(reqChan, errChan)
-		require.Nilf(t, reqErr, "unwanted error")
-		require.Equalf(t, req, nilRequest, "must be equal")
+		require.Nil(t, reqErr, "unwanted error")
+		require.Equal(t, req, nilRequest, "must be equal")
 	})
 }
