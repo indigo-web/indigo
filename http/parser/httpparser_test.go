@@ -3,13 +3,15 @@ package parser
 import (
 	"bytes"
 	"fmt"
-	"github.com/stretchr/testify/require"
 	"indigo/errors"
 	"indigo/http"
 	"indigo/internal"
+	"indigo/settings"
 	"indigo/types"
 	"strconv"
 	"testing"
+
+	"github.com/stretchr/testify/require"
 )
 
 type testHeaders map[string]string
@@ -60,7 +62,8 @@ func newRequest() (types.Request, *internal.Pipe) {
 
 func getParser() (HTTPRequestsParser, *types.Request) {
 	request, pipe := newRequest()
-	return NewHTTPParser(&request, pipe, Settings{}), &request
+	parserSettings := settings.Prepare(settings.Settings{})
+	return NewHTTPParser(&request, pipe, parserSettings), &request
 }
 
 func readBody(request *types.Request, body chan []byte) {
