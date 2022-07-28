@@ -1,17 +1,15 @@
 package parser
 
 import (
-	"github.com/scott-ainsworth/go-ascii"
 	"indigo/errors"
 	"indigo/http"
 	"indigo/internal"
+	"indigo/settings"
 	"indigo/types"
 	"io"
-)
 
-type Parser interface {
-	Parse(requestStruct *types.Request, data []byte) (done bool, extra []byte, err error)
-}
+	"github.com/scott-ainsworth/go-ascii"
+)
 
 var (
 	contentLength    = []byte("content-length")
@@ -30,7 +28,7 @@ type httpRequestParser struct {
 	request *types.Request
 	pipe    *internal.Pipe
 
-	settings Settings
+	settings settings.Settings
 
 	state            parsingState
 	headerValueBegin uint8
@@ -45,16 +43,14 @@ type httpRequestParser struct {
 	chunksParser    *chunkedBodyParser
 }
 
-func NewHTTPParser(request *types.Request, pipe *internal.Pipe, settings Settings) HTTPRequestsParser {
-	settings = PrepareSettings(settings)
-
+func NewHTTPParser(request *types.Request, pipe *internal.Pipe, settings settings.Settings) HTTPRequestsParser {
 	return &httpRequestParser{
 		request:        request,
 		pipe:           pipe,
 		settings:       settings,
-		headersBuffer:  settings.HeadersBuffer,
-		infoLineBuffer: settings.InfoLineBuffer,
-		chunksParser:   NewChunkedBodyParser(pipe, settings.MaxChunkSize),
+		headersBuffer:  make([]byte, 0, settings.DefaultHeadersBuffSize),
+		infoLineBuffer: make([]byte, 0, settings.DefaultInfoLineBuffSize),
+		chunksParser:   NewChunkedBodyParser(pipe, uint(settings.MaxBodyChunkLength)),
 		state:          eMethod,
 	}
 }
@@ -154,7 +150,7 @@ func (p *httpRequestParser) Parse(data []byte) (done bool, extra []byte, err err
 
 			p.infoLineBuffer = append(p.infoLineBuffer, data[i])
 
-			if uint16(len(p.infoLineBuffer[p.infoLineOffset:])) > p.settings.MaxPathLength {
+			if uint16(len(p.infoLineBuffer[p.infoLineOffset:])) > p.settings.MaxURILength {
 				p.die()
 
 				return true, nil, errors.ErrBufferOverflow
@@ -220,7 +216,7 @@ func (p *httpRequestParser) Parse(data []byte) (done bool, extra []byte, err err
 
 			p.headersBuffer = append(p.headersBuffer, data[i])
 
-			if uint8(len(p.headersBuffer)) >= p.settings.MaxHeaderLength {
+			if uint8(len(p.headersBuffer)) >= p.settings.MaxHeaderKeyLength {
 				p.die()
 
 				return true, nil, errors.ErrBufferOverflow
