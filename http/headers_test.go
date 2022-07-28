@@ -23,12 +23,20 @@ func TestSetHeaders(t *testing.T) {
 		require.Equal(t, []byte("World"), headers["Hello"])
 		require.Equal(t, []byte("Richtig"), headers["Test"])
 	})
-	t.Run("SetAlreadyExisting", func(t *testing.T) {
+	t.Run("SetAlreadyExistingLonger", func(t *testing.T) {
 		headers := make(Headers, 1)
 		headers.Set([]byte("Hello"), []byte("World"))
 		require.Contains(t, headers, "Hello")
 
 		headers.Set([]byte("Hello"), []byte("Heaven"))
 		require.Equal(t, []byte("Heaven"), headers["Hello"])
+	})
+	t.Run("SetAlreadyExistingShorter", func(t *testing.T) {
+		headers := make(Headers, 1)
+		headers.Set([]byte("Hello"), []byte("World"))
+		require.Contains(t, headers, "Hello")
+
+		headers.Set([]byte("Hello"), []byte("Hell"))
+		require.Equal(t, []byte("Hell"), headers["Hello"])
 	})
 }
