@@ -1,10 +1,12 @@
 package indigo
 
 import (
+	"errors"
 	"fmt"
 	"indigo/http/parser"
 	"indigo/http/server"
 	"indigo/router"
+	"indigo/settings"
 	"indigo/types"
 	"net"
 )
@@ -23,7 +25,18 @@ func NewApp(addr string, port uint16) *Application {
 	}
 }
 
-func (a Application) Serve(router router.Router) error {
+func (a Application) Serve(router router.Router, maybeSettings ...settings.Settings) error {
+	var serverSettings settings.Settings
+
+	switch len(maybeSettings) {
+	case 0:
+		serverSettings = settings.Default()
+	case 1:
+		serverSettings = settings.Prepare(maybeSettings[0])
+	default:
+		return errors.New("too much settings (one struct is expected)")
+	}
+
 	address := fmt.Sprintf("%s:%d", a.addr, a.port)
 	sock, err := net.Listen("tcp", address)
 	if err != nil {
@@ -33,7 +46,7 @@ func (a Application) Serve(router router.Router) error {
 
 	return server.StartTCPServer(sock, func(conn net.Conn) {
 		request, pipe := types.NewRequest(make([]byte, 10), make(map[string][]byte), nil)
-		httpParser := parser.NewHTTPParser(&request, pipe, parser.Settings{})
+		httpParser := parser.NewHTTPParser(&request, pipe, serverSettings)
 
 		handler := server.NewHTTPHandler(server.HTTPHandlerArgs{
 			Router:  router,
