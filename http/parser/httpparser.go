@@ -11,6 +11,11 @@ import (
 	"github.com/scott-ainsworth/go-ascii"
 )
 
+const (
+	maxMethodLength   = len("CONNECT")
+	maxProtocolLength = len("HTTP/1.1")
+)
+
 var (
 	contentLength    = []byte("content-length")
 	transferEncoding = []byte("transfer-encoding")
@@ -124,7 +129,7 @@ func (p *httpRequestParser) Parse(data []byte) (done bool, extra []byte, err err
 
 			p.infoLineBuffer = append(p.infoLineBuffer, data[i])
 
-			if len(p.infoLineBuffer) > MaxMethodLength {
+			if len(p.infoLineBuffer) > maxMethodLength {
 				p.die()
 
 				return true, nil, errors.ErrInvalidMethod
@@ -164,7 +169,7 @@ func (p *httpRequestParser) Parse(data []byte) (done bool, extra []byte, err err
 			default:
 				p.infoLineBuffer = append(p.infoLineBuffer, data[i])
 
-				if len(p.infoLineBuffer[p.infoLineOffset:]) > MaxProtocolLength {
+				if len(p.infoLineBuffer[p.infoLineOffset:]) > maxProtocolLength {
 					p.die()
 
 					return true, nil, errors.ErrBufferOverflow
