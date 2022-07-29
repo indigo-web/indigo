@@ -15,9 +15,6 @@ type requestBody struct {
 }
 
 func (r *requestBody) Read(bodyCb onBodyCallback, completeCb onBodyCompleteCallback) error {
-	// actually, we can set r.Completed to true right here as we
-	// can guarantee that this function will complete reading anyway
-	// But it won't be that beautiful solution
 	for {
 		piece, err := r.body.Read()
 
