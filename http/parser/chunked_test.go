@@ -1,7 +1,7 @@
 package parser
 
 import (
-	"fmt"
+	"github.com/stretchr/testify/require"
 	"indigo/errors"
 	"testing"
 )
@@ -32,28 +32,16 @@ func TestParserReuseAbilityChunkedRequest(t *testing.T) {
 	go readBody(request, bodyChan)
 	err, _ := FeedParser(parser, rawRequest, 5)
 
-	if err != nil {
-		t.Fatalf("unwanted error: %s", err)
-	} else if err = compareRequests(wantedRequest, <-bodyChan, *request); err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
+	require.NoError(t, compareRequests(wantedRequest, <-bodyChan, *request))
 
-	fmt.Println("----- good, second part -----")
-
-	rawRequest = []byte("POST / HTTP/1.1\r\n" +
-		"Content-Type: some content type\r\n" +
-		"Host: indigo.dev\r\n" +
-		"Transfer-Encoding: chunked\r\n" +
-		"\r\nd\r\nHello, world!\r\n1a\r\nBut what's wrong with you?\r\nf\r\nFinally am here\r\n0\r\n\r\n")
+	request.Reset()
 
 	go readBody(request, bodyChan)
 	err, _ = FeedParser(parser, rawRequest, 5)
 
-	if err != nil {
-		t.Fatalf("unwanted error after reuse: %s", err)
-	} else if err = compareRequests(wantedRequest, <-bodyChan, *request); err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
+	require.NoError(t, compareRequests(wantedRequest, <-bodyChan, *request))
 }
 
 func TestChunkedTransferEncodingFullRequestBody(t *testing.T) {
@@ -81,15 +69,10 @@ func TestChunkedTransferEncodingFullRequestBody(t *testing.T) {
 	go readBody(request, bodyChan)
 	done, extra, err := parser.Parse([]byte(rawRequest))
 
-	if !done {
-		t.Fatal("wanted completion flag but got false")
-	} else if len(extra) != 0 {
-		t.Fatalf("unwanted extra-bytes: %s", quote(extra))
-	} else if err != nil {
-		t.Fatalf("unwanted error: %s", err)
-	} else if err = compareRequests(wantedRequest, <-bodyChan, *request); err != nil {
-		t.Fatal(err)
-	}
+	require.True(t, done, "wanted completion flag but got false")
+	require.Empty(t, extra)
+	require.NoError(t, err)
+	require.NoError(t, compareRequests(wantedRequest, <-bodyChan, *request))
 }
 
 func TestChunkOverflow(t *testing.T) {
@@ -101,11 +84,8 @@ func TestChunkOverflow(t *testing.T) {
 	go readBody(&request, bodyChan)
 	done, _, err := parser.Feed(data)
 
-	if !done {
-		t.Fatal("wanted completion flag but got false")
-	} else if err != errors.ErrInvalidChunkSplitter {
-		t.Fatalf(`wanted "ErrInvalidChunkSplitter", got "%s"`, err)
-	}
+	require.True(t, done, "wanted completion flag but got false")
+	require.ErrorIs(t, errors.ErrInvalidChunkSplitter, err)
 
 	<-bodyChan
 }
@@ -119,11 +99,8 @@ func TestChunkTooSmall(t *testing.T) {
 	go readBody(&request, bodyChan)
 	done, _, err := parser.Feed(data)
 
-	if !done {
-		t.Fatal("wanted completion flag but got false")
-	} else if err != errors.ErrInvalidChunkSplitter {
-		t.Fatalf(`wanted "ErrInvalidChunkSplitter" error, got "%s"`, err.Error())
-	}
+	require.True(t, done, "wanted completion flag but got false")
+	require.ErrorIs(t, errors.ErrInvalidChunkSplitter, err)
 
 	<-bodyChan
 }
@@ -137,11 +114,8 @@ func TestMixChunkSplitters(t *testing.T) {
 	go readBody(&request, bodyChan)
 	done, _, err := parser.Feed(data)
 
-	if !done {
-		t.Fatal("wanted completion flag but got false")
-	} else if err != nil {
-		t.Fatalf("unwanted error: %s", err.Error())
-	}
+	require.True(t, done, "wanted completion flag but got false")
+	require.NoError(t, err)
 
 	<-bodyChan
 }
@@ -157,20 +131,14 @@ func TestWithDifferentBlockSizes(t *testing.T) {
 
 		for j := 0; j < len(data); j += i {
 			end := j + i
-
 			if end > len(data) {
 				end = len(data)
 			}
 
 			done, _, err := parser.Feed(data[j:end])
 
-			if err != nil {
-				t.Fatalf("unwanted error: %s", err.Error())
-			}
-
-			if done && end < len(data) {
-				t.Fatal("unwanted completion flag, wanted false")
-			}
+			require.NoError(t, err)
+			require.False(t, done && end < len(data), "unwanted completion flag")
 		}
 
 		<-bodyChan
