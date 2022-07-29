@@ -5,12 +5,7 @@ import (
 	"indigo/internal"
 )
 
-type (
-	Params map[string][]byte
-)
-
-// DefaultBodySize TODO: set this value in settings
-const DefaultBodySize = 1024
+type Params map[string][]byte
 
 type Request struct {
 	Method   http.Method
@@ -19,10 +14,14 @@ type Request struct {
 	Protocol http.Protocol
 	Headers  http.Headers
 
-	body requestBody
+	body         requestBody
+	bodyBuff     []byte
+	bodyBuffSize uint32
 }
 
-func NewRequest(pathBuffer []byte, headers http.Headers, params Params) (Request, *internal.Pipe) {
+func NewRequest(
+	pathBuffer []byte, headers http.Headers, params Params,
+	bodyBuffSize uint32) (Request, *internal.Pipe) {
 	// pipe is sized chan because parser can write an error even before
 	// handler will be called
 	pipe := internal.NewChanSizedPipe(0, 1)
@@ -35,6 +34,7 @@ func NewRequest(pathBuffer []byte, headers http.Headers, params Params) (Request
 		body: requestBody{
 			body: pipe,
 		},
+		bodyBuffSize: bodyBuffSize,
 	}, pipe
 }
 
@@ -42,22 +42,24 @@ func (r *Request) GetBody(bodyCb onBodyCallback, completeCb onBodyCompleteCallba
 	return r.body.Read(bodyCb, completeCb)
 }
 
-func (r *Request) GetFullBody() []byte {
-	buffer := make([]byte, 0, DefaultBodySize)
+func (r *Request) GetFullBody() (body []byte, err error) {
+	if uint32(cap(r.bodyBuff)) < r.bodyBuffSize {
+		r.bodyBuff = make([]byte, 0, r.bodyBuffSize)
+	} else {
+		r.bodyBuff = r.bodyBuff[:0]
+	}
 
-	// currently we have no limit for max body size
-	// so no error is possible to occur
-	_ = r.GetBody(
+	err = r.GetBody(
 		func(b []byte) error {
-			buffer = append(buffer, b...)
+			r.bodyBuff = append(r.bodyBuff, b...)
 			return nil
 		},
-		func(err error) {
+		func(bodyErr error) {
 			return
 		},
 	)
 
-	return buffer
+	return r.bodyBuff, err
 }
 
 func (r *Request) Reset() {
