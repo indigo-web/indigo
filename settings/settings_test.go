@@ -1,12 +1,14 @@
 package settings
 
 import (
-	"github.com/stretchr/testify/require"
 	"testing"
+
+	"github.com/stretchr/testify/require"
 )
 
 func compareDefaultValues(t *testing.T, settings Settings) {
 	require.Equal(t, defaultMaxBodyLength, settings.MaxBodyLength)
+	require.Equal(t, defaultBodyBuffSize, settings.DefaultBodyBuffSize)
 	require.Equal(t, defaultSockReadBuffSize, settings.SockReadBuffSize)
 	require.Equal(t, defaultMaxHeaders, settings.MaxHeaders)
 	require.Equal(t, defaultMaxURILength, settings.MaxURILength)

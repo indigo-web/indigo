@@ -3,9 +3,11 @@ package settings
 import "math"
 
 const (
-	defaultMaxHeaders           uint8  = math.MaxUint8
-	defaultSockReadBuffSize     uint16 = 2048
-	defaultMaxBodyLength        uint32 = math.MaxUint32
+	defaultMaxHeaders       uint8  = math.MaxUint8
+	defaultSockReadBuffSize uint16 = 2048
+	defaultMaxBodyLength    uint32 = math.MaxUint32
+	// defaultBodyBuffSize set to 128 not to overload memory by default
+	defaultBodyBuffSize         uint32 = 128
 	defaultMaxURILength         uint16 = 4096
 	defaultMaxHeaderKeyLength   uint8  = 100 // just like Apache
 	defaultMaxHeaderValueLength uint16 = 8192
@@ -25,6 +27,10 @@ type Settings struct {
 
 	// MaxBodyLength is a maximal value accepted in Content-Length header
 	MaxBodyLength uint32
+
+	// DefaultBodyBuffSize is an initial size of body buffer (used in case
+	// request.GetFullBody())
+	DefaultBodyBuffSize uint32
 
 	// MaxURILength is a maximal length of request path is accepted
 	MaxURILength uint16
@@ -54,6 +60,9 @@ func Prepare(settings Settings) Settings {
 	}
 	if settings.MaxBodyLength == 0 {
 		settings.MaxBodyLength = defaultMaxBodyLength
+	}
+	if settings.DefaultBodyBuffSize == 0 {
+		settings.DefaultBodyBuffSize = defaultBodyBuffSize
 	}
 	if settings.MaxURILength == 0 {
 		settings.MaxURILength = defaultMaxURILength
