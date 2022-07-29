@@ -109,8 +109,8 @@ func (p *httpRequestParser) Parse(data []byte) (done bool, extra []byte, err err
 		switch p.state {
 		case eMethod:
 			if data[i] == ' ' {
-				method := http.GetMethod(p.infoLineBuffer)
-				if method == 0 {
+				method := http.Bytes2Method(p.infoLineBuffer)
+				if method == http.UNKNOWN {
 					p.die()
 
 					return true, nil, errors.ErrInvalidMethod

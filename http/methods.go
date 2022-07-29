@@ -5,7 +5,8 @@ import "indigo/internal"
 type Method uint8
 
 const (
-	GET Method = iota + 1
+	UNKNOWN Method = 0
+	GET     Method = iota + 1
 	HEAD
 	POST
 	PUT
@@ -16,7 +17,7 @@ const (
 	PATCH
 )
 
-func GetMethod(method []byte) Method {
+func Bytes2Method(method []byte) Method {
 	switch internal.B2S(method) {
 	case "GET":
 		return GET
@@ -38,7 +39,7 @@ func GetMethod(method []byte) Method {
 		return PATCH
 	}
 
-	return 0
+	return UNKNOWN
 }
 
 func Method2String(method Method) string {

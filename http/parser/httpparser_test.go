@@ -71,7 +71,7 @@ func readBody(request *types.Request, body chan []byte) {
 }
 
 func compareRequests(wanted WantedRequest, body []byte, got types.Request) error {
-	if http.GetMethod([]byte(wanted.Method)) != got.Method {
+	if http.Bytes2Method([]byte(wanted.Method)) != got.Method {
 		gotMethod := http.Method2String(got.Method)
 		return fmt.Errorf(
 			"methods mismatching: wanted %s, got %s",
