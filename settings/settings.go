@@ -3,15 +3,15 @@ package settings
 import "math"
 
 const (
-	defaultMaxHeaders           = 255
-	defaultSockReadBuffSize     = 2048
-	defaultMaxBodyLength        = math.MaxUint32
-	defaultMaxURILength         = 4096
-	defaultMaxHeaderKeyLength   = 100 // just like Apache
-	defaultMaxHeaderValueLength = 8192
-	defaultMaxBodyChunkLength   = math.MaxUint32
-	defaultInfoLineBuffSize     = 30
-	defaultHeadersBuffSize      = 500
+	defaultMaxHeaders           uint8  = math.MaxUint8
+	defaultSockReadBuffSize     uint16 = 2048
+	defaultMaxBodyLength        uint32 = math.MaxUint32
+	defaultMaxURILength         uint16 = 4096
+	defaultMaxHeaderKeyLength   uint8  = 100 // just like Apache
+	defaultMaxHeaderValueLength uint16 = 8192
+	defaultMaxBodyChunkLength   uint32 = math.MaxUint32
+	defaultInfoLineBuffSize     uint16 = 30
+	defaultHeadersBuffSize      uint16 = 500
 )
 
 type Settings struct {
