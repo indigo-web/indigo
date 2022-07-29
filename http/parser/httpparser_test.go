@@ -57,7 +57,7 @@ func quote(data []byte) string {
 }
 
 func newRequest() (types.Request, *internal.Pipe) {
-	return types.NewRequest(nil, make(http.Headers, 5), nil)
+	return types.NewRequest(nil, make(http.Headers, 5), nil, 0)
 }
 
 func getParser() (HTTPRequestsParser, *types.Request) {
@@ -66,8 +66,9 @@ func getParser() (HTTPRequestsParser, *types.Request) {
 	return NewHTTPParser(&request, pipe, parserSettings), &request
 }
 
-func readBody(request *types.Request, body chan []byte) {
-	body <- request.GetFullBody()
+func readBody(request *types.Request, bodyChan chan []byte) {
+	body, _ := request.GetFullBody()
+	bodyChan <- body
 }
 
 func compareRequests(wanted WantedRequest, body []byte, got types.Request) error {
