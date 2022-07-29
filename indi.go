@@ -45,7 +45,9 @@ func (a Application) Serve(router router.Router, maybeSettings ...settings.Setti
 	defer sock.Close()
 
 	return server.StartTCPServer(sock, func(conn net.Conn) {
-		request, pipe := types.NewRequest(make([]byte, 10), make(map[string][]byte), nil)
+		request, pipe := types.NewRequest(
+			make([]byte, 10), make(map[string][]byte), nil,
+			serverSettings.DefaultBodyBuffSize)
 		httpParser := parser.NewHTTPParser(&request, pipe, serverSettings)
 
 		handler := server.NewHTTPHandler(server.HTTPHandlerArgs{
