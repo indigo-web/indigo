@@ -1,12 +1,13 @@
-package examples
+package main
 
 import (
 	"fmt"
+	"log"
+
 	"indigo"
 	"indigo/http"
 	"indigo/router"
 	"indigo/types"
-	"log"
 )
 
 /*
