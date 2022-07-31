@@ -7,6 +7,7 @@ import (
 	"indigo/types"
 )
 
+// DefaultResponseBufferSize TODO: move this const to settings
 const DefaultResponseBufferSize = 1024
 
 type (
@@ -50,7 +51,6 @@ func (d DefaultRouter) OnRequest(req *types.Request, writeResponse types.Respons
 
 	resp = prepareResponse(resp)
 	err, d.respBuff = types.WriteResponse(d.respBuff[:len(http.BytesHTTP11)+1], resp, writeResponse)
-
 	return err
 }
 
