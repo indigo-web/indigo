@@ -4,7 +4,6 @@ import (
 	"github.com/stretchr/testify/require"
 	"io"
 	"testing"
-	"time"
 )
 
 func TestPipeReadWrite(t *testing.T) {
@@ -48,21 +47,4 @@ func TestPipeErrAfterWrite(t *testing.T) {
 
 	data, err = pipe.Read()
 	require.Error(t, err, wantedErr)
-}
-
-func TestPipeReadable(t *testing.T) {
-	pipe := NewPipe()
-	require.False(t, pipe.Readable(), "empty pipe but readable")
-
-	go func() {
-		pipe.Write([]byte("Hello, world!"))
-	}()
-
-	// oh fuck, how dirty... But I really don't know how else to notify
-	<-time.After(50 * time.Millisecond)
-
-	require.True(t, pipe.Readable(), "pipe is not empty but not readable")
-
-	_, _ = pipe.Read()
-	require.False(t, pipe.Readable(), "pipe is now again empty but readable")
 }
