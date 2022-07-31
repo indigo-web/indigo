@@ -1,9 +1,5 @@
 package internal
 
-import (
-	"sync/atomic"
-)
-
 /*
 Pipe is a simple implementation of io.Pipe, except re-usability. This means
 that after error is written pipe is still usable as it was before. This was
@@ -17,41 +13,32 @@ I lost like half and hour debugging the problem was caused because of that
 type Pipe struct {
 	data  chan []byte
 	error chan error
-
-	entries int32
 }
 
-func NewChanSizedPipe(dataChanSize, errChanSize int) *Pipe {
-	return &Pipe{
+func NewChanSizedPipe(dataChanSize, errChanSize int) Pipe {
+	return Pipe{
 		data:  make(chan []byte, dataChanSize),
 		error: make(chan error, errChanSize),
 	}
 }
 
-func NewPipe() *Pipe {
+func NewPipe() Pipe {
 	return NewChanSizedPipe(0, 0)
 }
 
-func (p *Pipe) Write(b []byte) {
-	atomic.AddInt32(&p.entries, 1)
+func (p Pipe) Write(b []byte) {
 	p.data <- b
 }
 
-func (p *Pipe) WriteErr(err error) {
-	atomic.AddInt32(&p.entries, 1)
+func (p Pipe) WriteErr(err error) {
 	p.error <- err
 }
 
-func (p *Pipe) Read() (b []byte, err error) {
-	atomic.AddInt32(&p.entries, -1)
+func (p Pipe) Read() (b []byte, err error) {
 	select {
 	case b = <-p.data:
 		return b, nil
 	case err = <-p.error:
 		return nil, err
 	}
-}
-
-func (p Pipe) Readable() bool {
-	return p.entries > 0
 }
