@@ -11,10 +11,15 @@ type (
 )
 
 type requestBody struct {
-	body *internal.Pipe
+	body internal.Pipe
+	read bool
 }
 
 func (r *requestBody) Read(bodyCb onBodyCallback, completeCb onBodyCompleteCallback) error {
+	defer func() {
+		r.read = true
+	}()
+
 	for {
 		piece, err := r.body.Read()
 
@@ -39,7 +44,16 @@ func (r *requestBody) Write(b []byte) {
 }
 
 func (r *requestBody) Reset() {
-	for r.body.Readable() {
-		_, _ = r.body.Read()
+	r.eraseBody()
+	r.read = false
+}
+
+func (r *requestBody) eraseBody() {
+	for !r.read {
+		if _, err := r.body.Read(); err != nil {
+			break
+		}
 	}
+
+	r.read = true
 }
