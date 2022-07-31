@@ -36,6 +36,9 @@ func (p *poller) Poll() {
 				p.errChan <- err
 				return
 			}
+
+			// signalize a completion of request handling
+			p.errChan <- nil
 		case err := <-p.errChan:
 			p.router.OnError(err)
 			return
@@ -90,17 +93,27 @@ func (c *httpHandler) Poll() {
 }
 
 func (c *httpHandler) OnData(data []byte) (err error) {
-	var done bool
+	var state parser.RequestState
 
 	for len(data) > 0 {
-		done, data, err = c.parser.Parse(data)
-		if err != nil {
+		state, data, err = c.parser.Parse(data)
+		switch state {
+		case parser.Pending:
+		case parser.Error:
 			c.poller.errChan <- errors.ErrParsingRequest
 			return err
-		}
-
-		if done {
+		case parser.RequestCompleted:
 			c.poller.reqChan <- c.request
+		case parser.BodyCompleted:
+			if err = <-c.poller.errChan; err != nil {
+				return err
+			}
+		case parser.RequestCompleted | parser.BodyCompleted:
+			c.poller.reqChan <- c.request
+
+			if err = <-c.poller.errChan; err != nil {
+				return err
+			}
 		}
 	}
 
