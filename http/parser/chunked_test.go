@@ -67,9 +67,9 @@ func TestChunkedTransferEncodingFullRequestBody(t *testing.T) {
 	}
 
 	parser, request := getParser()
-	done, extra, err := parser.Parse([]byte(rawRequest))
+	state, extra, err := parser.Parse([]byte(rawRequest))
 
-	require.True(t, done, "wanted completion flag but got false")
+	require.Equal(t, RequestCompleted, state, "wanted completion flag but got false")
 	require.Equal(t, []byte(wantBody), extra)
 	require.NoError(t, err)
 	require.NoError(t, compareRequests(wantedRequest, *request))
