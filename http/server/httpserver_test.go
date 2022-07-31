@@ -1,6 +1,7 @@
 package server
 
 import (
+	"indigo/http/parser"
 	"indigo/tests"
 	"indigo/types"
 	"testing"
@@ -9,8 +10,9 @@ import (
 )
 
 var (
-	simpleRequest = []byte("GET / HTTP/1.1\r\nHello: world\r\n\r\n")
-	nilRequest    = (*types.Request)(nil)
+	simpleGETRequest      = []byte("GET / HTTP/1.1\r\nHello: world\r\n\r\n")
+	helloWorldPOSTRequest = []byte("POST / HTTP/1.1\r\nContent-Length: 13\r\n\r\nHello, world!")
+	nilRequest            = (*types.Request)(nil)
 )
 
 func getPollerOutput(reqChan <-chan *types.Request, errChan <-chan error) (*types.Request, error) {
@@ -22,141 +24,122 @@ func getPollerOutput(reqChan <-chan *types.Request, errChan <-chan error) (*type
 	}
 }
 
-func TestHTTPServerRunAbility(t *testing.T) {
-	t.Run("RunOnce", func(t *testing.T) {
-		mockedParser := tests.HTTPParserMock{
-			Actions: []tests.ParserRetVal{
-				{true, nil, nil},
-			},
-		}
+func testParseNRequests(t *testing.T, n int, request []byte) {
+	reqChan, errChan := make(requestsChan, 1), make(errorsChan, 2)
+	mockedParser := &tests.HTTPParserMock{}
+	handler := newHTTPHandler(HTTPHandlerArgs{
+		Router:     nil,
+		Request:    nilRequest,
+		Parser:     mockedParser,
+		RespWriter: nil,
+	}, reqChan, errChan)
 
-		reqChan, errChan := make(requestsChan, 1), make(errorsChan, 2)
-		handler := newHTTPHandler(HTTPHandlerArgs{
-			Router:     nil,
-			Request:    nilRequest,
-			Parser:     &mockedParser,
-			RespWriter: nil,
-		}, reqChan, errChan)
+	for i := 0; i < n; i++ {
+		mockedParser.Actions = append(mockedParser.Actions, tests.ParserRetVal{
+			State: parser.RequestCompleted | parser.BodyCompleted,
+			Extra: nil,
+			Err:   nil,
+		})
 
-		err := handler.OnData(simpleRequest)
+		errChan <- nil
+		err := handler.OnData(request)
 		require.Nil(t, err, "unwanted error")
-		require.Equal(t, 1, mockedParser.CallsCount(), "too much parser calls")
+		require.Equal(t, i+1, mockedParser.CallsCount(), "too much parser calls")
 		require.Nil(t, mockedParser.GetError(), "unwanted error")
 
 		req, reqErr := getPollerOutput(reqChan, errChan)
 		require.Nil(t, reqErr, "unwanted error")
-		require.Equal(t, req, nilRequest, "must be equal")
+		require.Equal(t, req, nilRequest)
+	}
+}
+
+func testParse2Parts(t *testing.T, mockedParser tests.HTTPParserMock, firstPart, secondPart []byte) {
+	reqChan, errChan := make(requestsChan, 1), make(errorsChan, 2)
+	errChan <- nil
+	handler := newHTTPHandler(HTTPHandlerArgs{
+		Router:     nil,
+		Request:    nilRequest,
+		Parser:     &mockedParser,
+		RespWriter: nil,
+	}, reqChan, errChan)
+
+	err := handler.OnData(firstPart)
+	require.Nil(t, err, "unwanted error")
+	require.Nil(t, mockedParser.GetError(), "unwanted error")
+
+	req, reqErr := getPollerOutput(reqChan, errChan)
+	require.Nil(t, reqErr, "unwanted error")
+	require.Equal(t, req, nilRequest)
+
+	errChan <- nil
+	err = handler.OnData(secondPart)
+	require.Nil(t, err, "unwanted error")
+	require.Nil(t, mockedParser.GetError(), "unwanted error")
+
+	req, reqErr = getPollerOutput(reqChan, errChan)
+	require.Nil(t, reqErr, "unwanted error")
+	require.Equal(t, req, nilRequest)
+}
+
+func testSimpleCase(t *testing.T, request []byte) {
+	t.Run("RunOnce", func(t *testing.T) {
+		testParseNRequests(t, 1, request)
 	})
 
 	t.Run("SplitRequestInto2Parts", func(t *testing.T) {
-		firstPart := simpleRequest[:len(simpleRequest)/2]
-		secondPart := simpleRequest[len(simpleRequest)/2:]
+		firstPart := request[:len(request)/2]
+		secondPart := request[len(request)/2:]
 
 		mockedParser := tests.HTTPParserMock{
 			Actions: []tests.ParserRetVal{
-				{false, nil, nil},
-				{true, nil, nil},
+				{parser.Pending, nil, nil},
+				{parser.RequestCompleted | parser.BodyCompleted, nil, nil},
 			},
 		}
 
-		reqChan, errChan := make(requestsChan, 1), make(errorsChan, 2)
-		handler := newHTTPHandler(HTTPHandlerArgs{
-			Router:     nil,
-			Request:    nilRequest,
-			Parser:     &mockedParser,
-			RespWriter: nil,
-		}, reqChan, errChan)
-
-		err := handler.OnData(firstPart)
-		require.Nil(t, err, "unwanted error")
-		require.Equal(t, 1, mockedParser.CallsCount(), "too much parser calls")
-		require.Nil(t, mockedParser.GetError(), "unwanted error")
-
-		err = handler.OnData(secondPart)
-		require.Nil(t, err, "unwanted error")
-		require.Equal(t, 2, mockedParser.CallsCount(), "too much parser calls")
-		require.Nil(t, mockedParser.GetError(), "unwanted error")
-
-		req, reqErr := getPollerOutput(reqChan, errChan)
-		require.Nil(t, reqErr, "unwanted error")
-		require.Equal(t, req, nilRequest, "must be equal")
+		testParse2Parts(t, mockedParser, firstPart, secondPart)
 	})
-
 }
 
-func TestHTTPServer2Requests(t *testing.T) {
+func testSimpleManyRequests(t *testing.T, request []byte) {
 	t.Run("2Requests", func(t *testing.T) {
-		mockedParser := tests.HTTPParserMock{
-			Actions: []tests.ParserRetVal{
-				{true, nil, nil},
-				{true, nil, nil},
-			},
-		}
-
-		reqChan, errChan := make(requestsChan, 1), make(errorsChan, 2)
-		handler := newHTTPHandler(HTTPHandlerArgs{
-			Router:     nil,
-			Request:    nilRequest,
-			Parser:     &mockedParser,
-			RespWriter: nil,
-		}, reqChan, errChan)
-
-		err := handler.OnData(simpleRequest)
-		require.Nil(t, err, "unwanted error")
-		require.Equal(t, 1, mockedParser.CallsCount(), "too much parser calls")
-		require.Nil(t, mockedParser.GetError(), "unwanted error")
-
-		req, reqErr := getPollerOutput(reqChan, errChan)
-		require.Nil(t, reqErr, "unwanted error")
-		require.Equal(t, req, nilRequest, "must be equal")
-
-		err = handler.OnData(simpleRequest)
-		require.Nil(t, err, "unwanted error")
-		require.Equal(t, 2, mockedParser.CallsCount(), "too much parser calls")
-		require.Nil(t, mockedParser.GetError(), "unwanted error")
-
-		req, reqErr = getPollerOutput(reqChan, errChan)
-		require.Nil(t, reqErr, "unwanted error")
-		require.Equal(t, req, nilRequest, "must be equal")
+		testParseNRequests(t, 2, request)
 	})
 
 	t.Run("2RequestsWithExtra", func(t *testing.T) {
 		// just copy to be sure no implicit shit will happen
-		request := append(make([]byte, 0, len(simpleRequest)), simpleRequest...)
-		firstRequest := append(request, simpleRequest[:len(simpleRequest)/2]...)
-		secondRequest := simpleRequest[len(simpleRequest)/2:]
+		requestCopy := append(make([]byte, 0, len(request)), request...)
+		firstRequest := append(requestCopy, request[:len(request)/2]...)
+		secondRequest := request[len(request)/2:]
 
 		mockedParser := tests.HTTPParserMock{
 			Actions: []tests.ParserRetVal{
-				{true, nil, nil},
-				{true, nil, nil},
+				{parser.RequestCompleted | parser.BodyCompleted, request[:len(request)/2], nil},
+				{parser.Pending, nil, nil},
+				{parser.RequestCompleted | parser.BodyCompleted, nil, nil},
 			},
 		}
 
-		reqChan, errChan := make(requestsChan, 1), make(errorsChan, 2)
-		handler := newHTTPHandler(HTTPHandlerArgs{
-			Router:     nil,
-			Request:    nilRequest,
-			Parser:     &mockedParser,
-			RespWriter: nil,
-		}, reqChan, errChan)
-
-		err := handler.OnData(firstRequest)
-		require.Nil(t, err, "unwanted error")
-		require.Equal(t, 1, mockedParser.CallsCount(), "too much parser calls")
-		require.Nil(t, mockedParser.GetError(), "unwanted error")
-
-		req, reqErr := getPollerOutput(reqChan, errChan)
-		require.Nil(t, reqErr, "unwanted error")
-		require.Equal(t, req, nilRequest, "must be equal")
-
-		err = handler.OnData(secondRequest)
-		require.Nil(t, err, "unwanted error")
-		require.Equal(t, 2, mockedParser.CallsCount(), "too much parser calls")
-		require.Nil(t, mockedParser.GetError(), "unwanted error")
-
-		req, reqErr = getPollerOutput(reqChan, errChan)
-		require.Nil(t, reqErr, "unwanted error")
-		require.Equal(t, req, nilRequest, "must be equal")
+		testParse2Parts(t, mockedParser, firstRequest, secondRequest)
 	})
+
+	t.Run("5Requests", func(t *testing.T) {
+		testParseNRequests(t, 5, request)
+	})
+}
+
+func TestHTTPServerGETRequest(t *testing.T) {
+	testSimpleCase(t, simpleGETRequest)
+}
+
+func TestHTTPServerPOSTRequest(t *testing.T) {
+	testSimpleCase(t, helloWorldPOSTRequest)
+}
+
+func TestHTTPServerManyGETRequests(t *testing.T) {
+	testSimpleManyRequests(t, simpleGETRequest)
+}
+
+func TestHTTPServerManyPOSTRequests(t *testing.T) {
+	testSimpleManyRequests(t, helloWorldPOSTRequest)
 }
