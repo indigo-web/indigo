@@ -133,7 +133,7 @@ func testOrdinaryGETRequestParse(t *testing.T, chunkSize int) {
 	if chunkSize == -1 {
 		chunkSize = len(ordinaryGetRequest) + 1
 	}
-	
+
 	err, extra := FeedParser(parser, ordinaryGetRequest, chunkSize)
 
 	require.Nil(t, err, "unwanted error from parser")
