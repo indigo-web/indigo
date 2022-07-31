@@ -25,10 +25,10 @@ func NewRequest(
 	pipe := internal.NewChanSizedPipe(0, 1)
 
 	return Request{
-		Path:     pathBuffer,
-		Params:   params,
-		Protocol: http.Protocol{},
-		Headers:  headers,
+		Path:   pathBuffer,
+		Params: params,
+		// Protocol is null until first request
+		Headers: headers,
 		body: requestBody{
 			body: pipe,
 		},
