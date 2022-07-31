@@ -31,7 +31,6 @@ func TestHTTPServerRunAbility(t *testing.T) {
 		}
 
 		reqChan, errChan := make(requestsChan, 1), make(errorsChan, 2)
-		errChan <- nil
 		handler := newHTTPHandler(HTTPHandlerArgs{
 			Router:     nil,
 			Request:    nilRequest,
@@ -61,7 +60,6 @@ func TestHTTPServerRunAbility(t *testing.T) {
 		}
 
 		reqChan, errChan := make(requestsChan, 1), make(errorsChan, 2)
-		errChan <- nil
 		handler := newHTTPHandler(HTTPHandlerArgs{
 			Router:     nil,
 			Request:    nilRequest,
@@ -96,7 +94,6 @@ func TestHTTPServer2Requests(t *testing.T) {
 		}
 
 		reqChan, errChan := make(requestsChan, 1), make(errorsChan, 2)
-		errChan <- nil
 		handler := newHTTPHandler(HTTPHandlerArgs{
 			Router:     nil,
 			Request:    nilRequest,
@@ -113,7 +110,6 @@ func TestHTTPServer2Requests(t *testing.T) {
 		require.Nil(t, reqErr, "unwanted error")
 		require.Equal(t, req, nilRequest, "must be equal")
 
-		errChan <- nil
 		err = handler.OnData(simpleRequest)
 		require.Nil(t, err, "unwanted error")
 		require.Equal(t, 2, mockedParser.CallsCount(), "too much parser calls")
@@ -138,7 +134,6 @@ func TestHTTPServer2Requests(t *testing.T) {
 		}
 
 		reqChan, errChan := make(requestsChan, 1), make(errorsChan, 2)
-		errChan <- nil
 		handler := newHTTPHandler(HTTPHandlerArgs{
 			Router:     nil,
 			Request:    nilRequest,
@@ -155,7 +150,6 @@ func TestHTTPServer2Requests(t *testing.T) {
 		require.Nil(t, reqErr, "unwanted error")
 		require.Equal(t, req, nilRequest, "must be equal")
 
-		errChan <- nil
 		err = handler.OnData(secondRequest)
 		require.Nil(t, err, "unwanted error")
 		require.Equal(t, 2, mockedParser.CallsCount(), "too much parser calls")
