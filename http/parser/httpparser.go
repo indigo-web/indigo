@@ -24,7 +24,7 @@ var (
 )
 
 type HTTPRequestsParser interface {
-	Parse([]byte) (done bool, extra []byte, err error)
+	Parse([]byte) (state RequestState, extra []byte, err error)
 	Clear()
 }
 
@@ -71,24 +71,25 @@ func (p *httpRequestParser) Clear() {
 	This parser is absolutely stand-alone. It's like a separated sub-system in every
 	server, because everything you need is just to feed it
 */
-func (p *httpRequestParser) Parse(data []byte) (done bool, extra []byte, err error) {
+func (p *httpRequestParser) Parse(data []byte) (state RequestState, extra []byte, err error) {
 	if len(data) == 0 {
 		if p.closeConnection {
 			p.die()
 			p.pipe.WriteErr(io.EOF)
 			// to let server know that we received everything, and it's time to close the connection
-			return true, nil, errors.ErrConnectionClosed
+			return BodyCompleted, nil, errors.ErrConnectionClosed
 		}
 
-		return false, nil, nil
+		return Pending, nil, nil
 	}
 
 	switch p.state {
 	case eDead:
-		return true, nil, errors.ErrParserIsDead
+		return Error, nil, errors.ErrParserIsDead
 	case eMessageBegin:
 		p.state = eMethod
 	case eBody:
+		var done bool
 		done, extra, err = p.pushBodyPiece(data)
 		if err != nil {
 			p.die()
@@ -96,28 +97,30 @@ func (p *httpRequestParser) Parse(data []byte) (done bool, extra []byte, err err
 			// body parser. But chunked body parser anyway writes error by its own.
 			// So we don't care about it
 
-			return true, extra, err
+			return Error, extra, err
 		} else if done {
 			if !p.isChunked {
 				p.pipe.WriteErr(io.EOF)
 			}
 
 			p.Clear()
+
+			return BodyCompleted, extra, nil
 		}
 
-		return false, extra, nil
+		return Pending, extra, nil
 	case eBodyConnectionClose:
 		p.bodyBytesLeft -= len(data)
 		if p.bodyBytesLeft < 0 {
 			p.die()
 			p.pipe.WriteErr(errors.ErrBodyTooBig)
 
-			return true, nil, errors.ErrBodyTooBig
+			return Error, nil, errors.ErrBodyTooBig
 		}
 
 		p.pipe.Write(data)
 
-		return false, nil, nil
+		return Pending, nil, nil
 	}
 
 	for i := 0; i < len(data); i++ {
@@ -128,7 +131,7 @@ func (p *httpRequestParser) Parse(data []byte) (done bool, extra []byte, err err
 				if method == http.UNKNOWN {
 					p.die()
 
-					return true, nil, errors.ErrInvalidMethod
+					return Error, nil, errors.ErrInvalidMethod
 				}
 
 				p.request.Method = method
@@ -142,14 +145,14 @@ func (p *httpRequestParser) Parse(data []byte) (done bool, extra []byte, err err
 			if len(p.infoLineBuffer) > maxMethodLength {
 				p.die()
 
-				return true, nil, errors.ErrInvalidMethod
+				return Error, nil, errors.ErrInvalidMethod
 			}
 		case ePath:
 			if data[i] == ' ' {
 				if uint16(len(p.infoLineBuffer)) == p.infoLineOffset {
 					p.die()
 
-					return true, nil, errors.ErrInvalidPath
+					return Error, nil, errors.ErrInvalidPath
 				}
 
 				p.request.Path = p.infoLineBuffer[p.infoLineOffset:]
@@ -160,7 +163,7 @@ func (p *httpRequestParser) Parse(data []byte) (done bool, extra []byte, err err
 			} else if !ascii.IsPrint(data[i]) {
 				p.die()
 
-				return true, nil, errors.ErrInvalidPath
+				return Error, nil, errors.ErrInvalidPath
 			}
 
 			p.infoLineBuffer = append(p.infoLineBuffer, data[i])
@@ -168,7 +171,7 @@ func (p *httpRequestParser) Parse(data []byte) (done bool, extra []byte, err err
 			if uint16(len(p.infoLineBuffer[p.infoLineOffset:])) > p.settings.MaxURILength {
 				p.die()
 
-				return true, nil, errors.ErrBufferOverflow
+				return Error, nil, errors.ErrBufferOverflow
 			}
 		case eProtocol:
 			switch data[i] {
@@ -182,14 +185,14 @@ func (p *httpRequestParser) Parse(data []byte) (done bool, extra []byte, err err
 				if len(p.infoLineBuffer[p.infoLineOffset:]) > maxProtocolLength {
 					p.die()
 
-					return true, nil, errors.ErrBufferOverflow
+					return Error, nil, errors.ErrBufferOverflow
 				}
 			}
 		case eProtocolCR:
 			if data[i] != '\n' {
 				p.die()
 
-				return true, nil, errors.ErrRequestSyntaxError
+				return Error, nil, errors.ErrRequestSyntaxError
 			}
 
 			p.state = eProtocolLF
@@ -198,7 +201,7 @@ func (p *httpRequestParser) Parse(data []byte) (done bool, extra []byte, err err
 			if !ok {
 				p.die()
 
-				return true, nil, errors.ErrProtocolNotSupported
+				return Error, nil, errors.ErrProtocolNotSupported
 			}
 
 			p.request.Protocol = *proto
@@ -210,11 +213,11 @@ func (p *httpRequestParser) Parse(data []byte) (done bool, extra []byte, err err
 				p.Clear()
 				p.pipe.WriteErr(io.EOF)
 
-				return true, data[i+1:], nil
+				return RequestCompleted | BodyCompleted, data[i+1:], nil
 			} else if !ascii.IsPrint(data[i]) || data[i] == ':' {
 				p.die()
 
-				return true, nil, errors.ErrInvalidHeader
+				return Error, nil, errors.ErrInvalidHeader
 			}
 
 			p.headersBuffer = append(p.headersBuffer, data[i])
@@ -227,7 +230,7 @@ func (p *httpRequestParser) Parse(data []byte) (done bool, extra []byte, err err
 			} else if !ascii.IsPrint(data[i]) {
 				p.die()
 
-				return true, nil, errors.ErrInvalidHeader
+				return Error, nil, errors.ErrInvalidHeader
 			}
 
 			p.headersBuffer = append(p.headersBuffer, data[i])
@@ -235,7 +238,7 @@ func (p *httpRequestParser) Parse(data []byte) (done bool, extra []byte, err err
 			if uint8(len(p.headersBuffer)) >= p.settings.MaxHeaderKeyLength {
 				p.die()
 
-				return true, nil, errors.ErrBufferOverflow
+				return Error, nil, errors.ErrBufferOverflow
 			}
 		case eHeaderColon:
 			p.state = eHeaderValue
@@ -243,7 +246,7 @@ func (p *httpRequestParser) Parse(data []byte) (done bool, extra []byte, err err
 			if !ascii.IsPrint(data[i]) {
 				p.die()
 
-				return true, nil, errors.ErrInvalidHeader
+				return Error, nil, errors.ErrInvalidHeader
 			}
 
 			if data[i] != ' ' {
@@ -259,7 +262,7 @@ func (p *httpRequestParser) Parse(data []byte) (done bool, extra []byte, err err
 				if !ascii.IsPrint(data[i]) {
 					p.die()
 
-					return true, nil, errors.ErrInvalidHeader
+					return Error, nil, errors.ErrInvalidHeader
 				}
 
 				p.headersBuffer = append(p.headersBuffer, data[i])
@@ -267,14 +270,14 @@ func (p *httpRequestParser) Parse(data []byte) (done bool, extra []byte, err err
 				if uint16(len(p.headersBuffer)) > p.settings.MaxHeaderValueLength {
 					p.die()
 
-					return true, nil, errors.ErrBufferOverflow
+					return Error, nil, errors.ErrBufferOverflow
 				}
 			}
 		case eHeaderValueCR:
 			if data[i] != '\n' {
 				p.die()
 
-				return true, nil, errors.ErrRequestSyntaxError
+				return Error, nil, errors.ErrRequestSyntaxError
 			}
 
 			p.state = eHeaderValueLF
@@ -297,7 +300,7 @@ func (p *httpRequestParser) Parse(data []byte) (done bool, extra []byte, err err
 					if p.bodyBytesLeft, err = parseUint(value); err != nil {
 						p.die()
 
-						return true, nil, errors.ErrInvalidContentLength
+						return Error, nil, errors.ErrInvalidContentLength
 					}
 				}
 			case len(transferEncoding):
@@ -338,16 +341,16 @@ func (p *httpRequestParser) Parse(data []byte) (done bool, extra []byte, err err
 					// anyway in case of empty byte data it will stop parsing, so it's safe
 					// but also keeps amount of body bytes limited
 					p.bodyBytesLeft = int(p.settings.MaxBodyLength)
-					return true, data[i+1:], nil
+					return RequestCompleted, data[i+1:], nil
 				} else if p.bodyBytesLeft == 0 && !p.isChunked {
 					p.Clear()
 					p.pipe.WriteErr(io.EOF)
 
-					return true, data[i+1:], nil
+					return RequestCompleted | BodyCompleted, data[i+1:], nil
 				}
 
 				p.state = eBody
-				return true, data[i+1:], nil
+				return RequestCompleted, data[i+1:], nil
 			default:
 				p.headersBuffer = append(p.headersBuffer[:0], data[i])
 				p.state = eHeaderKey
@@ -356,25 +359,25 @@ func (p *httpRequestParser) Parse(data []byte) (done bool, extra []byte, err err
 			if data[i] != '\n' {
 				p.die()
 
-				return true, nil, errors.ErrRequestSyntaxError
+				return Error, nil, errors.ErrRequestSyntaxError
 			} else if p.closeConnection {
 				p.state = eBodyConnectionClose
 				p.bodyBytesLeft = int(p.settings.MaxBodyLength)
 
-				return true, data[i+1:], nil
+				return RequestCompleted, data[i+1:], nil
 			} else if p.bodyBytesLeft == 0 && !p.isChunked {
 				p.Clear()
 				p.pipe.WriteErr(io.EOF)
 
-				return true, data[i+1:], nil
+				return RequestCompleted | BodyCompleted, data[i+1:], nil
 			}
 
 			p.state = eBody
-			return true, data[i+1:], nil
+			return RequestCompleted, data[i+1:], nil
 		}
 	}
 
-	return false, nil, nil
+	return Pending, nil, nil
 }
 
 func (p *httpRequestParser) die() {
@@ -397,12 +400,10 @@ func (p *httpRequestParser) pushBodyPiece(data []byte) (done bool, extra []byte,
 	}
 
 	if p.bodyBytesLeft <= 0 {
-		p.pipe.WriteErr(io.EOF)
 		return true, data, nil
 	}
 
 	p.pipe.Write(data[:p.bodyBytesLeft])
-	p.pipe.WriteErr(io.EOF)
 
 	return true, data[p.bodyBytesLeft:], nil
 }

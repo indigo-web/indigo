@@ -1,8 +1,16 @@
 package parser
 
 type (
+	RequestState     uint8
 	parsingState     uint8
 	chunkedBodyState uint8
+)
+
+const (
+	Pending RequestState = 1 << iota
+	RequestCompleted
+	BodyCompleted
+	Error
 )
 
 const (
