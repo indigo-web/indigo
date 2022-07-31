@@ -5,12 +5,10 @@ import (
 	"indigo/internal"
 )
 
-type Params map[string][]byte
-
 type Request struct {
 	Method   http.Method
 	Path     []byte
-	Params   Params
+	Params   http.Params
 	Protocol http.Protocol
 	Headers  http.Headers
 
@@ -20,7 +18,7 @@ type Request struct {
 }
 
 func NewRequest(
-	pathBuffer []byte, headers http.Headers, params Params,
+	pathBuffer []byte, headers http.Headers, params http.Params,
 	bodyBuffSize uint32) (Request, internal.Pipe) {
 	// pipe is sized chan because parser can write an error even before
 	// handler will be called
