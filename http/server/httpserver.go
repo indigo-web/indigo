@@ -36,9 +36,6 @@ func (p *poller) Poll() {
 				p.errChan <- err
 				return
 			}
-
-			// signalize a completion of request handling
-			p.errChan <- nil
 		case err := <-p.errChan:
 			p.router.OnError(err)
 			return
@@ -56,7 +53,6 @@ type HTTPHandlerArgs struct {
 	Request    *types.Request
 	Parser     parser.HTTPRequestsParser
 	RespWriter types.ResponseWriter
-	poller     *poller
 }
 
 type httpHandler struct {
@@ -98,7 +94,6 @@ func (c *httpHandler) OnData(data []byte) (err error) {
 
 	for len(data) > 0 {
 		done, data, err = c.parser.Parse(data)
-
 		if err != nil {
 			c.poller.errChan <- errors.ErrParsingRequest
 			return err
@@ -106,10 +101,6 @@ func (c *httpHandler) OnData(data []byte) (err error) {
 
 		if done {
 			c.poller.reqChan <- c.request
-
-			if err = <-c.poller.errChan; err != nil {
-				return err
-			}
 		}
 	}
 
