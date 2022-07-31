@@ -1,14 +1,13 @@
 package parser
 
 import (
+	"github.com/scott-ainsworth/go-ascii"
 	"indigo/errors"
 	"indigo/http"
 	"indigo/internal"
 	"indigo/settings"
 	"indigo/types"
 	"io"
-
-	"github.com/scott-ainsworth/go-ascii"
 )
 
 const (
@@ -31,7 +30,7 @@ type HTTPRequestsParser interface {
 
 type httpRequestParser struct {
 	request *types.Request
-	pipe    *internal.Pipe
+	pipe    internal.Pipe
 
 	settings settings.Settings
 
@@ -48,7 +47,7 @@ type httpRequestParser struct {
 	chunksParser    *chunkedBodyParser
 }
 
-func NewHTTPParser(request *types.Request, pipe *internal.Pipe, settings settings.Settings) HTTPRequestsParser {
+func NewHTTPParser(request *types.Request, pipe internal.Pipe, settings settings.Settings) HTTPRequestsParser {
 	return &httpRequestParser{
 		request:        request,
 		pipe:           pipe,
@@ -91,7 +90,6 @@ func (p *httpRequestParser) Parse(data []byte) (done bool, extra []byte, err err
 		p.state = eMethod
 	case eBody:
 		done, extra, err = p.pushBodyPiece(data)
-
 		if err != nil {
 			p.die()
 			// do not write err because the only thing can return error is chunked
@@ -107,7 +105,19 @@ func (p *httpRequestParser) Parse(data []byte) (done bool, extra []byte, err err
 			p.Clear()
 		}
 
-		return done, extra, nil
+		return false, extra, nil
+	case eBodyConnectionClose:
+		p.bodyBytesLeft -= len(data)
+		if p.bodyBytesLeft < 0 {
+			p.die()
+			p.pipe.WriteErr(errors.ErrBodyTooBig)
+
+			return true, nil, errors.ErrBodyTooBig
+		}
+
+		p.pipe.Write(data)
+
+		return false, nil, nil
 	}
 
 	for i := 0; i < len(data); i++ {
@@ -198,6 +208,7 @@ func (p *httpRequestParser) Parse(data []byte) (done bool, extra []byte, err err
 				break
 			} else if data[i] == '\n' {
 				p.Clear()
+				p.pipe.WriteErr(io.EOF)
 
 				return true, data[i+1:], nil
 			} else if !ascii.IsPrint(data[i]) || data[i] == ':' {
@@ -327,7 +338,7 @@ func (p *httpRequestParser) Parse(data []byte) (done bool, extra []byte, err err
 					// anyway in case of empty byte data it will stop parsing, so it's safe
 					// but also keeps amount of body bytes limited
 					p.bodyBytesLeft = int(p.settings.MaxBodyLength)
-					break
+					return true, data[i+1:], nil
 				} else if p.bodyBytesLeft == 0 && !p.isChunked {
 					p.Clear()
 					p.pipe.WriteErr(io.EOF)
@@ -336,6 +347,7 @@ func (p *httpRequestParser) Parse(data []byte) (done bool, extra []byte, err err
 				}
 
 				p.state = eBody
+				return true, data[i+1:], nil
 			default:
 				p.headersBuffer = append(p.headersBuffer[:0], data[i])
 				p.state = eHeaderKey
@@ -348,7 +360,8 @@ func (p *httpRequestParser) Parse(data []byte) (done bool, extra []byte, err err
 			} else if p.closeConnection {
 				p.state = eBodyConnectionClose
 				p.bodyBytesLeft = int(p.settings.MaxBodyLength)
-				break
+
+				return true, data[i+1:], nil
 			} else if p.bodyBytesLeft == 0 && !p.isChunked {
 				p.Clear()
 				p.pipe.WriteErr(io.EOF)
@@ -357,30 +370,7 @@ func (p *httpRequestParser) Parse(data []byte) (done bool, extra []byte, err err
 			}
 
 			p.state = eBody
-		case eBody:
-			done, extra, err = p.pushBodyPiece(data[i:])
-			if err != nil {
-				p.die()
-				p.pipe.WriteErr(err)
-			} else if done {
-				p.Clear()
-				p.pipe.WriteErr(io.EOF)
-			}
-
-			return done, extra, err
-		case eBodyConnectionClose:
-			p.bodyBytesLeft -= len(data[i:])
-
-			if p.bodyBytesLeft < 0 {
-				p.die()
-				p.pipe.WriteErr(errors.ErrBodyTooBig)
-
-				return true, nil, errors.ErrBodyTooBig
-			}
-
-			p.pipe.Write(data[i:])
-
-			return false, nil, nil
+			return true, data[i+1:], nil
 		}
 	}
 
@@ -396,25 +386,23 @@ func (p *httpRequestParser) die() {
 
 func (p *httpRequestParser) pushBodyPiece(data []byte) (done bool, extra []byte, err error) {
 	if p.isChunked {
-		done, extra, err = p.chunksParser.Feed(data)
-
-		return done, extra, err
+		return p.chunksParser.Feed(data)
 	}
 
-	dataLen := len(data)
-
-	if p.bodyBytesLeft > dataLen {
+	if p.bodyBytesLeft > len(data) {
 		p.pipe.Write(data)
-		p.bodyBytesLeft -= dataLen
+		p.bodyBytesLeft -= len(data)
 
 		return false, nil, nil
 	}
 
 	if p.bodyBytesLeft <= 0 {
+		p.pipe.WriteErr(io.EOF)
 		return true, data, nil
 	}
 
 	p.pipe.Write(data[:p.bodyBytesLeft])
+	p.pipe.WriteErr(io.EOF)
 
 	return true, data[p.bodyBytesLeft:], nil
 }
