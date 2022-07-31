@@ -1,9 +1,12 @@
 package tests
 
-import "errors"
+import (
+	"errors"
+	"indigo/http/parser"
+)
 
 type ParserRetVal struct {
-	Done  bool
+	State parser.RequestState
 	Extra []byte
 	Err   error
 }
@@ -20,16 +23,16 @@ type HTTPParserMock struct {
 	err error
 }
 
-func (h *HTTPParserMock) Parse(_ []byte) (done bool, extra []byte, err error) {
+func (h *HTTPParserMock) Parse(_ []byte) (state parser.RequestState, extra []byte, err error) {
 	if h.callsCounter >= len(h.Actions) {
 		h.err = errors.New("too much calls")
-		return true, nil, h.err
+		return parser.Error, nil, h.err
 	}
 
 	action := h.Actions[h.callsCounter]
 	h.callsCounter++
 
-	return action.Done, action.Extra, action.Err
+	return action.State, action.Extra, action.Err
 }
 
 func (h *HTTPParserMock) Clear() {
