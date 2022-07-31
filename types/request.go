@@ -21,7 +21,7 @@ type Request struct {
 
 func NewRequest(
 	pathBuffer []byte, headers http.Headers, params Params,
-	bodyBuffSize uint32) (Request, *internal.Pipe) {
+	bodyBuffSize uint32) (Request, internal.Pipe) {
 	// pipe is sized chan because parser can write an error even before
 	// handler will be called
 	pipe := internal.NewChanSizedPipe(0, 1)
