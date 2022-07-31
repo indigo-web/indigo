@@ -33,7 +33,8 @@ func TestParserReuseAbilityChunkedRequest(t *testing.T) {
 	err, _ := FeedParser(parser, rawRequest, 5)
 
 	require.NoError(t, err)
-	require.NoError(t, compareRequests(wantedRequest, <-bodyChan, *request))
+	require.NoError(t, compareRequests(wantedRequest, *request))
+	require.Equal(t, []byte(wantedRequest.Body), <-bodyChan)
 
 	request.Reset()
 
@@ -41,7 +42,8 @@ func TestParserReuseAbilityChunkedRequest(t *testing.T) {
 	err, _ = FeedParser(parser, rawRequest, 5)
 
 	require.NoError(t, err)
-	require.NoError(t, compareRequests(wantedRequest, <-bodyChan, *request))
+	require.NoError(t, compareRequests(wantedRequest, *request))
+	require.Equal(t, []byte(wantedRequest.Body), <-bodyChan)
 }
 
 func TestChunkedTransferEncodingFullRequestBody(t *testing.T) {
@@ -51,6 +53,7 @@ func TestChunkedTransferEncodingFullRequestBody(t *testing.T) {
 		"Transfer-Encoding: chunked\r\n" +
 		"\r\nd\r\nHello, world!\r\n1a\r\nBut what's wrong with you?\r\nf\r\nFinally am here\r\n0\r\n\r\n"
 
+	wantBody := "d\r\nHello, world!\r\n1a\r\nBut what's wrong with you?\r\nf\r\nFinally am here\r\n0\r\n\r\n"
 	wantedRequest := WantedRequest{
 		Method:   "POST",
 		Path:     "/",
@@ -60,19 +63,17 @@ func TestChunkedTransferEncodingFullRequestBody(t *testing.T) {
 			"Host":              "indigo.dev",
 			"Transfer-Encoding": "chunked",
 		},
-		Body:                 "Hello, world!But what's wrong with you?Finally am here",
 		StrictHeadersCompare: true,
 	}
 
 	parser, request := getParser()
-	bodyChan := make(chan []byte)
-	go readBody(request, bodyChan)
 	done, extra, err := parser.Parse([]byte(rawRequest))
 
 	require.True(t, done, "wanted completion flag but got false")
-	require.Empty(t, extra)
+	require.Equal(t, []byte(wantBody), extra)
 	require.NoError(t, err)
-	require.NoError(t, compareRequests(wantedRequest, <-bodyChan, *request))
+	require.NoError(t, compareRequests(wantedRequest, *request))
+	require.Equal(t, []byte(wantBody), extra)
 }
 
 func TestChunkOverflow(t *testing.T) {
