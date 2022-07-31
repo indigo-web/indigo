@@ -16,11 +16,7 @@ import (
 
 type testHeaders map[string]string
 
-type parserer interface {
-	Parse([]byte) (done bool, extra []byte, err error)
-}
-
-func FeedParser(parser parserer, data []byte, chunksSize int) (err error, extra []byte) {
+func FeedParser(parser HTTPRequestsParser, data []byte, chunksSize int) (err error, extra []byte) {
 	for i := 0; i < len(data); i += chunksSize {
 		end := i + chunksSize
 
@@ -295,9 +291,9 @@ func TestChromeGETRequest(t *testing.T) {
 		"blqbudgdgdgdgddgdgdgdgdsgsdgsdgdgddgdGWnwfuDG; Goland-1dc491b=e03b2dgdgvdfgad0-b7ab-e4f8e1715c8b\r\n\r\n"
 
 	parser, request := getParser()
-	bodyChan := make(chan []byte, 1)
+	bodyChan := make(chan []byte)
 	go readBody(request, bodyChan)
-	done, extra, err := parser.Parse([]byte(rawRequest))
+	state, extra, err := parser.Parse([]byte(rawRequest))
 
 	wantedRequest := WantedRequest{
 		Method:   "GET",
@@ -313,9 +309,11 @@ func TestChromeGETRequest(t *testing.T) {
 	}
 
 	require.Nil(t, err)
-	require.True(t, done, "wanted completion flag")
-	require.Empty(t, extra, "unwanted extra")
+	require.Equal(t, RequestCompleted|BodyCompleted, state, "wanted completion flag")
+	require.Empty(t, extra, state, "unwanted extra")
 	require.Nil(t, compareRequests(wantedRequest, *request))
+
+	<-bodyChan
 }
 
 func TestParserReuseAbility(t *testing.T) {
@@ -422,10 +420,10 @@ func TestConnectionClose(t *testing.T) {
 	// on Connection: close header, the finish is connection close
 	// in this case, reading from socket returns empty byte
 	// and this will be a completion mark for our parser
-	var done bool
-	done, extra, err = parser.Parse(nil)
+	var state RequestState
+	state, extra, err = parser.Parse(nil)
 
-	require.True(t, done, "wanted completion flag")
+	require.Equal(t, BodyCompleted, state, "wanted completion flag")
 	require.Empty(t, extra, "unwanted extra")
 	require.Error(t, err, errors.ErrConnectionClosed)
 	require.Nil(t, compareRequests(wantedRequest, *request))
