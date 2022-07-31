@@ -37,6 +37,14 @@ func FeedParser(parser parserer, data []byte, chunksSize int) (err error, extra 
 		if err != nil {
 			return err, extra
 		}
+
+		for len(extra) > 0 {
+			_, extra, err = parser.Parse(extra)
+
+			if err != nil {
+				return err, extra
+			}
+		}
 	}
 
 	return nil, extra
@@ -56,7 +64,7 @@ func quote(data []byte) string {
 	return strconv.Quote(string(data))
 }
 
-func newRequest() (types.Request, *internal.Pipe) {
+func newRequest() (types.Request, internal.Pipe) {
 	return types.NewRequest(nil, make(http.Headers, 5), nil, 0)
 }
 
@@ -71,7 +79,7 @@ func readBody(request *types.Request, bodyChan chan []byte) {
 	bodyChan <- body
 }
 
-func compareRequests(wanted WantedRequest, body []byte, got types.Request) error {
+func compareRequests(wanted WantedRequest, got types.Request) error {
 	if http.Bytes2Method([]byte(wanted.Method)) != got.Method {
 		gotMethod := http.Method2String(got.Method)
 		return fmt.Errorf(
@@ -103,12 +111,6 @@ func compareRequests(wanted WantedRequest, body []byte, got types.Request) error
 		}
 	}
 
-	if len(wanted.Body) != len(body) {
-		return fmt.Errorf(
-			"mismatching bodies: wanted %s, got %s",
-			strconv.Quote(wanted.Body), quote(body))
-	}
-
 	return nil
 }
 
@@ -131,14 +133,12 @@ func testOrdinaryGETRequestParse(t *testing.T, chunkSize int) {
 	if chunkSize == -1 {
 		chunkSize = len(ordinaryGetRequest) + 1
 	}
-
-	bodyChan := make(chan []byte, 1)
-	go readBody(request, bodyChan)
+	
 	err, extra := FeedParser(parser, ordinaryGetRequest, chunkSize)
 
 	require.Nil(t, err, "unwanted error from parser")
 	require.Empty(t, extra, "unwanted extra")
-	require.Nil(t, compareRequests(wantedRequest, <-bodyChan, *request))
+	require.Nil(t, compareRequests(wantedRequest, *request))
 }
 
 func TestOrdinaryGETRequestParse1Char(t *testing.T) {
@@ -262,8 +262,8 @@ func testOrdinaryPOSTRequestParse(t *testing.T, chunkSize int) {
 	err, extra := FeedParser(parser, ordinaryGetRequest, chunkSize)
 
 	require.Nil(t, err)
-	require.Empty(t, extra, "unwanted extra")
-	require.Nil(t, compareRequests(wantedRequest, <-bodyChan, *request))
+	require.Empty(t, extra)
+	require.Nil(t, compareRequests(wantedRequest, *request))
 }
 
 func TestOrdinaryPOSTRequestParse1Char(t *testing.T) {
@@ -315,7 +315,7 @@ func TestChromeGETRequest(t *testing.T) {
 	require.Nil(t, err)
 	require.True(t, done, "wanted completion flag")
 	require.Empty(t, extra, "unwanted extra")
-	require.Nil(t, compareRequests(wantedRequest, <-bodyChan, *request))
+	require.Nil(t, compareRequests(wantedRequest, *request))
 }
 
 func TestParserReuseAbility(t *testing.T) {
@@ -340,7 +340,8 @@ func TestParserReuseAbility(t *testing.T) {
 	}
 
 	require.Nil(t, err)
-	require.Nil(t, compareRequests(wantedRequest, body, *request))
+	require.Nil(t, compareRequests(wantedRequest, *request))
+	require.Empty(t, body)
 	require.Empty(t, extra, "unwanted extra")
 
 	go readBody(request, bodyChan)
@@ -348,7 +349,8 @@ func TestParserReuseAbility(t *testing.T) {
 	body = <-bodyChan
 
 	require.Nil(t, err)
-	require.Nil(t, compareRequests(wantedRequest, body, *request))
+	require.Empty(t, body)
+	require.Nil(t, compareRequests(wantedRequest, *request))
 }
 
 func testOnlyLFGETRequest(t *testing.T, n int) {
@@ -377,7 +379,7 @@ func testOnlyLFGETRequest(t *testing.T, n int) {
 
 	require.Nil(t, err)
 	require.Empty(t, extra, "unwanted extra")
-	require.Nil(t, compareRequests(wantedRequest, <-bodyChan, *request))
+	require.Nil(t, compareRequests(wantedRequest, *request))
 }
 
 func TestOnlyLFGETRequestFull(t *testing.T) {
@@ -426,5 +428,5 @@ func TestConnectionClose(t *testing.T) {
 	require.True(t, done, "wanted completion flag")
 	require.Empty(t, extra, "unwanted extra")
 	require.Error(t, err, errors.ErrConnectionClosed)
-	require.Nil(t, compareRequests(wantedRequest, <-bodyChan, *request))
+	require.Nil(t, compareRequests(wantedRequest, *request))
 }
