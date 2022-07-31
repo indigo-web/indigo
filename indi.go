@@ -14,13 +14,13 @@ import (
 // Application TODO: add domain to allow host multiple
 //                   domains in a single web-server instance
 type Application struct {
-	addr string
+	host string
 	port uint16
 }
 
-func NewApp(addr string, port uint16) *Application {
+func NewApp(host string, port uint16) *Application {
 	return &Application{
-		addr: addr,
+		host: host,
 		port: port,
 	}
 }
@@ -37,7 +37,7 @@ func (a Application) Serve(router router.Router, maybeSettings ...settings.Setti
 		return errors.New("too much settings (one struct is expected)")
 	}
 
-	address := fmt.Sprintf("%s:%d", a.addr, a.port)
+	address := fmt.Sprintf("%s:%d", a.host, a.port)
 	sock, err := net.Listen("tcp", address)
 	if err != nil {
 		return err
@@ -46,6 +46,7 @@ func (a Application) Serve(router router.Router, maybeSettings ...settings.Setti
 
 	return server.StartTCPServer(sock, func(conn net.Conn) {
 		request, pipe := types.NewRequest(
+			// TODO: add all this shit to settings
 			make([]byte, 10), make(map[string][]byte), nil,
 			serverSettings.DefaultBodyBuffSize)
 		httpParser := parser.NewHTTPParser(&request, pipe, serverSettings)
