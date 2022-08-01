@@ -1,6 +1,7 @@
 package parser
 
 import (
+	"bytes"
 	"github.com/scott-ainsworth/go-ascii"
 	"indigo/errors"
 	"indigo/http"
@@ -220,7 +221,7 @@ func (p *httpRequestParser) Parse(data []byte) (state RequestState, extra []byte
 				return Error, nil, errors.ErrInvalidHeader
 			}
 
-			p.headersBuffer = append(p.headersBuffer, data[i])
+			p.headersBuffer = append(p.headersBuffer, data[i]|0x20)
 			p.state = eHeaderKey
 		case eHeaderKey:
 			if data[i] == ':' {
@@ -233,7 +234,7 @@ func (p *httpRequestParser) Parse(data []byte) (state RequestState, extra []byte
 				return Error, nil, errors.ErrInvalidHeader
 			}
 
-			p.headersBuffer = append(p.headersBuffer, data[i])
+			p.headersBuffer = append(p.headersBuffer, data[i]|0x20)
 
 			if uint8(len(p.headersBuffer)) >= p.settings.MaxHeaderKeyLength {
 				p.die()
@@ -287,16 +288,7 @@ func (p *httpRequestParser) Parse(data []byte) (state RequestState, extra []byte
 
 			switch len(key) {
 			case len(contentLength):
-				good := true
-
-				for j, character := range contentLength {
-					if character != (key[j] | 0x20) {
-						good = false
-						break
-					}
-				}
-
-				if good {
+				if bytes.Equal(key, contentLength) {
 					if p.bodyBytesLeft, err = parseUint(value); err != nil {
 						p.die()
 
@@ -304,30 +296,12 @@ func (p *httpRequestParser) Parse(data []byte) (state RequestState, extra []byte
 					}
 				}
 			case len(transferEncoding):
-				good := true
-
-				for j, character := range transferEncoding {
-					if character != (key[j] | 0x20) {
-						good = false
-						break
-					}
-				}
-
-				if good {
+				if bytes.Equal(key, transferEncoding) {
 					// TODO: maybe, there are some more transfer encodings I must support?
 					p.isChunked = EqualFold(chunked, value)
 				}
 			case len(connection):
-				good := true
-
-				for j, character := range connection {
-					if character != (key[j] | 0x20) {
-						good = false
-						break
-					}
-				}
-
-				if good {
+				if bytes.Equal(key, connection) {
 					p.closeConnection = EqualFold(closeConnection, value)
 				}
 			}
@@ -352,7 +326,7 @@ func (p *httpRequestParser) Parse(data []byte) (state RequestState, extra []byte
 				p.state = eBody
 				return RequestCompleted, data[i+1:], nil
 			default:
-				p.headersBuffer = append(p.headersBuffer[:0], data[i])
+				p.headersBuffer = append(p.headersBuffer[:0], data[i]|0x20)
 				p.state = eHeaderKey
 			}
 		case eHeaderValueDoubleCR:

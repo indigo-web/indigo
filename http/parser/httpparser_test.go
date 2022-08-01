@@ -118,8 +118,8 @@ func testOrdinaryGETRequestParse(t *testing.T, chunkSize int) {
 		Path:     "/",
 		Protocol: "HTTP/1.1",
 		Headers: testHeaders{
-			"Content-Type": "some content type",
-			"Host":         "indigo.dev",
+			"content-type": "some content type",
+			"host":         "indigo.dev",
 		},
 		Body: "",
 	}
@@ -241,9 +241,9 @@ func testOrdinaryPOSTRequestParse(t *testing.T, chunkSize int) {
 		Path:     "/",
 		Protocol: "HTTP/1.1",
 		Headers: testHeaders{
-			"Content-Type":   "some content type",
-			"Host":           "indigo.dev",
-			"Content-Length": "13",
+			"content-type":   "some content type",
+			"host":           "indigo.dev",
+			"content-length": "13",
 		},
 		Body:                 "Hello, world!",
 		StrictHeadersCompare: true,
@@ -300,9 +300,9 @@ func TestChromeGETRequest(t *testing.T) {
 		Path:     "/",
 		Protocol: "HTTP/1.1",
 		Headers: testHeaders{
-			"Host":            "localhost:8080",
-			"Content-Type":    "some content type",
-			"Accept-Encoding": "gzip, deflate, br",
+			"host":            "localhost:8080",
+			"content-type":    "some content type",
+			"accept-encoding": "gzip, deflate, br",
 		},
 		Body:                 "",
 		StrictHeadersCompare: false,
@@ -330,8 +330,8 @@ func TestParserReuseAbility(t *testing.T) {
 		Path:     "/",
 		Protocol: "HTTP/1.1",
 		Headers: testHeaders{
-			"Content-Type": "some content type",
-			"Host":         "indigo.dev",
+			"content-type": "some content type",
+			"host":         "indigo.dev",
 		},
 		Body:                 "",
 		StrictHeadersCompare: true,
@@ -365,7 +365,7 @@ func testOnlyLFGETRequest(t *testing.T, n int) {
 		Path:     "/",
 		Protocol: "HTTP/1.1",
 		Headers: testHeaders{
-			"Server": "indigo",
+			"server": "indigo",
 		},
 		Body:                 "",
 		StrictHeadersCompare: true,
@@ -403,8 +403,8 @@ func TestConnectionClose(t *testing.T) {
 		Path:     "/",
 		Protocol: "HTTP/1.1",
 		Headers: testHeaders{
-			"Host":       "indigo.dev",
-			"Connection": "close",
+			"host":       "indigo.dev",
+			"connection": "close",
 		},
 		Body:                 body,
 		StrictHeadersCompare: true,

@@ -20,9 +20,9 @@ func TestParserReuseAbilityChunkedRequest(t *testing.T) {
 		Path:     "/",
 		Protocol: "HTTP/1.1",
 		Headers: testHeaders{
-			"Content-Type":      "some content type",
-			"Host":              "indigo.dev",
-			"Transfer-Encoding": "chunked",
+			"content-type":      "some content type",
+			"host":              "indigo.dev",
+			"transfer-encoding": "chunked",
 		},
 		Body:                 "Hello, world!But what's wrong with you?Finally am here",
 		StrictHeadersCompare: true,
@@ -59,9 +59,9 @@ func TestChunkedTransferEncodingFullRequestBody(t *testing.T) {
 		Path:     "/",
 		Protocol: "HTTP/1.1",
 		Headers: testHeaders{
-			"Content-Type":      "some content type",
-			"Host":              "indigo.dev",
-			"Transfer-Encoding": "chunked",
+			"content-type":      "some content type",
+			"host":              "indigo.dev",
+			"transfer-encoding": "chunked",
 		},
 		StrictHeadersCompare: true,
 	}
