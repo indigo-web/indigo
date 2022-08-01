@@ -36,7 +36,7 @@ func (r Response) WithHeader(key, value string) Response {
 }
 
 func (r Response) WithBodyByte(body []byte) Response {
-	r.Body = append(r.Body, body...)
+	r.Body = body
 	return r
 }
 
@@ -56,17 +56,16 @@ func (r Response) GrowHeaders(newsize int) Response {
 render function takes buffer (that already starts with protocol and space),
 rendering and writing response directly into the response writer
 */
-func (r Response) render(buff []byte, writer ResponseWriter) (err error, modifiedBuff []byte) {
+func (r Response) render(buff []byte) (response []byte) {
 	// append code and status to buff
 	buff = append(append(buff, http.GetByteCodeTrailingSpace(r.Code)...), http.GetStatusTrailingCRLF(r.Code)...)
 
 	for _, header := range r.Headers {
 		buff = append(append(buff, header...), crlf...)
 	}
-
 	buff = append(buff, "Content-Length: "+strconv.Itoa(len(r.Body))+"\r\n\r\n"...)
 
-	return writer(append(buff, r.Body...)), buff
+	return append(buff, r.Body...)
 }
 
 func renderHeader(key, value []byte) []byte {
@@ -74,5 +73,6 @@ func renderHeader(key, value []byte) []byte {
 }
 
 func WriteResponse(buff []byte, response Response, writer ResponseWriter) (error, []byte) {
-	return response.render(buff, writer)
+	rendered := response.render(buff)
+	return writer(rendered), rendered
 }
