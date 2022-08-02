@@ -43,9 +43,7 @@ func testParseNRequests(t *testing.T, n int, request []byte) {
 
 		errChan <- nil
 		err := handler.OnData(request)
-		require.Nil(t, err, "unwanted error")
-		require.Equal(t, i+1, mockedParser.CallsCount(), "too much parser calls")
-		require.Nil(t, mockedParser.GetError(), "unwanted error")
+		require.NoError(t, err, "unwanted error")
 
 		req, reqErr := getPollerOutput(reqChan, errChan)
 		require.Nil(t, reqErr, "unwanted error")
@@ -64,8 +62,7 @@ func testParse2Parts(t *testing.T, mockedParser tests.HTTPParserMock, firstPart,
 	}, reqChan, errChan)
 
 	err := handler.OnData(firstPart)
-	require.Nil(t, err, "unwanted error")
-	require.Nil(t, mockedParser.GetError(), "unwanted error")
+	require.NoError(t, err, "unwanted error")
 
 	req, reqErr := getPollerOutput(reqChan, errChan)
 	require.Nil(t, reqErr, "unwanted error")
@@ -73,8 +70,7 @@ func testParse2Parts(t *testing.T, mockedParser tests.HTTPParserMock, firstPart,
 
 	errChan <- nil
 	err = handler.OnData(secondPart)
-	require.Nil(t, err, "unwanted error")
-	require.Nil(t, mockedParser.GetError(), "unwanted error")
+	require.NoError(t, err, "unwanted error")
 
 	req, reqErr = getPollerOutput(reqChan, errChan)
 	require.Nil(t, reqErr, "unwanted error")
