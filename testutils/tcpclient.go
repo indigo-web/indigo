@@ -1,4 +1,4 @@
-package tests
+package testutils
 
 import (
 	"fmt"
