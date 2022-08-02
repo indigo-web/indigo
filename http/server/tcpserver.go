@@ -1,7 +1,9 @@
 package server
 
 import (
+	"indigo/errors"
 	"net"
+	"sync"
 )
 
 /*
@@ -12,26 +14,38 @@ with sockets. All the received data it provides to
 const ReadBytesPerOnce = 2048 // may be even decreased to 1024
 
 type (
-	connHandler func(net.Conn)
+	connHandler func(*sync.WaitGroup, net.Conn)
 	dataHandler func([]byte) error
 )
 
-func StartTCPServer(sock net.Listener, handleConn connHandler) error {
+func StartTCPServer(sock net.Listener, handleConn connHandler, shutdown chan bool) error {
+	var wg *sync.WaitGroup
+
 	for {
 		conn, err := sock.Accept()
 
 		if err != nil {
-			// high-level api anyway will handle this error
-			// and restart tcp server
+			// TODO: high-level api must catch and wait some time before
+			//       calling this function again
 			return err
 		}
 
-		go handleConn(conn)
+		wg.Add(1)
+		go handleConn(wg, conn)
+
+		select {
+		case <-shutdown:
+			wg.Wait()
+			shutdown <- true
+			return errors.ErrServerShutdown
+		default:
+		}
 	}
 }
 
-func DefaultConnHandler(conn net.Conn, handleData dataHandler) {
+func DefaultConnHandler(wg *sync.WaitGroup, conn net.Conn, handleData dataHandler) {
 	defer conn.Close()
+	defer wg.Done()
 	buff := make([]byte, ReadBytesPerOnce)
 
 	for {
