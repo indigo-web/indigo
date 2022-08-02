@@ -5,7 +5,10 @@ import "errors"
 type Error error
 
 var (
+	ErrTooMuchSettings  = errors.New("too much settings (one struct is expected)")
 	ErrDuplicatedHeader = errors.New("ErrDuplicatedHeader: found a duplicated header")
+
+	ErrServerShutdown = errors.New("server is shutdown gracefully")
 
 	ErrInvalidMethod        = errors.New("ErrInvalidMethod: invalid method")
 	ErrInvalidPath          = errors.New("ErrInvalidPath: path is empty or contains disallowed characters")
