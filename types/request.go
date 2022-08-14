@@ -1,66 +1,51 @@
 package types
 
 import (
-	"indigo/http"
+	"indigo/http/headers"
+	methods "indigo/http/method"
+	"indigo/http/proto"
+	"indigo/http/url"
 	"indigo/internal"
 )
 
 type Request struct {
-	Method   http.Method
-	Path     []byte
-	Params   http.Params
-	Protocol http.Protocol
-	Headers  http.Headers
+	Method   methods.Method
+	Path     url.Path
+	Query    url.Query
+	Fragment url.Fragment
+	Proto    proto.Proto
 
-	body         requestBody
-	bodyBuff     []byte
-	bodyBuffSize uint32
+	Headers headers.Manager
+
+	body     requestBody
+	bodyBuff []byte
 }
 
-func NewRequest(
-	pathBuffer []byte, headers http.Headers, params http.Params,
-	bodyBuffSize uint32) (Request, internal.Pipe) {
-	// pipe is sized chan because parser can write an error even before
-	// handler will be called
-	pipe := internal.NewChanSizedPipe(0, 1)
-
-	return Request{
-		Path:   pathBuffer,
-		Params: params,
-		// Protocol is null until first request
+func NewRequest(headers headers.Manager) (*Request, *internal.BodyGateway) {
+	requestBodyStruct, gateway := newRequestBody()
+	request := &Request{
 		Headers: headers,
-		body: requestBody{
-			body: pipe,
-		},
-		bodyBuffSize: bodyBuffSize,
-	}, pipe
-}
-
-func (r *Request) GetBody(bodyCb onBodyCallback, completeCb onBodyCompleteCallback) error {
-	return r.body.Read(bodyCb, completeCb)
-}
-
-func (r *Request) GetFullBody() (body []byte, err error) {
-	if uint32(cap(r.bodyBuff)) < r.bodyBuffSize {
-		r.bodyBuff = make([]byte, 0, r.bodyBuffSize)
-	} else {
-		r.bodyBuff = r.bodyBuff[:0]
+		body:    requestBodyStruct,
 	}
 
-	err = r.GetBody(
-		func(b []byte) error {
-			r.bodyBuff = append(r.bodyBuff, b...)
-			return nil
-		},
-		func(bodyErr error) {
-			return
-		},
-	)
+	return request, gateway
+}
+
+func (r *Request) OnBody(onBody onBodyCallback, onComplete onCompleteCallback) error {
+	return r.body.Read(onBody, onComplete)
+}
+
+func (r *Request) Body() ([]byte, error) {
+	r.bodyBuff = r.bodyBuff[:0]
+	err := r.body.Read(func(b []byte) error {
+		r.bodyBuff = append(r.bodyBuff, b...)
+		return nil
+	}, func(err error) {
+	})
 
 	return r.bodyBuff, err
 }
 
-func (r *Request) Reset() {
-	// TODO: headers must also be reset
-	r.body.Reset()
+func (r *Request) Reset() error {
+	return r.body.Reset()
 }
