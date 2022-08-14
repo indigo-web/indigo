@@ -7,115 +7,97 @@ import (
 	"indigo/types"
 )
 
-/*
-HTTP server is a second and core layer. It receives data from tcp server,
-delegates it to parser, parser fills parsed data directly into the request
-structure, and then Session struct finally delegates request to a Router
-(if request has been received completely)
-*/
-
-type (
-	requestsChan chan *types.Request
-	errorsChan   chan error
-)
-
-type poller struct {
-	router        router.Router
-	writeResponse types.ResponseWriter
-
-	reqChan requestsChan
-	errChan errorsChan
-}
-
-func (p *poller) Poll() {
-	for {
-		select {
-		case request := <-p.reqChan:
-			if err := p.router.OnRequest(request, p.writeResponse); err != nil {
-				p.router.OnError(err)
-				p.errChan <- err
-				return
-			}
-
-			// signalize a completion of request handling
-			p.errChan <- nil
-		case err := <-p.errChan:
-			p.router.OnError(err)
-			return
-		}
-	}
-}
-
-type HTTPHandler interface {
+type HTTPServer interface {
+	Run()
 	OnData(b []byte) error
-	Poll()
 }
 
-type HTTPHandlerArgs struct {
-	Router     router.Router
-	Request    *types.Request
-	Parser     parser.HTTPRequestsParser
-	RespWriter types.ResponseWriter
+type httpServer struct {
+	request    *types.Request
+	respWriter types.ResponseWriter
+	router     router.Router
+	parser     parser.HTTPRequestsParser
+
+	notifier chan serverState
 }
 
-type httpHandler struct {
-	request *types.Request
-	parser  parser.HTTPRequestsParser
-	poller  poller
+func NewHTTPServer(
+	req *types.Request, respWriter types.ResponseWriter,
+	router router.Router, parser parser.HTTPRequestsParser) HTTPServer {
 
-	reqChan requestsChan
-	errChan errorsChan
-}
-
-func NewHTTPHandler(args HTTPHandlerArgs) HTTPHandler {
-	reqChan, errChan := make(requestsChan), make(errorsChan)
-
-	return newHTTPHandler(args, reqChan, errChan)
-}
-
-func newHTTPHandler(args HTTPHandlerArgs, reqChan requestsChan, errChan errorsChan) *httpHandler {
-	return &httpHandler{
-		request: args.Request,
-		parser:  args.Parser,
-		poller: poller{
-			router:        args.Router,
-			writeResponse: args.RespWriter,
-			reqChan:       reqChan,
-			errChan:       errChan,
-		},
-		reqChan: reqChan,
-		errChan: errChan,
+	return httpServer{
+		request:    req,
+		respWriter: respWriter,
+		router:     router,
+		parser:     parser,
+		notifier:   make(chan serverState),
 	}
 }
 
-func (c *httpHandler) Poll() {
-	c.poller.Poll()
+func (h httpServer) Run() {
+	h.requestProcessor()
 }
 
-func (c *httpHandler) OnData(data []byte) (err error) {
+func (h httpServer) OnData(data []byte) (err error) {
 	var state parser.RequestState
 
 	for len(data) > 0 {
-		state, data, err = c.parser.Parse(data)
+		state, data, err = h.parser.Parse(data)
+
 		switch state {
 		case parser.Pending:
-		case parser.Error:
-			c.poller.errChan <- errors.ErrParsingRequest
-			return err
-		case parser.RequestCompleted:
-			c.poller.reqChan <- c.request
+		case parser.HeadersCompleted:
+			h.notifier <- headersCompleted
 		case parser.BodyCompleted:
-			if err = <-c.poller.errChan; err != nil {
-				return err
+			if <-h.notifier != processed {
+				return errors.ErrCloseConnection
 			}
-		case parser.RequestCompleted | parser.BodyCompleted:
-			c.poller.reqChan <- c.request
+		case parser.RequestCompleted:
+			h.notifier <- headersCompleted
+			// the reason why we have manually finalize body is that
+			// parser has not notified about request completion yet, so
+			// handler is not called, but parser already has to write
+			// something to a blocking chan. This causes a deadlock, so
+			// we choose a bit hacky solution
+			h.parser.FinalizeBody()
+			if <-h.notifier != processed {
+				return errors.ErrCloseConnection
+			}
+		case parser.ConnectionClose:
+			h.notifier <- closeConnection
 
-			if err = <-c.poller.errChan; err != nil {
-				return err
-			}
+			return nil
+		case parser.Error:
+			h.notifier <- badRequest
+
+			return err
 		}
 	}
 
 	return nil
+}
+
+func (h httpServer) requestProcessor() {
+	for {
+		switch <-h.notifier {
+		case headersCompleted:
+			if h.router.OnRequest(h.request, h.respWriter) != nil {
+				h.notifier <- closeConnection
+				return
+			}
+			if err := h.request.Reset(); err != nil {
+				h.router.OnError(err)
+				h.notifier <- closeConnection
+				return
+			}
+
+			h.notifier <- processed
+		case closeConnection:
+			h.router.OnError(errors.ErrCloseConnection)
+			return
+		case badRequest:
+			h.router.OnError(errors.ErrBadRequest)
+			return
+		}
+	}
 }
