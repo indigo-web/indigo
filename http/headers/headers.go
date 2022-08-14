@@ -1,7 +1,9 @@
 package headers
 
 import (
+	"indigo/errors"
 	"indigo/internal"
+	"indigo/settings"
 )
 
 type ValueAppender func(...byte) int
@@ -24,12 +26,14 @@ func (h *HeaderValue) append(chars ...byte) (newLen int) {
 }
 
 type Manager struct {
-	headers map[string]*HeaderValue
+	headers    map[string]*HeaderValue
+	maxHeaders uint8
 }
 
-func NewManager(initialCap uint8) Manager {
+func NewManager(headersSettings settings.Setting[uint8]) Manager {
 	return Manager{
-		headers: make(map[string]*HeaderValue, initialCap),
+		headers:    make(map[string]*HeaderValue, headersSettings.Default),
+		maxHeaders: headersSettings.Maximal,
 	}
 }
 
@@ -38,16 +42,20 @@ func (m Manager) Get(key string) (header *HeaderValue, found bool) {
 	return header, found
 }
 
-func (m Manager) Set(key []byte) ValueAppender {
+func (m Manager) Set(key []byte) (appender ValueAppender, err error) {
 	// TODO: pre-alloc HeaderValue.value slice to some minimal size
 	header, found := m.headers[internal.B2S(key)]
 
 	if !found {
+		if uint8(len(m.headers)) >= m.maxHeaders {
+			return appender, errors.ErrTooManyHeaders
+		}
+
 		header = new(HeaderValue)
 		m.headers[string(key)] = header
 	} else {
 		header.value = header.value[:0]
 	}
 
-	return header.append
+	return header.append, nil
 }
