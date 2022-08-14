@@ -5,33 +5,25 @@ import (
 	"log"
 
 	"indigo"
-	"indigo/http"
+	"indigo/http/status"
 	"indigo/router"
 	"indigo/types"
 )
 
-/*
-MyManualHandler is actually not much faster, even if response is static and cached
-*/
-func MyManualHandler(request *types.Request) types.Response {
-	return types.Response{
-		Body: []byte("<h1>Hello, world! From kit</h1>"),
-	}
-}
+var addr = "localhost:9090"
 
-func MyBeautifulHandler(request *types.Request) types.Response {
-	return types.NewResponse().
-		WithCode(http.StatusOk).
+func MyHandler(request *types.Request) types.Response {
+	return types.WithResponse.
+		WithCode(status.OK).
 		WithHeader("Hello", "world").
 		WithBody("<h1>How are you doing?</h1>")
 }
 
 func main() {
 	myRouter := router.NewDefaultRouter()
-	myRouter.Route("/", MyManualHandler)
-	myRouter.Route("/hello", MyBeautifulHandler)
+	myRouter.Route("/", MyHandler)
 
-	fmt.Println("Listening on localhost:9090")
-	app := indigo.NewApp("localhost", 9090)
+	fmt.Println("Listening on", addr)
+	app := indigo.NewApp(addr)
 	log.Fatal(app.Serve(myRouter))
 }

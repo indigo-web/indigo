@@ -3,31 +3,31 @@ package main
 import (
 	"fmt"
 	"indigo"
-	"indigo/http"
-	"indigo/router"
+	"indigo/http/status"
+	router2 "indigo/router"
 	"indigo/types"
 	"log"
+	"strconv"
 )
 
-func MyPostHandler(request *types.Request) types.Response {
-	body, err := request.GetFullBody()
+var addr = "localhost:9090"
 
+func MyHandler(request *types.Request) types.Response {
+	body, err := request.Body()
 	if err != nil {
-		return types.NewResponse().
-			WithCode(http.StatusBadRequest).
-			WithBody("bad request")
+		return types.WithResponse.WithCode(status.BadRequest)
 	}
 
-	fmt.Println("somebody said:", string(body))
+	fmt.Println("somebody said:", strconv.Quote(string(body)))
 
-	return types.NewResponse().WithBody("Received and processed")
+	return types.WithResponse.WithBody("Received and processed! Thank you!")
 }
 
 func main() {
-	myRouter := router.NewDefaultRouter()
-	myRouter.Route("/tell", MyPostHandler)
+	router := router2.NewDefaultRouter()
+	router.Route("/say", MyHandler)
 
-	fmt.Println("Listening on localhost:9090")
-	app := indigo.NewApp("localhost", 9090)
-	log.Fatal(app.Serve(myRouter))
+	fmt.Println("Listening on", addr)
+	app := indigo.NewApp(addr)
+	log.Fatal(app.Serve(router))
 }
