@@ -206,13 +206,13 @@ func (p *httpRequestsParser) Parse(data []byte) (state parser.RequestState, extr
 		case eProto:
 			switch data[i] {
 			case '\r':
-				p.request.Proto = proto.String2Proto(internal.B2S(p.startLineBuff[p.offset:]))
+				p.request.Proto = proto.Parse(internal.B2S(p.startLineBuff[p.offset:]))
 				if p.request.Proto == proto.Unknown {
 					return parser.Error, nil, errors.ErrUnsupportedProtocol
 				}
 				p.state = eProtoCR
 			case '\n':
-				p.request.Proto = proto.String2Proto(internal.B2S(p.startLineBuff[p.offset:]))
+				p.request.Proto = proto.Parse(internal.B2S(p.startLineBuff[p.offset:]))
 				if p.request.Proto == proto.Unknown {
 					return parser.Error, nil, errors.ErrUnsupportedProtocol
 				}
