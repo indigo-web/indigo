@@ -12,8 +12,6 @@ import (
 type Application struct {
 	addr string
 
-	sock *net.Listener
-
 	shutdown chan bool
 }
 
