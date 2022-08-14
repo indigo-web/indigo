@@ -2,90 +2,125 @@ package settings
 
 import "math"
 
-const (
-	defaultMaxHeaders       uint8  = math.MaxUint8
-	defaultSockReadBuffSize uint16 = 2048
-	defaultMaxBodyLength    uint32 = math.MaxUint32
-	// defaultBodyBuffSize set to 128 not to overload memory by default
-	defaultBodyBuffSize         uint32 = 128
-	defaultMaxURILength         uint16 = 4096
-	defaultMaxHeaderKeyLength   uint8  = 100 // just like Apache
-	defaultMaxHeaderValueLength uint16 = 8192
-	defaultMaxBodyChunkLength   uint32 = math.MaxUint32
-	defaultInfoLineBuffSize     uint16 = 30
-	defaultHeadersBuffSize      uint16 = 500
-)
-
-type Settings struct {
-	// MaxHeaders is a max number of headers allowed to keep, in case of exceeding this value
-	// connection will be closed with StatusBadRequest code. By default, the value is 255,
-	// and it cannot be more. IMHO nobody even needs more as 255 is already a hell
-	MaxHeaders uint8
-
-	// SockReadBuffSize is a size of buffer to which one we are reading from socket
-	SockReadBuffSize uint16
-
-	// MaxBodyLength is a maximal value accepted in Content-Length header
-	MaxBodyLength uint32
-
-	// DefaultBodyBuffSize is an initial size of body buffer (used in case
-	// request.GetFullBody())
-	DefaultBodyBuffSize uint32
-
-	// MaxURILength is a maximal length of request path is accepted
-	MaxURILength uint16
-
-	// MaxHeaderKeyLength is a maximal length of header key is allowed (colon is not included)
-	MaxHeaderKeyLength uint8
-
-	// MaxHeaderValueLength is a maximal length of header value
-	MaxHeaderValueLength uint16
-
-	// MaxBodyChunkLength is a maximal length for body chunk (in case of chunked transfer encoding)
-	MaxBodyChunkLength uint32
-
-	// DefaultInfoLineBuffSize is a default capacity of newly allocated buffer for info line
-	DefaultInfoLineBuffSize uint16
-
-	// DefaultHeadersBuffSize is a default capacity of newly allocated buffer for headers line
-	DefaultHeadersBuffSize uint16
+type number interface {
+	int | int8 | int16 | int32 | int64 | uint | uint8 | uint16 | uint32 | uint64
 }
 
-func Prepare(settings Settings) Settings {
-	if settings.MaxHeaders == 0 {
-		settings.MaxHeaders = defaultMaxHeaders
-	}
-	if settings.SockReadBuffSize == 0 {
-		settings.SockReadBuffSize = defaultSockReadBuffSize
-	}
-	if settings.MaxBodyLength == 0 {
-		settings.MaxBodyLength = defaultMaxBodyLength
-	}
-	if settings.DefaultBodyBuffSize == 0 {
-		settings.DefaultBodyBuffSize = defaultBodyBuffSize
-	}
-	if settings.MaxURILength == 0 {
-		settings.MaxURILength = defaultMaxURILength
-	}
-	if settings.MaxHeaderKeyLength == 0 {
-		settings.MaxHeaderKeyLength = defaultMaxHeaderKeyLength
-	}
-	if settings.MaxHeaderValueLength == 0 {
-		settings.MaxHeaderValueLength = defaultMaxHeaderValueLength
-	}
-	if settings.MaxBodyChunkLength == 0 {
-		settings.MaxBodyChunkLength = defaultMaxBodyChunkLength
-	}
-	if settings.DefaultInfoLineBuffSize == 0 {
-		settings.DefaultInfoLineBuffSize = defaultInfoLineBuffSize
-	}
-	if settings.DefaultHeadersBuffSize == 0 {
-		settings.DefaultHeadersBuffSize = defaultHeadersBuffSize
-	}
+type Setting[T number] struct {
+	Default T // soft limit
+	Maximal T // hard limit
+}
 
-	return settings
+type Settings struct {
+	HeadersNumber       Setting[uint8]
+	HeaderKeyBuffSize   Setting[uint8]
+	HeaderValueBuffSize Setting[uint16]
+	URLBuffSize         Setting[uint16]
+	SockReadBufferSize  Setting[uint16]
+	BodyLength          Setting[uint32]
+	BodyBuff            Setting[uint32]
+	BodyChunkSize       Setting[uint32]
 }
 
 func Default() Settings {
-	return Prepare(Settings{})
+	// Usually, Default field stands for size of pre-allocated something
+	// and Maximal stands for maximal size of something
+
+	return Settings{
+		HeadersNumber: Setting[uint8]{
+			Default: math.MaxUint8 / 4,
+			Maximal: math.MaxUint8,
+		},
+		HeaderKeyBuffSize: Setting[uint8]{
+			// I heard Apache has the same
+			Default: 100,
+			Maximal: 100,
+		},
+		HeaderValueBuffSize: Setting[uint16]{
+			Default: math.MaxUint16 / 8,
+			Maximal: math.MaxUint16,
+		},
+		URLBuffSize: Setting[uint16]{
+			// math.MaxUint16 / 32 == 1024
+			Default: math.MaxUint16 / 32,
+			Maximal: math.MaxUint16,
+		},
+		SockReadBufferSize: Setting[uint16]{
+			// in case of SockReadBufferSize, we don't have an option of growth,
+			// so only one of them is used
+			Default: 2048,
+			Maximal: 2048,
+		},
+		BodyLength: Setting[uint32]{
+			Default: math.MaxUint32,
+			Maximal: math.MaxUint32,
+		},
+		BodyBuff: Setting[uint32]{
+			Default: 0,
+			Maximal: math.MaxUint32,
+		},
+		BodyChunkSize: Setting[uint32]{
+			// in case of BodyChunkSize, we don't have an option of growth,
+			// too
+			Default: math.MaxUint32,
+			Maximal: math.MaxUint32,
+		},
+	}
+}
+
+// Fill takes some settings and fills it with default values
+// everywhere where it is not filled
+func Fill(original Settings) (modified Settings) {
+	defaultSettings := Default()
+
+	if original.HeadersNumber.Default == 0 {
+		original.HeadersNumber.Default = defaultSettings.HeadersNumber.Default
+	}
+	if original.HeadersNumber.Maximal == 0 {
+		original.HeadersNumber.Maximal = defaultSettings.HeadersNumber.Maximal
+	}
+	if original.HeaderKeyBuffSize.Default == 0 {
+		original.HeaderKeyBuffSize.Default = defaultSettings.HeaderKeyBuffSize.Default
+	}
+	if original.HeaderKeyBuffSize.Maximal == 0 {
+		original.HeaderKeyBuffSize.Maximal = defaultSettings.HeaderKeyBuffSize.Maximal
+	}
+	if original.HeaderValueBuffSize.Default == 0 {
+		original.HeaderValueBuffSize.Default = defaultSettings.HeaderValueBuffSize.Default
+	}
+	if original.HeaderValueBuffSize.Maximal == 0 {
+		original.HeaderValueBuffSize.Maximal = defaultSettings.HeaderValueBuffSize.Maximal
+	}
+	if original.URLBuffSize.Default == 0 {
+		original.URLBuffSize.Default = defaultSettings.URLBuffSize.Default
+	}
+	if original.URLBuffSize.Maximal == 0 {
+		original.URLBuffSize.Maximal = defaultSettings.URLBuffSize.Maximal
+	}
+	if original.SockReadBufferSize.Default == 0 {
+		original.SockReadBufferSize.Default = defaultSettings.SockReadBufferSize.Default
+	}
+	if original.SockReadBufferSize.Maximal == 0 {
+		original.SockReadBufferSize.Maximal = defaultSettings.SockReadBufferSize.Maximal
+	}
+	if original.BodyLength.Default == 0 {
+		original.BodyLength.Default = defaultSettings.BodyLength.Default
+	}
+	if original.BodyLength.Maximal == 0 {
+		original.BodyLength.Maximal = defaultSettings.BodyLength.Maximal
+	}
+	if original.BodyBuff.Default == 0 {
+		original.BodyBuff.Default = defaultSettings.BodyBuff.Default
+	}
+	if original.BodyBuff.Maximal == 0 {
+		original.BodyBuff.Maximal = defaultSettings.BodyBuff.Maximal
+	}
+	if original.BodyChunkSize.Default == 0 {
+		original.BodyChunkSize.Default = defaultSettings.BodyChunkSize.Default
+	}
+	if original.BodyChunkSize.Maximal == 0 {
+		original.BodyChunkSize.Maximal = defaultSettings.BodyChunkSize.Maximal
+	}
+
+	return original
 }
