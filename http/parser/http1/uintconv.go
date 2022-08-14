@@ -1,4 +1,4 @@
-package parser
+package http1
 
 import (
 	"indigo/errors"
@@ -14,7 +14,7 @@ func parseUint(raw []byte) (num int, err error) {
 		char -= '0'
 
 		if char > 9 {
-			return 0, errors.ErrInvalidContentLength
+			return 0, errors.ErrBadRequest
 		}
 
 		num = num*10 + int(char)
