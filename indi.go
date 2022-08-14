@@ -1,89 +1,52 @@
 package indigo
 
 import (
-	"fmt"
-	"indigo/errors"
-	"indigo/http/parser"
+	"indigo/http/headers"
+	"indigo/http/parser/http1"
 	"indigo/http/server"
 	"indigo/router"
-	"indigo/settings"
 	"indigo/types"
 	"net"
-	"sync"
 )
 
-// Application TODO: add domain to allow host multiple
-//                   domains in a single web-server instance
 type Application struct {
-	host string
-	port uint16
+	addr string
+
+	sock *net.Listener
 
 	shutdown chan bool
 }
 
-func NewApp(host string, port uint16) *Application {
-	return &Application{
-		host: host,
-		port: port,
+func NewApp(addr string) Application {
+	return Application{
+		addr:     addr,
+		shutdown: make(chan bool),
 	}
 }
 
-func (a Application) Serve(router router.Router, maybeSettings ...settings.Settings) error {
-	serverSettings, err := getSettings(maybeSettings)
+func (a Application) Serve(router router.Router) error {
+	sock, err := net.Listen("tcp", a.addr)
 	if err != nil {
 		return err
 	}
 
-	address := fmt.Sprintf("%s:%d", a.host, a.port)
-	sock, err := net.Listen("tcp", address)
-	if err != nil {
-		return err
-	}
-	defer sock.Close()
+	return server.StartTCPServer(sock, func(conn net.Conn) {
+		// TODO: add settings and add this value right there
+		headersManager := headers.NewManager(5)
+		request, gateway := types.NewRequest(headersManager)
+		// TODO: add startLine and headerBuff initial size to settings
+		startLineBuff := make([]byte, 0, 1024)
+		headerBuff := make([]byte, 0, 100)
+		httpParser := http1.NewHTTPRequestsParser(
+			request, startLineBuff, headerBuff, gateway,
+		)
+		httpServer := server.NewHTTPServer(request, func(b []byte) error {
+			_, err := conn.Write(b)
+			return err
+		}, router, httpParser)
+		go httpServer.Run()
 
-	return runTCPServer(sock, router, serverSettings, a.shutdown)
-}
-
-// Shutdown is a graceful shutdown that waits until all the clients
-// will disconnect by their own, without forced disconnecting
-// Calling this method blocks until next client will be connected
-// (and disconnected instantly)
-func (a Application) Shutdown() {
-	a.shutdown <- true
-	<-a.shutdown
-}
-
-func runTCPServer(sock net.Listener, router router.Router,
-	serverSettings settings.Settings, shutdown chan bool) error {
-	return server.StartTCPServer(sock, func(wg *sync.WaitGroup, conn net.Conn) {
-		request, pipe := types.NewRequest(
-			// TODO: add all this shit to settings
-			make([]byte, 10), make(map[string][]byte), nil,
-			serverSettings.DefaultBodyBuffSize)
-		httpParser := parser.NewHTTPParser(&request, pipe, serverSettings)
-
-		handler := server.NewHTTPHandler(server.HTTPHandlerArgs{
-			Router:  router,
-			Request: &request,
-			Parser:  httpParser,
-			RespWriter: func(b []byte) error {
-				_, err := conn.Write(b)
-				return err
-			},
-		})
-
-		go handler.Poll()
-		server.DefaultConnHandler(wg, conn, handler.OnData)
-	}, shutdown)
-}
-
-func getSettings(maybeSettings []settings.Settings) (settings.Settings, error) {
-	switch len(maybeSettings) {
-	case 0:
-		return settings.Default(), nil
-	case 1:
-		return settings.Prepare(maybeSettings[0]), nil
-	default:
-		return settings.Settings{}, errors.ErrTooMuchSettings
-	}
+		readBuff := make([]byte, 1024)
+		server.DefaultConnHandler(conn, readBuff, httpServer.OnData)
+	})
 }
