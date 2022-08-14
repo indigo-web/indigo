@@ -1,12 +1,10 @@
-package http
-
-import "indigo/internal"
+package methods
 
 type Method uint8
 
 const (
-	UNKNOWN Method = 0
-	GET     Method = iota + 1
+	Unknown Method = iota
+	GET
 	HEAD
 	POST
 	PUT
@@ -17,8 +15,8 @@ const (
 	PATCH
 )
 
-func Bytes2Method(method []byte) Method {
-	switch internal.B2S(method) {
+func Parse(method string) Method {
+	switch method {
 	case "GET":
 		return GET
 	case "HEAD":
@@ -39,10 +37,10 @@ func Bytes2Method(method []byte) Method {
 		return PATCH
 	}
 
-	return UNKNOWN
+	return Unknown
 }
 
-func Method2String(method Method) string {
+func ToString(method Method) string {
 	switch method {
 	case GET:
 		return "GET"
@@ -64,5 +62,5 @@ func Method2String(method Method) string {
 		return "PATCH"
 	}
 
-	return "UNKNOWN"
+	return "???"
 }
