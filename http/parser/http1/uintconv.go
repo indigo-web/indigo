@@ -9,7 +9,7 @@ parseUint is a tiny implementation of strconv.Atoi, but using directly bytes arr
 and returning only one error in case of shit - InvalidContentLength
 Parses 10-numeral system integers
 */
-func parseUint(raw []byte) (num int, err error) {
+func parseUint(raw []byte) (num uint, err error) {
 	for _, char := range raw {
 		char -= '0'
 
@@ -17,7 +17,7 @@ func parseUint(raw []byte) (num int, err error) {
 			return 0, errors.ErrBadRequest
 		}
 
-		num = num*10 + int(char)
+		num = num*10 + uint(char)
 	}
 
 	return num, nil
