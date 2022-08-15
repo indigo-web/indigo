@@ -7,4 +7,5 @@ const (
 	processed
 	closeConnection
 	badRequest
+	requestEntityTooLarge
 )

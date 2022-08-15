@@ -68,7 +68,18 @@ func (h httpServer) OnData(data []byte) (err error) {
 
 			return nil
 		case parser.Error:
-			h.notifier <- badRequest
+			switch err {
+			case errors.ErrBadRequest, errors.ErrURLDecoding:
+				h.notifier <- badRequest
+			case errors.ErrTooLarge, errors.ErrURLTooLong, errors.ErrTooManyHeaders:
+				h.notifier <- requestEntityTooLarge
+			default:
+				h.notifier <- badRequest
+			}
+
+			// wait for processor to handle the error before connection will be closed
+			// for example, respond client with error
+			<-h.notifier
 
 			return err
 		}
@@ -94,9 +105,15 @@ func (h httpServer) requestProcessor() {
 			h.notifier <- processed
 		case closeConnection:
 			h.router.OnError(h.request, h.respWriter, errors.ErrCloseConnection)
+			h.notifier <- processed
 			return
 		case badRequest:
 			h.router.OnError(h.request, h.respWriter, errors.ErrBadRequest)
+			h.notifier <- processed
+			return
+		case requestEntityTooLarge:
+			h.router.OnError(h.request, h.respWriter, errors.ErrTooLarge)
+			h.notifier <- processed
 			return
 		}
 	}
