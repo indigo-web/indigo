@@ -1,13 +1,13 @@
 package http1
 
 import (
-	"fmt"
-	"indigo/http/encodings"
+	"indigo/errors"
 	"indigo/http/headers"
 	methods "indigo/http/method"
 	httpparser "indigo/http/parser"
 	"indigo/http/proto"
 	"indigo/http/url"
+	settings2 "indigo/settings"
 	"indigo/types"
 	"testing"
 
@@ -25,10 +25,10 @@ var (
 )
 
 func getParser() (httpparser.HTTPRequestsParser, *types.Request) {
-	request, gateway := types.NewRequest(headers.NewManager(5))
-	contentCodings := encodings.NewContentEncodings()
+	settings := settings2.Default()
+	request, gateway := types.NewRequest(headers.NewManager(settings.HeadersNumber))
 	return NewHTTPRequestsParser(
-		request, contentCodings, nil, make([]byte, 0, 30), gateway,
+		request, gateway, nil, nil, settings,
 	), request
 }
 
@@ -53,7 +53,6 @@ func compareRequests(t *testing.T, wanted wantedRequest, actual *types.Request) 
 
 	for key, value := range wanted.Headers {
 		actualValue, found := actual.Headers.Get(key)
-		fmt.Println("expecting", key, "in", actual.Headers)
 		require.True(t, found)
 		require.Equal(t, value, actualValue.String())
 	}
@@ -93,7 +92,8 @@ func testPartedRequest(t *testing.T, parser httpparser.HTTPRequestsParser,
 	if finalState == httpparser.RequestCompleted {
 		parser.FinalizeBody()
 	} else {
-		require.Equal(t, httpparser.BodyCompleted, finalState)
+		require.Equalf(t, httpparser.BodyCompleted, finalState,
+			"Body part size: %d", n)
 	}
 }
 
@@ -238,5 +238,132 @@ func TestHttpRequestsParser_ParsePOST(t *testing.T) {
 			compareRequests(t, wanted, request)
 			require.NoError(t, request.Reset())
 		}
+	})
+}
+
+func TestHttpRequestsParser_Parse_Negative(t *testing.T) {
+	t.Run("NoMethod", func(t *testing.T) {
+		parser, request := getParser()
+
+		raw := []byte(" / HTTP/1.1\r\n\r\n")
+		ch := make(chan []byte)
+		go readBody(request, ch)
+		state, _, err := parser.Parse(raw)
+
+		require.Equal(t, httpparser.Error, state)
+		require.EqualError(t, errors.ErrBadRequest, err.Error())
+	})
+
+	t.Run("ShortInvalidMethod", func(t *testing.T) {
+		parser, request := getParser()
+
+		raw := []byte("GE / HTTP/1.1\r\n\r\n")
+		ch := make(chan []byte)
+		go readBody(request, ch)
+		state, _, err := parser.Parse(raw)
+
+		require.Equal(t, httpparser.Error, state)
+		require.EqualError(t, errors.ErrBadRequest, err.Error())
+	})
+
+	t.Run("LongInvalidMethod", func(t *testing.T) {
+		parser, request := getParser()
+
+		raw := []byte("PATCHPOSTPUT / HTTP/1.1\r\n\r\n")
+		ch := make(chan []byte)
+		go readBody(request, ch)
+		state, _, err := parser.Parse(raw)
+
+		require.Equal(t, httpparser.Error, state)
+		require.EqualError(t, errors.ErrBadRequest, err.Error())
+	})
+
+	t.Run("ShortInvalidProtocol", func(t *testing.T) {
+		parser, request := getParser()
+
+		raw := []byte("GET / HTT\r\n\r\n")
+		ch := make(chan []byte)
+		go readBody(request, ch)
+		state, _, err := parser.Parse(raw)
+
+		require.Equal(t, httpparser.Error, state)
+		require.EqualError(t, err, errors.ErrUnsupportedProtocol.Error())
+	})
+
+	t.Run("LongInvalidProtocol", func(t *testing.T) {
+		parser, request := getParser()
+
+		raw := []byte("GET / HTTPS/1.1\r\n\r\n")
+		ch := make(chan []byte)
+		go readBody(request, ch)
+		state, _, err := parser.Parse(raw)
+
+		require.Equal(t, httpparser.Error, state)
+		require.EqualError(t, err, errors.ErrUnsupportedProtocol.Error())
+	})
+
+	t.Run("UnsupportedProtocol", func(t *testing.T) {
+		parser, request := getParser()
+
+		raw := []byte("GET / HTTP/1.2\r\n\r\n")
+		ch := make(chan []byte)
+		go readBody(request, ch)
+		state, _, err := parser.Parse(raw)
+
+		require.Equal(t, httpparser.Error, state)
+		require.EqualError(t, err, errors.ErrUnsupportedProtocol.Error())
+	})
+
+	t.Run("LFCR_CRLF", func(t *testing.T) {
+		parser, request := getParser()
+
+		raw := []byte("GET / HTTP/1.1\n\r\r\n")
+		ch := make(chan []byte)
+		go readBody(request, ch)
+		state, _, err := parser.Parse(raw)
+
+		require.Equal(t, httpparser.Error, state)
+		require.EqualError(t, errors.ErrBadRequest, err.Error())
+	})
+
+	t.Run("LFCR_LFCR", func(t *testing.T) {
+		// our parser is able to parse both crlf and lf splitters
+		// so in example below he sees LF CRLF CR
+		// the last one CR will be returned as extra-bytes
+
+		parser, request := getParser()
+
+		raw := []byte("GET / HTTP/1.1\n\r\n\r")
+		ch := make(chan []byte)
+		go readBody(request, ch)
+		state, extra, err := parser.Parse(raw)
+
+		require.Equal(t, httpparser.RequestCompleted, state)
+		require.Equal(t, []byte("\r"), extra)
+		require.NoError(t, err)
+	})
+
+	t.Run("HeaderWithoutColon", func(t *testing.T) {
+		parser, request := getParser()
+
+		raw := []byte("GET / HTTP/1.1\r\nsome header some value\r\n\r\n")
+		ch := make(chan []byte)
+		go readBody(request, ch)
+		state, _, err := parser.Parse(raw)
+
+		require.Equal(t, httpparser.Error, state)
+		require.EqualError(t, errors.ErrBadRequest, err.Error())
+	})
+
+	t.Run("HeaderWithoutColon", func(t *testing.T) {
+		parser, request := getParser()
+
+		raw := []byte("GET / HTTP/1.1\r\nsome header some value\r\n\r\n")
+		ch := make(chan []byte)
+		go readBody(request, ch)
+		state, _, err := parser.Parse(raw)
+
+		require.Equal(t, httpparser.Error, state)
+		require.EqualError(t, errors.ErrBadRequest, err.Error())
 	})
 }
