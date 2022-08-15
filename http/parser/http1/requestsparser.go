@@ -42,10 +42,10 @@ func NewHTTPRequestsParser(
 		state:   eMethod,
 		request: request,
 
-		settings: settings,
-
-		startLineBuff: startLineBuff,
-		headerBuff:    headerBuff,
+		chunkedBodyParser: newChunkedBodyParser(body, settings),
+		settings:          settings,
+		startLineBuff:     startLineBuff,
+		headerBuff:        headerBuff,
 
 		body: body,
 	}
@@ -365,7 +365,7 @@ func (p *httpRequestsParser) Parse(data []byte) (state parser.RequestState, extr
 
 func (p *httpRequestsParser) parseBody(b []byte) (done bool, extra []byte, err error) {
 	if p.chunkedTransferEncoding {
-		panic("Chunked transfer encoding is not implemented!")
+		return p.chunkedBodyParser.Parse(b)
 	}
 
 	if p.lengthCountdown <= uint(len(b)) {
