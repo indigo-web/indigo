@@ -12,7 +12,6 @@ type (
 func StartTCPServer(sock net.Listener, handleConn connHandler) error {
 	for {
 		conn, err := sock.Accept()
-
 		if err != nil {
 			return err
 		}

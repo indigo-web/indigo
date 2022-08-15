@@ -23,8 +23,8 @@ type httpServer struct {
 
 func NewHTTPServer(
 	req *types.Request, respWriter types.ResponseWriter,
-	router router.Router, parser parser.HTTPRequestsParser) HTTPServer {
-
+	router router.Router, parser parser.HTTPRequestsParser,
+) HTTPServer {
 	return httpServer{
 		request:    req,
 		respWriter: respWriter,
