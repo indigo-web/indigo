@@ -311,7 +311,6 @@ func (p *httpRequestsParser) Parse(data []byte) (state parser.RequestState, extr
 					return parser.Error, nil, err
 				}
 				if p.contentLength > uint(p.settings.BodyLength.Maximal) {
-
 				}
 				p.lengthCountdown = p.contentLength
 			case "connection":

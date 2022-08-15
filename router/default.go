@@ -10,11 +10,9 @@ import (
 
 type Handler func(request *types.Request) types.Response
 
-var (
-	defaultNotFound = types.WithResponse.
-		WithCode(status.NotFound).
-		WithBody(`<h1 align="center">404 Request Page Not Found</h1>`)
-)
+var defaultNotFound = types.WithResponse.
+	WithCode(status.NotFound).
+	WithBody(`<h1 align="center">404 Request Page Not Found</h1>`)
 
 type DefaultRouter struct {
 	routes   map[url.Path]Handler

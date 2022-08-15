@@ -2,12 +2,11 @@ package main
 
 import (
 	"fmt"
-	"log"
-
 	"indigo"
 	"indigo/http/status"
 	"indigo/router"
 	"indigo/types"
+	"log"
 )
 
 var addr = "localhost:9090"
