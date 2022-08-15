@@ -29,7 +29,8 @@ const (
 type chunkedBodyParserState uint8
 
 const (
-	eChunkLength chunkedBodyParserState = iota + 1
+	eChunkLength1Char chunkedBodyParserState = iota + 1
+	eChunkLength
 	eChunkLengthCR
 	eChunkLengthCRLF
 	eChunkBody
