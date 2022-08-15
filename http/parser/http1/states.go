@@ -36,6 +36,4 @@ const (
 	eChunkBodyCR
 	eChunkBodyCRLF
 	eLastChunkCR
-	eLastChunkCRLF
-	eLastChunkCRLFCR
 )
