@@ -86,17 +86,17 @@ func (h httpServer) requestProcessor() {
 				return
 			}
 			if err := h.request.Reset(); err != nil {
-				h.router.OnError(err)
+				h.router.OnError(h.request, h.respWriter, err)
 				h.notifier <- closeConnection
 				return
 			}
 
 			h.notifier <- processed
 		case closeConnection:
-			h.router.OnError(errors.ErrCloseConnection)
+			h.router.OnError(h.request, h.respWriter, errors.ErrCloseConnection)
 			return
 		case badRequest:
-			h.router.OnError(errors.ErrBadRequest)
+			h.router.OnError(h.request, h.respWriter, errors.ErrBadRequest)
 			return
 		}
 	}
