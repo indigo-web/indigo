@@ -1,28 +1,134 @@
 package settings
 
-const (
-	DefaultMaxHeaders       = 255
-	DefaultMaxBodyPieceSize = 2048
-)
+import "math"
 
-type Settings struct {
-	// MaxHeaders is a max number of headers allowed to keep, in case of exceeding this value
-	// connection will be closed with StatusBadRequest code. By default, the value is 255,
-	// and it cannot be more. IMHO nobody even needs more as 255 is already a hell
-	MaxHeaders uint8
-
-	// MaxBodyPieceSize is a max number of bytes can be read
-	MaxBodyPieceSize int
+type number interface {
+	int | int8 | int16 | int32 | int64 | uint | uint8 | uint16 | uint32 | uint64
 }
 
-func CookSettings(settings Settings) Settings {
-	maxHeaders := settings.MaxHeaders
+type Setting[T number] struct {
+	Default T // soft limit
+	Maximal T // hard limit
+}
 
-	if maxHeaders == 0 {
-		maxHeaders = DefaultMaxHeaders
-	}
+type Settings struct {
+	HeadersNumber       Setting[uint8]
+	HeaderKeyBuffSize   Setting[uint8]
+	HeaderValueBuffSize Setting[uint16]
+	URLBuffSize         Setting[uint16]
+	SockReadBufferSize  Setting[uint16]
+	BodyLength          Setting[uint32]
+	BodyBuff            Setting[uint32]
+	BodyChunkSize       Setting[uint32]
+}
+
+func Default() Settings {
+	// Usually, Default field stands for size of pre-allocated something
+	// and Maximal stands for maximal size of something
 
 	return Settings{
-		MaxHeaders: maxHeaders,
+		HeadersNumber: Setting[uint8]{
+			Default: math.MaxUint8 / 4,
+			Maximal: math.MaxUint8,
+		},
+		HeaderKeyBuffSize: Setting[uint8]{
+			// I heard Apache has the same
+			Default: 100,
+			Maximal: 100,
+		},
+		HeaderValueBuffSize: Setting[uint16]{
+			Default: math.MaxUint16 / 8,
+			Maximal: math.MaxUint16,
+		},
+		URLBuffSize: Setting[uint16]{
+			// math.MaxUint16 / 32 == 1024
+			Default: math.MaxUint16 / 32,
+			Maximal: math.MaxUint16,
+		},
+		SockReadBufferSize: Setting[uint16]{
+			// in case of SockReadBufferSize, we don't have an option of growth,
+			// so only one of them is used
+			Default: 2048,
+			Maximal: 2048,
+		},
+		BodyLength: Setting[uint32]{
+			Default: math.MaxUint32,
+			Maximal: math.MaxUint32,
+		},
+		BodyBuff: Setting[uint32]{
+			Default: 0,
+			Maximal: math.MaxUint32,
+		},
+		BodyChunkSize: Setting[uint32]{
+			// in case of BodyChunkSize, we don't have an option of growth,
+			// too
+			Default: math.MaxUint32,
+			Maximal: math.MaxUint32,
+		},
 	}
+}
+
+// Fill takes some settings and fills it with default values
+// everywhere where it is not filled
+func Fill(original Settings) (modified Settings) {
+	defaultSettings := Default()
+
+	original.HeadersNumber.Default = customOrDefault(
+		original.HeadersNumber.Default, defaultSettings.HeadersNumber.Default,
+	)
+	original.HeadersNumber.Maximal = customOrDefault(
+		original.HeadersNumber.Maximal, defaultSettings.HeadersNumber.Maximal,
+	)
+	original.HeaderKeyBuffSize.Default = customOrDefault(
+		original.HeaderKeyBuffSize.Default, defaultSettings.HeaderKeyBuffSize.Default,
+	)
+	original.HeaderKeyBuffSize.Maximal = customOrDefault(
+		original.HeaderKeyBuffSize.Maximal, defaultSettings.HeaderKeyBuffSize.Maximal,
+	)
+	original.HeaderValueBuffSize.Default = customOrDefault(
+		original.HeaderValueBuffSize.Default, defaultSettings.HeaderValueBuffSize.Default,
+	)
+	original.HeaderValueBuffSize.Maximal = customOrDefault(
+		original.HeaderValueBuffSize.Maximal, defaultSettings.HeaderValueBuffSize.Maximal,
+	)
+	original.URLBuffSize.Default = customOrDefault(
+		original.URLBuffSize.Default, defaultSettings.URLBuffSize.Default,
+	)
+	original.URLBuffSize.Maximal = customOrDefault(
+		original.URLBuffSize.Maximal, defaultSettings.URLBuffSize.Maximal,
+	)
+	original.SockReadBufferSize.Default = customOrDefault(
+		original.SockReadBufferSize.Default, defaultSettings.SockReadBufferSize.Default,
+	)
+	original.SockReadBufferSize.Maximal = customOrDefault(
+		original.SockReadBufferSize.Maximal, defaultSettings.SockReadBufferSize.Maximal,
+	)
+	original.BodyLength.Default = customOrDefault(
+		original.BodyLength.Default, defaultSettings.BodyLength.Default,
+	)
+	original.BodyLength.Maximal = customOrDefault(
+		original.BodyLength.Maximal, defaultSettings.BodyLength.Maximal,
+	)
+	original.BodyBuff.Default = customOrDefault(
+		original.BodyBuff.Default, defaultSettings.BodyBuff.Default,
+	)
+	original.BodyBuff.Maximal = customOrDefault(
+		original.BodyBuff.Maximal, defaultSettings.BodyBuff.Maximal,
+	)
+	original.BodyChunkSize.Default = customOrDefault(
+		original.BodyChunkSize.Default, defaultSettings.BodyChunkSize.Default,
+	)
+	original.BodyChunkSize.Maximal = customOrDefault(
+		original.BodyChunkSize.Maximal, defaultSettings.BodyChunkSize.Maximal,
+	)
+
+	return original
+}
+
+func customOrDefault[T number](custom, defaultVal T) T {
+	if custom == 0 {
+		return defaultVal
+	}
+
+	return custom
 }

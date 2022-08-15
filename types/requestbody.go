@@ -2,47 +2,63 @@ package types
 
 import (
 	"indigo/internal"
-	"io"
 )
 
 type (
-	onBodyCallback         func(b []byte) error
-	onBodyCompleteCallback func(err error)
+	onBodyCallback     func(b []byte) error
+	onCompleteCallback func(err error)
 )
 
+// requestBody is a struct that handles request body. Separated from types.Request
+// because contains a lot of internal logic and conventions that are exotic
+// TODO: add some struct that implements io.Reader interface. I propose implement it
+//       as a struct equal to this one, but sends signal about completion on a next
+//       Read() call (such a structure looks pretty unstable as for me, but no choice)
 type requestBody struct {
-	body *internal.Pipe
+	body *internal.BodyGateway
+	read bool
 }
 
-func (r *requestBody) Read(bodyCb onBodyCallback, completeCb onBodyCompleteCallback) error {
-	// actually, we can set r.Completed to true right here as we
-	// can guarantee that this function will complete reading anyway
-	// But it won't be that beautiful solution
-	for {
-		piece, err := r.body.Read()
+func newRequestBody() (requestBody, *internal.BodyGateway) {
+	gateway := internal.NewBodyGateway()
 
-		switch err {
-		case nil:
-			if err = bodyCb(piece); err != nil {
-				completeCb(err)
-				return err
-			}
-		case io.EOF:
-			completeCb(nil)
-			return nil
-		default:
-			completeCb(err)
+	return requestBody{
+		body: gateway,
+	}, gateway
+}
+
+func (r *requestBody) Read(onBody onBodyCallback, onComplete onCompleteCallback) (err error) {
+	r.read = true
+
+	for {
+		data := <-r.body.Data
+		if data == nil {
+			onComplete(r.body.Err)
+
+			return r.body.Err
+		}
+
+		if err = onBody(data); err != nil {
+			r.body.Err = err
+			r.body.Data <- nil
+
 			return err
 		}
+
+		r.body.Data <- nil
 	}
 }
 
-func (r *requestBody) Write(b []byte) {
-	r.body.Write(b)
-}
+func (r *requestBody) Reset() error {
+	if r.read {
+		return nil
+	}
 
-func (r *requestBody) Reset() {
-	for r.body.Readable() {
-		_, _ = r.body.Read()
+	r.read = false
+
+	for {
+		if <-r.body.Data == nil {
+			return r.body.Err
+		}
 	}
 }

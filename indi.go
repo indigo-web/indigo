@@ -1,51 +1,70 @@
 package indigo
 
 import (
-	"fmt"
-	"indigo/http/parser"
+	"errors"
+	"indigo/http/headers"
+	"indigo/http/parser/http1"
 	"indigo/http/server"
 	"indigo/router"
+	settings2 "indigo/settings"
 	"indigo/types"
 	"net"
 )
 
-// Application TODO: add domain to allow host multiple
-//                   domains in a single web-server instance
 type Application struct {
 	addr string
-	port uint16
+
+	shutdown chan bool
 }
 
-func NewApp(addr string, port uint16) *Application {
-	return &Application{
-		addr: addr,
-		port: port,
+func NewApp(addr string) Application {
+	return Application{
+		addr:     addr,
+		shutdown: make(chan bool),
 	}
 }
 
-func (a Application) Serve(router router.Router) error {
-	address := fmt.Sprintf("%s:%d", a.addr, a.port)
-	sock, err := net.Listen("tcp", address)
+func (a Application) Serve(router router.Router, someSettings ...settings2.Settings) error {
+	settings, err := getSettings(someSettings...)
 	if err != nil {
 		return err
 	}
-	defer sock.Close()
+
+	sock, err := net.Listen("tcp", a.addr)
+	if err != nil {
+		return err
+	}
 
 	return server.StartTCPServer(sock, func(conn net.Conn) {
-		request, pipe := types.NewRequest(make([]byte, 10), make(map[string][]byte), nil)
-		httpParser := parser.NewHTTPParser(&request, pipe, parser.Settings{})
+		headersManager := headers.NewManager(settings.HeadersNumber)
+		request, gateway := types.NewRequest(headersManager)
 
-		handler := server.NewHTTPHandler(server.HTTPHandlerArgs{
-			Router:  router,
-			Request: &request,
-			Parser:  httpParser,
-			RespWriter: func(b []byte) error {
-				_, err = conn.Write(b)
-				return err
-			},
-		})
+		startLineBuff := make([]byte, 0, settings.URLBuffSize.Default)
+		headerBuff := make([]byte, 0, settings.HeaderKeyBuffSize.Default)
 
-		go handler.Poll()
-		server.DefaultConnHandler(conn, handler.OnData)
+		httpParser := http1.NewHTTPRequestsParser(
+			request, gateway, startLineBuff, headerBuff, settings,
+		)
+
+		httpServer := server.NewHTTPServer(request, func(b []byte) error {
+			_, err := conn.Write(b)
+			return err
+		}, router, httpParser)
+
+		go httpServer.Run()
+
+		readBuff := make([]byte, settings.SockReadBufferSize.Default)
+		server.DefaultConnHandler(conn, readBuff, httpServer.OnData)
 	})
+}
+
+func getSettings(settings ...settings2.Settings) (settings2.Settings, error) {
+	switch len(settings) {
+	case 0:
+		return settings2.Default(), nil
+	case 1:
+		return settings2.Fill(settings[0]), nil
+	default:
+		return settings2.Settings{}, errors.New("too much settings")
+	}
 }

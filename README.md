@@ -4,10 +4,10 @@ Web-server in the middle of std and fasthttp.
 Implemented:
 - Stream-based request body processing
 - Convinient response constructor
+- Server-wide settings
 - I don't know what else to write here
 
 TODO:
-- Finish implementing server settings
 - Parse request params
 - Add request context
 - Fix bug with saving headers from previous request if were not used in a new one
