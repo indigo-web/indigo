@@ -110,7 +110,7 @@ func (p *httpRequestsParser) Parse(data []byte) (state parser.RequestState, extr
 				p.offset = len(p.startLineBuff)
 				p.state = eFragment
 			default:
-				if len(p.startLineBuff) >= int(p.settings.URLBuffSize.Maximal) {
+				if uint16(len(p.startLineBuff)) >= p.settings.URLBuffSize.Maximal {
 					return parser.Error, nil, errors.ErrURLTooLong
 				}
 
@@ -127,7 +127,7 @@ func (p *httpRequestsParser) Parse(data []byte) (state parser.RequestState, extr
 			if !isHex(data[i]) {
 				return parser.Error, nil, errors.ErrURLDecoding
 			}
-			if len(p.startLineBuff) >= int(p.settings.URLBuffSize.Maximal) {
+			if uint16(len(p.startLineBuff)) >= p.settings.URLBuffSize.Maximal {
 				return parser.Error, nil, errors.ErrURLTooLong
 			}
 
@@ -146,13 +146,13 @@ func (p *httpRequestsParser) Parse(data []byte) (state parser.RequestState, extr
 			case '%':
 				p.state = eQueryDecode1Char
 			case '+':
-				if len(p.startLineBuff) >= int(p.settings.URLBuffSize.Maximal) {
+				if uint16(len(p.startLineBuff)) >= p.settings.URLBuffSize.Maximal {
 					return parser.Error, nil, errors.ErrURLTooLong
 				}
 
 				p.startLineBuff = append(p.startLineBuff, ' ')
 			default:
-				if len(p.startLineBuff) >= int(p.settings.URLBuffSize.Maximal) {
+				if uint16(len(p.startLineBuff)) >= p.settings.URLBuffSize.Maximal {
 					return parser.Error, nil, errors.ErrURLTooLong
 				}
 
@@ -169,7 +169,7 @@ func (p *httpRequestsParser) Parse(data []byte) (state parser.RequestState, extr
 			if !isHex(data[i]) {
 				return parser.Error, nil, errors.ErrURLDecoding
 			}
-			if len(p.startLineBuff) >= int(p.settings.URLBuffSize.Maximal) {
+			if uint16(len(p.startLineBuff)) >= p.settings.URLBuffSize.Maximal {
 				return parser.Error, nil, errors.ErrURLTooLong
 			}
 
@@ -185,7 +185,7 @@ func (p *httpRequestsParser) Parse(data []byte) (state parser.RequestState, extr
 			case '%':
 				p.state = eFragmentDecode1Char
 			default:
-				if len(p.startLineBuff) >= int(p.settings.URLBuffSize.Maximal) {
+				if uint16(len(p.startLineBuff)) >= p.settings.URLBuffSize.Maximal {
 					return parser.Error, nil, errors.ErrURLTooLong
 				}
 
@@ -202,7 +202,7 @@ func (p *httpRequestsParser) Parse(data []byte) (state parser.RequestState, extr
 			if !isHex(data[i]) {
 				return parser.Error, nil, errors.ErrURLDecoding
 			}
-			if len(p.startLineBuff) >= int(p.settings.URLBuffSize.Maximal) {
+			if uint16(len(p.startLineBuff)) >= p.settings.URLBuffSize.Maximal {
 				return parser.Error, nil, errors.ErrURLTooLong
 			}
 
