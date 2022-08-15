@@ -73,54 +73,62 @@ func Default() Settings {
 func Fill(original Settings) (modified Settings) {
 	defaultSettings := Default()
 
-	if original.HeadersNumber.Default == 0 {
-		original.HeadersNumber.Default = defaultSettings.HeadersNumber.Default
-	}
-	if original.HeadersNumber.Maximal == 0 {
-		original.HeadersNumber.Maximal = defaultSettings.HeadersNumber.Maximal
-	}
-	if original.HeaderKeyBuffSize.Default == 0 {
-		original.HeaderKeyBuffSize.Default = defaultSettings.HeaderKeyBuffSize.Default
-	}
-	if original.HeaderKeyBuffSize.Maximal == 0 {
-		original.HeaderKeyBuffSize.Maximal = defaultSettings.HeaderKeyBuffSize.Maximal
-	}
-	if original.HeaderValueBuffSize.Default == 0 {
-		original.HeaderValueBuffSize.Default = defaultSettings.HeaderValueBuffSize.Default
-	}
-	if original.HeaderValueBuffSize.Maximal == 0 {
-		original.HeaderValueBuffSize.Maximal = defaultSettings.HeaderValueBuffSize.Maximal
-	}
-	if original.URLBuffSize.Default == 0 {
-		original.URLBuffSize.Default = defaultSettings.URLBuffSize.Default
-	}
-	if original.URLBuffSize.Maximal == 0 {
-		original.URLBuffSize.Maximal = defaultSettings.URLBuffSize.Maximal
-	}
-	if original.SockReadBufferSize.Default == 0 {
-		original.SockReadBufferSize.Default = defaultSettings.SockReadBufferSize.Default
-	}
-	if original.SockReadBufferSize.Maximal == 0 {
-		original.SockReadBufferSize.Maximal = defaultSettings.SockReadBufferSize.Maximal
-	}
-	if original.BodyLength.Default == 0 {
-		original.BodyLength.Default = defaultSettings.BodyLength.Default
-	}
-	if original.BodyLength.Maximal == 0 {
-		original.BodyLength.Maximal = defaultSettings.BodyLength.Maximal
-	}
-	if original.BodyBuff.Default == 0 {
-		original.BodyBuff.Default = defaultSettings.BodyBuff.Default
-	}
-	if original.BodyBuff.Maximal == 0 {
-		original.BodyBuff.Maximal = defaultSettings.BodyBuff.Maximal
-	}
-	if original.BodyChunkSize.Default == 0 {
-		original.BodyChunkSize.Default = defaultSettings.BodyChunkSize.Default
-	}
-	if original.BodyChunkSize.Maximal == 0 {
-		original.BodyChunkSize.Maximal = defaultSettings.BodyChunkSize.Maximal
-	}
+	original.HeadersNumber.Default = customOrDefault(
+		original.HeadersNumber.Default, defaultSettings.HeadersNumber.Default,
+	)
+	original.HeadersNumber.Maximal = customOrDefault(
+		original.HeadersNumber.Maximal, defaultSettings.HeadersNumber.Maximal,
+	)
+	original.HeaderKeyBuffSize.Default = customOrDefault(
+		original.HeaderKeyBuffSize.Default, defaultSettings.HeaderKeyBuffSize.Default,
+	)
+	original.HeaderKeyBuffSize.Maximal = customOrDefault(
+		original.HeaderKeyBuffSize.Maximal, defaultSettings.HeaderKeyBuffSize.Maximal,
+	)
+	original.HeaderValueBuffSize.Default = customOrDefault(
+		original.HeaderValueBuffSize.Default, defaultSettings.HeaderValueBuffSize.Default,
+	)
+	original.HeaderValueBuffSize.Maximal = customOrDefault(
+		original.HeaderValueBuffSize.Maximal, defaultSettings.HeaderValueBuffSize.Maximal,
+	)
+	original.URLBuffSize.Default = customOrDefault(
+		original.URLBuffSize.Default, defaultSettings.URLBuffSize.Default,
+	)
+	original.URLBuffSize.Maximal = customOrDefault(
+		original.URLBuffSize.Maximal, defaultSettings.URLBuffSize.Maximal,
+	)
+	original.SockReadBufferSize.Default = customOrDefault(
+		original.SockReadBufferSize.Default, defaultSettings.SockReadBufferSize.Default,
+	)
+	original.SockReadBufferSize.Maximal = customOrDefault(
+		original.SockReadBufferSize.Maximal, defaultSettings.SockReadBufferSize.Maximal,
+	)
+	original.BodyLength.Default = customOrDefault(
+		original.BodyLength.Default, defaultSettings.BodyLength.Default,
+	)
+	original.BodyLength.Maximal = customOrDefault(
+		original.BodyLength.Maximal, defaultSettings.BodyLength.Maximal,
+	)
+	original.BodyBuff.Default = customOrDefault(
+		original.BodyBuff.Default, defaultSettings.BodyBuff.Default,
+	)
+	original.BodyBuff.Maximal = customOrDefault(
+		original.BodyBuff.Maximal, defaultSettings.BodyBuff.Maximal,
+	)
+	original.BodyChunkSize.Default = customOrDefault(
+		original.BodyChunkSize.Default, defaultSettings.BodyChunkSize.Default,
+	)
+	original.BodyChunkSize.Maximal = customOrDefault(
+		original.BodyChunkSize.Maximal, defaultSettings.BodyChunkSize.Maximal,
+	)
 
 	return original
+}
+
+func customOrDefault[T number](custom, defaultVal T) T {
+	if custom == 0 {
+		return defaultVal
+	}
+
+	return custom
 }
