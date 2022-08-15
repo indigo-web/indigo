@@ -17,7 +17,7 @@ type chunkedBodyParser struct {
 
 func newChunkedBodyParser(gateway *internal.BodyGateway, settings settings.Settings) chunkedBodyParser {
 	return chunkedBodyParser{
-		state:    eChunkLength,
+		state:    eChunkLength1Char,
 		gateway:  gateway,
 		settings: settings,
 	}
@@ -26,6 +26,13 @@ func newChunkedBodyParser(gateway *internal.BodyGateway, settings settings.Setti
 func (c *chunkedBodyParser) Parse(data []byte) (done bool, extra []byte, err error) {
 	for i := range data {
 		switch c.state {
+		case eChunkLength1Char:
+			if !isHex(data[i]) {
+				return true, nil, errors.ErrBadRequest
+			}
+
+			c.chunkLength = uint32(unHex(data[i]))
+			c.state = eChunkLength
 		case eChunkLength:
 			switch data[i] {
 			case '\r':
@@ -55,7 +62,7 @@ func (c *chunkedBodyParser) Parse(data []byte) (done bool, extra []byte, err err
 				case '\r':
 					c.state = eLastChunkCR
 				case '\n':
-					c.state = eChunkLength
+					c.state = eChunkLength1Char
 
 					return true, data[i+1:], nil
 				default:
@@ -76,26 +83,42 @@ func (c *chunkedBodyParser) Parse(data []byte) (done bool, extra []byte, err err
 					return true, nil, c.gateway.Err
 				}
 
-				c.state = eChunkBodyCR
+				switch data[i] {
+				case '\r':
+					c.state = eChunkBodyCR
+				case '\n':
+					c.state = eChunkBodyCRLF
+				default:
+					return true, nil, errors.ErrBadRequest
+				}
 			}
 		case eChunkBodyCR:
 			switch data[i] {
-			case '\r':
-				c.state = eChunkBodyCRLF
 			case '\n':
-				c.state = eChunkLength
+				c.state = eChunkBodyCRLF
+			default:
+				return true, nil, errors.ErrBadRequest
 			}
 		case eChunkBodyCRLF:
 			switch data[i] {
+			case '\r':
+				c.state = eLastChunkCR
 			case '\n':
-				c.state = eChunkLength
+				c.state = eChunkLength1Char
+
+				return true, data[i+1:], nil
 			default:
-				return true, nil, errors.ErrBadRequest
+				c.chunkLength = uint32(unHex(data[i]))
+				if c.chunkLength > c.settings.BodyChunkSize.Maximal {
+					return true, nil, errors.ErrRequestEntityTooLarge
+				}
+
+				c.state = eChunkLength
 			}
 		case eLastChunkCR:
 			switch data[i] {
 			case '\n':
-				c.state = eChunkLength
+				c.state = eChunkLength1Char
 
 				return true, data[i+1:], nil
 			default:
