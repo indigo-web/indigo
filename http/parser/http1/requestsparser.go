@@ -225,6 +225,9 @@ func (p *httpRequestsParser) Parse(data []byte) (state parser.RequestState, extr
 				p.state = eProtoCRLF
 			default:
 				p.startLineBuff = append(p.startLineBuff, data[i])
+				if uint16(len(p.startLineBuff)) >= p.settings.URLBuffSize.Maximal {
+					return parser.Error, nil, errors.ErrUnsupportedProtocol
+				}
 			}
 		case eProtoCR:
 			if data[i] != '\n' {
@@ -368,9 +371,10 @@ func (p *httpRequestsParser) parseBody(b []byte) (done bool, extra []byte, err e
 	if p.lengthCountdown <= uint(len(b)) {
 		p.body.Data <- b[:p.lengthCountdown]
 		<-p.body.Data
+		extra = b[p.lengthCountdown:]
 		p.lengthCountdown = 0
 
-		return true, b[p.lengthCountdown:], p.body.Err
+		return true, extra, p.body.Err
 	}
 
 	p.body.Data <- b
