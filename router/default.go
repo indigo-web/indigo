@@ -33,7 +33,7 @@ func NewDefaultRouter() DefaultRouter {
 }
 
 func (d DefaultRouter) Route(method methods.Method, path string, handler Handler) {
-	if !strings.HasPrefix(path, "/") && path != "*" {
+	if path != "*" && !strings.HasPrefix(path, "/") {
 		path = "/" + path
 	}
 
