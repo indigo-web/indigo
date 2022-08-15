@@ -271,7 +271,7 @@ func (p *httpRequestsParser) Parse(data []byte) (state parser.RequestState, extr
 				return parser.Error, nil, errors.ErrBadRequest
 			default:
 				if len(p.headerBuff) >= int(p.settings.HeaderKeyBuffSize.Maximal) {
-					return parser.Error, nil, errors.ErrRequestEntityTooLarge
+					return parser.Error, nil, errors.ErrTooLarge
 				}
 
 				p.headerBuff = append(p.headerBuff, data[i]|0x20)
