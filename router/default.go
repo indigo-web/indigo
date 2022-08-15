@@ -7,6 +7,7 @@ import (
 	"indigo/http/status"
 	"indigo/http/url"
 	"indigo/types"
+	"strings"
 )
 
 type (
@@ -16,6 +17,7 @@ type (
 )
 
 type DefaultRouter struct {
+	prefix      string
 	routes      routesMap
 	errHandlers errHandlers
 	renderer    render.Renderer
@@ -31,7 +33,11 @@ func NewDefaultRouter() DefaultRouter {
 }
 
 func (d DefaultRouter) Route(method methods.Method, path string, handler Handler) {
-	urlPath := url.Path(path)
+	if !strings.HasPrefix(path, "/") && path != "*" {
+		path = "/" + path
+	}
+
+	urlPath := url.Path(d.prefix + path)
 	methodsMap, found := d.routes[urlPath]
 	if !found {
 		methodsMap = make(handlersMap)
@@ -41,8 +47,53 @@ func (d DefaultRouter) Route(method methods.Method, path string, handler Handler
 	methodsMap[method] = handler
 }
 
+func (d DefaultRouter) Get(path string, handler Handler) {
+	d.Route(methods.GET, path, handler)
+}
+
+func (d DefaultRouter) Head(path string, handler Handler) {
+	d.Route(methods.HEAD, path, handler)
+}
+
+func (d DefaultRouter) Post(path string, handler Handler) {
+	d.Route(methods.POST, path, handler)
+}
+
+func (d DefaultRouter) Put(path string, handler Handler) {
+	d.Route(methods.PUT, path, handler)
+}
+
+func (d DefaultRouter) Delete(path string, handler Handler) {
+	d.Route(methods.DELETE, path, handler)
+}
+
+func (d DefaultRouter) Connect(path string, handler Handler) {
+	d.Route(methods.CONNECT, path, handler)
+}
+
+func (d DefaultRouter) Options(path string, handler Handler) {
+	d.Route(methods.OPTIONS, path, handler)
+}
+
+func (d DefaultRouter) Trace(path string, handler Handler) {
+	d.Route(methods.TRACE, path, handler)
+}
+
+func (d DefaultRouter) Patch(path string, handler Handler) {
+	d.Route(methods.PATCH, path, handler)
+}
+
 func (d DefaultRouter) RouteError(code status.Code, handler ErrorHandler) {
 	d.errHandlers[code] = handler
+}
+
+func (d DefaultRouter) Group(prefix string) DefaultRouter {
+	return DefaultRouter{
+		prefix:      d.prefix + prefix,
+		routes:      d.routes,
+		errHandlers: d.errHandlers,
+		renderer:    d.renderer,
+	}
 }
 
 func (d DefaultRouter) OnRequest(request *types.Request, respWriter types.ResponseWriter) error {
