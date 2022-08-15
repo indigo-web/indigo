@@ -34,7 +34,8 @@ func (d DefaultRouter) Route(method methods.Method, path string, handler Handler
 	urlPath := url.Path(path)
 	methodsMap, found := d.routes[urlPath]
 	if !found {
-		d.routes[urlPath] = handlersMap{}
+		methodsMap = make(handlersMap)
+		d.routes[urlPath] = methodsMap
 	}
 
 	methodsMap[method] = handler
@@ -59,14 +60,21 @@ func (d DefaultRouter) OnRequest(request *types.Request, respWriter types.Respon
 }
 
 func (d DefaultRouter) OnError(request *types.Request, respWriter types.ResponseWriter, err error) {
-	// currently this callback may be only called with these 2 errors
+	var code status.Code
+
 	switch err {
 	case errors.ErrCloseConnection:
-		d.errHandlers[status.ConnectionClose](request)
+		code = status.ConnectionClose
 	case errors.ErrBadRequest:
-		response := d.errHandlers[status.BadRequest](request)
-		// we don't care whether any error occurred here because in case of calling this
-		// callback connection will be anyway closed
-		_ = respWriter(d.renderer.Response(request.Proto, response))
+		code = status.BadRequest
+	case errors.ErrTooLarge:
+		code = status.RequestEntityTooLarge
+	default:
+		// unknown error, but for consistent behaviour we must respond with
+		// something. Let it be some neutral error
+		code = status.BadRequest
 	}
+
+	response := d.errHandlers[code](request)
+	_ = respWriter(d.renderer.Response(request.Proto, response))
 }
