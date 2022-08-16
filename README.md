@@ -5,13 +5,12 @@ Implemented:
 - Stream-based request body processing
 - Convinient response constructor
 - Server-wide settings
-- Convinient router with groups and error handlers
+- Convinient router with customizable error handlers, middlewares and handlers groups
 - I don't know what else to write here
 
 TODO:
 - Parse request params
 - Add request context
-- Add middlewares
 - Fix bug with saving headers from previous request if were not used in a new one
 - Add connection hijacking
 
