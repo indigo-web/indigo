@@ -2,17 +2,17 @@ package main
 
 import (
 	"fmt"
-	"log"
-
 	"indigo"
+	methods "indigo/http/method"
 	"indigo/http/status"
 	"indigo/router"
 	"indigo/types"
+	"log"
 )
 
 var addr = "localhost:9090"
 
-func MyHandler(request *types.Request) types.Response {
+func MyHandler(_ *types.Request) types.Response {
 	return types.WithResponse.
 		WithCode(status.OK).
 		WithHeader("Hello", "world").
@@ -21,7 +21,7 @@ func MyHandler(request *types.Request) types.Response {
 
 func main() {
 	myRouter := router.NewDefaultRouter()
-	myRouter.Route("/", MyHandler)
+	myRouter.Route(methods.GET, "/", MyHandler)
 
 	fmt.Println("Listening on", addr)
 	app := indigo.NewApp(addr)

@@ -5,6 +5,7 @@ Implemented:
 - Stream-based request body processing
 - Convinient response constructor
 - Server-wide settings
+- Convinient router with customizable error handlers, middlewares and handlers groups
 - I don't know what else to write here
 
 TODO:

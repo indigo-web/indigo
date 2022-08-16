@@ -6,5 +6,5 @@ import (
 
 type Router interface {
 	OnRequest(request *types.Request, writer types.ResponseWriter) error
-	OnError(err error)
+	OnError(request *types.Request, writer types.ResponseWriter, err error)
 }

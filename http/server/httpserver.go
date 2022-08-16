@@ -23,8 +23,8 @@ type httpServer struct {
 
 func NewHTTPServer(
 	req *types.Request, respWriter types.ResponseWriter,
-	router router.Router, parser parser.HTTPRequestsParser) HTTPServer {
-
+	router router.Router, parser parser.HTTPRequestsParser,
+) HTTPServer {
 	return httpServer{
 		request:    req,
 		respWriter: respWriter,
@@ -68,7 +68,18 @@ func (h httpServer) OnData(data []byte) (err error) {
 
 			return nil
 		case parser.Error:
-			h.notifier <- badRequest
+			switch err {
+			case errors.ErrBadRequest, errors.ErrURLDecoding:
+				h.notifier <- badRequest
+			case errors.ErrTooLarge, errors.ErrURLTooLong, errors.ErrTooManyHeaders:
+				h.notifier <- requestEntityTooLarge
+			default:
+				h.notifier <- badRequest
+			}
+
+			// wait for processor to handle the error before connection will be closed
+			// for example, respond client with error
+			<-h.notifier
 
 			return err
 		}
@@ -86,17 +97,23 @@ func (h httpServer) requestProcessor() {
 				return
 			}
 			if err := h.request.Reset(); err != nil {
-				h.router.OnError(err)
+				h.router.OnError(h.request, h.respWriter, err)
 				h.notifier <- closeConnection
 				return
 			}
 
 			h.notifier <- processed
 		case closeConnection:
-			h.router.OnError(errors.ErrCloseConnection)
+			h.router.OnError(h.request, h.respWriter, errors.ErrCloseConnection)
+			h.notifier <- processed
 			return
 		case badRequest:
-			h.router.OnError(errors.ErrBadRequest)
+			h.router.OnError(h.request, h.respWriter, errors.ErrBadRequest)
+			h.notifier <- processed
+			return
+		case requestEntityTooLarge:
+			h.router.OnError(h.request, h.respWriter, errors.ErrTooLarge)
+			h.notifier <- processed
 			return
 		}
 	}

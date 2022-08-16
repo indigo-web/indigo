@@ -46,7 +46,7 @@ func (c *chunkedBodyParser) Parse(data []byte) (done bool, extra []byte, err err
 
 				c.chunkLength = (c.chunkLength << 4) | uint32(unHex(data[i]))
 				if c.chunkLength > c.settings.BodyChunkSize.Maximal {
-					return true, nil, errors.ErrRequestEntityTooLarge
+					return true, nil, errors.ErrTooLarge
 				}
 			}
 		case eChunkLengthCR:
@@ -110,7 +110,7 @@ func (c *chunkedBodyParser) Parse(data []byte) (done bool, extra []byte, err err
 			default:
 				c.chunkLength = uint32(unHex(data[i]))
 				if c.chunkLength > c.settings.BodyChunkSize.Maximal {
-					return true, nil, errors.ErrRequestEntityTooLarge
+					return true, nil, errors.ErrTooLarge
 				}
 
 				c.state = eChunkLength
