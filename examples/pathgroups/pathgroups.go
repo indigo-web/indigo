@@ -9,7 +9,7 @@ import (
 
 var addr = "localhost:9090"
 
-func MyAPIHandler(request *types.Request) types.Response {
+func MyAPIHandler(_ *types.Request) types.Response {
 	return types.WithResponse
 }
 

@@ -13,7 +13,7 @@ import (
 
 var addr = "localhost:9090"
 
-func MyHandler(request *types.Request) types.Response {
+func MyHandler(_ *types.Request) types.Response {
 	return types.WithResponse.
 		WithCode(status.OK).
 		WithHeader("Hello", "world").
