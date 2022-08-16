@@ -7,20 +7,20 @@ import (
 
 var (
 	defaultBadRequest = types.WithResponse.
-		WithCode(status.BadRequest).
-		WithBody(`<h1 align="center">400 Bad Request</h1>`)
+				WithCode(status.BadRequest).
+				WithBody(`<h1 align="center">400 Bad Request</h1>`)
 
 	defaultNotFound = types.WithResponse.
-		WithCode(status.NotFound).
-		WithBody(`<h1 align="center">404 Request Page Not Found</h1>`)
+			WithCode(status.NotFound).
+			WithBody(`<h1 align="center">404 Request Page Not Found</h1>`)
 
 	defaultMethodNotAllowed = types.WithResponse.
-		WithCode(status.MethodNotAllowed).
-		WithBody(`<h1 align="center">405 Method Not Allowed</h1>`)
+				WithCode(status.MethodNotAllowed).
+				WithBody(`<h1 align="center">405 Method Not Allowed</h1>`)
 
 	defaultRequestEntityTooLarge = types.WithResponse.
-		WithCode(status.RequestEntityTooLarge).
-		WithBody(`<h1 align="center">413 Request Entity Too Large</h1>`)
+					WithCode(status.RequestEntityTooLarge).
+					WithBody(`<h1 align="center">413 Request Entity Too Large</h1>`)
 )
 
 type (
