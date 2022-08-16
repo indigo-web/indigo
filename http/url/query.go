@@ -5,12 +5,8 @@ type (
 	parsedQuery map[string][]byte
 )
 
-// Query struct is simply url parameters parser. I have a choice to implement it
-// in to ways:
-// 1) lazy parsing - if we wanna get a specific query, but it is not in parsedParams,
-// then we simply start parsing rawQuery until key we need will be met
-// 2) naive parsing - as we have a limited length of URL, we may do not mind about
-// flood and just parse everything until the end
+// Query is optional, it may contain rawQuery, but it will not be parsed until
+// needed
 type Query struct {
 	parsedQuery parsedQuery
 	rawQuery    rawQuery
@@ -23,6 +19,19 @@ func NewQuery(raw []byte) Query {
 	}
 }
 
-func (q *Query) Get(key string) []byte {
-	panic("Implement me!")
+func (q *Query) Set(raw []byte) {
+	q.rawQuery = append(q.rawQuery[:0], raw...)
+}
+
+func (q *Query) Get(key string) (value []byte, found bool) {
+	if q.parsedQuery == nil {
+		q.parsedQuery = parse(q.rawQuery)
+	}
+
+	value, found = q.parsedQuery[key]
+	return value, found
+}
+
+func parse(raw []byte) parsedQuery {
+	panic("implement me!")
 }

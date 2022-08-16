@@ -24,6 +24,7 @@ type Request struct {
 func NewRequest(headers headers.Manager) (*Request, *internal.BodyGateway) {
 	requestBodyStruct, gateway := newRequestBody()
 	request := &Request{
+		Query:   url.NewQuery(nil),
 		Proto:   proto.HTTP11,
 		Headers: headers,
 		body:    requestBodyStruct,

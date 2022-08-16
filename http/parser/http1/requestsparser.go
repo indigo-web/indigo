@@ -137,7 +137,7 @@ func (p *httpRequestsParser) Parse(data []byte) (state parser.RequestState, extr
 		case eQuery:
 			switch data[i] {
 			case ' ':
-				p.request.Query = url.NewQuery(p.startLineBuff[p.offset:])
+				p.request.Query.Set(p.startLineBuff[p.offset:])
 				p.offset = len(p.startLineBuff)
 				p.state = eProto
 			case '#':
