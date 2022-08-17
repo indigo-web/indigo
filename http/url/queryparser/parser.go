@@ -25,6 +25,10 @@ func Parse(data []byte) (queries map[string][]byte, err error) {
 		case eKey:
 			if data[i] == '=' {
 				key = internal.B2S(data[offset:i])
+				if len(key) == 0 {
+					return nil, errors.ErrBadQuery
+				}
+
 				offset = i + 1
 				state = eValue
 			}
