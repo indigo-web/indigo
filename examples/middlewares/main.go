@@ -26,7 +26,7 @@ func main() {
 	v1.Use(SecondMiddleware)
 	v1.Get("/hello", MyBeautifulHandler)
 
+	fmt.Println("listening on", addr)
 	app := indigo.NewApp(addr)
-	fmt.Println("running on", addr)
 	log.Fatal(app.Serve(r))
 }

@@ -3,9 +3,8 @@ package main
 import (
 	"fmt"
 	"indigo"
-	methods "indigo/http/method"
 	"indigo/http/status"
-	router2 "indigo/router"
+	"indigo/router"
 	"indigo/types"
 	"log"
 	"strconv"
@@ -25,10 +24,10 @@ func MyHandler(request *types.Request) types.Response {
 }
 
 func main() {
-	router := router2.NewDefaultRouter()
-	router.Route(methods.POST, "/say", MyHandler)
+	r := router.NewDefaultRouter()
+	r.Post("/say", MyHandler)
 
 	fmt.Println("Listening on", addr)
 	app := indigo.NewApp(addr)
-	log.Fatal(app.Serve(router))
+	log.Fatal(app.Serve(r))
 }
