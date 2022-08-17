@@ -16,6 +16,8 @@ var (
 
 type Renderer struct {
 	buff []byte
+
+	defaultHeaders types.ResponseHeaders
 }
 
 func NewRenderer(buff []byte) Renderer {
@@ -34,6 +36,13 @@ func (r *Renderer) Response(protocol proto.Proto, response types.Response) []byt
 
 	for key, value := range headers {
 		buff = append(renderHeader(key, value, buff), crlf...)
+	}
+
+	for key, value := range r.defaultHeaders {
+		_, found := headers[key]
+		if !found {
+			buff = append(renderHeader(key, value, buff), crlf...)
+		}
 	}
 
 	buff = append(append(append(buff, contentLength...), strconv.Itoa(len(response.Body))...), crlf...)
