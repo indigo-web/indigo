@@ -1,4 +1,5 @@
-# IndiGo
+<img src="logo.png" alt="drawing" width="300" align="right" title="What are you looking for?"/>
+
 Web-server in the middle of std and fasthttp.
 
 Implemented:
@@ -9,7 +10,6 @@ Implemented:
 - I don't know what else to write here
 
 TODO:
-- Parse request params
 - Add request context
 - Fix bug with saving headers from previous request if were not used in a new one
 - Add connection hijacking

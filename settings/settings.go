@@ -11,7 +11,7 @@ type Setting[T number] struct {
 	Maximal T // hard limit
 }
 
-type Settings struct {
+type (
 	HeadersNumber       Setting[uint8]
 	HeaderKeyBuffSize   Setting[uint8]
 	HeaderValueBuffSize Setting[uint16]
@@ -20,6 +20,17 @@ type Settings struct {
 	BodyLength          Setting[uint32]
 	BodyBuff            Setting[uint32]
 	BodyChunkSize       Setting[uint32]
+)
+
+type Settings struct {
+	HeadersNumber       HeadersNumber
+	HeaderKeyBuffSize   HeaderKeyBuffSize
+	HeaderValueBuffSize HeaderValueBuffSize
+	URLBuffSize         URLBuffSize
+	SockReadBufferSize  SockReadBufferSize
+	BodyLength          BodyLength
+	BodyBuff            BodyBuff
+	BodyChunkSize       BodyChunkSize
 }
 
 func Default() Settings {
@@ -27,39 +38,39 @@ func Default() Settings {
 	// and Maximal stands for maximal size of something
 
 	return Settings{
-		HeadersNumber: Setting[uint8]{
+		HeadersNumber: HeadersNumber{
 			Default: math.MaxUint8 / 4,
 			Maximal: math.MaxUint8,
 		},
-		HeaderKeyBuffSize: Setting[uint8]{
+		HeaderKeyBuffSize: HeaderKeyBuffSize{
 			// I heard Apache has the same
 			Default: 100,
 			Maximal: 100,
 		},
-		HeaderValueBuffSize: Setting[uint16]{
+		HeaderValueBuffSize: HeaderValueBuffSize{
 			Default: math.MaxUint16 / 8,
 			Maximal: math.MaxUint16,
 		},
-		URLBuffSize: Setting[uint16]{
+		URLBuffSize: URLBuffSize{
 			// math.MaxUint16 / 32 == 1024
 			Default: math.MaxUint16 / 32,
 			Maximal: math.MaxUint16,
 		},
-		SockReadBufferSize: Setting[uint16]{
+		SockReadBufferSize: SockReadBufferSize{
 			// in case of SockReadBufferSize, we don't have an option of growth,
 			// so only one of them is used
 			Default: 2048,
 			Maximal: 2048,
 		},
-		BodyLength: Setting[uint32]{
+		BodyLength: BodyLength{
 			Default: math.MaxUint32,
 			Maximal: math.MaxUint32,
 		},
-		BodyBuff: Setting[uint32]{
+		BodyBuff: BodyBuff{
 			Default: 0,
 			Maximal: math.MaxUint32,
 		},
-		BodyChunkSize: Setting[uint32]{
+		BodyChunkSize: BodyChunkSize{
 			// in case of BodyChunkSize, we don't have an option of growth,
 			// too
 			Default: math.MaxUint32,

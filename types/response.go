@@ -5,7 +5,10 @@ import (
 	"indigo/internal"
 )
 
-type ResponseWriter func([]byte) error
+type (
+	ResponseWriter  func([]byte) error
+	ResponseHeaders map[string]string
+)
 
 // WithResponse is just a nil-filled default pre-created response. Because
 // of clear methods, it is anyway copied every time it is used as constructor
@@ -24,6 +27,14 @@ type Response struct {
 	Body    []byte
 }
 
+func NewResponse() Response {
+	return Response{
+		Code:    status.OK,
+		Status:  status.Text(status.OK),
+		headers: make(ResponseHeaders),
+	}
+}
+
 func (r Response) WithCode(code status.Code) Response {
 	r.Code = code
 	r.Status = status.Text(code)
@@ -36,11 +47,16 @@ func (r Response) WithStatus(status status.Status) Response {
 }
 
 func (r Response) WithHeader(key, value string) Response {
-	return r.WithHeaderByte(internal.S2B(key), internal.S2B(value))
-}
+	if r.headers == nil {
+		r.headers = ResponseHeaders{
+			key: value,
+		}
 
-func (r Response) WithHeaderByte(key, value []byte) Response {
-	r.headers = r.headers.Append(key, value)
+		return r
+	}
+
+	r.headers[key] = value
+
 	return r
 }
 

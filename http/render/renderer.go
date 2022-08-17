@@ -8,21 +8,26 @@ import (
 )
 
 var (
-	space           = []byte(" ")
-	crlf            = []byte("\r\n")
-	colonSpace      = []byte(": ")
-	headerSplitters = [2][]byte{colonSpace, crlf}
-	contentLength   = []byte("Content-Length: ")
+	space         = []byte(" ")
+	crlf          = []byte("\r\n")
+	colonSpace    = []byte(": ")
+	contentLength = []byte("Content-Length: ")
 )
 
 type Renderer struct {
 	buff []byte
+
+	defaultHeaders types.ResponseHeaders
 }
 
-func NewRenderer(buff []byte) Renderer {
-	return Renderer{
+func NewRenderer(buff []byte) *Renderer {
+	return &Renderer{
 		buff: buff,
 	}
+}
+
+func (r *Renderer) SetDefaultHeaders(headers types.ResponseHeaders) {
+	r.defaultHeaders = headers
 }
 
 func (r *Renderer) Response(protocol proto.Proto, response types.Response) []byte {
@@ -33,12 +38,23 @@ func (r *Renderer) Response(protocol proto.Proto, response types.Response) []byt
 
 	headers := response.Headers()
 
-	for i := range headers {
-		buff = append(append(buff, headers[i]...), headerSplitters[i%2]...)
+	for key, value := range headers {
+		buff = append(renderHeader(key, value, buff), crlf...)
+	}
+
+	for key, value := range r.defaultHeaders {
+		_, found := headers[key]
+		if !found {
+			buff = append(renderHeader(key, value, buff), crlf...)
+		}
 	}
 
 	buff = append(append(append(buff, contentLength...), strconv.Itoa(len(response.Body))...), crlf...)
 	r.buff = append(append(buff, crlf...), response.Body...)
 
 	return r.buff
+}
+
+func renderHeader(key, value string, into []byte) []byte {
+	return append(append(append(into, key...), colonSpace...), value...)
 }

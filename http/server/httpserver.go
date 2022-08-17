@@ -89,6 +89,8 @@ func (h httpServer) OnData(data []byte) (err error) {
 }
 
 func (h httpServer) requestProcessor() {
+	h.router.OnStart()
+
 	for {
 		switch <-h.notifier {
 		case headersCompleted:

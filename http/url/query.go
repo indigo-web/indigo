@@ -1,28 +1,47 @@
 package url
 
+import (
+	"indigo/errors"
+	"indigo/http/url/queryparser"
+)
+
 type (
 	rawQuery    []byte
 	parsedQuery map[string][]byte
 )
 
-// Query struct is simply url parameters parser. I have a choice to implement it
-// in to ways:
-// 1) lazy parsing - if we wanna get a specific query, but it is not in parsedParams,
-// then we simply start parsing rawQuery until key we need will be met
-// 2) naive parsing - as we have a limited length of URL, we may do not mind about
-// flood and just parse everything until the end
+// Query is optional, it may contain rawQuery, but it will not be parsed until
+// needed
 type Query struct {
 	parsedQuery parsedQuery
 	rawQuery    rawQuery
 }
 
-func NewQuery(raw []byte) Query {
+func NewQuery(buff []byte) Query {
 	return Query{
-		parsedQuery: make(parsedQuery),
-		rawQuery:    raw,
+		rawQuery: buff,
 	}
 }
 
-func (q *Query) Get(key string) []byte {
-	panic("Implement me!")
+func (q *Query) Set(raw []byte) {
+	// TODO: add to settings a new setting of initial parsedQuery capacity
+	//       and maximal number of query key-values allowed
+	q.parsedQuery = nil
+	q.rawQuery = append(q.rawQuery[:0], raw...)
+}
+
+func (q *Query) Get(key string) (value []byte, err error) {
+	if q.parsedQuery == nil {
+		q.parsedQuery, err = queryparser.Parse(q.rawQuery)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	value, found := q.parsedQuery[key]
+	if !found {
+		err = errors.ErrNoSuchKey
+	}
+
+	return value, err
 }

@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"indigo"
 	"indigo/router"
 	"indigo/types"
@@ -21,6 +22,7 @@ func main() {
 	v1 := api.Group("/v1")
 	v1.Get("/endpoint", MyAPIHandler)
 
+	fmt.Println("listening on", addr)
 	app := indigo.NewApp(addr)
 	log.Fatal(app.Serve(r))
 }

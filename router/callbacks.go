@@ -6,6 +6,10 @@ import (
 	"indigo/types"
 )
 
+func (d DefaultRouter) OnStart() {
+	d.applyDefaultHeaders()
+}
+
 func (d DefaultRouter) OnRequest(request *types.Request, respWriter types.ResponseWriter) error {
 	urlMethods, found := d.routes[request.Path]
 	if !found {
