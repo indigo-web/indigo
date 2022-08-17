@@ -1,4 +1,4 @@
-# Indigo
+<img src="logo.png" alt="drawing" width="300" align="right" title="What are you looking for?"/>
 
 Web-server in the middle of std and fasthttp.
 
