@@ -8,11 +8,10 @@ import (
 )
 
 var (
-	space           = []byte(" ")
-	crlf            = []byte("\r\n")
-	colonSpace      = []byte(": ")
-	headerSplitters = [2][]byte{colonSpace, crlf}
-	contentLength   = []byte("Content-Length: ")
+	space         = []byte(" ")
+	crlf          = []byte("\r\n")
+	colonSpace    = []byte(": ")
+	contentLength = []byte("Content-Length: ")
 )
 
 type Renderer struct {
@@ -33,12 +32,23 @@ func (r *Renderer) Response(protocol proto.Proto, response types.Response) []byt
 
 	headers := response.Headers()
 
-	for i := range headers {
-		buff = append(append(buff, headers[i]...), headerSplitters[i%2]...)
+	for key, value := range headers {
+		buff = append(renderHeader(key, value, buff), crlf...)
 	}
 
 	buff = append(append(append(buff, contentLength...), strconv.Itoa(len(response.Body))...), crlf...)
 	r.buff = append(append(buff, crlf...), response.Body...)
 
 	return r.buff
+}
+
+func renderHeader(key, value string, into []byte) []byte {
+	return append(append(append(into, key...), colonSpace...), value...)
+}
+
+// Header is a function for public which needs just to render a header
+// for example, encodings/contentencodings.go
+func Header(key, value string) []byte {
+	buff := make([]byte, 0, len(key)+len(colonSpace)+len(value))
+	return renderHeader(key, value, buff)
 }
