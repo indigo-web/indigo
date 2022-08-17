@@ -1,5 +1,10 @@
 package url
 
+import (
+	"indigo/errors"
+	"indigo/http/url/queryparser"
+)
+
 type (
 	rawQuery    []byte
 	parsedQuery map[string][]byte
@@ -12,26 +17,31 @@ type Query struct {
 	rawQuery    rawQuery
 }
 
-func NewQuery(raw []byte) Query {
+func NewQuery(buff []byte) Query {
 	return Query{
-		parsedQuery: make(parsedQuery),
-		rawQuery:    raw,
+		rawQuery: buff,
 	}
 }
 
 func (q *Query) Set(raw []byte) {
+	// TODO: add to settings a new setting of initial parsedQuery capacity
+	//       and maximal number of query key-values allowed
+	q.parsedQuery = nil
 	q.rawQuery = append(q.rawQuery[:0], raw...)
 }
 
-func (q *Query) Get(key string) (value []byte, found bool) {
+func (q *Query) Get(key string) (value []byte, err error) {
 	if q.parsedQuery == nil {
-		q.parsedQuery = parse(q.rawQuery)
+		q.parsedQuery, err = queryparser.Parse(q.rawQuery)
+		if err != nil {
+			return nil, err
+		}
 	}
 
-	value, found = q.parsedQuery[key]
-	return value, found
-}
+	value, found := q.parsedQuery[key]
+	if !found {
+		err = errors.ErrNoSuchKey
+	}
 
-func parse(raw []byte) parsedQuery {
-	panic("implement me!")
+	return value, err
 }
