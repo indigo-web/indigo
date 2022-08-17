@@ -1,6 +1,7 @@
 package types
 
 import (
+	"indigo/errors"
 	"indigo/internal"
 )
 
@@ -28,6 +29,10 @@ func newRequestBody() (requestBody, *internal.BodyGateway) {
 }
 
 func (r *requestBody) Read(onBody onBodyCallback, onComplete onCompleteCallback) (err error) {
+	if r.read {
+		return errors.ErrRead
+	}
+
 	r.read = true
 
 	for {
