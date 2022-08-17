@@ -1,14 +1,13 @@
 package encodings
 
 type (
-	Decoder         func([]byte) []byte
-	token           string
-	AcceptEncodings []byte
+	Decoder func([]byte) []byte
+	token   string
 )
 
 type ContentEncodings struct {
 	encodings             map[token]Decoder
-	acceptEncodingsHeader AcceptEncodings
+	acceptEncodingsHeader []byte
 }
 
 func NewContentEncodings() ContentEncodings {
@@ -27,6 +26,6 @@ func (c ContentEncodings) AddDecoder(tok token, decoder Decoder) {
 	c.encodings[tok] = decoder
 }
 
-func (c ContentEncodings) Acceptable() AcceptEncodings {
+func (c ContentEncodings) Acceptable() []byte {
 	return c.acceptEncodingsHeader
 }
