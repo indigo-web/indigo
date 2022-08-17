@@ -1,6 +1,7 @@
 package router
 
 import (
+	"indigo/http/encodings"
 	methods "indigo/http/method"
 	"indigo/http/render"
 	"indigo/http/url"
@@ -14,21 +15,24 @@ type (
 )
 
 type DefaultRouter struct {
-	prefix string
-
+	prefix      string
 	middlewares []Middleware
 
 	routes      routesMap
 	errHandlers errHandlers
 
-	renderer render.Renderer
+	renderer *render.Renderer
+	codings  *encodings.ContentEncodings
 }
 
 func NewDefaultRouter() DefaultRouter {
+	contentEncodings := encodings.NewContentEncodings()
+
 	return DefaultRouter{
 		routes:      make(routesMap),
 		errHandlers: newErrHandlers(),
 		// let the first time response be rendered into the nil buffer
 		renderer: render.NewRenderer(nil),
+		codings:  &contentEncodings,
 	}
 }
