@@ -20,10 +20,14 @@ type Renderer struct {
 	defaultHeaders types.ResponseHeaders
 }
 
-func NewRenderer(buff []byte) Renderer {
-	return Renderer{
+func NewRenderer(buff []byte) *Renderer {
+	return &Renderer{
 		buff: buff,
 	}
+}
+
+func (r *Renderer) SetDefaultHeaders(headers types.ResponseHeaders) {
+	r.defaultHeaders = headers
 }
 
 func (r *Renderer) Response(protocol proto.Proto, response types.Response) []byte {
@@ -53,11 +57,4 @@ func (r *Renderer) Response(protocol proto.Proto, response types.Response) []byt
 
 func renderHeader(key, value string, into []byte) []byte {
 	return append(append(append(into, key...), colonSpace...), value...)
-}
-
-// Header is a function for public which needs just to render a header
-// for example, encodings/contentencodings.go
-func Header(key, value string) []byte {
-	buff := make([]byte, 0, len(key)+len(colonSpace)+len(value))
-	return renderHeader(key, value, buff)
 }
