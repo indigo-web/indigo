@@ -1,9 +1,10 @@
 package queryparser
 
 import (
-	"github.com/stretchr/testify/require"
 	"indigo/errors"
 	"testing"
+
+	"github.com/stretchr/testify/require"
 )
 
 func TestParse_Positive(t *testing.T) {

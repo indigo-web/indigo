@@ -1,9 +1,10 @@
 package url
 
 import (
-	"github.com/stretchr/testify/require"
 	"indigo/errors"
 	"testing"
+
+	"github.com/stretchr/testify/require"
 )
 
 func TestQuery(t *testing.T) {
