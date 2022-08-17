@@ -30,7 +30,7 @@ type Manager struct {
 	maxHeaders uint8
 }
 
-func NewManager(headersSettings settings.Setting[uint8]) Manager {
+func NewManager(headersSettings settings.HeadersNumber) Manager {
 	return Manager{
 		headers:    make(map[string]*HeaderValue, headersSettings.Default),
 		maxHeaders: headersSettings.Maximal,
