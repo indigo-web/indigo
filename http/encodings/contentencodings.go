@@ -1,9 +1,7 @@
 package encodings
 
 import (
-	"indigo/http/render"
 	"indigo/internal"
-	"strings"
 )
 
 type (
@@ -11,14 +9,12 @@ type (
 )
 
 type ContentEncodings struct {
-	encodings             map[string]Decoder
-	acceptEncodingsHeader []byte
+	encodings map[string]Decoder
 }
 
 func NewContentEncodings() ContentEncodings {
 	return ContentEncodings{
-		encodings:             make(map[string]Decoder),
-		acceptEncodingsHeader: []byte("Accept-Encodings: identity"),
+		encodings: make(map[string]Decoder),
 	}
 }
 
@@ -29,10 +25,12 @@ func (c ContentEncodings) GetDecoder(token string) (decoder Decoder, found bool)
 
 func (c ContentEncodings) AddDecoder(token string, decoder Decoder) {
 	c.encodings[token] = decoder
-	acceptable := strings.Join(internal.Keys(c.encodings), ", ")
-	c.acceptEncodingsHeader = render.Header("Accept-Encodings", acceptable)
 }
 
-func (c ContentEncodings) Acceptable() []byte {
-	return c.acceptEncodingsHeader
+func (c ContentEncodings) Acceptable() []string {
+	if len(c.encodings) == 0 {
+		return []string{"identity"}
+	}
+
+	return internal.Keys(c.encodings)
 }
