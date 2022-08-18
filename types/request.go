@@ -16,18 +16,18 @@ type Request struct {
 	Proto    proto.Proto
 
 	Headers        headers.Headers
-	headersManager headers.Manager
+	headersManager *headers.Manager
 
 	body     requestBody
 	bodyBuff []byte
 }
 
-func NewRequest(headers headers.Headers, manager headers.Manager) (*Request, *internal.BodyGateway) {
+func NewRequest(manager *headers.Manager) (*Request, *internal.BodyGateway) {
 	requestBodyStruct, gateway := newRequestBody()
 	request := &Request{
 		Query:          url.NewQuery(nil),
 		Proto:          proto.HTTP11,
-		Headers:        headers,
+		Headers:        manager.Headers,
 		headersManager: manager,
 		body:           requestBodyStruct,
 	}
@@ -52,6 +52,7 @@ func (r *Request) Body() ([]byte, error) {
 
 func (r *Request) Reset() error {
 	r.headersManager.Reset()
+	r.Headers = r.headersManager.Headers
 
 	return r.body.Reset()
 }
