@@ -6,6 +6,9 @@ import (
 	"indigo/settings"
 )
 
+// chunkedBodyParser is a parser for chunked encoded request bodies
+// used to encapsulate process of parsing because it's more convenient
+// to leave the process here and let main parser parse only http requests
 type chunkedBodyParser struct {
 	state   chunkedBodyParserState
 	gateway *internal.BodyGateway
@@ -23,6 +26,9 @@ func newChunkedBodyParser(gateway *internal.BodyGateway, settings settings.Setti
 	}
 }
 
+// Parse takes only body as it is. Returns a flag whether parsing is done,
+// extra that are extra-bytes related to a next one request, and err if
+// occurred
 func (c *chunkedBodyParser) Parse(data []byte) (done bool, extra []byte, err error) {
 	for i := range data {
 		switch c.state {

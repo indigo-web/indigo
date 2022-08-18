@@ -12,6 +12,12 @@ import (
 	"indigo/types"
 )
 
+// httpRequestsParser is a stream-based http requests parser. It modifies
+// request object by pointer in performance purposes. Decodes url-encoded
+// values by its own, you can see that by presented states ePathDecode1Char,
+// ePathDecode2Char, etc. When headers are parsed, parser returns state
+// parser.HeadersCompleted to notify http server about this, attaching all
+// the pending data as an extra. Body must be processed separately
 type httpRequestsParser struct {
 	state   parserState
 	request *types.Request
@@ -370,6 +376,9 @@ func (p *httpRequestsParser) Parse(data []byte) (state parser.RequestState, extr
 	return parser.Pending, nil, nil
 }
 
+// parseBody parses body. In case chunked transfer encoding is active,
+// only data chunks will be sent, excluding all the CRLFs and chunk
+// lengths
 func (p *httpRequestsParser) parseBody(b []byte) (done bool, extra []byte, err error) {
 	if p.chunkedTransferEncoding {
 		return p.chunkedBodyParser.Parse(b)
@@ -391,6 +400,11 @@ func (p *httpRequestsParser) parseBody(b []byte) (done bool, extra []byte, err e
 	return false, nil, p.body.Err
 }
 
+// FinalizeBody method just signalizes reader that we're done. This method
+// must be called only in 1 case - parser returned parser.RequestCompleted
+// state that means headers are parsed, but no body is presented for
+// the request, so first starting request processing, then sending a
+// completion flag into the body chan
 func (p *httpRequestsParser) FinalizeBody() {
 	p.body.Data <- nil
 }

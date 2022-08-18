@@ -14,6 +14,12 @@ var (
 	contentLength = []byte("Content-Length: ")
 )
 
+// Renderer is a session responses renderer. Its purpose is only to know
+// something about client, and knowing them, render correct response
+// for example, we SHOULD not use content-codings for HTTP/1.0 clients,
+// and MUST NOT use them for HTTP/0.9 clients
+// Also in case of file is being sent, it collects some meta about it,
+// and compresses using available on both server and client encoders
 type Renderer struct {
 	buff []byte
 
@@ -30,6 +36,15 @@ func (r *Renderer) SetDefaultHeaders(headers types.ResponseHeaders) {
 	r.defaultHeaders = headers
 }
 
+// Response provides next functionality:
+// 1) rendering request into reusable buffer kept inside
+// 2) rendering request includes: protocol, response code, response status,
+//    headers, and body
+// 3) default headers are also included. Default headers are just headers
+//    that are being set only if they are not presented in user-headers
+// 4) hard-coded content-length header. It must not be presented in user-headers,
+//    otherwise client may disconnect with error, or even worse, this will cause
+//    UB on client
 func (r *Renderer) Response(protocol proto.Proto, response types.Response) []byte {
 	buff := r.buff[:0]
 	buff = append(append(buff, proto.ToBytes(protocol)...), space...)
