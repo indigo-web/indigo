@@ -5,13 +5,14 @@ import (
 )
 
 var (
-	ErrBadRequest          = errors.New("bad request")
-	ErrTooLarge            = errors.New("too large")
-	ErrURLTooLong          = errors.New("request URI too long")
-	ErrURLDecoding         = errors.New("invalid url encoding")
-	ErrBadQuery            = errors.New("bad query")
-	ErrUnsupportedProtocol = errors.New("protocol is not supported")
-	ErrTooManyHeaders      = errors.New("too much headers")
+	ErrBadRequest           = errors.New("bad request")
+	ErrTooLarge             = errors.New("too large")
+	ErrHeaderFieldsTooLarge = errors.New("header fields too large")
+	ErrURITooLong           = errors.New("request URI too long")
+	ErrURIDecoding          = errors.New("invalid url encoding")
+	ErrBadQuery             = errors.New("bad query")
+	ErrUnsupportedProtocol  = errors.New("protocol is not supported")
+	ErrTooManyHeaders       = errors.New("too much headers")
 
 	ErrCloseConnection = errors.New("internal error as a signal")
 
