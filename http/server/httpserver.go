@@ -69,10 +69,16 @@ func (h httpServer) OnData(data []byte) (err error) {
 			return nil
 		case parser.Error:
 			switch err {
-			case errors.ErrBadRequest, errors.ErrURLDecoding:
+			case errors.ErrBadRequest, errors.ErrURIDecoding:
 				h.notifier <- badRequest
-			case errors.ErrTooLarge, errors.ErrURLTooLong, errors.ErrTooManyHeaders:
+			case errors.ErrTooManyHeaders, errors.ErrTooLarge:
 				h.notifier <- requestEntityTooLarge
+			case errors.ErrURITooLong:
+				h.notifier <- requestURITooLong
+			case errors.ErrHeaderFieldsTooLarge:
+				h.notifier <- requestHeaderFieldsTooLarge
+			case errors.ErrUnsupportedProtocol:
+				h.notifier <- unsupportedProtocol
 			default:
 				h.notifier <- badRequest
 			}
@@ -115,6 +121,18 @@ func (h httpServer) requestProcessor() {
 			return
 		case requestEntityTooLarge:
 			h.router.OnError(h.request, h.respWriter, errors.ErrTooLarge)
+			h.notifier <- processed
+			return
+		case requestHeaderFieldsTooLarge:
+			h.router.OnError(h.request, h.respWriter, errors.ErrHeaderFieldsTooLarge)
+			h.notifier <- processed
+			return
+		case requestURITooLong:
+			h.router.OnError(h.request, h.respWriter, errors.ErrURITooLong)
+			h.notifier <- processed
+			return
+		case unsupportedProtocol:
+			h.router.OnError(h.request, h.respWriter, errors.ErrUnsupportedProtocol)
 			h.notifier <- processed
 			return
 		}

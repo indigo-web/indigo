@@ -8,4 +8,7 @@ const (
 	closeConnection
 	badRequest
 	requestEntityTooLarge
+	requestURITooLong
+	requestHeaderFieldsTooLarge
+	unsupportedProtocol
 )
