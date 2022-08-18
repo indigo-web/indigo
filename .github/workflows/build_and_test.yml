@@ -19,5 +19,17 @@ jobs:
         with:
           go-version: 1.18
 
-      - name: Test
+      - name: Example - helloworld
+        run: go build examples/helloworld
+
+      - name: Example - requestbody
+        run: go build examples/requestbody
+
+      - name: Example - pathgroups
+        run: go build examples/pathgroups
+
+      - name: Example - middlewares
+        run: go build examples/middlewares
+
+      - name: Tests
         run: go test -v ./...
