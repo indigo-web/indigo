@@ -5,6 +5,11 @@ import (
 	"indigo/types"
 )
 
+/*
+This file is responsible for default responses for errors. Each has its
+own status code and text
+*/
+
 var (
 	defaultBadRequest = types.WithResponse.
 				WithCode(status.BadRequest).

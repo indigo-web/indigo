@@ -7,6 +7,13 @@ import (
 	"indigo/types"
 )
 
+// HTTPServer provides 2 methods:
+// - Run: starts requests processor, or what they need I don't know.
+//        Method is supposed to be blocking, so in a separated goroutine
+//        expected to be started
+// - OnData: main thing here. It parses request, and sends a signal into
+//           the gateway to notify requests processor goroutine, or what
+//           they need I don't know
 type HTTPServer interface {
 	Run()
 	OnData(b []byte) error
@@ -34,10 +41,14 @@ func NewHTTPServer(
 	}
 }
 
+// Run starts request processor in blocking mode
 func (h httpServer) Run() {
 	h.requestProcessor()
 }
 
+// OnData is a core-core function here, because does all the main stuff
+// core must do. It parses a data provided by tcp server, and according
+// to the parser state returned, decides what to do
 func (h httpServer) OnData(data []byte) (err error) {
 	var state parser.RequestState
 
@@ -94,6 +105,9 @@ func (h httpServer) OnData(data []byte) (err error) {
 	return nil
 }
 
+// requestProcessor is a top function in the whole userspace (requests processing
+// space), it receives a signal from notifier chan and decides what to do starting
+// from the actual signal. Also, when called, calls router OnStart() method
 func (h httpServer) requestProcessor() {
 	h.router.OnStart()
 

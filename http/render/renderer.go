@@ -1,6 +1,7 @@
 package render
 
 import (
+	"indigo/http/headers"
 	"indigo/http/proto"
 	"indigo/http/status"
 	"indigo/types"
@@ -23,7 +24,7 @@ var (
 type Renderer struct {
 	buff []byte
 
-	defaultHeaders types.ResponseHeaders
+	defaultHeaders headers.Headers
 }
 
 func NewRenderer(buff []byte) *Renderer {
@@ -32,7 +33,7 @@ func NewRenderer(buff []byte) *Renderer {
 	}
 }
 
-func (r *Renderer) SetDefaultHeaders(headers types.ResponseHeaders) {
+func (r *Renderer) SetDefaultHeaders(headers headers.Headers) {
 	r.defaultHeaders = headers
 }
 
@@ -51,14 +52,14 @@ func (r *Renderer) Response(protocol proto.Proto, response types.Response) []byt
 	buff = append(append(buff, strconv.Itoa(int(response.Code))...), space...)
 	buff = append(append(buff, status.Text(response.Code)...), crlf...)
 
-	headers := response.Headers()
+	reqHeaders := response.Headers()
 
-	for key, value := range headers {
+	for key, value := range reqHeaders {
 		buff = append(renderHeader(key, value, buff), crlf...)
 	}
 
 	for key, value := range r.defaultHeaders {
-		_, found := headers[key]
+		_, found := reqHeaders[key]
 		if !found {
 			buff = append(renderHeader(key, value, buff), crlf...)
 		}
@@ -70,6 +71,6 @@ func (r *Renderer) Response(protocol proto.Proto, response types.Response) []byt
 	return r.buff
 }
 
-func renderHeader(key, value string, into []byte) []byte {
+func renderHeader(key string, value []byte, into []byte) []byte {
 	return append(append(append(into, key...), colonSpace...), value...)
 }

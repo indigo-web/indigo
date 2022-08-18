@@ -1,13 +1,13 @@
 package types
 
 import (
+	"indigo/http/headers"
 	"indigo/http/status"
 	"indigo/internal"
 )
 
 type (
-	ResponseWriter  func([]byte) error
-	ResponseHeaders map[string]string
+	ResponseWriter func([]byte) error
 )
 
 // WithResponse is just a nil-filled default pre-created response. Because
@@ -23,7 +23,7 @@ type Response struct {
 	Status status.Status
 	// headers due to possible side effects are decided to be private
 	// also uninitialized response must ALWAYS have this value as nil
-	headers ResponseHeaders
+	headers headers.Headers
 	Body    []byte
 }
 
@@ -31,7 +31,7 @@ func NewResponse() Response {
 	return Response{
 		Code:    status.OK,
 		Status:  status.Text(status.OK),
-		headers: make(ResponseHeaders),
+		headers: make(headers.Headers),
 	}
 }
 
@@ -48,14 +48,14 @@ func (r Response) WithStatus(status status.Status) Response {
 
 func (r Response) WithHeader(key, value string) Response {
 	if r.headers == nil {
-		r.headers = ResponseHeaders{
-			key: value,
+		r.headers = headers.Headers{
+			key: internal.S2B(value),
 		}
 
 		return r
 	}
 
-	r.headers[key] = value
+	r.headers[key] = internal.S2B(value)
 
 	return r
 }
@@ -70,6 +70,6 @@ func (r Response) WithBodyByte(body []byte) Response {
 	return r
 }
 
-func (r Response) Headers() ResponseHeaders {
+func (r Response) Headers() headers.Headers {
 	return r.headers
 }

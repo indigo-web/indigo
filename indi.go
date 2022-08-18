@@ -11,12 +11,15 @@ import (
 	"net"
 )
 
+// Application is just a struct with addr and shutdown channel that is currently
+// not used. Planning to replace it with context.WithCancel()
 type Application struct {
 	addr string
 
 	shutdown chan bool
 }
 
+// NewApp returns a new application object with initialized shutdown chan
 func NewApp(addr string) Application {
 	return Application{
 		addr:     addr,
@@ -24,6 +27,8 @@ func NewApp(addr string) Application {
 	}
 }
 
+// Serve takes a router and someSettings, that must be only 0 or 1 elements
+// otherwise, error is returned
 func (a Application) Serve(router router.Router, someSettings ...settings2.Settings) error {
 	settings, err := getSettings(someSettings...)
 	if err != nil {
@@ -36,8 +41,7 @@ func (a Application) Serve(router router.Router, someSettings ...settings2.Setti
 	}
 
 	return server.StartTCPServer(sock, func(conn net.Conn) {
-		requestHeaders := make(headers.Headers, settings.Headers.Number.Default)
-		headersManager := headers.NewManager(requestHeaders, settings.Headers)
+		headersManager := headers.NewManager(settings.Headers)
 		request, gateway := types.NewRequest(&headersManager)
 
 		startLineBuff := make([]byte, 0, settings.URL.Length.Default)
