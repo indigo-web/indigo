@@ -25,6 +25,7 @@ func SecondMiddleware(next router.HandlerFunc, request *types.Request) types.Res
 
 	return response
 }
+
 func MyBeautifulHandler(_ *types.Request) types.Response {
 	fmt.Println("running handler")
 
