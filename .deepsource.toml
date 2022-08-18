@@ -19,4 +19,4 @@ enabled = true
 
 [[transformers]]
 name = "gofmt"
-enabled = true
+enabled = false
