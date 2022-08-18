@@ -8,30 +8,30 @@ type (
 )
 
 type Manager struct {
-	Headers    Headers
-	Values     []byte
-	valueBegin int
-	maxHeaders uint8
+	Headers       Headers
+	Values        []byte
+	valueBegin    int
+	headersNumber settings.HeadersNumber
 }
 
-func NewManager(headers settings.Headers) Manager {
-	defaultValuesBuffSize := uint16(headers.Number.Default) * headers.ValueLength.Default
+func NewManager(headers Headers, settings settings.Headers) Manager {
+	defaultValuesBuffSize := uint16(settings.Number.Default) * settings.ValueLength.Default
 
 	return Manager{
 		// TODO: update Default value
-		Headers:    make(map[string][]byte, headers.Number.Default),
-		Values:     make([]byte, 0, defaultValuesBuffSize),
-		maxHeaders: headers.Number.Maximal,
+		Headers:       headers,
+		Values:        make([]byte, 0, defaultValuesBuffSize),
+		headersNumber: settings.Number,
 	}
 }
 
 func (m *Manager) BeginValue() (oversize bool) {
 	m.valueBegin = len(m.Values)
 
-	return uint8(len(m.Headers)) >= m.maxHeaders
+	return uint8(len(m.Headers)) >= m.headersNumber.Maximal
 }
 
-func (m *Manager) FinalizeValue(key string) (finalValue []byte) {
+func (m Manager) FinalizeValue(key string) (finalValue []byte) {
 	finalValue = m.Values[m.valueBegin:]
 	m.Headers[key] = finalValue
 
@@ -40,4 +40,5 @@ func (m *Manager) FinalizeValue(key string) (finalValue []byte) {
 
 func (m *Manager) Reset() {
 	m.Values = m.Values[:0]
+	m.Headers = make(map[string][]byte, m.headersNumber.Default)
 }
