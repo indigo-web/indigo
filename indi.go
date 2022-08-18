@@ -36,11 +36,12 @@ func (a Application) Serve(router router.Router, someSettings ...settings2.Setti
 	}
 
 	return server.StartTCPServer(sock, func(conn net.Conn) {
-		headersManager := headers.NewManager(settings.HeadersNumber)
-		request, gateway := types.NewRequest(headersManager)
+		requestHeaders := make(headers.Headers, settings.Headers.Number.Default)
+		headersManager := headers.NewManager(settings.Headers)
+		request, gateway := types.NewRequest(requestHeaders, headersManager)
 
-		startLineBuff := make([]byte, 0, settings.URLBuffSize.Default)
-		headerBuff := make([]byte, 0, settings.HeaderKeyBuffSize.Default)
+		startLineBuff := make([]byte, 0, settings.URL.Length.Default)
+		headerBuff := make([]byte, 0, settings.Headers.KeyLength.Default)
 
 		httpParser := http1.NewHTTPRequestsParser(
 			request, gateway, startLineBuff, headerBuff, settings,
@@ -53,7 +54,7 @@ func (a Application) Serve(router router.Router, someSettings ...settings2.Setti
 
 		go httpServer.Run()
 
-		readBuff := make([]byte, settings.SockReadBufferSize.Default)
+		readBuff := make([]byte, settings.TCPServer.Read.Default)
 		server.DefaultConnHandler(conn, readBuff, httpServer.OnData)
 	})
 }

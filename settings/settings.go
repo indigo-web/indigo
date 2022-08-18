@@ -12,25 +12,44 @@ type Setting[T number] struct {
 }
 
 type (
-	HeadersNumber       Setting[uint8]
-	HeaderKeyBuffSize   Setting[uint8]
-	HeaderValueBuffSize Setting[uint16]
-	URLBuffSize         Setting[uint16]
-	SockReadBufferSize  Setting[uint16]
-	BodyLength          Setting[uint32]
-	BodyBuff            Setting[uint32]
-	BodyChunkSize       Setting[uint32]
+	HeadersNumber      Setting[uint8]
+	HeadersKeyLength   Setting[uint8]
+	HeadersValueLength Setting[uint16]
+
+	URLLength Setting[uint16]
+
+	TCPServerRead Setting[uint16]
+
+	BodyLength    Setting[uint32]
+	BodyChunkSize Setting[uint32]
+)
+
+type (
+	Headers struct {
+		Number      HeadersNumber
+		KeyLength   HeadersKeyLength
+		ValueLength HeadersValueLength
+	}
+
+	URL struct {
+		Length URLLength
+	}
+
+	TCPServer struct {
+		Read TCPServerRead
+	}
+
+	Body struct {
+		Length    BodyLength
+		ChunkSize BodyChunkSize
+	}
 )
 
 type Settings struct {
-	HeadersNumber       HeadersNumber
-	HeaderKeyBuffSize   HeaderKeyBuffSize
-	HeaderValueBuffSize HeaderValueBuffSize
-	URLBuffSize         URLBuffSize
-	SockReadBufferSize  SockReadBufferSize
-	BodyLength          BodyLength
-	BodyBuff            BodyBuff
-	BodyChunkSize       BodyChunkSize
+	Headers   Headers
+	URL       URL
+	TCPServer TCPServer
+	Body      Body
 }
 
 func Default() Settings {
@@ -38,43 +57,40 @@ func Default() Settings {
 	// and Maximal stands for maximal size of something
 
 	return Settings{
-		HeadersNumber: HeadersNumber{
-			Default: math.MaxUint8 / 4,
-			Maximal: math.MaxUint8,
+		Headers: Headers{
+			Number: HeadersNumber{
+				Default: 25,
+				Maximal: 100,
+			},
+			KeyLength: HeadersKeyLength{
+				Default: 100,
+				Maximal: math.MaxUint8,
+			},
+			ValueLength: HeadersValueLength{
+				Default: 4096,
+				Maximal: 8192,
+			},
 		},
-		HeaderKeyBuffSize: HeaderKeyBuffSize{
-			// I heard Apache has the same
-			Default: 100,
-			Maximal: 100,
+		URL: URL{
+			Length: URLLength{
+				Default: 8192,
+				Maximal: math.MaxUint16,
+			},
 		},
-		HeaderValueBuffSize: HeaderValueBuffSize{
-			Default: math.MaxUint16 / 8,
-			Maximal: math.MaxUint16,
+		TCPServer: TCPServer{
+			Read: TCPServerRead{
+				Default: 2048,
+			},
 		},
-		URLBuffSize: URLBuffSize{
-			// math.MaxUint16 / 32 == 1024
-			Default: math.MaxUint16 / 32,
-			Maximal: math.MaxUint16,
-		},
-		SockReadBufferSize: SockReadBufferSize{
-			// in case of SockReadBufferSize, we don't have an option of growth,
-			// so only one of them is used
-			Default: 2048,
-			Maximal: 2048,
-		},
-		BodyLength: BodyLength{
-			Default: math.MaxUint32,
-			Maximal: math.MaxUint32,
-		},
-		BodyBuff: BodyBuff{
-			Default: 0,
-			Maximal: math.MaxUint32,
-		},
-		BodyChunkSize: BodyChunkSize{
-			// in case of BodyChunkSize, we don't have an option of growth,
-			// too
-			Default: math.MaxUint32,
-			Maximal: math.MaxUint32,
+		Body: Body{
+			Length: BodyLength{
+				Default: 1024,
+				Maximal: math.MaxUint32,
+			},
+			ChunkSize: BodyChunkSize{
+				Default: 4096,
+				Maximal: math.MaxUint32,
+			},
 		},
 	}
 }
@@ -84,53 +100,47 @@ func Default() Settings {
 func Fill(original Settings) (modified Settings) {
 	defaultSettings := Default()
 
-	original.HeadersNumber.Default = customOrDefault(
-		original.HeadersNumber.Default, defaultSettings.HeadersNumber.Default,
+	original.Headers.Number.Default = customOrDefault(
+		original.Headers.Number.Default, defaultSettings.Headers.Number.Default,
 	)
-	original.HeadersNumber.Maximal = customOrDefault(
-		original.HeadersNumber.Maximal, defaultSettings.HeadersNumber.Maximal,
+	original.Headers.Number.Maximal = customOrDefault(
+		original.Headers.Number.Maximal, defaultSettings.Headers.Number.Maximal,
 	)
-	original.HeaderKeyBuffSize.Default = customOrDefault(
-		original.HeaderKeyBuffSize.Default, defaultSettings.HeaderKeyBuffSize.Default,
+	original.Headers.KeyLength.Default = customOrDefault(
+		original.Headers.KeyLength.Default, defaultSettings.Headers.KeyLength.Default,
 	)
-	original.HeaderKeyBuffSize.Maximal = customOrDefault(
-		original.HeaderKeyBuffSize.Maximal, defaultSettings.HeaderKeyBuffSize.Maximal,
+	original.Headers.KeyLength.Maximal = customOrDefault(
+		original.Headers.KeyLength.Maximal, defaultSettings.Headers.KeyLength.Maximal,
 	)
-	original.HeaderValueBuffSize.Default = customOrDefault(
-		original.HeaderValueBuffSize.Default, defaultSettings.HeaderValueBuffSize.Default,
+	original.Headers.ValueLength.Default = customOrDefault(
+		original.Headers.ValueLength.Default, defaultSettings.Headers.ValueLength.Default,
 	)
-	original.HeaderValueBuffSize.Maximal = customOrDefault(
-		original.HeaderValueBuffSize.Maximal, defaultSettings.HeaderValueBuffSize.Maximal,
+	original.Headers.ValueLength.Maximal = customOrDefault(
+		original.Headers.ValueLength.Maximal, defaultSettings.Headers.ValueLength.Maximal,
 	)
-	original.URLBuffSize.Default = customOrDefault(
-		original.URLBuffSize.Default, defaultSettings.URLBuffSize.Default,
+	original.URL.Length.Default = customOrDefault(
+		original.URL.Length.Default, defaultSettings.URL.Length.Default,
 	)
-	original.URLBuffSize.Maximal = customOrDefault(
-		original.URLBuffSize.Maximal, defaultSettings.URLBuffSize.Maximal,
+	original.URL.Length.Maximal = customOrDefault(
+		original.URL.Length.Maximal, defaultSettings.URL.Length.Maximal,
 	)
-	original.SockReadBufferSize.Default = customOrDefault(
-		original.SockReadBufferSize.Default, defaultSettings.SockReadBufferSize.Default,
+	original.TCPServer.Read.Default = customOrDefault(
+		original.TCPServer.Read.Default, defaultSettings.TCPServer.Read.Default,
 	)
-	original.SockReadBufferSize.Maximal = customOrDefault(
-		original.SockReadBufferSize.Maximal, defaultSettings.SockReadBufferSize.Maximal,
+	original.TCPServer.Read.Maximal = customOrDefault(
+		original.TCPServer.Read.Maximal, defaultSettings.TCPServer.Read.Maximal,
 	)
-	original.BodyLength.Default = customOrDefault(
-		original.BodyLength.Default, defaultSettings.BodyLength.Default,
+	original.Body.Length.Default = customOrDefault(
+		original.Body.Length.Default, defaultSettings.Body.Length.Default,
 	)
-	original.BodyLength.Maximal = customOrDefault(
-		original.BodyLength.Maximal, defaultSettings.BodyLength.Maximal,
+	original.Body.Length.Maximal = customOrDefault(
+		original.Body.Length.Maximal, defaultSettings.Body.Length.Maximal,
 	)
-	original.BodyBuff.Default = customOrDefault(
-		original.BodyBuff.Default, defaultSettings.BodyBuff.Default,
+	original.Body.ChunkSize.Default = customOrDefault(
+		original.Body.ChunkSize.Default, defaultSettings.Body.ChunkSize.Default,
 	)
-	original.BodyBuff.Maximal = customOrDefault(
-		original.BodyBuff.Maximal, defaultSettings.BodyBuff.Maximal,
-	)
-	original.BodyChunkSize.Default = customOrDefault(
-		original.BodyChunkSize.Default, defaultSettings.BodyChunkSize.Default,
-	)
-	original.BodyChunkSize.Maximal = customOrDefault(
-		original.BodyChunkSize.Maximal, defaultSettings.BodyChunkSize.Maximal,
+	original.Body.ChunkSize.Maximal = customOrDefault(
+		original.Body.ChunkSize.Maximal, defaultSettings.Body.ChunkSize.Maximal,
 	)
 
 	return original
