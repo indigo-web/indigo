@@ -37,14 +37,14 @@ func (a Application) Serve(router router.Router, someSettings ...settings2.Setti
 
 	return server.StartTCPServer(sock, func(conn net.Conn) {
 		requestHeaders := make(headers.Headers, settings.Headers.Number.Default)
-		headersManager := headers.NewManager(settings.Headers)
-		request, gateway := types.NewRequest(requestHeaders, headersManager)
+		headersManager := headers.NewManager(requestHeaders, settings.Headers)
+		request, gateway := types.NewRequest(&headersManager)
 
 		startLineBuff := make([]byte, 0, settings.URL.Length.Default)
 		headerBuff := make([]byte, 0, settings.Headers.KeyLength.Default)
 
 		httpParser := http1.NewHTTPRequestsParser(
-			request, gateway, startLineBuff, headerBuff, settings,
+			request, gateway, startLineBuff, headerBuff, settings, &headersManager,
 		)
 
 		httpServer := server.NewHTTPServer(request, func(b []byte) error {
