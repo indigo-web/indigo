@@ -29,7 +29,7 @@ type httpRequestsParser struct {
 	urlEncodedChar uint8
 
 	headerBuff     []byte
-	headersManager headers.Manager
+	headersManager *headers.Manager
 
 	body *internal.BodyGateway
 }
@@ -37,6 +37,7 @@ type httpRequestsParser struct {
 func NewHTTPRequestsParser(
 	request *types.Request, body *internal.BodyGateway,
 	startLineBuff, headerBuff []byte, settings settings.Settings,
+	manager *headers.Manager,
 ) parser.HTTPRequestsParser {
 	return &httpRequestsParser{
 		state:   eMethod,
@@ -46,7 +47,7 @@ func NewHTTPRequestsParser(
 		settings:          settings,
 		startLineBuff:     startLineBuff,
 		headerBuff:        headerBuff,
-		headersManager:    headers.NewManager(settings.Headers),
+		headersManager:    manager,
 
 		body: body,
 	}
