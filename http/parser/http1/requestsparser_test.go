@@ -78,7 +78,8 @@ func splitIntoParts(req []byte, n int) (parts [][]byte) {
 }
 
 func testPartedRequest(t *testing.T, parser httpparser.HTTPRequestsParser,
-	rawRequest []byte, n int) {
+	rawRequest []byte, n int,
+) {
 	var finalState httpparser.RequestState
 
 	for _, chunk := range splitIntoParts(rawRequest, n) {
