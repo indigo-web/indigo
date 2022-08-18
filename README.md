@@ -1,4 +1,4 @@
-<img src="logo.png" alt="drawing" width="300" align="right" title="What are you looking for?"/>
+<img src="logo.png" alt="drawing" width="300" align="top" title="What are you looking for?"/>
 
 Indigo is non-idiomatic, but focusing on simplicity and performance web-server
 
