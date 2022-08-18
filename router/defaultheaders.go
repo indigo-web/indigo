@@ -14,7 +14,7 @@ var (
 // default headers, and cause of that, Accept-Encoding header may be not
 // behave correctly. So using this method is unwanted, but if you do, use with
 // care
-func (d DefaultRouter) SetDefaultHeaders(headers headers.Headers) {
+func (d *DefaultRouter) SetDefaultHeaders(headers headers.Headers) {
 	d.defaultHeaders = headers
 }
 
