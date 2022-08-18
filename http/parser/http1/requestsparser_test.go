@@ -26,8 +26,7 @@ var (
 
 func getParser() (httpparser.HTTPRequestsParser, *types.Request) {
 	settings := settings2.Default()
-	reqHeaders := make(headers.Headers)
-	manager := headers.NewManager(reqHeaders, settings.Headers)
+	manager := headers.NewManager(settings.Headers)
 	request, gateway := types.NewRequest(&manager)
 	return NewHTTPRequestsParser(
 		request, gateway, nil, nil, settings, &manager,
