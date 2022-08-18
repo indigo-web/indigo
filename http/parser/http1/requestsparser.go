@@ -113,24 +113,24 @@ func (p *httpRequestsParser) Parse(data []byte) (state parser.RequestState, extr
 				p.state = eFragment
 			default:
 				if uint16(len(p.startLineBuff)) >= p.settings.URL.Length.Maximal {
-					return parser.Error, nil, errors.ErrURLTooLong
+					return parser.Error, nil, errors.ErrURITooLong
 				}
 
 				p.startLineBuff = append(p.startLineBuff, data[i])
 			}
 		case ePathDecode1Char:
 			if !isHex(data[i]) {
-				return parser.Error, nil, errors.ErrURLDecoding
+				return parser.Error, nil, errors.ErrURIDecoding
 			}
 
 			p.urlEncodedChar = unHex(data[i]) << 4
 			p.state = ePathDecode2Char
 		case ePathDecode2Char:
 			if !isHex(data[i]) {
-				return parser.Error, nil, errors.ErrURLDecoding
+				return parser.Error, nil, errors.ErrURIDecoding
 			}
 			if uint16(len(p.startLineBuff)) >= p.settings.URL.Length.Maximal {
-				return parser.Error, nil, errors.ErrURLTooLong
+				return parser.Error, nil, errors.ErrURITooLong
 			}
 
 			p.startLineBuff = append(p.startLineBuff, p.urlEncodedChar|unHex(data[i]))
@@ -149,30 +149,30 @@ func (p *httpRequestsParser) Parse(data []byte) (state parser.RequestState, extr
 				p.state = eQueryDecode1Char
 			case '+':
 				if uint16(len(p.startLineBuff)) >= p.settings.URL.Length.Maximal {
-					return parser.Error, nil, errors.ErrURLTooLong
+					return parser.Error, nil, errors.ErrURITooLong
 				}
 
 				p.startLineBuff = append(p.startLineBuff, ' ')
 			default:
 				if uint16(len(p.startLineBuff)) >= p.settings.URL.Length.Maximal {
-					return parser.Error, nil, errors.ErrURLTooLong
+					return parser.Error, nil, errors.ErrURITooLong
 				}
 
 				p.startLineBuff = append(p.startLineBuff, data[i])
 			}
 		case eQueryDecode1Char:
 			if !isHex(data[i]) {
-				return parser.Error, nil, errors.ErrURLDecoding
+				return parser.Error, nil, errors.ErrURIDecoding
 			}
 
 			p.urlEncodedChar = unHex(data[i]) << 4
 			p.state = eQueryDecode2Char
 		case eQueryDecode2Char:
 			if !isHex(data[i]) {
-				return parser.Error, nil, errors.ErrURLDecoding
+				return parser.Error, nil, errors.ErrURIDecoding
 			}
 			if uint16(len(p.startLineBuff)) >= p.settings.URL.Length.Maximal {
-				return parser.Error, nil, errors.ErrURLTooLong
+				return parser.Error, nil, errors.ErrURITooLong
 			}
 
 			p.startLineBuff = append(p.startLineBuff, p.urlEncodedChar|unHex(data[i]))
@@ -188,24 +188,24 @@ func (p *httpRequestsParser) Parse(data []byte) (state parser.RequestState, extr
 				p.state = eFragmentDecode1Char
 			default:
 				if uint16(len(p.startLineBuff)) >= p.settings.URL.Length.Maximal {
-					return parser.Error, nil, errors.ErrURLTooLong
+					return parser.Error, nil, errors.ErrURITooLong
 				}
 
 				p.startLineBuff = append(p.startLineBuff, data[i])
 			}
 		case eFragmentDecode1Char:
 			if !isHex(data[i]) {
-				return parser.Error, nil, errors.ErrURLDecoding
+				return parser.Error, nil, errors.ErrURIDecoding
 			}
 
 			p.urlEncodedChar = unHex(data[i]) << 4
 			p.state = eFragmentDecode2Char
 		case eFragmentDecode2Char:
 			if !isHex(data[i]) {
-				return parser.Error, nil, errors.ErrURLDecoding
+				return parser.Error, nil, errors.ErrURIDecoding
 			}
 			if uint16(len(p.startLineBuff)) >= p.settings.URL.Length.Maximal {
-				return parser.Error, nil, errors.ErrURLTooLong
+				return parser.Error, nil, errors.ErrURITooLong
 			}
 
 			p.startLineBuff = append(p.startLineBuff, p.urlEncodedChar|unHex(data[i]))
@@ -265,7 +265,6 @@ func (p *httpRequestsParser) Parse(data []byte) (state parser.RequestState, extr
 			switch data[i] {
 			case ':':
 				if p.headersManager.BeginValue() {
-					// TODO: add this to list of handling errors
 					return parser.Error, nil, errors.ErrTooManyHeaders
 				}
 				p.state = eHeaderColon
@@ -273,7 +272,7 @@ func (p *httpRequestsParser) Parse(data []byte) (state parser.RequestState, extr
 				return parser.Error, nil, errors.ErrBadRequest
 			default:
 				if len(p.headerBuff) >= int(p.settings.Headers.KeyLength.Maximal) {
-					return parser.Error, nil, errors.ErrTooLarge
+					return parser.Error, nil, errors.ErrHeaderFieldsTooLarge
 				}
 
 				p.headerBuff = append(p.headerBuff, data[i]|0x20)
@@ -284,7 +283,9 @@ func (p *httpRequestsParser) Parse(data []byte) (state parser.RequestState, extr
 				return parser.Error, nil, errors.ErrBadRequest
 			case ' ':
 			default:
-				p.headersManager.Values = append(p.headersManager.Values, data[i])
+				if p.headersManager.AppendValue(data[i]) {
+					return parser.Error, nil, errors.ErrHeaderFieldsTooLarge
+				}
 			}
 
 			p.state = eHeaderValue
@@ -295,7 +296,9 @@ func (p *httpRequestsParser) Parse(data []byte) (state parser.RequestState, extr
 			case '\n':
 				p.state = eHeaderValueCRLF
 			default:
-				p.headersManager.Values = append(p.headersManager.Values, data[i])
+				if p.headersManager.AppendValue(data[i]) {
+					return parser.Error, nil, errors.ErrHeaderFieldsTooLarge
+				}
 			}
 		case eHeaderValueCR:
 			switch data[i] {
