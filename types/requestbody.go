@@ -56,10 +56,10 @@ func (r *requestBody) Read(onBody onBodyCallback, onComplete onCompleteCallback)
 
 func (r *requestBody) Reset() error {
 	if r.read {
+		r.read = false
+
 		return nil
 	}
-
-	r.read = false
 
 	for {
 		if <-r.body.Data == nil {
