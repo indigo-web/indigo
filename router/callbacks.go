@@ -34,6 +34,12 @@ func (d DefaultRouter) OnError(request *types.Request, respWriter types.Response
 		code = status.BadRequest
 	case errors.ErrTooLarge:
 		code = status.RequestEntityTooLarge
+	case errors.ErrHeaderFieldsTooLarge:
+		code = status.RequestHeaderFieldsTooLarge
+	case errors.ErrURITooLong:
+		code = status.RequestURITooLong
+	case errors.ErrUnsupportedProtocol:
+		code = status.HTTPVersionNotSupported
 	default:
 		// unknown error, but for consistent behaviour we must respond with
 		// something. Let it be some neutral error
