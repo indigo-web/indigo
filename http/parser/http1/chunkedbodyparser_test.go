@@ -1,11 +1,12 @@
 package http1
 
 import (
-	"github.com/stretchr/testify/require"
 	"indigo/errors"
 	"indigo/internal"
 	"indigo/settings"
 	"testing"
+
+	"github.com/stretchr/testify/require"
 )
 
 func bodyReader(gateway *internal.BodyGateway, ch chan []byte) {
