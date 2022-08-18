@@ -1,17 +1,12 @@
 <img src="logo.png" alt="drawing" width="300" align="right" title="What are you looking for?"/>
 
-Web-server in the middle of std and fasthttp.
+Indigo is non-idiomatic, but focusing on simplicity and performance web-server
 
-Implemented:
-- Stream-based request body processing
-- Convinient response constructor
+It provides such a featues:
+- Streaming-based body processing
 - Server-wide settings
-- Convinient router with customizable error handlers, middlewares and handlers groups
-- I don't know what else to write here
+- Response object constructor
+- Middlewares
+- Endpoint groups
 
-TODO:
-- Add request context
-- Fix bug with saving headers from previous request if were not used in a new one
-- Add connection hijacking
-
-As you can see, TODO list is bigger than implemented list. This means this project is a piece of shit (at least currently). So welcome if you wanna do it a bit better!
+See examples in `examples/` folder
