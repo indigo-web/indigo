@@ -26,7 +26,9 @@ var (
 
 func getParser() (httpparser.HTTPRequestsParser, *types.Request) {
 	settings := settings2.Default()
-	request, gateway := types.NewRequest(headers.NewManager(settings.HeadersNumber))
+	reqHeaders := make(headers.Headers)
+	manager := headers.NewManager(settings.Headers)
+	request, gateway := types.NewRequest(reqHeaders, manager)
 	return NewHTTPRequestsParser(
 		request, gateway, nil, nil, settings,
 	), request
@@ -52,9 +54,9 @@ func compareRequests(t *testing.T, wanted wantedRequest, actual *types.Request) 
 	require.Equal(t, wanted.Protocol, actual.Proto)
 
 	for key, value := range wanted.Headers {
-		actualValue, found := actual.Headers.Get(key)
+		actualValue, found := actual.Headers[key]
 		require.True(t, found)
-		require.Equal(t, value, actualValue.String())
+		require.Equal(t, value, string(actualValue))
 	}
 }
 
