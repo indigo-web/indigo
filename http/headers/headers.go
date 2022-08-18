@@ -1,61 +1,44 @@
 package headers
 
-import (
-	"indigo/errors"
-	"indigo/internal"
-	"indigo/settings"
+import "indigo/settings"
+
+type (
+	Headers       map[string][]byte
+	ValueAppender func(b []byte) int
 )
 
-type ValueAppender func(...byte) int
-
-type HeaderValue struct {
-	value []byte
-}
-
-func (h HeaderValue) String() string {
-	return internal.B2S(h.value)
-}
-
-func (h HeaderValue) Bytes() []byte {
-	return h.value
-}
-
-func (h *HeaderValue) append(chars ...byte) (newLen int) {
-	h.value = append(h.value, chars...)
-	return len(h.value)
-}
-
 type Manager struct {
-	headers    map[string]*HeaderValue
-	maxHeaders uint8
+	Headers       Headers
+	Values        []byte
+	valueBegin    int
+	headersNumber settings.HeadersNumber
 }
 
-func NewManager(headersSettings settings.HeadersNumber) Manager {
+func NewManager(headers Headers, settings settings.Headers) Manager {
+	defaultValuesBuffSize := uint16(settings.Number.Default) * settings.ValueLength.Default
+
 	return Manager{
-		headers:    make(map[string]*HeaderValue, headersSettings.Default),
-		maxHeaders: headersSettings.Maximal,
+		// TODO: update Default value
+		Headers:       headers,
+		Values:        make([]byte, 0, defaultValuesBuffSize),
+		headersNumber: settings.Number,
 	}
 }
 
-func (m Manager) Get(key string) (header *HeaderValue, found bool) {
-	header, found = m.headers[key]
-	return header, found
+func (m *Manager) BeginValue() (oversize bool) {
+	m.valueBegin = len(m.Values)
+
+	return uint8(len(m.Headers)) >= m.headersNumber.Maximal
 }
 
-func (m Manager) Set(key []byte) (appender ValueAppender, err error) {
-	// TODO: pre-alloc HeaderValue.value slice to some minimal size
-	header, found := m.headers[internal.B2S(key)]
+func (m Manager) FinalizeValue(key string) (finalValue []byte) {
+	finalValue = m.Values[m.valueBegin:]
+	m.Headers[key] = finalValue
 
-	if !found {
-		if uint8(len(m.headers)) >= m.maxHeaders {
-			return appender, errors.ErrTooManyHeaders
-		}
+	return finalValue
+}
 
-		header = new(HeaderValue)
-		m.headers[string(key)] = header
-	} else {
-		header.value = header.value[:0]
-	}
-
-	return header.append, nil
+func (m *Manager) Reset() {
+	m.Values = m.Values[:0]
+	m.Headers = make(map[string][]byte, m.headersNumber.Default)
 }

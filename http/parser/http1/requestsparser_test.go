@@ -26,9 +26,11 @@ var (
 
 func getParser() (httpparser.HTTPRequestsParser, *types.Request) {
 	settings := settings2.Default()
-	request, gateway := types.NewRequest(headers.NewManager(settings.HeadersNumber))
+	reqHeaders := make(headers.Headers)
+	manager := headers.NewManager(reqHeaders, settings.Headers)
+	request, gateway := types.NewRequest(&manager)
 	return NewHTTPRequestsParser(
-		request, gateway, nil, nil, settings,
+		request, gateway, nil, nil, settings, &manager,
 	), request
 }
 
@@ -52,9 +54,9 @@ func compareRequests(t *testing.T, wanted wantedRequest, actual *types.Request) 
 	require.Equal(t, wanted.Protocol, actual.Proto)
 
 	for key, value := range wanted.Headers {
-		actualValue, found := actual.Headers.Get(key)
+		actualValue, found := actual.Headers[key]
 		require.True(t, found)
-		require.Equal(t, value, actualValue.String())
+		require.Equal(t, value, string(actualValue))
 	}
 }
 
@@ -76,14 +78,17 @@ func splitIntoParts(req []byte, n int) (parts [][]byte) {
 }
 
 func testPartedRequest(t *testing.T, parser httpparser.HTTPRequestsParser,
-	rawRequest []byte, n int) {
+	rawRequest []byte, n int,
+) {
 	var finalState httpparser.RequestState
 
 	for _, chunk := range splitIntoParts(rawRequest, n) {
 		state, extra, err := parser.Parse(chunk)
+
 		for len(extra) > 0 {
 			state, extra, err = parser.Parse(extra)
 		}
+
 		finalState = state
 		require.NoError(t, err)
 		require.Empty(t, extra)
@@ -185,9 +190,7 @@ func TestHttpRequestsParser_Parse_GET(t *testing.T) {
 			Method:   methods.GET,
 			Path:     url.Path("/hello world"),
 			Protocol: proto.HTTP11,
-			Headers: testHeaders{
-				"hello": "World!",
-			},
+			Headers:  testHeaders{},
 		}
 
 		compareRequests(t, wanted, request)
