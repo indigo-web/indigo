@@ -29,7 +29,7 @@ jobs:
         run: go build examples/pathgroups/pathgroups.go
 
       - name: Example - middlewares
-        run: go build examples/middlewares/main.go
+        run: go build examples/middlewares/middlewares.go
 
       - name: Tests
         run: go test -v ./...
