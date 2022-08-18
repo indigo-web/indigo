@@ -27,10 +27,10 @@ var (
 func getParser() (httpparser.HTTPRequestsParser, *types.Request) {
 	settings := settings2.Default()
 	reqHeaders := make(headers.Headers)
-	manager := headers.NewManager(settings.Headers)
-	request, gateway := types.NewRequest(reqHeaders, manager)
+	manager := headers.NewManager(reqHeaders, settings.Headers)
+	request, gateway := types.NewRequest(&manager)
 	return NewHTTPRequestsParser(
-		request, gateway, nil, nil, settings,
+		request, gateway, nil, nil, settings, &manager,
 	), request
 }
 
@@ -83,9 +83,11 @@ func testPartedRequest(t *testing.T, parser httpparser.HTTPRequestsParser,
 
 	for _, chunk := range splitIntoParts(rawRequest, n) {
 		state, extra, err := parser.Parse(chunk)
+
 		for len(extra) > 0 {
 			state, extra, err = parser.Parse(extra)
 		}
+
 		finalState = state
 		require.NoError(t, err)
 		require.Empty(t, extra)
@@ -187,9 +189,7 @@ func TestHttpRequestsParser_Parse_GET(t *testing.T) {
 			Method:   methods.GET,
 			Path:     url.Path("/hello world"),
 			Protocol: proto.HTTP11,
-			Headers: testHeaders{
-				"hello": "World!",
-			},
+			Headers:  testHeaders{},
 		}
 
 		compareRequests(t, wanted, request)
