@@ -17,6 +17,7 @@ jobs:
       - name: Run tests
         uses: actions/setup-go@v3
         with:
+          ref: ${{ github.event.pull_request.head.sha }}
           go-version: 1.18
 
       - name: Install deepsource-cli
