@@ -7,6 +7,13 @@ import (
 	"indigo/types"
 )
 
+// HTTPServer provides 2 methods:
+// - Run: starts requests processor, or what they need I don't know.
+//        Method is supposed to be blocking, so in a separated goroutine
+//        expected to be started
+// - OnData: main thing here. It parses request, and sends a signal into
+//           the gateway to notify requests processor goroutine, or what
+//           they need I don't know
 type HTTPServer interface {
 	Run()
 	OnData(b []byte) error
@@ -34,10 +41,14 @@ func NewHTTPServer(
 	}
 }
 
+// Run starts request processor in blocking mode
 func (h httpServer) Run() {
 	h.requestProcessor()
 }
 
+// OnData is a core-core function here, because does all the main stuff
+// core must do. It parses a data provided by tcp server, and according
+// to the parser state returned, decides what to do
 func (h httpServer) OnData(data []byte) (err error) {
 	var state parser.RequestState
 
@@ -69,10 +80,16 @@ func (h httpServer) OnData(data []byte) (err error) {
 			return nil
 		case parser.Error:
 			switch err {
-			case errors.ErrBadRequest, errors.ErrURLDecoding:
+			case errors.ErrBadRequest, errors.ErrURIDecoding:
 				h.notifier <- badRequest
-			case errors.ErrTooLarge, errors.ErrURLTooLong, errors.ErrTooManyHeaders:
+			case errors.ErrTooManyHeaders, errors.ErrTooLarge:
 				h.notifier <- requestEntityTooLarge
+			case errors.ErrURITooLong:
+				h.notifier <- requestURITooLong
+			case errors.ErrHeaderFieldsTooLarge:
+				h.notifier <- requestHeaderFieldsTooLarge
+			case errors.ErrUnsupportedProtocol:
+				h.notifier <- unsupportedProtocol
 			default:
 				h.notifier <- badRequest
 			}
@@ -88,6 +105,9 @@ func (h httpServer) OnData(data []byte) (err error) {
 	return nil
 }
 
+// requestProcessor is a top function in the whole userspace (requests processing
+// space), it receives a signal from notifier chan and decides what to do starting
+// from the actual signal. Also, when called, calls router OnStart() method
 func (h httpServer) requestProcessor() {
 	h.router.OnStart()
 
@@ -115,6 +135,18 @@ func (h httpServer) requestProcessor() {
 			return
 		case requestEntityTooLarge:
 			h.router.OnError(h.request, h.respWriter, errors.ErrTooLarge)
+			h.notifier <- processed
+			return
+		case requestHeaderFieldsTooLarge:
+			h.router.OnError(h.request, h.respWriter, errors.ErrHeaderFieldsTooLarge)
+			h.notifier <- processed
+			return
+		case requestURITooLong:
+			h.router.OnError(h.request, h.respWriter, errors.ErrURITooLong)
+			h.notifier <- processed
+			return
+		case unsupportedProtocol:
+			h.router.OnError(h.request, h.respWriter, errors.ErrUnsupportedProtocol)
 			h.notifier <- processed
 			return
 		}

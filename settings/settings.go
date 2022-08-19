@@ -12,15 +12,43 @@ type Setting[T number] struct {
 }
 
 type (
-	HeadersNumber      Setting[uint8]
-	HeadersKeyLength   Setting[uint8]
+	// HeadersNumber is responsible for headers map size
+	// Default value is an initial size of allocated headers map
+	// Maximal value is maximum number of headers allowed to be presented
+	HeadersNumber Setting[uint8]
+
+	// HeadersKeyLength is responsible for header key length
+	// Default value is an initial size of header key buffer allocated in parser
+	// Maximal value is a maximal length of header key
+	HeadersKeyLength Setting[uint8]
+
+	// HeadersValueLength is responsible for header value length
+	// Default value is an initial size for every header value
+	// Maximal value is a maximal possible length for header
 	HeadersValueLength Setting[uint16]
 
+	// URLLength is responsible for URL buffer
+	// Default value is an initial size of URL buffer
+	// Maximal value is a maximal length of URL (protocol and method are
+	//         included, so real limit will be a bit less than specified one,
+	//         depends on method and protocol)
 	URLLength Setting[uint16]
 
+	// TCPServerRead is responsible for tcp server reading buffer settings
+	// Default value is a size of buffer for reading from socket, also
+	//         we can call this setting as a "how many bytes are read from
+	//         socket at most"
 	TCPServerRead Setting[uint16]
 
-	BodyLength    Setting[uint32]
+	// BodyLength is responsible for body length parameters
+	// Default value stands for nothing, it's unused
+	// Maximal value is a maximal length of body
+	BodyLength Setting[uint32]
+
+	// BodyChunkSize is responsible for chunks in chunked transfer encoding mode
+	// Default value also stands for nothing because of peculiar properties of
+	//         chunked body parser
+	// Maximal value is a maximal length of chunk
 	BodyChunkSize Setting[uint32]
 )
 

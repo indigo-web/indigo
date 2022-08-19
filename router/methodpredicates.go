@@ -4,6 +4,11 @@ import (
 	"indigo/http/method"
 )
 
+/*
+This file is responsible for methods predicates - shortcuts for Route method
+with already set method taken from name of the method
+*/
+
 func (d DefaultRouter) Get(path string, handler HandlerFunc, middlewares ...Middleware) {
 	d.Route(methods.GET, path, handler, middlewares...)
 }

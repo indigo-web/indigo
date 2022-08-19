@@ -2,6 +2,7 @@ package router
 
 import (
 	"indigo/http/encodings"
+	"indigo/http/headers"
 	methods "indigo/http/method"
 	"indigo/http/render"
 	"indigo/http/url"
@@ -14,9 +15,20 @@ type (
 	routesMap   map[url.Path]handlersMap
 )
 
+// DefaultRouter is a reference implementation of router for indigo
+// It supports:
+// 1) Endpoint groups
+// 2) Middlewares (currently does it not very well, middlewares must be set
+//    before handlers, but soon I will fix it)
+// 3) Error handlers
+// 4) Encoding/decoding incoming content
+// 5) Routing by path and method. If path not found, 404 Not Found is returned.
+//    If path is found, but no method attached, 413 Method Not Allowed is returned.
 type DefaultRouter struct {
 	prefix      string
 	middlewares []Middleware
+
+	defaultHeaders headers.Headers
 
 	routes      routesMap
 	errHandlers errHandlers
@@ -25,6 +37,9 @@ type DefaultRouter struct {
 	codings  *encodings.ContentEncodings
 }
 
+// NewDefaultRouter constructs a new instance of default router. Error handlers
+// by default are applied, renderer with a nil (as initial value) buffer constructed,
+// and new content encodings is created (single for all the groups)
 func NewDefaultRouter() DefaultRouter {
 	contentEncodings := encodings.NewContentEncodings()
 

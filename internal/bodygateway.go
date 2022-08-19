@@ -1,7 +1,7 @@
 package internal
 
 /*
-BodyGateway is embedded solution instead of pipe
+BodyGateway is an embedded solution instead of pipe
 
 The idea is:
 - Core pushes some data into the Data channel
@@ -22,6 +22,7 @@ func NewBodyGateway() *BodyGateway {
 	}
 }
 
+// WriteErr is simply a sugar for setting an error and sending nil to the channel
 func (b *BodyGateway) WriteErr(err error) {
 	b.Err = err
 	b.Data <- nil
