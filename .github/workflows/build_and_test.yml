@@ -9,26 +9,6 @@ on:
       - master
 
 jobs:
-  build-examples:
-    runs-on: ubuntu-latest
-    steps:
-      - name: Install go 1.18
-        uses: actions/setup-go@v3
-        with:
-          go-version: 1.18
-
-      - name: Build example - helloworld
-        run: go build examples/helloworld/helloworld.go
-
-      - name: Build example - requestbody
-        run: go build examples/requestbody/printpost.go
-
-      - name: Build example - pathgroups
-        run: go build examples/pathgroups/pathgroups.go
-
-      - name: Build example - middlewares
-        run: go build examples/middlewares/middlewares.go
-
   run-tests:
     runs-on: ubuntu-latest
     steps:
@@ -51,8 +31,7 @@ jobs:
       - name: Run tests
         run: go test -v -coverprofile=cover.out ./...
 
-      - name: Checkout
-        uses: actions/checkout@v3
+      - uses: actions/checkout@v3
         with:
           ref: ${{ github.event.pull_request.head.sha }}
 
