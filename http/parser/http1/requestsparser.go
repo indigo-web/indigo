@@ -314,7 +314,6 @@ func (p *httpRequestsParser) Parse(data []byte) (state parser.RequestState, extr
 				return parser.Error, nil, errors.ErrBadRequest
 			}
 		case eHeaderValueCRLF:
-			// TODO: keep somewhere pre-allocated header name
 			key := string(p.headerBuff)
 			value := p.headersManager.FinalizeValue(key)
 			p.request.Headers[key] = value
