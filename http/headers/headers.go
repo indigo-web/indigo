@@ -8,9 +8,8 @@ type (
 )
 
 // Manager encapsulates all the stuff about keys and values of headers
-// For keys, it keeps all the keys that are already allocated, to avoid
-// allocating them one more time. For values, it's just a big slice with
-// a lot of smaller slices that pointing at their section with a value
+// For values, it's just a big slice with a lot of smaller slices that
+// pointing at their section with a value
 type Manager struct {
 	Headers         Headers
 	Values          []byte
@@ -49,10 +48,7 @@ func (m *Manager) AppendValue(char byte) (exceeded bool) {
 }
 
 // FinalizeValue just marks that we are done with our header value. It
-// takes header value as a string (unsafe string; unsafe string means
-// that it is converted with unsafe B2S function that will rewrite
-// our string after we will return an execution flow back to parser)
-// and expecting manager to add this key to headers map
+// takes provided key and adds a new entry into the headers map
 func (m Manager) FinalizeValue(key string) (finalValue []byte) {
 	finalValue = m.Values[m.valueBegin:]
 	m.Headers[key] = finalValue
