@@ -5,20 +5,14 @@ import (
 	"indigo/internal"
 )
 
-const (
-	// yes, this is a bad design. I don't know how to pass settings here
-	// so, TODO: queries must be initialized in indi.go
-	defaultQueriesLength = 5
-)
-
-func Parse(data []byte) (queries map[string][]byte, err error) {
+func Parse(data []byte, queryMapFactory func() map[string][]byte) (queries map[string][]byte, err error) {
 	var (
 		offset int
 		key    string
 	)
 
 	state := eKey
-	queries = make(map[string][]byte, defaultQueriesLength)
+	queries = queryMapFactory()
 
 	for i := range data {
 		switch state {
