@@ -8,31 +8,40 @@ import (
 type (
 	rawQuery    []byte
 	parsedQuery map[string][]byte
+
+	queryFactory func() map[string][]byte
 )
 
 // Query is optional, it may contain rawQuery, but it will not be parsed until
 // needed
 type Query struct {
-	parsedQuery parsedQuery
-	rawQuery    rawQuery
+	rawQuery     rawQuery
+	parsedQuery  parsedQuery
+	queryFactory queryFactory
 }
 
-func NewQuery(buff []byte) Query {
+func NewQuery(queryFactory queryFactory) Query {
 	return Query{
-		rawQuery: buff,
+		queryFactory: queryFactory,
 	}
 }
 
+// Set is responsible for setting a raw value of query. Each call
+// resets parsedQuery value to nil (query bytearray must be parsed
+// again)
 func (q *Query) Set(raw []byte) {
-	// TODO: add to settings a new setting of initial parsedQuery capacity
-	//       and maximal number of query key-values allowed
+	q.rawQuery = raw
 	q.parsedQuery = nil
-	q.rawQuery = append(q.rawQuery[:0], raw...)
 }
 
+// Get is responsible for getting a key from url query. In case this
+// method is called a first time since rawQuery was set (or not set
+// at all), rawQuery bytearray will be parsed and value returned
+// (or ErrNoSuchKey instead). In case of invalid query bytearray,
+// ErrBadQuery will be returned
 func (q *Query) Get(key string) (value []byte, err error) {
 	if q.parsedQuery == nil {
-		q.parsedQuery, err = queryparser.Parse(q.rawQuery)
+		q.parsedQuery, err = queryparser.Parse(q.rawQuery, q.queryFactory)
 		if err != nil {
 			return nil, err
 		}
