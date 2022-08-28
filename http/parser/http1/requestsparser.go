@@ -114,10 +114,18 @@ func (p *httpRequestsParser) Parse(data []byte) (state parser.RequestState, extr
 				p.state = ePathDecode1Char
 			case '?':
 				p.request.Path = url.Path(internal.B2S(p.startLineBuff[p.offset:]))
+				if len(p.request.Path) == 0 {
+					p.request.Path = "/"
+				}
+
 				p.offset = len(p.startLineBuff)
 				p.state = eQuery
 			case '#':
 				p.request.Path = url.Path(internal.B2S(p.startLineBuff[p.offset:]))
+				if len(p.request.Path) == 0 {
+					p.request.Path = "/"
+				}
+
 				p.offset = len(p.startLineBuff)
 				p.state = eFragment
 			default:
