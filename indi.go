@@ -10,6 +10,7 @@ import (
 	settings2 "indigo/settings"
 	"indigo/types"
 	"net"
+	"sync"
 )
 
 // Application is just a struct with addr and shutdown channel that is currently
@@ -41,7 +42,7 @@ func (a Application) Serve(router router.Router, someSettings ...settings2.Setti
 		return err
 	}
 
-	return server.StartTCPServer(sock, func(conn net.Conn) {
+	return server.StartTCPServer(sock, func(wg *sync.WaitGroup, conn net.Conn) {
 		headersManager := headers.NewManager(settings.Headers)
 		query := url.NewQuery(func() map[string][]byte {
 			return make(map[string][]byte, settings.URL.Query.Number.Default)
@@ -63,8 +64,18 @@ func (a Application) Serve(router router.Router, someSettings ...settings2.Setti
 		go httpServer.Run()
 
 		readBuff := make([]byte, settings.TCPServer.Read.Default)
-		server.DefaultConnHandler(conn, readBuff, httpServer.OnData)
-	})
+		server.DefaultConnHandler(wg, conn, readBuff, httpServer.OnData)
+	}, a.shutdown)
+}
+
+// Shutdown gracefully shutting down the server. It is not blocking,
+// server being shut down right after calling this method is not
+// guaranteed, because tcp server will wait for the next connection,
+// and only then he'll be able to receive a shutdown notify. Moreover,
+// tcp server will wait until all the existing connections will be
+// closed
+func (a Application) Shutdown() {
+	a.shutdown <- true
 }
 
 func getSettings(settings ...settings2.Settings) (settings2.Settings, error) {
