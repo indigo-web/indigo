@@ -85,6 +85,6 @@ func getSettings(settings ...settings2.Settings) (settings2.Settings, error) {
 	case 1:
 		return settings2.Fill(settings[0]), nil
 	default:
-		return settings2.Settings{}, errors.New("too much settings")
+		return settings2.Settings{}, errors.New("too many settings (none or single struct is expected)")
 	}
 }
