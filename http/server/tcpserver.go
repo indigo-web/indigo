@@ -30,6 +30,7 @@ func StartTCPServer(sock net.Listener, handleConn connHandler, sd chan bool) err
 				return err
 			}
 
+			wg.Add(1)
 			go handleConn(wg, conn)
 		}
 	}
