@@ -18,4 +18,6 @@ var (
 
 	ErrNoSuchKey = errors.New("requested key is not presented")
 	ErrRead      = errors.New("body has been already read")
+
+	ErrShutdown = errors.New("graceful shutdown")
 )
