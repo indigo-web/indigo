@@ -5,6 +5,7 @@ import (
 	"indigo/http/headers"
 	"indigo/http/parser/http1"
 	"indigo/http/server"
+	"indigo/http/url"
 	"indigo/router"
 	settings2 "indigo/settings"
 	"indigo/types"
@@ -42,7 +43,10 @@ func (a Application) Serve(router router.Router, someSettings ...settings2.Setti
 
 	return server.StartTCPServer(sock, func(conn net.Conn) {
 		headersManager := headers.NewManager(settings.Headers)
-		request, gateway := types.NewRequest(&headersManager)
+		query := url.NewQuery(func() map[string][]byte {
+			return make(map[string][]byte, settings.URL.Query.Number.Default)
+		})
+		request, gateway := types.NewRequest(&headersManager, query)
 
 		startLineBuff := make([]byte, 0, settings.URL.Length.Default)
 		headerBuff := make([]byte, 0, settings.Headers.KeyLength.Default)
