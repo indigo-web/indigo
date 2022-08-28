@@ -55,8 +55,8 @@ func (a Application) Serve(router router.Router, someSettings ...settings2.Setti
 			request, gateway, startLineBuff, headerBuff, settings, &headersManager,
 		)
 
-		httpServer := server.NewHTTPServer(request, func(b []byte) error {
-			_, err := conn.Write(b)
+		httpServer := server.NewHTTPServer(request, func(b []byte) (err error) {
+			_, err = conn.Write(b)
 			return err
 		}, router, httpParser)
 
