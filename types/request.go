@@ -35,10 +35,10 @@ type Request struct {
 // because it has only optional purposes and buff will be nil anyway
 // But maybe it's better to implement DI all the way we go? I don't know, maybe
 // someone will contribute and fix this
-func NewRequest(manager *headers.Manager) (*Request, *internal.BodyGateway) {
+func NewRequest(manager *headers.Manager, query url.Query) (*Request, *internal.BodyGateway) {
 	requestBodyStruct, gateway := newRequestBody()
 	request := &Request{
-		Query:          url.NewQuery(nil),
+		Query:          query,
 		Proto:          proto.HTTP11,
 		Headers:        manager.Headers,
 		headersManager: manager,
