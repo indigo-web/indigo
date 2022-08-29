@@ -27,8 +27,6 @@ const (
 	testQueryKey   = "hel lo"
 	testQueryValue = "wor ld"
 
-	testFragment = "Somewhere Here"
-
 	testRequestBody = "Hello, world!"
 )
 
@@ -166,18 +164,18 @@ func TestAllCases(t *testing.T) {
 	})
 
 	t.Run("/read-body", func(t *testing.T) {
-		body := bytes.Buffer{}
+		body := new(bytes.Buffer)
 		body.Write([]byte(testRequestBody))
-		resp, err := http.DefaultClient.Post(URL+"/read-body", "", &body)
+		resp, err := http.DefaultClient.Post(URL+"/read-body", "", body)
 		require.NoError(t, err)
 		defer resp.Body.Close()
 		require.Equal(t, http.StatusOK, resp.StatusCode)
 	})
 
 	t.Run("/do-not-read-body", func(t *testing.T) {
-		body := bytes.Buffer{}
+		body := new(bytes.Buffer)
 		body.Write([]byte(testRequestBody))
-		resp, err := http.DefaultClient.Post(URL+"/read-body", "", &body)
+		resp, err := http.DefaultClient.Post(URL+"/read-body", "", body)
 		require.NoError(t, err)
 		defer resp.Body.Close()
 		require.Equal(t, http.StatusOK, resp.StatusCode)
