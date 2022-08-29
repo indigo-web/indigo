@@ -22,12 +22,15 @@ var (
 	biggerGETURLEncoded = []byte("GET /hello%20world HTTP/1.1\r\n\r\n")
 
 	somePOST = []byte("POST / HTTP/1.1\r\nHello: World!\r\nContent-Length: 13\r\n\r\nHello, World!")
+
+	ordinaryChunkedBody = "d\r\nHello, world!\r\n1a\r\nBut what's wrong with you?\r\nf\r\nFinally am here\r\n0\r\n\r\n"
+	ordinaryChunked     = []byte("POST / HTTP/1.1\r\nTransfer-Encoding: chunked\r\n\r\n" + ordinaryChunkedBody)
 )
 
 func getParser() (httpparser.HTTPRequestsParser, *types.Request) {
 	settings := settings2.Default()
 	manager := headers.NewManager(settings.Headers)
-	request, gateway := types.NewRequest(&manager)
+	request, gateway := types.NewRequest(&manager, url.Query{})
 	return NewHTTPRequestsParser(
 		request, gateway, nil, nil, settings, &manager,
 	), request
@@ -367,5 +370,23 @@ func TestHttpRequestsParser_Parse_Negative(t *testing.T) {
 
 		require.Equal(t, httpparser.Error, state)
 		require.EqualError(t, errors.ErrBadRequest, err.Error())
+	})
+}
+
+func TestHttpRequestsParser_Chunked(t *testing.T) {
+	t.Run("OrdinaryChunkedRequest", func(t *testing.T) {
+		parser, request := getParser()
+
+		ch := make(chan []byte)
+		go readBody(request, ch)
+		state, extra, err := parser.Parse(ordinaryChunked)
+		require.NoError(t, err)
+		require.Equal(t, httpparser.HeadersCompleted, state)
+
+		state, extra, err = parser.Parse(extra)
+		require.NoError(t, err)
+		require.Equal(t, httpparser.BodyCompleted, state)
+		require.Empty(t, extra)
+		require.Equal(t, "Hello, world!But what's wrong with you?Finally am here", string(<-ch))
 	})
 }
