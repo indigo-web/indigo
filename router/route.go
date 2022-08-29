@@ -19,7 +19,8 @@ func (d *DefaultRouter) Route(
 	method methods.Method, path string, handler HandlerFunc,
 	middlewares ...Middleware,
 ) {
-	if path != "*" && !strings.HasPrefix(path, "/") {
+	if path != "*" && !strings.HasPrefix(path, "/") && d.prefix == "" {
+		// applying prefix slash only if we are not in group
 		path = "/" + path
 	}
 
