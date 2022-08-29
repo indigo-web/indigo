@@ -13,6 +13,7 @@ like a core of the router
 
 // OnStart currently only applies default headers, but in future it will also
 // apply all the middlewares onto handlers
+// TODO: update middlewares so they will be applied here
 func (d DefaultRouter) OnStart() {
 	d.applyDefaultHeaders()
 }
