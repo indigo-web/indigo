@@ -11,20 +11,27 @@ import (
 
 type (
 	HandlerFunc func(*types.Request) types.Response
-	handlersMap map[methods.Method]HandlerFunc
+	handlersMap map[methods.Method]*handlerObject
 	routesMap   map[url.Path]handlersMap
+
+	handlerObject struct {
+		fun         HandlerFunc
+		middlewares []Middleware
+	}
 )
 
 // DefaultRouter is a reference implementation of router for indigo
 // It supports:
 // 1) Endpoint groups
-// 2) Middlewares (currently does it not very well, middlewares must be set
-//    before handlers, but soon I will fix it)
+// 2) Middlewares
 // 3) Error handlers
 // 4) Encoding/decoding incoming content
 // 5) Routing by path and method. If path not found, 404 Not Found is returned.
 //    If path is found, but no method attached, 413 Method Not Allowed is returned.
 type DefaultRouter struct {
+	root   *DefaultRouter
+	groups []DefaultRouter
+
 	prefix      string
 	middlewares []Middleware
 
@@ -40,14 +47,18 @@ type DefaultRouter struct {
 // NewDefaultRouter constructs a new instance of default router. Error handlers
 // by default are applied, renderer with a nil (as initial value) buffer constructed,
 // and new content encodings is created (single for all the groups)
-func NewDefaultRouter() DefaultRouter {
+func NewDefaultRouter() *DefaultRouter {
 	contentEncodings := encodings.NewContentEncodings()
 
-	return DefaultRouter{
+	r := &DefaultRouter{
 		routes:      make(routesMap),
 		errHandlers: newErrHandlers(),
 		// let the first time response be rendered into the nil buffer
 		renderer: render.NewRenderer(nil),
 		codings:  &contentEncodings,
 	}
+
+	r.root = r
+
+	return r
 }
