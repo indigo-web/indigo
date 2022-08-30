@@ -106,6 +106,10 @@ func (p *httpRequestsParser) Parse(data []byte) (state parser.RequestState, extr
 		case ePath:
 			switch data[i] {
 			case ' ':
+				if len(p.startLineBuff) == p.offset {
+					return parser.Error, nil, errors.ErrBadRequest
+				}
+
 				p.request.Path = url.Path(internal.B2S(p.startLineBuff[p.offset:]))
 				p.offset = len(p.startLineBuff)
 				p.state = eProto
@@ -128,6 +132,9 @@ func (p *httpRequestsParser) Parse(data []byte) (state parser.RequestState, extr
 
 				p.offset = len(p.startLineBuff)
 				p.state = eFragment
+			case '\x00', '\n', '\r', '\t', '\b', '\a', '\v', '\f':
+				// request path MUST NOT include any non-printable characters
+				return parser.Error, nil, errors.ErrBadRequest
 			default:
 				if uint16(len(p.startLineBuff)) >= p.settings.URL.Length.Maximal {
 					return parser.Error, nil, errors.ErrURITooLong
@@ -170,6 +177,8 @@ func (p *httpRequestsParser) Parse(data []byte) (state parser.RequestState, extr
 				}
 
 				p.startLineBuff = append(p.startLineBuff, ' ')
+			case '\x00', '\n', '\r', '\t', '\b', '\a', '\v', '\f':
+				return parser.Error, nil, errors.ErrBadRequest
 			default:
 				if uint16(len(p.startLineBuff)) >= p.settings.URL.Length.Maximal {
 					return parser.Error, nil, errors.ErrURITooLong
@@ -203,6 +212,8 @@ func (p *httpRequestsParser) Parse(data []byte) (state parser.RequestState, extr
 				p.state = eProto
 			case '%':
 				p.state = eFragmentDecode1Char
+			case '\x00', '\n', '\r', '\t', '\b', '\a', '\v', '\f':
+				return parser.Error, nil, errors.ErrBadRequest
 			default:
 				if uint16(len(p.startLineBuff)) >= p.settings.URL.Length.Maximal {
 					return parser.Error, nil, errors.ErrURITooLong

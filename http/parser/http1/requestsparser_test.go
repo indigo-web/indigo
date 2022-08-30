@@ -255,8 +255,32 @@ func TestHttpRequestsParser_Parse_Negative(t *testing.T) {
 		go readBody(request, ch)
 		state, _, err := parser.Parse(raw)
 
+		require.EqualError(t, err, errors.ErrBadRequest.Error())
 		require.Equal(t, httpparser.Error, state)
-		require.EqualError(t, errors.ErrBadRequest, err.Error())
+	})
+
+	t.Run("NoPath", func(t *testing.T) {
+		parser, request := getParser()
+
+		raw := []byte("GET HTTP/1.1\r\n\r\n")
+		ch := make(chan []byte)
+		go readBody(request, ch)
+		state, _, err := parser.Parse(raw)
+
+		require.EqualError(t, err, errors.ErrBadRequest.Error())
+		require.Equal(t, httpparser.Error, state)
+	})
+
+	t.Run("PathWhitespace", func(t *testing.T) {
+		parser, request := getParser()
+
+		raw := []byte("GET  HTTP/1.1\r\n\r\n")
+		ch := make(chan []byte)
+		go readBody(request, ch)
+		state, _, err := parser.Parse(raw)
+
+		require.EqualError(t, err, errors.ErrBadRequest.Error())
+		require.Equal(t, httpparser.Error, state)
 	})
 
 	t.Run("ShortInvalidMethod", func(t *testing.T) {
@@ -267,8 +291,8 @@ func TestHttpRequestsParser_Parse_Negative(t *testing.T) {
 		go readBody(request, ch)
 		state, _, err := parser.Parse(raw)
 
+		require.EqualError(t, err, errors.ErrBadRequest.Error())
 		require.Equal(t, httpparser.Error, state)
-		require.EqualError(t, errors.ErrBadRequest, err.Error())
 	})
 
 	t.Run("LongInvalidMethod", func(t *testing.T) {
@@ -279,8 +303,8 @@ func TestHttpRequestsParser_Parse_Negative(t *testing.T) {
 		go readBody(request, ch)
 		state, _, err := parser.Parse(raw)
 
+		require.EqualError(t, err, errors.ErrBadRequest.Error())
 		require.Equal(t, httpparser.Error, state)
-		require.EqualError(t, errors.ErrBadRequest, err.Error())
 	})
 
 	t.Run("ShortInvalidProtocol", func(t *testing.T) {
@@ -291,8 +315,8 @@ func TestHttpRequestsParser_Parse_Negative(t *testing.T) {
 		go readBody(request, ch)
 		state, _, err := parser.Parse(raw)
 
-		require.Equal(t, httpparser.Error, state)
 		require.EqualError(t, err, errors.ErrUnsupportedProtocol.Error())
+		require.Equal(t, httpparser.Error, state)
 	})
 
 	t.Run("LongInvalidProtocol", func(t *testing.T) {
@@ -303,8 +327,8 @@ func TestHttpRequestsParser_Parse_Negative(t *testing.T) {
 		go readBody(request, ch)
 		state, _, err := parser.Parse(raw)
 
-		require.Equal(t, httpparser.Error, state)
 		require.EqualError(t, err, errors.ErrUnsupportedProtocol.Error())
+		require.Equal(t, httpparser.Error, state)
 	})
 
 	t.Run("UnsupportedProtocol", func(t *testing.T) {
@@ -315,8 +339,8 @@ func TestHttpRequestsParser_Parse_Negative(t *testing.T) {
 		go readBody(request, ch)
 		state, _, err := parser.Parse(raw)
 
-		require.Equal(t, httpparser.Error, state)
 		require.EqualError(t, err, errors.ErrUnsupportedProtocol.Error())
+		require.Equal(t, httpparser.Error, state)
 	})
 
 	t.Run("LFCR_CRLF", func(t *testing.T) {
@@ -327,8 +351,8 @@ func TestHttpRequestsParser_Parse_Negative(t *testing.T) {
 		go readBody(request, ch)
 		state, _, err := parser.Parse(raw)
 
+		require.EqualError(t, err, errors.ErrBadRequest.Error())
 		require.Equal(t, httpparser.Error, state)
-		require.EqualError(t, errors.ErrBadRequest, err.Error())
 	})
 
 	t.Run("LFCR_LFCR", func(t *testing.T) {
@@ -343,9 +367,9 @@ func TestHttpRequestsParser_Parse_Negative(t *testing.T) {
 		go readBody(request, ch)
 		state, extra, err := parser.Parse(raw)
 
-		require.Equal(t, httpparser.RequestCompleted, state)
 		require.Equal(t, []byte("\r"), extra)
 		require.NoError(t, err)
+		require.Equal(t, httpparser.RequestCompleted, state)
 	})
 
 	t.Run("HeaderWithoutColon", func(t *testing.T) {
@@ -356,8 +380,8 @@ func TestHttpRequestsParser_Parse_Negative(t *testing.T) {
 		go readBody(request, ch)
 		state, _, err := parser.Parse(raw)
 
-		require.Equal(t, httpparser.Error, state)
 		require.EqualError(t, errors.ErrBadRequest, err.Error())
+		require.Equal(t, httpparser.Error, state)
 	})
 
 	t.Run("HeaderWithoutColon", func(t *testing.T) {
@@ -368,8 +392,8 @@ func TestHttpRequestsParser_Parse_Negative(t *testing.T) {
 		go readBody(request, ch)
 		state, _, err := parser.Parse(raw)
 
-		require.Equal(t, httpparser.Error, state)
 		require.EqualError(t, errors.ErrBadRequest, err.Error())
+		require.Equal(t, httpparser.Error, state)
 	})
 }
 
