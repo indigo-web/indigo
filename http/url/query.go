@@ -54,3 +54,8 @@ func (q *Query) Get(key string) (value []byte, err error) {
 
 	return value, err
 }
+
+// Raw just returns a raw value of query as it is
+func (q Query) Raw() []byte {
+	return q.rawQuery
+}
