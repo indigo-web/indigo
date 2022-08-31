@@ -5,6 +5,7 @@ import (
 	"indigo/http/parser"
 	"indigo/router"
 	"indigo/types"
+	"net"
 )
 
 // HTTPServer provides 2 methods:
@@ -17,6 +18,7 @@ import (
 type HTTPServer interface {
 	Run()
 	OnData(b []byte) error
+	HijackConn() net.Conn
 }
 
 type httpServer struct {
@@ -24,25 +26,30 @@ type httpServer struct {
 	respWriter types.ResponseWriter
 	router     router.Router
 	parser     parser.HTTPRequestsParser
+	conn       net.Conn
 
 	notifier chan serverState
 }
 
 func NewHTTPServer(
-	req *types.Request, respWriter types.ResponseWriter,
-	router router.Router, parser parser.HTTPRequestsParser,
+	req *types.Request, respWriter types.ResponseWriter, router router.Router,
+	parser parser.HTTPRequestsParser, conn net.Conn,
 ) HTTPServer {
 	return httpServer{
 		request:    req,
 		respWriter: respWriter,
 		router:     router,
 		parser:     parser,
+		conn:       conn,
 		notifier:   make(chan serverState),
 	}
 }
 
-// Run starts request processor in blocking mode
+// Run first prepares request by setting up hijacker, then starts
+// requests processor in blocking mode
 func (h httpServer) Run() {
+	h.request.Hijack = types.Hijacker(h.request, h.HijackConn)
+
 	h.requestProcessor()
 }
 
@@ -60,7 +67,11 @@ func (h httpServer) OnData(data []byte) (err error) {
 		case parser.HeadersCompleted:
 			h.notifier <- headersCompleted
 		case parser.BodyCompleted:
-			if <-h.notifier != processed {
+			switch <-h.notifier {
+			case processed:
+			case connHijack:
+				return errors.ErrHijackConn
+			default:
 				return errors.ErrCloseConnection
 			}
 		case parser.RequestCompleted:
@@ -71,7 +82,12 @@ func (h httpServer) OnData(data []byte) (err error) {
 			// something to a blocking chan. This causes a deadlock, so
 			// we choose a bit hacky solution
 			h.parser.FinalizeBody()
-			if <-h.notifier != processed {
+
+			switch <-h.notifier {
+			case processed:
+			case connHijack:
+				return errors.ErrHijackConn
+			default:
 				return errors.ErrCloseConnection
 			}
 		case parser.ConnectionClose:
@@ -151,4 +167,18 @@ func (h httpServer) requestProcessor() {
 			return
 		}
 	}
+}
+
+func (h httpServer) HijackConn() net.Conn {
+	// HijackConn call can be initiated only by user. So in this case, we know
+	// that server is in clearly defined state - waiting for body completion,
+	// than waiting for a completion signal from requestProcessor. requestProcessor
+	// cannot signalize anything because it's busy of waiting for handler completion
+	// so in this case, we can just send some signal by ourselves. The idea is to
+	// notify the core about hijacking, so it'll die silently, without closing the
+	// connection
+	// note: for successful connection hijacking, request body MUST BE read before
+	h.notifier <- connHijack
+
+	return h.conn
 }
