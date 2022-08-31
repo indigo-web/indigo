@@ -7,6 +7,7 @@ import (
 	methods "indigo/http/method"
 	"indigo/http/proto"
 	"indigo/router"
+	"indigo/router/inbuilt"
 	"indigo/types"
 	"net"
 	"net/http"
@@ -40,7 +41,7 @@ func instantlyDisconnect() {
 }
 
 func getRouter(t *testing.T) router.Router {
-	r := router.NewDefaultRouter()
+	r := inbuilt.NewRouter()
 
 	r.Get("/simple-get", func(request *types.Request) types.Response {
 		require.Equal(t, methods.GET, request.Method)

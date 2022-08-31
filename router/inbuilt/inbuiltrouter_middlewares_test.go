@@ -122,7 +122,7 @@ func TestMiddlewares(t *testing.T) {
 	pointApplied1mware := getPointApplied1Middleware(stack)
 	pointApplied2mware := getPointApplied2Middleware(stack)
 
-	r := NewDefaultRouter()
+	r := NewRouter()
 	r.Use(global1mware)
 	r.Get("/", nopHandler, global2mware)
 

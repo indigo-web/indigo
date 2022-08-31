@@ -13,7 +13,7 @@ func nopHandler(_ *types.Request) types.Response {
 }
 
 func TestRoute(t *testing.T) {
-	r := NewDefaultRouter()
+	r := NewRouter()
 
 	t.Run("NewRoute", func(t *testing.T) {
 		r.Route(methods.GET, "/", nopHandler)
@@ -54,7 +54,7 @@ func testMethodPredicate(t *testing.T, router *DefaultRouter, route func(string,
 }
 
 func TestMethodPredicates(t *testing.T) {
-	r := NewDefaultRouter()
+	r := NewRouter()
 
 	t.Run("GET", func(t *testing.T) {
 		testMethodPredicate(t, r, r.Get, methods.GET)
@@ -86,7 +86,7 @@ func TestMethodPredicates(t *testing.T) {
 }
 
 func TestGroups(t *testing.T) {
-	r := NewDefaultRouter()
+	r := NewRouter()
 
 	r.Get("/", nopHandler)
 
@@ -107,7 +107,7 @@ func TestGroups(t *testing.T) {
 }
 
 func TestDefaultHeaders(t *testing.T) {
-	r := NewDefaultRouter()
+	r := NewRouter()
 
 	t.Run("Default", func(t *testing.T) {
 		r.applyDefaultHeaders()

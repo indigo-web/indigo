@@ -43,10 +43,10 @@ type DefaultRouter struct {
 	codings  *encodings.ContentEncodings
 }
 
-// NewDefaultRouter constructs a new instance of default router. Error handlers
+// NewRouter constructs a new instance of inbuilt router. Error handlers
 // by default are applied, renderer with a nil (as initial value) buffer constructed,
 // and new content encodings is created (single for all the groups)
-func NewDefaultRouter() *DefaultRouter {
+func NewRouter() *DefaultRouter {
 	contentEncodings := encodings.NewContentEncodings()
 
 	r := &DefaultRouter{

@@ -3,7 +3,7 @@ package main
 import (
 	"fmt"
 	"indigo"
-	"indigo/router"
+	"indigo/router/inbuilt"
 	"indigo/types"
 	"log"
 )
@@ -15,7 +15,7 @@ func MyAPIHandler(_ *types.Request) types.Response {
 }
 
 func main() {
-	r := router.NewDefaultRouter()
+	r := inbuilt.NewRouter()
 
 	api := r.Group("/api")
 
