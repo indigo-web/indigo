@@ -5,14 +5,13 @@ import (
 	"indigo/http/headers"
 	methods "indigo/http/method"
 	"indigo/http/render"
-	"indigo/http/url"
 	"indigo/types"
 )
 
 type (
 	HandlerFunc func(*types.Request) types.Response
 	handlersMap map[methods.Method]*handlerObject
-	routesMap   map[url.Path]handlersMap
+	routesMap   map[string]handlersMap
 
 	handlerObject struct {
 		fun         HandlerFunc

@@ -45,7 +45,7 @@ type testHeaders map[string]string
 
 type wantedRequest struct {
 	Method   methods.Method
-	Path     url.Path
+	Path     string
 	Protocol proto.Proto
 	Headers  testHeaders
 }
@@ -120,7 +120,7 @@ func TestHttpRequestsParser_Parse_GET(t *testing.T) {
 
 		wanted := wantedRequest{
 			Method:   methods.GET,
-			Path:     url.Path("/"),
+			Path:     "/",
 			Protocol: proto.HTTP11,
 			Headers:  testHeaders{},
 		}
@@ -142,7 +142,7 @@ func TestHttpRequestsParser_Parse_GET(t *testing.T) {
 
 		wanted := wantedRequest{
 			Method:   methods.GET,
-			Path:     url.Path("/"),
+			Path:     "/",
 			Protocol: proto.HTTP11,
 			Headers: testHeaders{
 				"hello": "World!",
@@ -166,7 +166,7 @@ func TestHttpRequestsParser_Parse_GET(t *testing.T) {
 
 		wanted := wantedRequest{
 			Method:   methods.GET,
-			Path:     url.Path("/"),
+			Path:     "/",
 			Protocol: proto.HTTP11,
 			Headers: testHeaders{
 				"hello": "World!",
@@ -190,7 +190,7 @@ func TestHttpRequestsParser_Parse_GET(t *testing.T) {
 
 		wanted := wantedRequest{
 			Method:   methods.GET,
-			Path:     url.Path("/hello world"),
+			Path:     "/hello world",
 			Protocol: proto.HTTP11,
 			Headers:  testHeaders{},
 		}
@@ -208,7 +208,7 @@ func TestHttpRequestsParser_Parse_GET(t *testing.T) {
 
 			wanted := wantedRequest{
 				Method:   methods.GET,
-				Path:     url.Path("/"),
+				Path:     "/",
 				Protocol: proto.HTTP11,
 				Headers: testHeaders{
 					"hello": "World!",
@@ -233,7 +233,7 @@ func TestHttpRequestsParser_ParsePOST(t *testing.T) {
 
 			wanted := wantedRequest{
 				Method:   methods.POST,
-				Path:     url.Path("/"),
+				Path:     "/",
 				Protocol: proto.HTTP11,
 				Headers: testHeaders{
 					"hello": "World!",

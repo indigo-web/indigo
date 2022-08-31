@@ -22,13 +22,12 @@ type (
 
 // Request struct represents http request
 // About headers manager see at http/headers/headers.go:Manager
-// Headers attribute references at that one that lays in
-// manager
+// Headers attribute references at that one that lays in manager
 type Request struct {
 	Method   methods.Method
-	Path     url.Path
+	Path     string
 	Query    url.Query
-	Fragment url.Fragment
+	Fragment string
 	Proto    proto.Proto
 
 	Headers        headers.Headers

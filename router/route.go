@@ -3,7 +3,6 @@ package router
 import (
 	methods "indigo/http/method"
 	"indigo/http/status"
-	"indigo/http/url"
 	"strings"
 )
 
@@ -21,7 +20,7 @@ func (d *DefaultRouter) Route(
 		path = "/" + path
 	}
 
-	urlPath := url.Path(d.prefix + path)
+	urlPath := d.prefix + path
 	methodsMap, found := d.routes[urlPath]
 	if !found {
 		methodsMap = make(handlersMap)

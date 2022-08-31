@@ -4,7 +4,6 @@ import (
 	"github.com/stretchr/testify/require"
 	headers2 "indigo/http/headers"
 	methods "indigo/http/method"
-	"indigo/http/url"
 	"indigo/types"
 	"testing"
 )
@@ -19,7 +18,7 @@ func TestRoute(t *testing.T) {
 	t.Run("NewRoute", func(t *testing.T) {
 		r.Route(methods.GET, "/", nopHandler)
 
-		require.Contains(t, r.routes, url.Path("/"))
+		require.Contains(t, r.routes, "/")
 		require.Equal(t, 1, len(r.routes))
 		require.Equal(t, 1, len(r.routes["/"]))
 		require.Contains(t, r.routes["/"], methods.GET)
@@ -29,7 +28,7 @@ func TestRoute(t *testing.T) {
 	t.Run("SamePathDifferentMethod", func(t *testing.T) {
 		r.Route(methods.POST, "/", nopHandler)
 
-		require.Contains(t, r.routes, url.Path("/"))
+		require.Contains(t, r.routes, "/")
 		require.Equal(t, 1, len(r.routes))
 		require.Equal(t, 2, len(r.routes["/"]))
 		require.Contains(t, r.routes["/"], methods.POST)
@@ -39,7 +38,7 @@ func TestRoute(t *testing.T) {
 	t.Run("DifferentPath", func(t *testing.T) {
 		r.Route(methods.POST, "/hello", nopHandler)
 
-		require.Contains(t, r.routes, url.Path("/hello"))
+		require.Contains(t, r.routes, "/hello")
 		require.Equal(t, 2, len(r.routes))
 		require.Equal(t, 1, len(r.routes["/hello"]))
 		require.Contains(t, r.routes["/hello"], methods.POST)
@@ -49,7 +48,7 @@ func TestRoute(t *testing.T) {
 
 func testMethodPredicate(t *testing.T, router *DefaultRouter, route func(string, HandlerFunc, ...Middleware), method methods.Method) {
 	route("/", nopHandler)
-	require.Contains(t, router.routes, url.Path("/"))
+	require.Contains(t, router.routes, "/")
 	require.Contains(t, router.routes["/"], method)
 	require.NotNil(t, router.routes["/"][method])
 }
@@ -101,9 +100,9 @@ func TestGroups(t *testing.T) {
 
 	r.OnStart()
 
-	require.Contains(t, r.routes, url.Path("/"))
-	require.Contains(t, r.routes, url.Path("/api/v1/hello"))
-	require.Contains(t, r.routes, url.Path("/api/v2/world"))
+	require.Contains(t, r.routes, "/")
+	require.Contains(t, r.routes, "/api/v1/hello")
+	require.Contains(t, r.routes, "/api/v2/world")
 	require.Equal(t, 3, len(r.routes))
 }
 

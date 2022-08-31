@@ -6,7 +6,6 @@ import (
 	methods "indigo/http/method"
 	"indigo/http/parser"
 	"indigo/http/proto"
-	"indigo/http/url"
 	"indigo/internal"
 	"indigo/settings"
 	"indigo/types"
@@ -110,13 +109,13 @@ func (p *httpRequestsParser) Parse(data []byte) (state parser.RequestState, extr
 					return parser.Error, nil, errors.ErrBadRequest
 				}
 
-				p.request.Path = url.Path(internal.B2S(p.startLineBuff[p.offset:]))
+				p.request.Path = internal.B2S(p.startLineBuff[p.offset:])
 				p.offset = len(p.startLineBuff)
 				p.state = eProto
 			case '%':
 				p.state = ePathDecode1Char
 			case '?':
-				p.request.Path = url.Path(internal.B2S(p.startLineBuff[p.offset:]))
+				p.request.Path = internal.B2S(p.startLineBuff[p.offset:])
 				if len(p.request.Path) == 0 {
 					p.request.Path = "/"
 				}
@@ -124,7 +123,7 @@ func (p *httpRequestsParser) Parse(data []byte) (state parser.RequestState, extr
 				p.offset = len(p.startLineBuff)
 				p.state = eQuery
 			case '#':
-				p.request.Path = url.Path(internal.B2S(p.startLineBuff[p.offset:]))
+				p.request.Path = internal.B2S(p.startLineBuff[p.offset:])
 				if len(p.request.Path) == 0 {
 					p.request.Path = "/"
 				}
@@ -206,7 +205,7 @@ func (p *httpRequestsParser) Parse(data []byte) (state parser.RequestState, extr
 		case eFragment:
 			switch data[i] {
 			case ' ':
-				p.request.Fragment = url.Fragment(internal.B2S(p.startLineBuff[p.offset:]))
+				p.request.Fragment = internal.B2S(p.startLineBuff[p.offset:])
 				p.offset = len(p.startLineBuff)
 				p.state = eProto
 			case '%':
