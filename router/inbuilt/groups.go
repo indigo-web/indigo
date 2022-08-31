@@ -1,4 +1,4 @@
-package router
+package inbuilt
 
 /*
 This file is responsible for endpoint groups

@@ -1,4 +1,4 @@
-package router
+package inbuilt
 
 import (
 	"indigo/types"

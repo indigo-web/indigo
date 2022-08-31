@@ -1,4 +1,4 @@
-package router
+package inbuilt
 
 import (
 	methods "indigo/http/method"
