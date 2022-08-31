@@ -8,5 +8,6 @@ It provides such a featues:
 - Response object constructor
 - Middlewares
 - Endpoint groups
+- Connection hijacking
 
 See examples in `examples/` folder
