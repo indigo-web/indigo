@@ -59,8 +59,7 @@ func (a Application) Serve(router router.Router, someSettings ...settings2.Setti
 		httpServer := server.NewHTTPServer(request, func(b []byte) (err error) {
 			_, err = conn.Write(b)
 			return err
-		}, router, httpParser)
-
+		}, router, httpParser, conn)
 		go httpServer.Run()
 
 		readBuff := make([]byte, settings.TCPServer.Read.Default)
