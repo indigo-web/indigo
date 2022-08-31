@@ -6,6 +6,18 @@ import (
 	"indigo/http/proto"
 	"indigo/http/url"
 	"indigo/internal"
+	"net"
+)
+
+type (
+	// ConnectionHijacker is for user. It returns error because it has to
+	// read full request body to stop the server in defined state. And,
+	// as we know, reading body may return an error
+	ConnectionHijacker func() (net.Conn, error)
+
+	// hijackConn is like an interface of httpServer method that notifies
+	// core about hijacking and returns connection object
+	hijackConn func() net.Conn
 )
 
 // Request struct represents http request
@@ -24,6 +36,8 @@ type Request struct {
 
 	body     requestBody
 	bodyBuff []byte
+
+	Hijack ConnectionHijacker
 }
 
 // NewRequest returns a new instance of request object and body gateway
@@ -77,4 +91,17 @@ func (r *Request) Reset() error {
 	r.Headers = r.headersManager.Headers
 
 	return r.body.Reset()
+}
+
+func Hijacker(request *Request, hijacker hijackConn) func() (net.Conn, error) {
+	return func() (net.Conn, error) {
+		// we anyway don't need to have a body anymore. Also, without reading
+		// the body until complete server will not transfer into the state
+		// we need so this step is anyway compulsory
+		if err := request.body.Reset(); err != nil {
+			return nil, err
+		}
+
+		return hijacker(), nil
+	}
 }
