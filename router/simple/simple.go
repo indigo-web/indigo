@@ -1,11 +1,11 @@
 package simple
 
 import (
-	"indigo/http/render"
-	"indigo/http/status"
-	router2 "indigo/router"
-	"indigo/router/inbuilt"
-	"indigo/types"
+	"github.com/fakefloordiv/indigo/http/render"
+	"github.com/fakefloordiv/indigo/http/status"
+	router2 "github.com/fakefloordiv/indigo/router"
+	"github.com/fakefloordiv/indigo/router/inbuilt"
+	"github.com/fakefloordiv/indigo/types"
 )
 
 var defaultErrResponse = types.WithResponse.

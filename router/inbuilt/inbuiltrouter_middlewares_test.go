@@ -1,12 +1,12 @@
 package inbuilt
 
 import (
-	"indigo/http/headers"
-	methods "indigo/http/method"
-	"indigo/http/url"
-	"indigo/internal"
-	"indigo/settings"
-	"indigo/types"
+	"github.com/fakefloordiv/indigo/http/headers"
+	methods "github.com/fakefloordiv/indigo/http/method"
+	"github.com/fakefloordiv/indigo/http/url"
+	"github.com/fakefloordiv/indigo/internal"
+	"github.com/fakefloordiv/indigo/settings"
+	"github.com/fakefloordiv/indigo/types"
 	"testing"
 
 	"github.com/stretchr/testify/require"

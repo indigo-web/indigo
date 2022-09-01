@@ -2,10 +2,10 @@ package main
 
 import (
 	"fmt"
-	"indigo"
-	"indigo/http/status"
-	"indigo/router/inbuilt"
-	"indigo/types"
+	"github.com/fakefloordiv/indigo"
+	"github.com/fakefloordiv/indigo/http/status"
+	"github.com/fakefloordiv/indigo/router/inbuilt"
+	"github.com/fakefloordiv/indigo/types"
 	"log"
 	"strconv"
 )

@@ -1,7 +1,7 @@
 package inbuilt
 
 import (
-	"indigo/http/method"
+	"github.com/fakefloordiv/indigo/http/method"
 )
 
 /*

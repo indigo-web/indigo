@@ -1,10 +1,10 @@
 package render
 
 import (
-	"indigo/http/headers"
-	"indigo/http/proto"
-	"indigo/http/status"
-	"indigo/types"
+	"github.com/fakefloordiv/indigo/http/headers"
+	"github.com/fakefloordiv/indigo/http/proto"
+	"github.com/fakefloordiv/indigo/http/status"
+	"github.com/fakefloordiv/indigo/types"
 	"strconv"
 )
 

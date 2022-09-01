@@ -1,7 +1,7 @@
 package http1
 
 import (
-	"indigo/errors"
+	"github.com/fakefloordiv/indigo/errors"
 	"testing"
 
 	"github.com/stretchr/testify/require"

@@ -1,9 +1,9 @@
 package types
 
 import (
-	"indigo/http/headers"
-	"indigo/http/status"
-	"indigo/internal"
+	"github.com/fakefloordiv/indigo/http/headers"
+	"github.com/fakefloordiv/indigo/http/status"
+	"github.com/fakefloordiv/indigo/internal"
 )
 
 type (

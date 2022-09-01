@@ -1,6 +1,6 @@
 package inbuilt
 
-import "indigo/http/encodings"
+import "github.com/fakefloordiv/indigo/http/encodings"
 
 /*
 This file is responsible for adding content-encodings decoders/encoders

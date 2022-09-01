@@ -1,8 +1,8 @@
 package url
 
 import (
-	"indigo/errors"
-	"indigo/http/url/queryparser"
+	"github.com/fakefloordiv/indigo/errors"
+	"github.com/fakefloordiv/indigo/http/url/queryparser"
 )
 
 type (
