@@ -1,6 +1,7 @@
 package types
 
 import (
+	"indigo/errors"
 	"indigo/http/headers"
 	methods "indigo/http/method"
 	"indigo/http/proto"
@@ -97,7 +98,9 @@ func Hijacker(request *Request, hijacker hijackConn) func() (net.Conn, error) {
 		// we anyway don't need to have a body anymore. Also, without reading
 		// the body until complete server will not transfer into the state
 		// we need so this step is anyway compulsory
-		if err := request.body.Reset(); err != nil {
+		switch err := request.body.Reset(); err {
+		case nil, errors.ErrRead:
+		default:
 			return nil, err
 		}
 
