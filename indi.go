@@ -2,13 +2,13 @@ package indigo
 
 import (
 	"errors"
-	"indigo/http/headers"
-	"indigo/http/parser/http1"
-	"indigo/http/server"
-	"indigo/http/url"
-	"indigo/router"
-	settings2 "indigo/settings"
-	"indigo/types"
+	"github.com/fakefloordiv/indigo/http/headers"
+	"github.com/fakefloordiv/indigo/http/parser/http1"
+	"github.com/fakefloordiv/indigo/http/server"
+	"github.com/fakefloordiv/indigo/http/url"
+	"github.com/fakefloordiv/indigo/router"
+	settings2 "github.com/fakefloordiv/indigo/settings"
+	"github.com/fakefloordiv/indigo/types"
 	"net"
 	"sync"
 )

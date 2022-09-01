@@ -1,9 +1,9 @@
 package inbuilt
 
 import (
-	"indigo/errors"
-	"indigo/http/status"
-	"indigo/types"
+	"github.com/fakefloordiv/indigo/errors"
+	"github.com/fakefloordiv/indigo/http/status"
+	"github.com/fakefloordiv/indigo/types"
 )
 
 /*

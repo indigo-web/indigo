@@ -1,7 +1,7 @@
 package server
 
 import (
-	"indigo/errors"
+	"github.com/fakefloordiv/indigo/errors"
 	"net"
 	"sync"
 )

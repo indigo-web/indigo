@@ -1,7 +1,7 @@
 package inbuilt
 
 import (
-	"indigo/types"
+	"github.com/fakefloordiv/indigo/types"
 )
 
 /*

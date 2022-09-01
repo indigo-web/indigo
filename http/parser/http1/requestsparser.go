@@ -1,14 +1,14 @@
 package http1
 
 import (
-	"indigo/errors"
-	"indigo/http/headers"
-	methods "indigo/http/method"
-	"indigo/http/parser"
-	"indigo/http/proto"
-	"indigo/internal"
-	"indigo/settings"
-	"indigo/types"
+	"github.com/fakefloordiv/indigo/errors"
+	"github.com/fakefloordiv/indigo/http/headers"
+	methods "github.com/fakefloordiv/indigo/http/method"
+	"github.com/fakefloordiv/indigo/http/parser"
+	"github.com/fakefloordiv/indigo/http/proto"
+	"github.com/fakefloordiv/indigo/internal"
+	"github.com/fakefloordiv/indigo/settings"
+	"github.com/fakefloordiv/indigo/types"
 )
 
 // httpRequestsParser is a stream-based http requests parser. It modifies

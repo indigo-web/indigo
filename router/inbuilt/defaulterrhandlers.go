@@ -1,8 +1,8 @@
 package inbuilt
 
 import (
-	"indigo/http/status"
-	"indigo/types"
+	"github.com/fakefloordiv/indigo/http/status"
+	"github.com/fakefloordiv/indigo/types"
 )
 
 /*

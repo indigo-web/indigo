@@ -1,8 +1,8 @@
 package types
 
 import (
-	"indigo/errors"
-	"indigo/internal"
+	"github.com/fakefloordiv/indigo/errors"
+	"github.com/fakefloordiv/indigo/internal"
 )
 
 type (

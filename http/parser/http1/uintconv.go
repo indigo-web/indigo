@@ -1,7 +1,7 @@
 package http1
 
 import (
-	"indigo/errors"
+	"github.com/fakefloordiv/indigo/errors"
 )
 
 // parseUint is a tiny implementation of strconv.Atoi, but reading

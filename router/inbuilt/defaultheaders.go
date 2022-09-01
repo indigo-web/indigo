@@ -1,7 +1,7 @@
 package inbuilt
 
 import (
-	"indigo/http/headers"
+	"github.com/fakefloordiv/indigo/http/headers"
 	"strings"
 )
 

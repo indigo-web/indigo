@@ -1,7 +1,7 @@
 package encodings
 
 import (
-	"indigo/internal"
+	"github.com/fakefloordiv/indigo/internal"
 )
 
 type (

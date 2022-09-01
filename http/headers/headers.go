@@ -1,6 +1,6 @@
 package headers
 
-import "indigo/settings"
+import "github.com/fakefloordiv/indigo/settings"
 
 type (
 	Headers       map[string][]byte

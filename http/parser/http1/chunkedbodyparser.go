@@ -1,9 +1,9 @@
 package http1
 
 import (
-	"indigo/errors"
-	"indigo/internal"
-	"indigo/settings"
+	"github.com/fakefloordiv/indigo/errors"
+	"github.com/fakefloordiv/indigo/internal"
+	"github.com/fakefloordiv/indigo/settings"
 )
 
 // chunkedBodyParser is a parser for chunked encoded request bodies

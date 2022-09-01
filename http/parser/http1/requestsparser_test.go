@@ -1,14 +1,14 @@
 package http1
 
 import (
-	"indigo/errors"
-	"indigo/http/headers"
-	methods "indigo/http/method"
-	httpparser "indigo/http/parser"
-	"indigo/http/proto"
-	"indigo/http/url"
-	settings2 "indigo/settings"
-	"indigo/types"
+	"github.com/fakefloordiv/indigo/errors"
+	"github.com/fakefloordiv/indigo/http/headers"
+	methods "github.com/fakefloordiv/indigo/http/method"
+	httpparser "github.com/fakefloordiv/indigo/http/parser"
+	"github.com/fakefloordiv/indigo/http/proto"
+	"github.com/fakefloordiv/indigo/http/url"
+	settings2 "github.com/fakefloordiv/indigo/settings"
+	"github.com/fakefloordiv/indigo/types"
 	"testing"
 
 	"github.com/stretchr/testify/require"

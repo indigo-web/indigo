@@ -1,8 +1,8 @@
 package inbuilt
 
 import (
-	methods "indigo/http/method"
-	"indigo/http/status"
+	methods "github.com/fakefloordiv/indigo/http/method"
+	"github.com/fakefloordiv/indigo/http/status"
 	"strings"
 )
 

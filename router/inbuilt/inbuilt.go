@@ -1,11 +1,11 @@
 package inbuilt
 
 import (
-	"indigo/http/encodings"
-	"indigo/http/headers"
-	methods "indigo/http/method"
-	"indigo/http/render"
-	"indigo/types"
+	"github.com/fakefloordiv/indigo/http/encodings"
+	"github.com/fakefloordiv/indigo/http/headers"
+	methods "github.com/fakefloordiv/indigo/http/method"
+	"github.com/fakefloordiv/indigo/http/render"
+	"github.com/fakefloordiv/indigo/types"
 )
 
 type (

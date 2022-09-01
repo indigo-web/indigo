@@ -1,9 +1,9 @@
 package inbuilt
 
 import (
-	headers2 "indigo/http/headers"
-	methods "indigo/http/method"
-	"indigo/types"
+	headers2 "github.com/fakefloordiv/indigo/http/headers"
+	methods "github.com/fakefloordiv/indigo/http/method"
+	"github.com/fakefloordiv/indigo/types"
 	"testing"
 
 	"github.com/stretchr/testify/require"
