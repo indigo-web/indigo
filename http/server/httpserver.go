@@ -35,7 +35,7 @@ func NewHTTPServer(
 	req *types.Request, respWriter types.ResponseWriter, router router.Router,
 	parser parser.HTTPRequestsParser, conn net.Conn,
 ) HTTPServer {
-	return httpServer{
+	return &httpServer{
 		request:    req,
 		respWriter: respWriter,
 		router:     router,
