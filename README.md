@@ -27,7 +27,7 @@ Instantiating with `inbuilt.NewRouter()`. Includes following methods:
   - Passed middlewares are called "point applied", and they are applied only to the handler
 - `<Method>(path string, handler HandlerFunc, mwares ...Middleware)`
   - Where Method is a method name in camelcase
-  - Is just a predicate to `Route(path, methods.METHOD, handler, mwares...)`
+  - Is just a shorthand to `Route(path, methods.METHOD, handler, mwares...)`
 - `Group(prefix string) Router`
   - Instantiates a new separated router, routes of which will be merged into the root router later
   - Prefix works simply as a prefix (wow). Each route will have a prefix concatenated to its path
