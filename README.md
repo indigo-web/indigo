@@ -81,6 +81,37 @@ struct.
   - Calling this method automatically erases body (waits until will be completely received, then reading into nowhere, if was not read by user before), and returns error if occurred while reading body
   - After hijacking, connection must be utilized by user, because this process is permanent (for example, server core is shutting down, but without closing the connection)
 
+`types.Response` includes following fields:
+- `WithCode(code status.Code) Response`
+  - Set response code, returns new `Response` object with updated `Code` field
+- `WithStatus(status status.Status) Response`
+  - Set a custom status. Not recommended to use because `WithCode` automatically sets a corresponding status
+- `WithHeader(key, value string) Response`
+  - Set a header and receive a new `Response` object
+    - Actually, this is the only method that is not clear. It uses an underlying `headers.Headers` map, so this call modifies the map and is absolutely not compulsory to save a returned value, it is just _trying_ to behave like a clear method
+- `WithHeaders(headers map[string]string) Response`
+  - Does the same as `WithHeader` does, but headers are in map now
+- `Headers() headers.Headers`
+  - Returns response headers
+- `WithBodyByte(body []byte) Response`
+  - Sets a response body. Sets - not appends
+- `WithBody(body string) Response`
+  - Does all the same as `WithBodyByte` does, but takes a string as an argument
+- `Code status.Code`
+  - Attribute with response code. Default value is 200 (if instantiating using `NewResponse` or using `types.WithResponse`)
+- `Status status.Status`
+  - Attribute with response status. Default value is a corresponding status to 200
+- `Body []byte`
+  - Attribute with response body. Can be used to modify response body by middlewares
+
+Example:
+```
+return types.WithResponse.
+  WithCode(status.OK).
+  WithHeader("Hello", "World!").
+  WithBody("How are you doing, fellow kids?")
+```
+
 ### `indigo/router/simple`
 Simple router with no routing at all. All it does is just encapsulates router-specific structure.
 It ignores all the errors (the only thing it does is writing 400 Bad Request back), in case of
