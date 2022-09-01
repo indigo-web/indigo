@@ -4,7 +4,6 @@ import (
 	"bytes"
 	stderrors "errors"
 	"fmt"
-	"github.com/stretchr/testify/require"
 	"indigo/errors"
 	methods "indigo/http/method"
 	"indigo/http/proto"
@@ -16,6 +15,8 @@ import (
 	"net/url"
 	"testing"
 	"time"
+
+	"github.com/stretchr/testify/require"
 )
 
 const (
@@ -163,7 +164,6 @@ func TestAllCases(t *testing.T) {
 	}()
 
 	defer func() {
-
 		go app.Shutdown()
 		instantlyDisconnect()
 

@@ -24,7 +24,7 @@ func NewRouter(handler inbuilt.HandlerFunc) router2.Router {
 	}
 }
 
-func (r router) OnStart() {}
+func (router) OnStart() {}
 
 func (r router) OnRequest(request *types.Request, respWriter types.ResponseWriter) error {
 	return respWriter(r.renderer.Response(request.Proto, r.handler(request)))

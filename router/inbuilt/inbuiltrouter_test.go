@@ -1,11 +1,12 @@
 package inbuilt
 
 import (
-	"github.com/stretchr/testify/require"
 	headers2 "indigo/http/headers"
 	methods "indigo/http/method"
 	"indigo/types"
 	"testing"
+
+	"github.com/stretchr/testify/require"
 )
 
 func nopHandler(_ *types.Request) types.Response {
