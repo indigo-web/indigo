@@ -105,12 +105,14 @@ struct.
   - Attribute with response body. Can be used to modify response body by middlewares
 
 Example:
-```
+```golang
 return types.WithResponse.
   WithCode(status.OK).
   WithHeader("Hello", "World!").
   WithBody("How are you doing, fellow kids?")
 ```
+
+Note: you can `return types.WithResponse` from handler. This will return a simple 200 OK response
 
 ### `indigo/router/simple`
 Simple router with no routing at all. All it does is just encapsulates router-specific structure.
