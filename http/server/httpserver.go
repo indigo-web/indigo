@@ -178,7 +178,7 @@ func (h httpServer) requestProcessor() {
 	}
 }
 
-func (h httpServer) HijackConn() net.Conn {
+func (h *httpServer) HijackConn() net.Conn {
 	// HijackConn call can be initiated only by user. So in this case, we know
 	// that server is in clearly defined state - waiting for body completion,
 	// than waiting for a completion signal from requestProcessor. requestProcessor
