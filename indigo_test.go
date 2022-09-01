@@ -2,6 +2,8 @@ package indigo
 
 import (
 	"bytes"
+	stderrors "errors"
+	"fmt"
 	"github.com/stretchr/testify/require"
 	"indigo/errors"
 	methods "indigo/http/method"
@@ -37,7 +39,27 @@ func instantlyDisconnect() {
 		return
 	}
 
-	conn.Close()
+	_ = conn.Close()
+}
+
+func readN(conn net.Conn, n int) ([]byte, error) {
+	receivedBuff := make([]byte, 0, n)
+	buff := make([]byte, n)
+
+	for {
+		recvd, err := conn.Read(buff)
+		if err != nil {
+			return nil, err
+		}
+
+		receivedBuff = append(receivedBuff, buff[:recvd]...)
+
+		if len(receivedBuff) == n {
+			return receivedBuff, nil
+		} else if len(receivedBuff) > n {
+			return nil, stderrors.New("received too much data")
+		}
+	}
 }
 
 func getRouter(t *testing.T) router.Router {
@@ -89,6 +111,39 @@ func getRouter(t *testing.T) router.Router {
 		return types.WithResponse
 	})
 
+	r.Get("/hijack-conn-no-body-read", func(request *types.Request) types.Response {
+		conn, err := request.Hijack()
+		require.NoError(t, err)
+
+		// just to notify client that we are ready for receiving something
+		_, _ = conn.Write([]byte("a"))
+
+		data, err := readN(conn, len(testRequestBody))
+		require.NoError(t, err)
+		require.Equal(t, testRequestBody, string(data))
+
+		_ = conn.Close()
+
+		return types.WithResponse
+	})
+
+	r.Get("/hijack-conn-with-body-read", func(request *types.Request) types.Response {
+		_, _ = request.Body()
+
+		conn, err := request.Hijack()
+		require.NoError(t, err)
+
+		_, _ = conn.Write([]byte("a"))
+
+		data, err := readN(conn, len(testRequestBody))
+		require.NoError(t, err)
+		require.Equal(t, testRequestBody, string(data))
+
+		_ = conn.Close()
+
+		return types.WithResponse
+	})
+
 	return r
 }
 
@@ -125,7 +180,9 @@ func TestAllCases(t *testing.T) {
 	t.Run("/simple-get", func(t *testing.T) {
 		resp, err := http.DefaultClient.Get(URL + "/simple-get")
 		require.NoError(t, err)
-		defer resp.Body.Close()
+		defer func() {
+			_ = resp.Body.Close()
+		}()
 		require.Equal(t, http.StatusOK, resp.StatusCode)
 		require.Equal(t, "200 "+http.StatusText(http.StatusOK), resp.Status)
 		require.Equal(t, "HTTP/1.1", resp.Proto)
@@ -153,14 +210,18 @@ func TestAllCases(t *testing.T) {
 		}
 		resp, err := http.DefaultClient.Do(request)
 		require.NoError(t, err)
-		defer resp.Body.Close()
+		defer func() {
+			_ = resp.Body.Close()
+		}()
 		require.Equal(t, http.StatusOK, resp.StatusCode)
 	})
 
 	t.Run("/with-query", func(t *testing.T) {
 		resp, err := http.DefaultClient.Get(URL + "/with-query?hel+lo=wor+ld")
 		require.NoError(t, err)
-		defer resp.Body.Close()
+		defer func() {
+			_ = resp.Body.Close()
+		}()
 		require.Equal(t, http.StatusOK, resp.StatusCode)
 	})
 
@@ -169,7 +230,9 @@ func TestAllCases(t *testing.T) {
 		body.Write([]byte(testRequestBody))
 		resp, err := http.DefaultClient.Post(URL+"/read-body", "", body)
 		require.NoError(t, err)
-		defer resp.Body.Close()
+		defer func() {
+			_ = resp.Body.Close()
+		}()
 		require.Equal(t, http.StatusOK, resp.StatusCode)
 	})
 
@@ -178,11 +241,37 @@ func TestAllCases(t *testing.T) {
 		body.Write([]byte(testRequestBody))
 		resp, err := http.DefaultClient.Post(URL+"/read-body", "", body)
 		require.NoError(t, err)
-		defer resp.Body.Close()
+		defer func() {
+			_ = resp.Body.Close()
+		}()
 		require.Equal(t, http.StatusOK, resp.StatusCode)
+	})
+
+	t.Run("/hijack-conn-no-body-read", func(t *testing.T) {
+		sendSimpleRequest(t, "/hijack-conn-no-body-read")
+	})
+
+	t.Run("/hijack-conn-with-body-read", func(t *testing.T) {
+		sendSimpleRequest(t, "/hijack-conn-with-body-read")
 	})
 
 	http.DefaultClient.CloseIdleConnections()
 
 	// at this point server is supposed to be closed, but who knows, who knows
+}
+
+func sendSimpleRequest(t *testing.T, path string) {
+	conn, err := net.Dial("tcp", addr)
+	require.NoError(t, err)
+
+	request := fmt.Sprintf("GET %s HTTP/1.1\r\n\r\n", path)
+
+	_, err = conn.Write([]byte(request))
+	require.NoError(t, err)
+	_, err = conn.Read(make([]byte, 1))
+	require.NoError(t, err)
+	_, err = conn.Write([]byte(testRequestBody))
+	require.NoError(t, err)
+
+	_ = conn.Close()
 }
