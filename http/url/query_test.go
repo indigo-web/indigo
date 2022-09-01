@@ -11,7 +11,9 @@ func TestQuery(t *testing.T) {
 	// here we test laziness of query
 
 	// just test that passed buffer's content will not be used
-	query := NewQuery([]byte("Hello, world!"))
+	query := NewQuery(func() map[string][]byte {
+		return make(map[string][]byte)
+	})
 	query.Set([]byte("hello=world"))
 	require.Equal(t, "hello=world", string(query.rawQuery))
 	require.Nil(t, query.parsedQuery)

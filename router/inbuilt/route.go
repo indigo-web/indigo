@@ -1,9 +1,8 @@
-package router
+package inbuilt
 
 import (
 	methods "indigo/http/method"
 	"indigo/http/status"
-	"indigo/http/url"
 	"strings"
 )
 
@@ -11,26 +10,29 @@ import (
 This file is responsible for registering handlers
 */
 
-// Route is a base method for registering handlers. At the moment it composes
-// all the handler-specific and global middlewares right now, but in future
-// planning to change api, and contain Handler struct that contains handler
-// middlewares that will be applied only after server started up
+// Route is a base method for registering handlers
 func (d *DefaultRouter) Route(
-	method methods.Method, path string, handler HandlerFunc,
+	method methods.Method, path string, handlerFunc HandlerFunc,
 	middlewares ...Middleware,
 ) {
-	if path != "*" && !strings.HasPrefix(path, "/") {
+	if path != "*" && !strings.HasPrefix(path, "/") && d.prefix == "" {
+		// applying prefix slash only if we are not in group
 		path = "/" + path
 	}
 
-	urlPath := url.Path(d.prefix + path)
+	urlPath := d.prefix + path
 	methodsMap, found := d.routes[urlPath]
 	if !found {
 		methodsMap = make(handlersMap)
 		d.routes[urlPath] = methodsMap
 	}
 
-	methodsMap[method] = compose(handler, append(middlewares, d.middlewares...))
+	handlerStruct := &handlerObject{
+		fun:         handlerFunc,
+		middlewares: append(middlewares, d.middlewares...),
+	}
+
+	methodsMap[method] = handlerStruct
 }
 
 // RouteError adds an error handler. You can handle next errors:

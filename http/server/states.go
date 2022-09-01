@@ -11,4 +11,5 @@ const (
 	requestURITooLong
 	requestHeaderFieldsTooLarge
 	unsupportedProtocol
+	connHijack
 )

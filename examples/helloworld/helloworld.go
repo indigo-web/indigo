@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"indigo"
 	"indigo/http/status"
-	"indigo/router"
+	"indigo/router/inbuilt"
 	"indigo/types"
 	"log"
 )
@@ -19,7 +19,7 @@ func MyHandler(_ *types.Request) types.Response {
 }
 
 func main() {
-	myRouter := router.NewDefaultRouter()
+	myRouter := inbuilt.NewRouter()
 	myRouter.Get("/", MyHandler)
 
 	fmt.Println("Listening on", addr)

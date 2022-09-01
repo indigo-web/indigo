@@ -6,7 +6,6 @@ import (
 	methods "indigo/http/method"
 	"indigo/http/parser"
 	"indigo/http/proto"
-	"indigo/http/url"
 	"indigo/internal"
 	"indigo/settings"
 	"indigo/types"
@@ -106,17 +105,34 @@ func (p *httpRequestsParser) Parse(data []byte) (state parser.RequestState, extr
 		case ePath:
 			switch data[i] {
 			case ' ':
-				p.request.Path = url.Path(internal.B2S(p.startLineBuff[p.offset:]))
+				if len(p.startLineBuff) == p.offset {
+					return parser.Error, nil, errors.ErrBadRequest
+				}
+
+				p.request.Path = internal.B2S(p.startLineBuff[p.offset:])
 				p.offset = len(p.startLineBuff)
 				p.state = eProto
 			case '%':
 				p.state = ePathDecode1Char
 			case '?':
+				p.request.Path = internal.B2S(p.startLineBuff[p.offset:])
+				if len(p.request.Path) == 0 {
+					p.request.Path = "/"
+				}
+
 				p.offset = len(p.startLineBuff)
 				p.state = eQuery
 			case '#':
+				p.request.Path = internal.B2S(p.startLineBuff[p.offset:])
+				if len(p.request.Path) == 0 {
+					p.request.Path = "/"
+				}
+
 				p.offset = len(p.startLineBuff)
 				p.state = eFragment
+			case '\x00', '\n', '\r', '\t', '\b', '\a', '\v', '\f':
+				// request path MUST NOT include any non-printable characters
+				return parser.Error, nil, errors.ErrBadRequest
 			default:
 				if uint16(len(p.startLineBuff)) >= p.settings.URL.Length.Maximal {
 					return parser.Error, nil, errors.ErrURITooLong
@@ -159,6 +175,8 @@ func (p *httpRequestsParser) Parse(data []byte) (state parser.RequestState, extr
 				}
 
 				p.startLineBuff = append(p.startLineBuff, ' ')
+			case '\x00', '\n', '\r', '\t', '\b', '\a', '\v', '\f':
+				return parser.Error, nil, errors.ErrBadRequest
 			default:
 				if uint16(len(p.startLineBuff)) >= p.settings.URL.Length.Maximal {
 					return parser.Error, nil, errors.ErrURITooLong
@@ -187,11 +205,13 @@ func (p *httpRequestsParser) Parse(data []byte) (state parser.RequestState, extr
 		case eFragment:
 			switch data[i] {
 			case ' ':
-				p.request.Fragment = url.Fragment(internal.B2S(p.startLineBuff[p.offset:]))
+				p.request.Fragment = internal.B2S(p.startLineBuff[p.offset:])
 				p.offset = len(p.startLineBuff)
 				p.state = eProto
 			case '%':
 				p.state = eFragmentDecode1Char
+			case '\x00', '\n', '\r', '\t', '\b', '\a', '\v', '\f':
+				return parser.Error, nil, errors.ErrBadRequest
 			default:
 				if uint16(len(p.startLineBuff)) >= p.settings.URL.Length.Maximal {
 					return parser.Error, nil, errors.ErrURITooLong
@@ -220,10 +240,6 @@ func (p *httpRequestsParser) Parse(data []byte) (state parser.RequestState, extr
 		case eProto:
 			switch data[i] {
 			case '\r':
-				p.request.Proto = proto.Parse(internal.B2S(p.startLineBuff[p.offset:]))
-				if p.request.Proto == proto.Unknown {
-					return parser.Error, nil, errors.ErrUnsupportedProtocol
-				}
 				p.state = eProtoCR
 			case '\n':
 				p.request.Proto = proto.Parse(internal.B2S(p.startLineBuff[p.offset:]))
@@ -244,6 +260,11 @@ func (p *httpRequestsParser) Parse(data []byte) (state parser.RequestState, extr
 
 			p.state = eProtoCRLF
 		case eProtoCRLF:
+			p.request.Proto = proto.Parse(internal.B2S(p.startLineBuff[p.offset:]))
+			if p.request.Proto == proto.Unknown {
+				return parser.Error, nil, errors.ErrUnsupportedProtocol
+			}
+
 			switch data[i] {
 			case '\r':
 				p.state = eProtoCRLFCR
@@ -314,7 +335,6 @@ func (p *httpRequestsParser) Parse(data []byte) (state parser.RequestState, extr
 				return parser.Error, nil, errors.ErrBadRequest
 			}
 		case eHeaderValueCRLF:
-			// TODO: keep somewhere pre-allocated header name
 			key := string(p.headerBuff)
 			value := p.headersManager.FinalizeValue(key)
 			p.request.Headers[key] = value

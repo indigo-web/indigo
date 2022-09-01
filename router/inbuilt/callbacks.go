@@ -1,4 +1,4 @@
-package router
+package inbuilt
 
 import (
 	"indigo/errors"
@@ -11,10 +11,11 @@ This file contains core-callbacks that are called by server, so it's
 like a core of the router
 */
 
-// OnStart currently only applies default headers, but in future it will also
-// apply all the middlewares onto handlers
+// OnStart applies default headers and composes all the registered handlers with middlewares
 func (d DefaultRouter) OnStart() {
 	d.applyDefaultHeaders()
+	d.applyGroups()
+	d.applyMiddlewares()
 }
 
 // OnRequest routes the request
@@ -29,7 +30,7 @@ func (d DefaultRouter) OnRequest(request *types.Request, respWriter types.Respon
 		return respWriter(d.renderer.Response(request.Proto, defaultMethodNotAllowed))
 	}
 
-	return respWriter(d.renderer.Response(request.Proto, handler(request)))
+	return respWriter(d.renderer.Response(request.Proto, handler.fun(request)))
 }
 
 // OnError receives error and decides, which error handler is better to use in this case
