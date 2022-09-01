@@ -1,8 +1,9 @@
 package queryparser
 
 import (
-	"github.com/fakefloordiv/indigo/errors"
 	"testing"
+
+	"github.com/fakefloordiv/indigo/errors"
 
 	"github.com/stretchr/testify/require"
 )

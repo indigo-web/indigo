@@ -2,12 +2,13 @@ package main
 
 import (
 	"fmt"
+	"log"
+	"strconv"
+
 	"github.com/fakefloordiv/indigo"
 	"github.com/fakefloordiv/indigo/http/status"
 	"github.com/fakefloordiv/indigo/router/inbuilt"
 	"github.com/fakefloordiv/indigo/types"
-	"log"
-	"strconv"
 )
 
 var addr = "localhost:9090"
