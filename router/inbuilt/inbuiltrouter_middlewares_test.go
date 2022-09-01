@@ -1,7 +1,6 @@
 package inbuilt
 
 import (
-	"github.com/stretchr/testify/require"
 	"indigo/http/headers"
 	methods "indigo/http/method"
 	"indigo/http/url"
@@ -9,6 +8,8 @@ import (
 	"indigo/settings"
 	"indigo/types"
 	"testing"
+
+	"github.com/stretchr/testify/require"
 )
 
 /*
