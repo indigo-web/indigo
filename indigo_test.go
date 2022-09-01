@@ -4,17 +4,18 @@ import (
 	"bytes"
 	stderrors "errors"
 	"fmt"
+	"net"
+	"net/http"
+	"net/url"
+	"testing"
+	"time"
+
 	"github.com/fakefloordiv/indigo/errors"
 	methods "github.com/fakefloordiv/indigo/http/method"
 	"github.com/fakefloordiv/indigo/http/proto"
 	"github.com/fakefloordiv/indigo/router"
 	"github.com/fakefloordiv/indigo/router/inbuilt"
 	"github.com/fakefloordiv/indigo/types"
-	"net"
-	"net/http"
-	"net/url"
-	"testing"
-	"time"
 
 	"github.com/stretchr/testify/require"
 )

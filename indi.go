@@ -2,6 +2,9 @@ package indigo
 
 import (
 	"errors"
+	"net"
+	"sync"
+
 	"github.com/fakefloordiv/indigo/http/headers"
 	"github.com/fakefloordiv/indigo/http/parser/http1"
 	"github.com/fakefloordiv/indigo/http/server"
@@ -9,8 +12,6 @@ import (
 	"github.com/fakefloordiv/indigo/router"
 	settings2 "github.com/fakefloordiv/indigo/settings"
 	"github.com/fakefloordiv/indigo/types"
-	"net"
-	"sync"
 )
 
 // Application is just a struct with addr and shutdown channel that is currently

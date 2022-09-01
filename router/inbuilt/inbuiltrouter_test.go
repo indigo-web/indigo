@@ -1,10 +1,11 @@
 package inbuilt
 
 import (
+	"testing"
+
 	headers2 "github.com/fakefloordiv/indigo/http/headers"
 	methods "github.com/fakefloordiv/indigo/http/method"
 	"github.com/fakefloordiv/indigo/types"
-	"testing"
 
 	"github.com/stretchr/testify/require"
 )

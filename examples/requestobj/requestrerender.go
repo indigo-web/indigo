@@ -2,6 +2,8 @@ package main
 
 import (
 	"fmt"
+	"log"
+
 	"github.com/fakefloordiv/indigo"
 	headers2 "github.com/fakefloordiv/indigo/http/headers"
 	methods "github.com/fakefloordiv/indigo/http/method"
@@ -9,7 +11,6 @@ import (
 	"github.com/fakefloordiv/indigo/http/status"
 	"github.com/fakefloordiv/indigo/router/inbuilt"
 	"github.com/fakefloordiv/indigo/types"
-	"log"
 )
 
 var addr = "localhost:9090"

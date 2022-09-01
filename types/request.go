@@ -1,13 +1,14 @@
 package types
 
 import (
+	"net"
+
 	"github.com/fakefloordiv/indigo/errors"
 	"github.com/fakefloordiv/indigo/http/headers"
 	methods "github.com/fakefloordiv/indigo/http/method"
 	"github.com/fakefloordiv/indigo/http/proto"
 	"github.com/fakefloordiv/indigo/http/url"
 	"github.com/fakefloordiv/indigo/internal"
-	"net"
 )
 
 type (
