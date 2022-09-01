@@ -1,4 +1,4 @@
-module indigo
+module github.com/fakefloordiv/indigo
 
 go 1.18
 
