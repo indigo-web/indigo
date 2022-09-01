@@ -60,6 +60,16 @@ func (r Response) WithHeader(key, value string) Response {
 	return r
 }
 
+func (r Response) WithHeaders(headers map[string]string) Response {
+	response := r
+
+	for key, value := range headers {
+		response = response.WithHeader(key, value)
+	}
+
+	return response
+}
+
 func (r Response) WithBody(body string) Response {
 	r.Body = internal.S2B(body)
 	return r
