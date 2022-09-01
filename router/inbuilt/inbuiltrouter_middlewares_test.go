@@ -1,13 +1,14 @@
 package inbuilt
 
 import (
+	"testing"
+
 	"github.com/fakefloordiv/indigo/http/headers"
 	methods "github.com/fakefloordiv/indigo/http/method"
 	"github.com/fakefloordiv/indigo/http/url"
 	"github.com/fakefloordiv/indigo/internal"
 	"github.com/fakefloordiv/indigo/settings"
 	"github.com/fakefloordiv/indigo/types"
-	"testing"
 
 	"github.com/stretchr/testify/require"
 )

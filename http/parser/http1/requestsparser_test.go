@@ -1,6 +1,8 @@
 package http1
 
 import (
+	"testing"
+
 	"github.com/fakefloordiv/indigo/errors"
 	"github.com/fakefloordiv/indigo/http/headers"
 	methods "github.com/fakefloordiv/indigo/http/method"
@@ -9,7 +11,6 @@ import (
 	"github.com/fakefloordiv/indigo/http/url"
 	settings2 "github.com/fakefloordiv/indigo/settings"
 	"github.com/fakefloordiv/indigo/types"
-	"testing"
 
 	"github.com/stretchr/testify/require"
 )
