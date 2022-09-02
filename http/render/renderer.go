@@ -37,16 +37,17 @@ func (r *Renderer) SetDefaultHeaders(headers headers.Headers) {
 	r.defaultHeaders = headers
 }
 
-// Response provides next functionality:
-// 1) rendering request into reusable buffer kept inside
-// 2) rendering request includes: protocol, response code, response status,
-//    headers, and body
-// 3) default headers are also included. Default headers are just headers
-//    that are being set only if they are not presented in user-headers
-// 4) hard-coded content-length header. It must not be presented in user-headers,
-//    otherwise client may disconnect with error, or even worse, this will cause
-//    UB on client
-func (r *Renderer) Response(protocol proto.Proto, response types.Response) []byte {
+// Response method is rendering types.Response object into some buffer and then writes
+// it into the writer. Response method must provide next functionality:
+// 1) Render types.Response object according to the provided protocol version
+// 2) Be sure that used features of response are supported by client (provided protocol)
+// 3) Support default headers
+// 4) Add system-important headers, e.g. Content-Length
+// 5) Content encodings must be applied here
+// 6) Stream-based files uploading must be supported
+func (r *Renderer) Response(
+	protocol proto.Proto, response types.Response, writer types.ResponseWriter,
+) error {
 	buff := r.buff[:0]
 	buff = append(append(buff, proto.ToBytes(protocol)...), space...)
 	buff = append(append(buff, strconv.Itoa(int(response.Code))...), space...)
@@ -68,7 +69,7 @@ func (r *Renderer) Response(protocol proto.Proto, response types.Response) []byt
 	buff = append(append(append(buff, contentLength...), strconv.Itoa(len(response.Body))...), crlf...)
 	r.buff = append(append(buff, crlf...), response.Body...)
 
-	return r.buff
+	return writer(r.buff)
 }
 
 func renderHeader(key string, value []byte, into []byte) []byte {

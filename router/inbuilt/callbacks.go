@@ -22,15 +22,15 @@ func (d DefaultRouter) OnStart() {
 func (d DefaultRouter) OnRequest(request *types.Request, respWriter types.ResponseWriter) error {
 	urlMethods, found := d.routes[request.Path]
 	if !found {
-		return respWriter(d.renderer.Response(request.Proto, defaultNotFound))
+		return d.renderer.Response(request.Proto, defaultNotFound, respWriter)
 	}
 
 	handler, found := urlMethods[request.Method]
 	if !found {
-		return respWriter(d.renderer.Response(request.Proto, defaultMethodNotAllowed))
+		return d.renderer.Response(request.Proto, defaultMethodNotAllowed, respWriter)
 	}
 
-	return respWriter(d.renderer.Response(request.Proto, handler.fun(request)))
+	return d.renderer.Response(request.Proto, handler.fun(request), respWriter)
 }
 
 // OnError receives error and decides, which error handler is better to use in this case
@@ -57,5 +57,5 @@ func (d DefaultRouter) OnError(request *types.Request, respWriter types.Response
 	}
 
 	response := d.errHandlers[code](request)
-	_ = respWriter(d.renderer.Response(request.Proto, response))
+	_ = d.renderer.Response(request.Proto, response, respWriter)
 }
