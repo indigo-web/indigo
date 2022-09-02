@@ -1,10 +1,14 @@
 package render
 
 import (
+	"errors"
 	"github.com/fakefloordiv/indigo/http/headers"
 	"github.com/fakefloordiv/indigo/http/proto"
 	"github.com/fakefloordiv/indigo/http/status"
 	"github.com/fakefloordiv/indigo/types"
+	"io"
+	"math"
+	"os"
 	"strconv"
 )
 
@@ -13,6 +17,8 @@ var (
 	crlf          = []byte("\r\n")
 	colonSpace    = []byte(": ")
 	contentLength = []byte("Content-Length: ")
+
+	errConnWrite = errors.New("error occurred while communicating with conn")
 )
 
 // Renderer is a session responses renderer. Its purpose is only to know
@@ -66,10 +72,75 @@ func (r *Renderer) Response(
 		}
 	}
 
-	buff = append(append(append(buff, contentLength...), strconv.Itoa(len(response.Body))...), crlf...)
+	if len(response.Filename) > 0 {
+		r.buff = buff
+
+		switch err := r.renderFileInto(writer, response); err {
+		case nil:
+		case errConnWrite:
+			return err
+		default:
+			_, handler := response.File()
+
+			return r.Response(protocol, handler(err), writer)
+		}
+
+		return nil
+	}
+
+	buff = renderContentLength(len(response.Body), buff)
 	r.buff = append(append(buff, crlf...), response.Body...)
 
 	return writer(r.buff)
+}
+
+// renderFileInto opens a file in os.O_RDONLY mode, reading its size and appends
+// a Content-Length header equal to size of the file, after that headers are being
+// sent. Then 64kb buffer is allocated for reading from file and writing to the
+// connection. In case network error occurred, errConnWrite is returned. Otherwise,
+// received error is returned
+//
+// Not very elegant solution, but uploading files is not the main purpose of web-server.
+// For small and medium projects, this may be enough, for anything serious - most of all
+// nginx will be used (the same is about https)
+func (r *Renderer) renderFileInto(writer types.ResponseWriter, response types.Response) error {
+	file, err := os.OpenFile(response.Filename, os.O_RDONLY, 69420) // anyway unused
+	if err != nil {
+		return err
+	}
+
+	stat, err := file.Stat()
+	if err != nil {
+		return err
+	}
+
+	r.buff = renderContentLength(int(stat.Size()), r.buff)
+
+	if err = writer(append(r.buff, crlf...)); err != nil {
+		return errConnWrite
+	}
+
+	// write by blocks 64kb each
+	buff := make([]byte, math.MaxUint16)
+
+	for {
+		n, err := file.Read(buff)
+		switch err {
+		case nil:
+		case io.EOF:
+			return nil
+		default:
+			return err
+		}
+
+		if err = writer(buff[:n]); err != nil {
+			return errConnWrite
+		}
+	}
+}
+
+func renderContentLength(value int, buff []byte) []byte {
+	return append(append(append(buff, contentLength...), strconv.Itoa(value)...), crlf...)
 }
 
 func renderHeader(key string, value []byte, into []byte) []byte {

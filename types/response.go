@@ -8,6 +8,7 @@ import (
 
 type (
 	ResponseWriter func([]byte) error
+	FileErrHandler func(err error) Response
 )
 
 // WithResponse is just a nil-filled default pre-created response. Because
@@ -23,8 +24,10 @@ type Response struct {
 	Status status.Status
 	// headers due to possible side effects are decided to be private
 	// also uninitialized response must ALWAYS have this value as nil
-	headers headers.Headers
-	Body    []byte
+	headers  headers.Headers
+	Body     []byte
+	Filename string
+	handler  FileErrHandler
 }
 
 func NewResponse() Response {
@@ -79,6 +82,16 @@ func (r Response) WithBodyByte(body []byte) Response {
 	return r
 }
 
+func (r Response) WithFile(path string, handler FileErrHandler) Response {
+	r.Filename = path
+	r.handler = handler
+	return r
+}
+
 func (r Response) Headers() headers.Headers {
 	return r.headers
+}
+
+func (r Response) File() (string, FileErrHandler) {
+	return r.Filename, r.handler
 }
