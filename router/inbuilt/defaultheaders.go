@@ -1,8 +1,9 @@
 package inbuilt
 
 import (
-	"github.com/fakefloordiv/indigo/http/headers"
 	"strings"
+
+	"github.com/fakefloordiv/indigo/http/headers"
 )
 
 var (

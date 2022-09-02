@@ -1,9 +1,10 @@
 package inbuilt
 
 import (
+	"strings"
+
 	methods "github.com/fakefloordiv/indigo/http/method"
 	"github.com/fakefloordiv/indigo/http/status"
-	"strings"
 )
 
 /*

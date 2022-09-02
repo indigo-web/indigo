@@ -1,9 +1,10 @@
 package server
 
 import (
-	"github.com/fakefloordiv/indigo/errors"
 	"net"
 	"sync"
+
+	"github.com/fakefloordiv/indigo/errors"
 )
 
 type (

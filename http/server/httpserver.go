@@ -1,11 +1,12 @@
 package server
 
 import (
+	"net"
+
 	"github.com/fakefloordiv/indigo/errors"
 	"github.com/fakefloordiv/indigo/http/parser"
 	"github.com/fakefloordiv/indigo/router"
 	"github.com/fakefloordiv/indigo/types"
-	"net"
 )
 
 // HTTPServer provides 2 methods:
