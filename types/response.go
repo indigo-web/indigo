@@ -71,8 +71,7 @@ func (r Response) WithHeaders(headers map[string]string) Response {
 }
 
 func (r Response) WithBody(body string) Response {
-	r.Body = internal.S2B(body)
-	return r
+	return r.WithBodyByte(internal.S2B(body))
 }
 
 func (r Response) WithBodyByte(body []byte) Response {
