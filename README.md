@@ -97,6 +97,12 @@ struct.
   - Sets a response body. Sets - not appends
 - `WithBody(body string) Response`
   - Does all the same as `WithBodyByte` does, but takes a string as an argument
+- `WithFile(path string, errHandler FileErrHandler) Response`
+  - In case called, request body will be ignored
+  - Responds to client with a body that is a content of file
+    - Current implementation does not use chunked encoding or smth. It simply takes a size of the file, sets Content-Length value equal to it, and just writes file content into the socket by 64kb blocks
+  - If file not found, `errHandler` (that is simply `func(err error) types.Response`) will be called
+    - Yes, it is a fundamental design problem - user cannot receive an error from the outside. But the way net/http does (or smth), I don't like at all. So looking for a balance
 - `Code status.Code`
   - Attribute with response code. Default value is 200 (if instantiating using `NewResponse` or using `types.WithResponse`)
 - `Status status.Status`
