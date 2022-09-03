@@ -4,9 +4,11 @@ import (
 	"bytes"
 	stderrors "errors"
 	"fmt"
+	"io"
 	"net"
 	"net/http"
 	"net/url"
+	"os"
 	"testing"
 	"time"
 
@@ -33,6 +35,9 @@ const (
 	testQueryValue = "wor ld"
 
 	testRequestBody = "Hello, world!"
+
+	testFilename       = "tests/index.html"
+	testFileIfNotFound = "404 not found"
 )
 
 func instantlyDisconnect() {
@@ -146,6 +151,20 @@ func getRouter(t *testing.T) router.Router {
 		return types.WithResponse
 	})
 
+	r.Get("/with-file", func(request *types.Request) types.Response {
+		return types.WithResponse.WithFile(testFilename, func(err error) types.Response {
+			t.Fail() // this callback must never be called
+
+			return types.WithResponse
+		})
+	})
+
+	r.Get("/with-file-notfound", func(request *types.Request) types.Response {
+		return types.WithResponse.WithFile(testFilename+"notfound", func(err error) types.Response {
+			return types.WithResponse.WithBody(testFileIfNotFound)
+		})
+	})
+
 	return r
 }
 
@@ -254,6 +273,26 @@ func TestAllCases(t *testing.T) {
 
 	t.Run("/hijack-conn-with-body-read", func(t *testing.T) {
 		sendSimpleRequest(t, "/hijack-conn-with-body-read")
+	})
+
+	t.Run("/with-file", func(t *testing.T) {
+		resp, err := http.DefaultClient.Get(URL + "/with-file")
+		require.NoError(t, err)
+
+		data, err := io.ReadAll(resp.Body)
+		require.NoError(t, err)
+
+		actualContent, err := os.ReadFile(testFilename)
+		require.Equal(t, string(actualContent), string(data))
+	})
+
+	t.Run("/with-file-notfound", func(t *testing.T) {
+		resp, err := http.DefaultClient.Get(URL + "/with-file-notfound")
+		require.NoError(t, err)
+
+		data, err := io.ReadAll(resp.Body)
+		require.NoError(t, err)
+		require.Equal(t, testFileIfNotFound, string(data))
 	})
 
 	http.DefaultClient.CloseIdleConnections()
