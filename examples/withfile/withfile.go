@@ -24,7 +24,7 @@ func main() {
 	r := inbuilt.NewRouter()
 	r.Get("/", IndexHandler)
 
-	app := indigo.NewApp(addr)
 	fmt.Println("Listening on", addr)
+	app := indigo.NewApp(addr)
 	log.Fatal(app.Serve(r))
 }
