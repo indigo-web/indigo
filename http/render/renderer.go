@@ -176,21 +176,13 @@ func isKeepAlive(request *types.Request) bool {
 	}
 
 	keepAlive, found := request.Headers["connection"]
-	switch found {
-	case true:
+	if found {
 		return keepAlive == "keep-alive"
-	case false:
-		switch request.Proto {
-		case proto.HTTP10:
-			// by default http/1.0 is not keep-alive. To be, it must
-			// specify it explicitly
-			return false
-		case proto.HTTP11:
-			return true
-		}
 	}
 
-	return false
+	// because HTTP/1.0 by default is not keep-alive. And if no Connection
+	// is specified, it is absolutely not keep-alive
+	return request.Proto == proto.HTTP11
 }
 
 // shouldAppendContentLength decides whether content length should be presented
