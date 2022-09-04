@@ -1,14 +1,18 @@
 package types
 
 import (
-	"indigo/http/headers"
-	"indigo/http/status"
-	"indigo/internal"
+	"github.com/fakefloordiv/indigo/http/headers"
+	"github.com/fakefloordiv/indigo/http/status"
+	"github.com/fakefloordiv/indigo/internal"
 )
 
 type (
 	ResponseWriter func([]byte) error
+	FileErrHandler func(err error) Response
 )
+
+// idk why 5, but why not
+const initialRespHeadersSize = 5
 
 // WithResponse is just a nil-filled default pre-created response. Because
 // of clear methods, it is anyway copied every time it is used as constructor
@@ -23,8 +27,10 @@ type Response struct {
 	Status status.Status
 	// headers due to possible side effects are decided to be private
 	// also uninitialized response must ALWAYS have this value as nil
-	headers headers.Headers
-	Body    []byte
+	headers  headers.Headers
+	Body     []byte
+	Filename string
+	handler  FileErrHandler
 }
 
 func NewResponse() Response {
@@ -48,21 +54,26 @@ func (r Response) WithStatus(status status.Status) Response {
 
 func (r Response) WithHeader(key, value string) Response {
 	if r.headers == nil {
-		r.headers = headers.Headers{
-			key: internal.S2B(value),
-		}
-
-		return r
+		r.headers = make(headers.Headers, initialRespHeadersSize)
 	}
 
-	r.headers[key] = internal.S2B(value)
+	r.headers[key] = value
 
 	return r
 }
 
+func (r Response) WithHeaders(headers headers.Headers) Response {
+	response := r
+
+	for key, value := range headers {
+		response = response.WithHeader(key, value)
+	}
+
+	return response
+}
+
 func (r Response) WithBody(body string) Response {
-	r.Body = internal.S2B(body)
-	return r
+	return r.WithBodyByte(internal.S2B(body))
 }
 
 func (r Response) WithBodyByte(body []byte) Response {
@@ -70,6 +81,16 @@ func (r Response) WithBodyByte(body []byte) Response {
 	return r
 }
 
+func (r Response) WithFile(path string, handler FileErrHandler) Response {
+	r.Filename = path
+	r.handler = handler
+	return r
+}
+
 func (r Response) Headers() headers.Headers {
 	return r.headers
+}
+
+func (r Response) File() (string, FileErrHandler) {
+	return r.Filename, r.handler
 }

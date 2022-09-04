@@ -2,11 +2,12 @@ package main
 
 import (
 	"fmt"
-	"indigo"
-	"indigo/http/status"
-	"indigo/router"
-	"indigo/types"
 	"log"
+
+	"github.com/fakefloordiv/indigo"
+	"github.com/fakefloordiv/indigo/http/status"
+	"github.com/fakefloordiv/indigo/router/inbuilt"
+	"github.com/fakefloordiv/indigo/types"
 )
 
 var addr = "localhost:9090"
@@ -19,7 +20,7 @@ func MyHandler(_ *types.Request) types.Response {
 }
 
 func main() {
-	myRouter := router.NewDefaultRouter()
+	myRouter := inbuilt.NewRouter()
 	myRouter.Get("/", MyHandler)
 
 	fmt.Println("Listening on", addr)

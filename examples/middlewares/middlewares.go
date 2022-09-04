@@ -2,15 +2,16 @@ package main
 
 import (
 	"fmt"
-	"indigo"
-	"indigo/router"
-	"indigo/types"
 	"log"
+
+	"github.com/fakefloordiv/indigo"
+	"github.com/fakefloordiv/indigo/router/inbuilt"
+	"github.com/fakefloordiv/indigo/types"
 )
 
 var addr = "localhost:9090"
 
-func HelloWorldMiddleware(next router.HandlerFunc, request *types.Request) types.Response {
+func HelloWorldMiddleware(next inbuilt.HandlerFunc, request *types.Request) types.Response {
 	fmt.Println("running middleware before handler")
 	response := next(request)
 	fmt.Println("running middleware after handler")
@@ -18,7 +19,7 @@ func HelloWorldMiddleware(next router.HandlerFunc, request *types.Request) types
 	return response
 }
 
-func SecondMiddleware(next router.HandlerFunc, request *types.Request) types.Response {
+func SecondMiddleware(next inbuilt.HandlerFunc, request *types.Request) types.Response {
 	fmt.Println("running second middleware before first one")
 	response := next(request)
 	fmt.Println("running second middleware after first one")
@@ -33,7 +34,7 @@ func MyBeautifulHandler(_ *types.Request) types.Response {
 }
 
 func main() {
-	r := router.NewDefaultRouter()
+	r := inbuilt.NewRouter()
 
 	api := r.Group("/api")
 	api.Use(HelloWorldMiddleware)

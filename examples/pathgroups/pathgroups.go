@@ -2,10 +2,11 @@ package main
 
 import (
 	"fmt"
-	"indigo"
-	"indigo/router"
-	"indigo/types"
 	"log"
+
+	"github.com/fakefloordiv/indigo"
+	"github.com/fakefloordiv/indigo/router/inbuilt"
+	"github.com/fakefloordiv/indigo/types"
 )
 
 var addr = "localhost:9090"
@@ -15,7 +16,7 @@ func MyAPIHandler(_ *types.Request) types.Response {
 }
 
 func main() {
-	r := router.NewDefaultRouter()
+	r := inbuilt.NewRouter()
 
 	api := r.Group("/api")
 

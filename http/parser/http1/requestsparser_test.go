@@ -1,15 +1,17 @@
 package http1
 
 import (
-	"indigo/errors"
-	"indigo/http/headers"
-	methods "indigo/http/method"
-	httpparser "indigo/http/parser"
-	"indigo/http/proto"
-	"indigo/http/url"
-	settings2 "indigo/settings"
-	"indigo/types"
 	"testing"
+
+	"github.com/fakefloordiv/indigo/http"
+
+	"github.com/fakefloordiv/indigo/http/headers"
+	methods "github.com/fakefloordiv/indigo/http/method"
+	httpparser "github.com/fakefloordiv/indigo/http/parser"
+	"github.com/fakefloordiv/indigo/http/proto"
+	"github.com/fakefloordiv/indigo/http/url"
+	settings2 "github.com/fakefloordiv/indigo/settings"
+	"github.com/fakefloordiv/indigo/types"
 
 	"github.com/stretchr/testify/require"
 )
@@ -22,12 +24,15 @@ var (
 	biggerGETURLEncoded = []byte("GET /hello%20world HTTP/1.1\r\n\r\n")
 
 	somePOST = []byte("POST / HTTP/1.1\r\nHello: World!\r\nContent-Length: 13\r\n\r\nHello, World!")
+
+	ordinaryChunkedBody = "d\r\nHello, world!\r\n1a\r\nBut what's wrong with you?\r\nf\r\nFinally am here\r\n0\r\n\r\n"
+	ordinaryChunked     = []byte("POST / HTTP/1.1\r\nTransfer-Encoding: chunked\r\n\r\n" + ordinaryChunkedBody)
 )
 
 func getParser() (httpparser.HTTPRequestsParser, *types.Request) {
 	settings := settings2.Default()
 	manager := headers.NewManager(settings.Headers)
-	request, gateway := types.NewRequest(&manager)
+	request, gateway := types.NewRequest(&manager, url.Query{})
 	return NewHTTPRequestsParser(
 		request, gateway, nil, nil, settings, &manager,
 	), request
@@ -42,7 +47,7 @@ type testHeaders map[string]string
 
 type wantedRequest struct {
 	Method   methods.Method
-	Path     url.Path
+	Path     string
 	Protocol proto.Proto
 	Headers  testHeaders
 }
@@ -117,7 +122,7 @@ func TestHttpRequestsParser_Parse_GET(t *testing.T) {
 
 		wanted := wantedRequest{
 			Method:   methods.GET,
-			Path:     url.Path("/"),
+			Path:     "/",
 			Protocol: proto.HTTP11,
 			Headers:  testHeaders{},
 		}
@@ -139,7 +144,7 @@ func TestHttpRequestsParser_Parse_GET(t *testing.T) {
 
 		wanted := wantedRequest{
 			Method:   methods.GET,
-			Path:     url.Path("/"),
+			Path:     "/",
 			Protocol: proto.HTTP11,
 			Headers: testHeaders{
 				"hello": "World!",
@@ -163,7 +168,7 @@ func TestHttpRequestsParser_Parse_GET(t *testing.T) {
 
 		wanted := wantedRequest{
 			Method:   methods.GET,
-			Path:     url.Path("/"),
+			Path:     "/",
 			Protocol: proto.HTTP11,
 			Headers: testHeaders{
 				"hello": "World!",
@@ -187,7 +192,7 @@ func TestHttpRequestsParser_Parse_GET(t *testing.T) {
 
 		wanted := wantedRequest{
 			Method:   methods.GET,
-			Path:     url.Path("/hello world"),
+			Path:     "/hello world",
 			Protocol: proto.HTTP11,
 			Headers:  testHeaders{},
 		}
@@ -205,7 +210,7 @@ func TestHttpRequestsParser_Parse_GET(t *testing.T) {
 
 			wanted := wantedRequest{
 				Method:   methods.GET,
-				Path:     url.Path("/"),
+				Path:     "/",
 				Protocol: proto.HTTP11,
 				Headers: testHeaders{
 					"hello": "World!",
@@ -230,7 +235,7 @@ func TestHttpRequestsParser_ParsePOST(t *testing.T) {
 
 			wanted := wantedRequest{
 				Method:   methods.POST,
-				Path:     url.Path("/"),
+				Path:     "/",
 				Protocol: proto.HTTP11,
 				Headers: testHeaders{
 					"hello": "World!",
@@ -252,8 +257,32 @@ func TestHttpRequestsParser_Parse_Negative(t *testing.T) {
 		go readBody(request, ch)
 		state, _, err := parser.Parse(raw)
 
+		require.EqualError(t, err, http.ErrBadRequest.Error())
 		require.Equal(t, httpparser.Error, state)
-		require.EqualError(t, errors.ErrBadRequest, err.Error())
+	})
+
+	t.Run("NoPath", func(t *testing.T) {
+		parser, request := getParser()
+
+		raw := []byte("GET HTTP/1.1\r\n\r\n")
+		ch := make(chan []byte)
+		go readBody(request, ch)
+		state, _, err := parser.Parse(raw)
+
+		require.EqualError(t, err, http.ErrBadRequest.Error())
+		require.Equal(t, httpparser.Error, state)
+	})
+
+	t.Run("PathWhitespace", func(t *testing.T) {
+		parser, request := getParser()
+
+		raw := []byte("GET  HTTP/1.1\r\n\r\n")
+		ch := make(chan []byte)
+		go readBody(request, ch)
+		state, _, err := parser.Parse(raw)
+
+		require.EqualError(t, err, http.ErrBadRequest.Error())
+		require.Equal(t, httpparser.Error, state)
 	})
 
 	t.Run("ShortInvalidMethod", func(t *testing.T) {
@@ -264,8 +293,8 @@ func TestHttpRequestsParser_Parse_Negative(t *testing.T) {
 		go readBody(request, ch)
 		state, _, err := parser.Parse(raw)
 
+		require.EqualError(t, err, http.ErrMethodNotImplemented.Error())
 		require.Equal(t, httpparser.Error, state)
-		require.EqualError(t, errors.ErrBadRequest, err.Error())
 	})
 
 	t.Run("LongInvalidMethod", func(t *testing.T) {
@@ -276,8 +305,8 @@ func TestHttpRequestsParser_Parse_Negative(t *testing.T) {
 		go readBody(request, ch)
 		state, _, err := parser.Parse(raw)
 
+		require.EqualError(t, err, http.ErrBadRequest.Error())
 		require.Equal(t, httpparser.Error, state)
-		require.EqualError(t, errors.ErrBadRequest, err.Error())
 	})
 
 	t.Run("ShortInvalidProtocol", func(t *testing.T) {
@@ -288,8 +317,8 @@ func TestHttpRequestsParser_Parse_Negative(t *testing.T) {
 		go readBody(request, ch)
 		state, _, err := parser.Parse(raw)
 
+		require.EqualError(t, err, http.ErrUnsupportedProtocol.Error())
 		require.Equal(t, httpparser.Error, state)
-		require.EqualError(t, err, errors.ErrUnsupportedProtocol.Error())
 	})
 
 	t.Run("LongInvalidProtocol", func(t *testing.T) {
@@ -300,8 +329,8 @@ func TestHttpRequestsParser_Parse_Negative(t *testing.T) {
 		go readBody(request, ch)
 		state, _, err := parser.Parse(raw)
 
+		require.EqualError(t, err, http.ErrUnsupportedProtocol.Error())
 		require.Equal(t, httpparser.Error, state)
-		require.EqualError(t, err, errors.ErrUnsupportedProtocol.Error())
 	})
 
 	t.Run("UnsupportedProtocol", func(t *testing.T) {
@@ -312,8 +341,8 @@ func TestHttpRequestsParser_Parse_Negative(t *testing.T) {
 		go readBody(request, ch)
 		state, _, err := parser.Parse(raw)
 
+		require.EqualError(t, err, http.ErrUnsupportedProtocol.Error())
 		require.Equal(t, httpparser.Error, state)
-		require.EqualError(t, err, errors.ErrUnsupportedProtocol.Error())
 	})
 
 	t.Run("LFCR_CRLF", func(t *testing.T) {
@@ -324,8 +353,8 @@ func TestHttpRequestsParser_Parse_Negative(t *testing.T) {
 		go readBody(request, ch)
 		state, _, err := parser.Parse(raw)
 
+		require.EqualError(t, err, http.ErrBadRequest.Error())
 		require.Equal(t, httpparser.Error, state)
-		require.EqualError(t, errors.ErrBadRequest, err.Error())
 	})
 
 	t.Run("LFCR_LFCR", func(t *testing.T) {
@@ -340,9 +369,9 @@ func TestHttpRequestsParser_Parse_Negative(t *testing.T) {
 		go readBody(request, ch)
 		state, extra, err := parser.Parse(raw)
 
-		require.Equal(t, httpparser.RequestCompleted, state)
 		require.Equal(t, []byte("\r"), extra)
 		require.NoError(t, err)
+		require.Equal(t, httpparser.RequestCompleted, state)
 	})
 
 	t.Run("HeaderWithoutColon", func(t *testing.T) {
@@ -353,8 +382,8 @@ func TestHttpRequestsParser_Parse_Negative(t *testing.T) {
 		go readBody(request, ch)
 		state, _, err := parser.Parse(raw)
 
+		require.EqualError(t, http.ErrBadRequest, err.Error())
 		require.Equal(t, httpparser.Error, state)
-		require.EqualError(t, errors.ErrBadRequest, err.Error())
 	})
 
 	t.Run("HeaderWithoutColon", func(t *testing.T) {
@@ -365,7 +394,25 @@ func TestHttpRequestsParser_Parse_Negative(t *testing.T) {
 		go readBody(request, ch)
 		state, _, err := parser.Parse(raw)
 
+		require.EqualError(t, http.ErrBadRequest, err.Error())
 		require.Equal(t, httpparser.Error, state)
-		require.EqualError(t, errors.ErrBadRequest, err.Error())
+	})
+}
+
+func TestHttpRequestsParser_Chunked(t *testing.T) {
+	t.Run("OrdinaryChunkedRequest", func(t *testing.T) {
+		parser, request := getParser()
+
+		ch := make(chan []byte)
+		go readBody(request, ch)
+		state, extra, err := parser.Parse(ordinaryChunked)
+		require.NoError(t, err)
+		require.Equal(t, httpparser.HeadersCompleted, state)
+
+		state, extra, err = parser.Parse(extra)
+		require.NoError(t, err)
+		require.Equal(t, httpparser.BodyCompleted, state)
+		require.Empty(t, extra)
+		require.Equal(t, "Hello, world!But what's wrong with you?Finally am here", string(<-ch))
 	})
 }

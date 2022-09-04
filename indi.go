@@ -2,13 +2,16 @@ package indigo
 
 import (
 	"errors"
-	"indigo/http/headers"
-	"indigo/http/parser/http1"
-	"indigo/http/server"
-	"indigo/router"
-	settings2 "indigo/settings"
-	"indigo/types"
 	"net"
+	"sync"
+
+	"github.com/fakefloordiv/indigo/http/headers"
+	"github.com/fakefloordiv/indigo/http/parser/http1"
+	"github.com/fakefloordiv/indigo/http/server"
+	"github.com/fakefloordiv/indigo/http/url"
+	"github.com/fakefloordiv/indigo/router"
+	settings2 "github.com/fakefloordiv/indigo/settings"
+	"github.com/fakefloordiv/indigo/types"
 )
 
 // Application is just a struct with addr and shutdown channel that is currently
@@ -40,9 +43,12 @@ func (a Application) Serve(router router.Router, someSettings ...settings2.Setti
 		return err
 	}
 
-	return server.StartTCPServer(sock, func(conn net.Conn) {
+	return server.StartTCPServer(sock, func(wg *sync.WaitGroup, conn net.Conn) {
 		headersManager := headers.NewManager(settings.Headers)
-		request, gateway := types.NewRequest(&headersManager)
+		query := url.NewQuery(func() map[string][]byte {
+			return make(map[string][]byte, settings.URL.Query.Number.Default)
+		})
+		request, gateway := types.NewRequest(&headersManager, query)
 
 		startLineBuff := make([]byte, 0, settings.URL.Length.Default)
 		headerBuff := make([]byte, 0, settings.Headers.KeyLength.Default)
@@ -51,16 +57,25 @@ func (a Application) Serve(router router.Router, someSettings ...settings2.Setti
 			request, gateway, startLineBuff, headerBuff, settings, &headersManager,
 		)
 
-		httpServer := server.NewHTTPServer(request, func(b []byte) error {
-			_, err := conn.Write(b)
+		httpServer := server.NewHTTPServer(request, func(b []byte) (err error) {
+			_, err = conn.Write(b)
 			return err
-		}, router, httpParser)
-
+		}, router, httpParser, conn)
 		go httpServer.Run()
 
 		readBuff := make([]byte, settings.TCPServer.Read.Default)
-		server.DefaultConnHandler(conn, readBuff, httpServer.OnData)
-	})
+		server.DefaultConnHandler(wg, conn, readBuff, httpServer.OnData)
+	}, a.shutdown)
+}
+
+// Shutdown gracefully shutting down the server. It is not blocking,
+// server being shut down right after calling this method is not
+// guaranteed, because tcp server will wait for the next connection,
+// and only then he'll be able to receive a shutdown notify. Moreover,
+// tcp server will wait until all the existing connections will be
+// closed
+func (a Application) Shutdown() {
+	a.shutdown <- true
 }
 
 func getSettings(settings ...settings2.Settings) (settings2.Settings, error) {
@@ -70,6 +85,6 @@ func getSettings(settings ...settings2.Settings) (settings2.Settings, error) {
 	case 1:
 		return settings2.Fill(settings[0]), nil
 	default:
-		return settings2.Settings{}, errors.New("too much settings")
+		return settings2.Settings{}, errors.New("too many settings (none or single struct is expected)")
 	}
 }

@@ -3,12 +3,8 @@ package server
 type serverState uint8
 
 const (
-	headersCompleted serverState = iota + 1
-	processed
-	closeConnection
-	badRequest
-	requestEntityTooLarge
-	requestURITooLong
-	requestHeaderFieldsTooLarge
-	unsupportedProtocol
+	eHeadersCompleted serverState = iota + 1
+	eProcessed
+	eError
+	eConnHijack
 )

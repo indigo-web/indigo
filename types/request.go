@@ -1,22 +1,36 @@
 package types
 
 import (
-	"indigo/http/headers"
-	methods "indigo/http/method"
-	"indigo/http/proto"
-	"indigo/http/url"
-	"indigo/internal"
+	"net"
+
+	"github.com/fakefloordiv/indigo/http"
+
+	"github.com/fakefloordiv/indigo/http/headers"
+	methods "github.com/fakefloordiv/indigo/http/method"
+	"github.com/fakefloordiv/indigo/http/proto"
+	"github.com/fakefloordiv/indigo/http/url"
+	"github.com/fakefloordiv/indigo/internal"
+)
+
+type (
+	// ConnectionHijacker is for user. It returns error because it has to
+	// read full request body to stop the server in defined state. And,
+	// as we know, reading body may return an error
+	ConnectionHijacker func() (net.Conn, error)
+
+	// hijackConn is like an interface of httpServer method that notifies
+	// core about hijacking and returns connection object
+	hijackConn func() net.Conn
 )
 
 // Request struct represents http request
 // About headers manager see at http/headers/headers.go:Manager
-// Headers attribute references at that one that lays in
-// manager
+// Headers attribute references at that one that lays in manager
 type Request struct {
 	Method   methods.Method
-	Path     url.Path
+	Path     string
 	Query    url.Query
-	Fragment url.Fragment
+	Fragment string
 	Proto    proto.Proto
 
 	Headers        headers.Headers
@@ -24,6 +38,8 @@ type Request struct {
 
 	body     requestBody
 	bodyBuff []byte
+
+	Hijack ConnectionHijacker
 }
 
 // NewRequest returns a new instance of request object and body gateway
@@ -35,10 +51,10 @@ type Request struct {
 // because it has only optional purposes and buff will be nil anyway
 // But maybe it's better to implement DI all the way we go? I don't know, maybe
 // someone will contribute and fix this
-func NewRequest(manager *headers.Manager) (*Request, *internal.BodyGateway) {
+func NewRequest(manager *headers.Manager, query url.Query) (*Request, *internal.BodyGateway) {
 	requestBodyStruct, gateway := newRequestBody()
 	request := &Request{
-		Query:          url.NewQuery(nil),
+		Query:          query,
 		Proto:          proto.HTTP11,
 		Headers:        manager.Headers,
 		headersManager: manager,
@@ -77,4 +93,19 @@ func (r *Request) Reset() error {
 	r.Headers = r.headersManager.Headers
 
 	return r.body.Reset()
+}
+
+func Hijacker(request *Request, hijacker hijackConn) func() (net.Conn, error) {
+	return func() (net.Conn, error) {
+		// we anyway don't need to have a body anymore. Also, without reading
+		// the body until complete server will not transfer into the state
+		// we need so this step is anyway compulsory
+		switch err := request.body.Reset(); err {
+		case nil, http.ErrRead:
+		default:
+			return nil, err
+		}
+
+		return hijacker(), nil
+	}
 }

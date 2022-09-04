@@ -1,24 +1,18 @@
 package queryparser
 
 import (
-	"indigo/errors"
-	"indigo/internal"
+	"github.com/fakefloordiv/indigo/http"
+	"github.com/fakefloordiv/indigo/internal"
 )
 
-const (
-	// yes, this is a bad design. I don't know how to pass settings here
-	// so, TODO: queries must be initialized in indi.go
-	defaultQueriesLength = 5
-)
-
-func Parse(data []byte) (queries map[string][]byte, err error) {
+func Parse(data []byte, queryMapFactory func() map[string][]byte) (queries map[string][]byte, err error) {
 	var (
 		offset int
 		key    string
 	)
 
 	state := eKey
-	queries = make(map[string][]byte, defaultQueriesLength)
+	queries = queryMapFactory()
 
 	for i := range data {
 		switch state {
@@ -26,7 +20,7 @@ func Parse(data []byte) (queries map[string][]byte, err error) {
 			if data[i] == '=' {
 				key = internal.B2S(data[offset:i])
 				if len(key) == 0 {
-					return nil, errors.ErrBadQuery
+					return nil, http.ErrBadQuery
 				}
 
 				offset = i + 1
@@ -42,7 +36,7 @@ func Parse(data []byte) (queries map[string][]byte, err error) {
 	}
 
 	if state == eKey {
-		return nil, errors.ErrBadQuery
+		return nil, http.ErrBadQuery
 	}
 
 	queries[key] = data[offset:]

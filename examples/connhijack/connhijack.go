@@ -14,21 +14,32 @@ import (
 var addr = "localhost:9090"
 
 func MyHandler(request *types.Request) types.Response {
-	body, err := request.Body()
+	conn, err := request.Hijack()
 	if err != nil {
-		return types.WithResponse.WithCode(status.BadRequest)
+		return types.WithResponse.
+			WithCode(status.BadRequest).
+			WithBody("bad body")
 	}
 
-	fmt.Println("somebody said:", strconv.Quote(string(body)))
+	readBuff := make([]byte, 1024)
 
-	return types.WithResponse.WithBody("Received and processed! Thank you!")
+	for {
+		n, err := conn.Read(readBuff)
+		if n == 0 || err != nil {
+			conn.Close()
+
+			return types.WithResponse
+		}
+
+		fmt.Println("somebody says:", strconv.Quote(string(readBuff[:n])))
+	}
 }
 
 func main() {
 	r := inbuilt.NewRouter()
-	r.Post("/say", MyHandler)
+	r.Get("/", MyHandler)
 
-	fmt.Println("Listening on", addr)
 	app := indigo.NewApp(addr)
+	fmt.Println("Listening on", addr)
 	log.Fatal(app.Serve(r))
 }

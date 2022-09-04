@@ -1,8 +1,8 @@
 package types
 
 import (
-	"indigo/errors"
-	"indigo/internal"
+	"github.com/fakefloordiv/indigo/http"
+	"github.com/fakefloordiv/indigo/internal"
 )
 
 type (
@@ -40,7 +40,7 @@ func newRequestBody() (requestBody, *internal.BodyGateway) {
 // to notify server back when we processed it because it has no sense
 func (r *requestBody) Read(onBody onBodyCallback, onComplete onCompleteCallback) (err error) {
 	if r.read {
-		return errors.ErrRead
+		return http.ErrRead
 	}
 
 	r.read = true

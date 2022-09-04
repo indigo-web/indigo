@@ -1,15 +1,15 @@
 package http1
 
 import (
-	"indigo/errors"
-	"indigo/http/headers"
-	methods "indigo/http/method"
-	"indigo/http/parser"
-	"indigo/http/proto"
-	"indigo/http/url"
-	"indigo/internal"
-	"indigo/settings"
-	"indigo/types"
+	"github.com/fakefloordiv/indigo/http"
+	"github.com/fakefloordiv/indigo/http/encodings"
+	"github.com/fakefloordiv/indigo/http/headers"
+	methods "github.com/fakefloordiv/indigo/http/method"
+	"github.com/fakefloordiv/indigo/http/parser"
+	"github.com/fakefloordiv/indigo/http/proto"
+	"github.com/fakefloordiv/indigo/internal"
+	"github.com/fakefloordiv/indigo/settings"
+	"github.com/fakefloordiv/indigo/types"
 )
 
 // httpRequestsParser is a stream-based http requests parser. It modifies
@@ -30,14 +30,18 @@ type httpRequestsParser struct {
 	chunkedTransferEncoding bool
 	chunkedBodyParser       chunkedBodyParser
 
-	startLineBuff  []byte
-	offset         int
-	urlEncodedChar uint8
+	startLineBuff          []byte
+	offset                 int
+	urlEncodedChar         uint8
+	protoMajor, protoMinor uint8
 
 	headerBuff     []byte
 	headersManager *headers.Manager
 
-	body *internal.BodyGateway
+	body       *internal.BodyGateway
+	codings    encodings.ContentEncodings
+	decodeBody bool
+	decoder    encodings.Decoder
 }
 
 func NewHTTPRequestsParser(
@@ -61,7 +65,7 @@ func NewHTTPRequestsParser(
 
 func (p *httpRequestsParser) Parse(data []byte) (state parser.RequestState, extra []byte, err error) {
 	if len(data) == 0 {
-		p.body.WriteErr(errors.ErrCloseConnection)
+		p.body.WriteErr(http.ErrCloseConnection)
 
 		return parser.ConnectionClose, nil, nil
 	}
@@ -87,10 +91,14 @@ func (p *httpRequestsParser) Parse(data []byte) (state parser.RequestState, extr
 		switch p.state {
 		case eMethod:
 			if data[i] == ' ' {
+				if len(p.startLineBuff) == 0 {
+					return parser.Error, nil, http.ErrBadRequest
+				}
+
 				p.request.Method = methods.Parse(internal.B2S(p.startLineBuff))
 
 				if p.request.Method == methods.Unknown {
-					return parser.Error, nil, errors.ErrBadRequest
+					return parser.Error, nil, http.ErrMethodNotImplemented
 				}
 
 				p.offset = len(p.startLineBuff)
@@ -99,44 +107,61 @@ func (p *httpRequestsParser) Parse(data []byte) (state parser.RequestState, extr
 			}
 
 			if len(p.startLineBuff) > len("CONNECT") { // the longest method, trust me
-				return parser.Error, nil, errors.ErrBadRequest
+				return parser.Error, nil, http.ErrBadRequest
 			}
 
 			p.startLineBuff = append(p.startLineBuff, data[i])
 		case ePath:
 			switch data[i] {
 			case ' ':
-				p.request.Path = url.Path(internal.B2S(p.startLineBuff[p.offset:]))
+				if len(p.startLineBuff) == p.offset {
+					return parser.Error, nil, http.ErrBadRequest
+				}
+
+				p.request.Path = internal.B2S(p.startLineBuff[p.offset:])
 				p.offset = len(p.startLineBuff)
 				p.state = eProto
 			case '%':
 				p.state = ePathDecode1Char
 			case '?':
+				p.request.Path = internal.B2S(p.startLineBuff[p.offset:])
+				if len(p.request.Path) == 0 {
+					p.request.Path = "/"
+				}
+
 				p.offset = len(p.startLineBuff)
 				p.state = eQuery
 			case '#':
+				p.request.Path = internal.B2S(p.startLineBuff[p.offset:])
+				if len(p.request.Path) == 0 {
+					p.request.Path = "/"
+				}
+
 				p.offset = len(p.startLineBuff)
 				p.state = eFragment
+			case '\x00', '\n', '\r', '\t', '\b', '\a', '\v', '\f':
+				// request path MUST NOT include any non-printable characters
+				return parser.Error, nil, http.ErrBadRequest
 			default:
 				if uint16(len(p.startLineBuff)) >= p.settings.URL.Length.Maximal {
-					return parser.Error, nil, errors.ErrURITooLong
+					return parser.Error, nil, http.ErrURITooLong
 				}
 
 				p.startLineBuff = append(p.startLineBuff, data[i])
 			}
 		case ePathDecode1Char:
 			if !isHex(data[i]) {
-				return parser.Error, nil, errors.ErrURIDecoding
+				return parser.Error, nil, http.ErrURIDecoding
 			}
 
 			p.urlEncodedChar = unHex(data[i]) << 4
 			p.state = ePathDecode2Char
 		case ePathDecode2Char:
 			if !isHex(data[i]) {
-				return parser.Error, nil, errors.ErrURIDecoding
+				return parser.Error, nil, http.ErrURIDecoding
 			}
 			if uint16(len(p.startLineBuff)) >= p.settings.URL.Length.Maximal {
-				return parser.Error, nil, errors.ErrURITooLong
+				return parser.Error, nil, http.ErrURITooLong
 			}
 
 			p.startLineBuff = append(p.startLineBuff, p.urlEncodedChar|unHex(data[i]))
@@ -155,30 +180,32 @@ func (p *httpRequestsParser) Parse(data []byte) (state parser.RequestState, extr
 				p.state = eQueryDecode1Char
 			case '+':
 				if uint16(len(p.startLineBuff)) >= p.settings.URL.Length.Maximal {
-					return parser.Error, nil, errors.ErrURITooLong
+					return parser.Error, nil, http.ErrURITooLong
 				}
 
 				p.startLineBuff = append(p.startLineBuff, ' ')
+			case '\x00', '\n', '\r', '\t', '\b', '\a', '\v', '\f':
+				return parser.Error, nil, http.ErrBadRequest
 			default:
 				if uint16(len(p.startLineBuff)) >= p.settings.URL.Length.Maximal {
-					return parser.Error, nil, errors.ErrURITooLong
+					return parser.Error, nil, http.ErrURITooLong
 				}
 
 				p.startLineBuff = append(p.startLineBuff, data[i])
 			}
 		case eQueryDecode1Char:
 			if !isHex(data[i]) {
-				return parser.Error, nil, errors.ErrURIDecoding
+				return parser.Error, nil, http.ErrURIDecoding
 			}
 
 			p.urlEncodedChar = unHex(data[i]) << 4
 			p.state = eQueryDecode2Char
 		case eQueryDecode2Char:
 			if !isHex(data[i]) {
-				return parser.Error, nil, errors.ErrURIDecoding
+				return parser.Error, nil, http.ErrURIDecoding
 			}
 			if uint16(len(p.startLineBuff)) >= p.settings.URL.Length.Maximal {
-				return parser.Error, nil, errors.ErrURITooLong
+				return parser.Error, nil, http.ErrURITooLong
 			}
 
 			p.startLineBuff = append(p.startLineBuff, p.urlEncodedChar|unHex(data[i]))
@@ -187,63 +214,127 @@ func (p *httpRequestsParser) Parse(data []byte) (state parser.RequestState, extr
 		case eFragment:
 			switch data[i] {
 			case ' ':
-				p.request.Fragment = url.Fragment(internal.B2S(p.startLineBuff[p.offset:]))
+				p.request.Fragment = internal.B2S(p.startLineBuff[p.offset:])
 				p.offset = len(p.startLineBuff)
 				p.state = eProto
 			case '%':
 				p.state = eFragmentDecode1Char
+			case '\x00', '\n', '\r', '\t', '\b', '\a', '\v', '\f':
+				return parser.Error, nil, http.ErrBadRequest
 			default:
 				if uint16(len(p.startLineBuff)) >= p.settings.URL.Length.Maximal {
-					return parser.Error, nil, errors.ErrURITooLong
+					return parser.Error, nil, http.ErrURITooLong
 				}
 
 				p.startLineBuff = append(p.startLineBuff, data[i])
 			}
 		case eFragmentDecode1Char:
 			if !isHex(data[i]) {
-				return parser.Error, nil, errors.ErrURIDecoding
+				return parser.Error, nil, http.ErrURIDecoding
 			}
 
 			p.urlEncodedChar = unHex(data[i]) << 4
 			p.state = eFragmentDecode2Char
 		case eFragmentDecode2Char:
 			if !isHex(data[i]) {
-				return parser.Error, nil, errors.ErrURIDecoding
+				return parser.Error, nil, http.ErrURIDecoding
 			}
 			if uint16(len(p.startLineBuff)) >= p.settings.URL.Length.Maximal {
-				return parser.Error, nil, errors.ErrURITooLong
+				return parser.Error, nil, http.ErrURITooLong
 			}
 
 			p.startLineBuff = append(p.startLineBuff, p.urlEncodedChar|unHex(data[i]))
 			p.urlEncodedChar = 0
 			p.state = eFragment
 		case eProto:
+
+			switch data[i] {
+			case '\r', '\n':
+				// TODO: in case CR or LF is met here, it is most of all simple request.
+				//       But we do not support simple requests, so Bad Request currently
+				//       will be returned. Maybe, we _can_ support it?
+				return parser.Error, nil, http.ErrBadRequest
+			case 'H', 'h':
+				p.state = eH
+			}
+		case eH:
+			switch data[i] {
+			case 'T', 't':
+				p.state = eHT
+			default:
+				return parser.Error, nil, http.ErrUnsupportedProtocol
+			}
+		case eHT:
+			switch data[i] {
+			case 'T', 't':
+				p.state = eHTT
+			default:
+				return parser.Error, nil, http.ErrUnsupportedProtocol
+			}
+		case eHTT:
+			switch data[i] {
+			case 'P', 'p':
+				p.state = eHTTP
+			default:
+				return parser.Error, nil, http.ErrUnsupportedProtocol
+			}
+		case eHTTP:
+			switch data[i] {
+			case '/':
+				p.state = eProtoMajor
+			default:
+				return parser.Error, nil, http.ErrUnsupportedProtocol
+			}
+		case eProtoMajor:
+			if data[i] == '.' {
+				p.state = eProtoMinor
+				continue
+			}
+
+			if data[i]-'0' > 9 {
+				return parser.Error, nil, http.ErrUnsupportedProtocol
+			}
+
+			was := p.protoMajor
+			p.protoMajor = p.protoMajor*10 + data[i] - '0'
+
+			if p.protoMajor < was {
+				// overflow
+				return parser.Error, nil, http.ErrUnsupportedProtocol
+			}
+		case eProtoMinor:
 			switch data[i] {
 			case '\r':
-				p.request.Proto = proto.Parse(internal.B2S(p.startLineBuff[p.offset:]))
-				if p.request.Proto == proto.Unknown {
-					return parser.Error, nil, errors.ErrUnsupportedProtocol
-				}
 				p.state = eProtoCR
 			case '\n':
-				p.request.Proto = proto.Parse(internal.B2S(p.startLineBuff[p.offset:]))
-				if p.request.Proto == proto.Unknown {
-					return parser.Error, nil, errors.ErrUnsupportedProtocol
-				}
 				p.state = eProtoCRLF
 			default:
-				p.startLineBuff = append(p.startLineBuff, data[i])
-				if uint16(len(p.startLineBuff)) >= p.settings.URL.Length.Maximal {
-					return parser.Error, nil, errors.ErrUnsupportedProtocol
+				if data[i]-'0' > 9 {
+					return parser.Error, nil, http.ErrUnsupportedProtocol
+				}
+
+				was := p.protoMinor
+				p.protoMinor = p.protoMinor*10 + data[i] - '0'
+
+				if p.protoMinor < was {
+					// overflow
+					return parser.Error, nil, http.ErrUnsupportedProtocol
 				}
 			}
 		case eProtoCR:
 			if data[i] != '\n' {
-				return parser.Error, nil, errors.ErrBadRequest
+				return parser.Error, nil, http.ErrBadRequest
 			}
 
 			p.state = eProtoCRLF
 		case eProtoCRLF:
+			p.request.Proto = proto.Parse(p.protoMajor, p.protoMinor)
+			if p.request.Proto == proto.Unknown {
+				return parser.Error, nil, http.ErrUnsupportedProtocol
+			}
+
+			p.protoMajor, p.protoMinor = 0, 0
+
 			switch data[i] {
 			case '\r':
 				p.state = eProtoCRLFCR
@@ -265,20 +356,20 @@ func (p *httpRequestsParser) Parse(data []byte) (state parser.RequestState, extr
 
 				return parser.RequestCompleted, data[i+1:], nil
 			default:
-				return parser.Error, nil, errors.ErrBadRequest
+				return parser.Error, nil, http.ErrBadRequest
 			}
 		case eHeaderKey:
 			switch data[i] {
 			case ':':
 				if p.headersManager.BeginValue() {
-					return parser.Error, nil, errors.ErrTooManyHeaders
+					return parser.Error, nil, http.ErrTooManyHeaders
 				}
 				p.state = eHeaderColon
 			case '\r', '\n':
-				return parser.Error, nil, errors.ErrBadRequest
+				return parser.Error, nil, http.ErrBadRequest
 			default:
 				if len(p.headerBuff) >= int(p.settings.Headers.KeyLength.Maximal) {
-					return parser.Error, nil, errors.ErrHeaderFieldsTooLarge
+					return parser.Error, nil, http.ErrHeaderFieldsTooLarge
 				}
 
 				p.headerBuff = append(p.headerBuff, data[i]|0x20)
@@ -286,11 +377,11 @@ func (p *httpRequestsParser) Parse(data []byte) (state parser.RequestState, extr
 		case eHeaderColon:
 			switch data[i] {
 			case '\r', '\n':
-				return parser.Error, nil, errors.ErrBadRequest
+				return parser.Error, nil, http.ErrBadRequest
 			case ' ':
 			default:
 				if p.headersManager.AppendValue(data[i]) {
-					return parser.Error, nil, errors.ErrHeaderFieldsTooLarge
+					return parser.Error, nil, http.ErrHeaderFieldsTooLarge
 				}
 			}
 
@@ -303,7 +394,7 @@ func (p *httpRequestsParser) Parse(data []byte) (state parser.RequestState, extr
 				p.state = eHeaderValueCRLF
 			default:
 				if p.headersManager.AppendValue(data[i]) {
-					return parser.Error, nil, errors.ErrHeaderFieldsTooLarge
+					return parser.Error, nil, http.ErrHeaderFieldsTooLarge
 				}
 			}
 		case eHeaderValueCR:
@@ -311,10 +402,9 @@ func (p *httpRequestsParser) Parse(data []byte) (state parser.RequestState, extr
 			case '\n':
 				p.state = eHeaderValueCRLF
 			default:
-				return parser.Error, nil, errors.ErrBadRequest
+				return parser.Error, nil, http.ErrBadRequest
 			}
 		case eHeaderValueCRLF:
-			// TODO: keep somewhere pre-allocated header name
 			key := string(p.headerBuff)
 			value := p.headersManager.FinalizeValue(key)
 			p.request.Headers[key] = value
@@ -326,7 +416,7 @@ func (p *httpRequestsParser) Parse(data []byte) (state parser.RequestState, extr
 					return parser.Error, nil, err
 				}
 				if p.contentLength > uint(p.settings.Body.Length.Maximal) {
-					return parser.Error, nil, errors.ErrTooLarge
+					return parser.Error, nil, http.ErrTooLarge
 				}
 				p.lengthCountdown = p.contentLength
 			case "connection":
@@ -334,6 +424,11 @@ func (p *httpRequestsParser) Parse(data []byte) (state parser.RequestState, extr
 			case "transfer-encoding":
 				// TODO: parse header value
 				p.chunkedTransferEncoding = string(value) == "chunked"
+			case "content-encoding":
+				p.decoder, p.decodeBody = p.codings.GetDecoder(value)
+				if !p.decodeBody {
+					return parser.Error, nil, http.ErrUnsupportedEncoding
+				}
 			}
 
 			p.headerBuff = p.headerBuff[:0]
@@ -368,7 +463,7 @@ func (p *httpRequestsParser) Parse(data []byte) (state parser.RequestState, extr
 
 				return parser.HeadersCompleted, data[i+1:], nil
 			default:
-				return parser.Error, nil, errors.ErrBadRequest
+				return parser.Error, nil, http.ErrBadRequest
 			}
 		}
 	}
@@ -381,11 +476,17 @@ func (p *httpRequestsParser) Parse(data []byte) (state parser.RequestState, extr
 // lengths
 func (p *httpRequestsParser) parseBody(b []byte) (done bool, extra []byte, err error) {
 	if p.chunkedTransferEncoding {
+		// TODO: implement body decoding in chunked body parser by passing decoder here
 		return p.chunkedBodyParser.Parse(b)
 	}
 
 	if p.lengthCountdown <= uint(len(b)) {
-		p.body.Data <- b[:p.lengthCountdown]
+		piece := b[:p.lengthCountdown]
+		if p.decodeBody {
+			piece = p.decoder(piece)
+		}
+
+		p.body.Data <- piece
 		<-p.body.Data
 		extra = b[p.lengthCountdown:]
 		p.lengthCountdown = 0
@@ -393,7 +494,12 @@ func (p *httpRequestsParser) parseBody(b []byte) (done bool, extra []byte, err e
 		return true, extra, p.body.Err
 	}
 
-	p.body.Data <- b
+	piece := b
+	if p.decodeBody {
+		piece = p.decoder(b)
+	}
+
+	p.body.Data <- piece
 	<-p.body.Data
 	p.lengthCountdown -= uint(len(b))
 
@@ -415,5 +521,6 @@ func (p *httpRequestsParser) reset() {
 	p.headerBuff = p.headerBuff[:0]
 	p.contentLength = 0
 	p.chunkedTransferEncoding = false
+	p.decodeBody = false
 	p.state = eMethod
 }

@@ -1,6 +1,8 @@
-package router
+package inbuilt
 
-import "indigo/types"
+import (
+	"github.com/fakefloordiv/indigo/types"
+)
 
 /*
 This file is responsible for middlewares
@@ -14,7 +16,21 @@ type Middleware func(next HandlerFunc, request *types.Request) types.Response
 // Use adds a middleware into the global lists of group middlewares. They will
 // be applied when registered
 func (d *DefaultRouter) Use(middleware Middleware) {
+	for _, methods := range d.routes {
+		for _, handler := range methods {
+			handler.middlewares = append(handler.middlewares, middleware)
+		}
+	}
+
 	d.middlewares = append(d.middlewares, middleware)
+}
+
+func (d DefaultRouter) applyMiddlewares() {
+	for _, methods := range d.routes {
+		for _, handler := range methods {
+			handler.fun = compose(handler.fun, handler.middlewares)
+		}
+	}
 }
 
 // compose just makes a single HandlerFunc from a chain of middlewares

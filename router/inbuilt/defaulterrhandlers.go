@@ -1,8 +1,9 @@
-package router
+package inbuilt
 
 import (
-	"indigo/http/status"
-	"indigo/types"
+	"github.com/fakefloordiv/indigo/http"
+	"github.com/fakefloordiv/indigo/http/status"
+	"github.com/fakefloordiv/indigo/types"
 )
 
 /*
@@ -38,23 +39,29 @@ var (
 	defaultUnsupportedProtocol = types.WithResponse.
 					WithCode(status.HTTPVersionNotSupported).
 					WithBody(`<h1 align="center">505 HTTP Version Not Supported</h1>`)
-)
 
-type (
-	ErrorHandler func(request *types.Request) types.Response
-	errHandlers  map[status.Code]ErrorHandler
+	defaultUnsupportedEncoding = types.WithResponse.
+					WithCode(status.NotImplemented).
+					WithBody(`<h1 align="center">501 Content Encoding Not Supported</h1>`)
+
+	defaultNotImplemented = types.WithResponse.
+				WithCode(status.NotImplemented).
+				WithBody(`<h1 align="center">501 Not Implemented</h1>`)
 )
 
 func newErrHandlers() errHandlers {
 	return errHandlers{
-		status.BadRequest:                  defaultBadRequestHandler,
-		status.NotFound:                    defaultNotFoundHandler,
-		status.MethodNotAllowed:            defaultMethodNotAllowedHandler,
-		status.RequestEntityTooLarge:       defaultRequestEntityTooLargeHandler,
-		status.ConnectionClose:             defaultConnectionClose,
-		status.RequestURITooLong:           defaultURITooLongHandler,
-		status.RequestHeaderFieldsTooLarge: defaultHeaderFieldsTooLargeHandler,
-		status.HTTPVersionNotSupported:     defaultUnsupportedProtocolHandler,
+		http.ErrBadRequest:           defaultBadRequestHandler,
+		http.ErrNotFound:             defaultNotFoundHandler,
+		http.ErrMethodNotAllowed:     defaultMethodNotAllowedHandler,
+		http.ErrTooLarge:             defaultRequestEntityTooLargeHandler,
+		http.ErrCloseConnection:      defaultConnectionClose,
+		http.ErrURITooLong:           defaultURITooLongHandler,
+		http.ErrHeaderFieldsTooLarge: defaultHeaderFieldsTooLargeHandler,
+		http.ErrTooManyHeaders:       defaultTooManyHeadersHandler,
+		http.ErrUnsupportedProtocol:  defaultUnsupportedProtocolHandler,
+		http.ErrUnsupportedEncoding:  defaultUnsupportedEncodingHandler,
+		http.ErrMethodNotImplemented: defaultNotImplementedHandler,
 	}
 }
 
@@ -89,6 +96,18 @@ func defaultHeaderFieldsTooLargeHandler(_ *types.Request) types.Response {
 	return defaultHeaderFieldsTooLarge
 }
 
+func defaultTooManyHeadersHandler(_ *types.Request) types.Response {
+	return defaultHeaderFieldsTooLarge
+}
+
 func defaultUnsupportedProtocolHandler(_ *types.Request) types.Response {
 	return defaultUnsupportedProtocol
+}
+
+func defaultUnsupportedEncodingHandler(_ *types.Request) types.Response {
+	return defaultUnsupportedEncoding
+}
+
+func defaultNotImplementedHandler(_ *types.Request) types.Response {
+	return defaultNotImplemented
 }
