@@ -2,6 +2,7 @@ package http1
 
 import (
 	"github.com/fakefloordiv/indigo/errors"
+	"github.com/fakefloordiv/indigo/http/encodings"
 	"github.com/fakefloordiv/indigo/http/headers"
 	methods "github.com/fakefloordiv/indigo/http/method"
 	"github.com/fakefloordiv/indigo/http/parser"
@@ -29,14 +30,17 @@ type httpRequestsParser struct {
 	chunkedTransferEncoding bool
 	chunkedBodyParser       chunkedBodyParser
 
-	startLineBuff  []byte
-	offset         int
-	urlEncodedChar uint8
+	startLineBuff          []byte
+	offset                 int
+	urlEncodedChar         uint8
+	protoMajor, protoMinor uint8
 
 	headerBuff     []byte
 	headersManager *headers.Manager
 
-	body *internal.BodyGateway
+	body    *internal.BodyGateway
+	codings encodings.ContentEncodings
+	decoder encodings.Decoder
 }
 
 func NewHTTPRequestsParser(
@@ -86,10 +90,14 @@ func (p *httpRequestsParser) Parse(data []byte) (state parser.RequestState, extr
 		switch p.state {
 		case eMethod:
 			if data[i] == ' ' {
+				if len(p.startLineBuff) == 0 {
+					return parser.Error, nil, errors.ErrBadRequest
+				}
+
 				p.request.Method = methods.Parse(internal.B2S(p.startLineBuff))
 
 				if p.request.Method == methods.Unknown {
-					return parser.Error, nil, errors.ErrBadRequest
+					return parser.Error, nil, errors.ErrMethodNotImplemented
 				}
 
 				p.offset = len(p.startLineBuff)
@@ -238,18 +246,77 @@ func (p *httpRequestsParser) Parse(data []byte) (state parser.RequestState, extr
 			p.urlEncodedChar = 0
 			p.state = eFragment
 		case eProto:
+
+			switch data[i] {
+			case '\r', '\n':
+				// TODO: in case CR or LF is met here, it is most of all simple request.
+				//       But we do not support simple requests, so Bad Request currently
+				//       will be returned. Maybe, we _can_ support it?
+				return parser.Error, nil, errors.ErrBadRequest
+			case 'H', 'h':
+				p.state = eH
+			}
+		case eH:
+			switch data[i] {
+			case 'T', 't':
+				p.state = eHT
+			default:
+				return parser.Error, nil, errors.ErrUnsupportedProtocol
+			}
+		case eHT:
+			switch data[i] {
+			case 'T', 't':
+				p.state = eHTT
+			default:
+				return parser.Error, nil, errors.ErrUnsupportedProtocol
+			}
+		case eHTT:
+			switch data[i] {
+			case 'P', 'p':
+				p.state = eHTTP
+			default:
+				return parser.Error, nil, errors.ErrUnsupportedProtocol
+			}
+		case eHTTP:
+			switch data[i] {
+			case '/':
+				p.state = eProtoMajor
+			default:
+				return parser.Error, nil, errors.ErrUnsupportedProtocol
+			}
+		case eProtoMajor:
+			if data[i] == '.' {
+				p.state = eProtoMinor
+				continue
+			}
+
+			if data[i]-'0' > 9 {
+				return parser.Error, nil, errors.ErrUnsupportedProtocol
+			}
+
+			was := p.protoMajor
+			p.protoMajor = p.protoMajor*10 + data[i] - '0'
+
+			if p.protoMajor < was {
+				// overflow
+				return parser.Error, nil, errors.ErrUnsupportedProtocol
+			}
+		case eProtoMinor:
 			switch data[i] {
 			case '\r':
 				p.state = eProtoCR
 			case '\n':
-				p.request.Proto = proto.Parse(internal.B2S(p.startLineBuff[p.offset:]))
-				if p.request.Proto == proto.Unknown {
-					return parser.Error, nil, errors.ErrUnsupportedProtocol
-				}
 				p.state = eProtoCRLF
 			default:
-				p.startLineBuff = append(p.startLineBuff, data[i])
-				if uint16(len(p.startLineBuff)) >= p.settings.URL.Length.Maximal {
+				if data[i]-'0' > 9 {
+					return parser.Error, nil, errors.ErrUnsupportedProtocol
+				}
+
+				was := p.protoMinor
+				p.protoMinor = p.protoMinor*10 + data[i] - '0'
+
+				if p.protoMinor < was {
+					// overflow
 					return parser.Error, nil, errors.ErrUnsupportedProtocol
 				}
 			}
@@ -260,10 +327,12 @@ func (p *httpRequestsParser) Parse(data []byte) (state parser.RequestState, extr
 
 			p.state = eProtoCRLF
 		case eProtoCRLF:
-			p.request.Proto = proto.Parse(internal.B2S(p.startLineBuff[p.offset:]))
+			p.request.Proto = proto.Parse(p.protoMajor, p.protoMinor)
 			if p.request.Proto == proto.Unknown {
 				return parser.Error, nil, errors.ErrUnsupportedProtocol
 			}
+
+			p.protoMajor, p.protoMinor = 0, 0
 
 			switch data[i] {
 			case '\r':
@@ -354,6 +423,11 @@ func (p *httpRequestsParser) Parse(data []byte) (state parser.RequestState, extr
 			case "transfer-encoding":
 				// TODO: parse header value
 				p.chunkedTransferEncoding = string(value) == "chunked"
+			case "content-encoding":
+				//decoder, found := p.codings.GetDecoder(internal.B2S(value))
+				//if !found {
+				//	return parser.Error, nil,
+				//}
 			}
 
 			p.headerBuff = p.headerBuff[:0]

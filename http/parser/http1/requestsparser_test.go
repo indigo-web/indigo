@@ -292,7 +292,7 @@ func TestHttpRequestsParser_Parse_Negative(t *testing.T) {
 		go readBody(request, ch)
 		state, _, err := parser.Parse(raw)
 
-		require.EqualError(t, err, errors.ErrBadRequest.Error())
+		require.EqualError(t, err, errors.ErrMethodNotImplemented.Error())
 		require.Equal(t, httpparser.Error, state)
 	})
 

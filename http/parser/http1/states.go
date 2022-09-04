@@ -14,6 +14,12 @@ const (
 	eFragmentDecode1Char
 	eFragmentDecode2Char
 	eProto
+	eH
+	eHT
+	eHTT
+	eHTTP
+	eProtoMajor
+	eProtoMinor
 	eProtoCR
 	eProtoCRLF
 	eProtoCRLFCR
