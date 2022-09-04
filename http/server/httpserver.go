@@ -30,6 +30,7 @@ type httpServer struct {
 	conn       net.Conn
 
 	notifier chan serverState
+	err      error
 }
 
 func NewHTTPServer(
@@ -48,7 +49,7 @@ func NewHTTPServer(
 
 // Run first prepares request by setting up hijacker, then starts
 // requests processor in blocking mode
-func (h httpServer) Run() {
+func (h *httpServer) Run() {
 	h.request.Hijack = types.Hijacker(h.request, h.HijackConn)
 
 	h.requestProcessor()
@@ -57,7 +58,7 @@ func (h httpServer) Run() {
 // OnData is a core-core function here, because does all the main stuff
 // core must do. It parses a data provided by tcp server, and according
 // to the parser state returned, decides what to do
-func (h httpServer) OnData(data []byte) (err error) {
+func (h *httpServer) OnData(data []byte) (err error) {
 	var state parser.RequestState
 
 	for len(data) > 0 {
@@ -66,17 +67,17 @@ func (h httpServer) OnData(data []byte) (err error) {
 		switch state {
 		case parser.Pending:
 		case parser.HeadersCompleted:
-			h.notifier <- headersCompleted
+			h.notifier <- eHeadersCompleted
 		case parser.BodyCompleted:
 			switch <-h.notifier {
-			case processed:
-			case connHijack:
-				return errors.ErrHijackConn
+			case eProcessed:
+			case eConnHijack:
+				return http.ErrHijackConn
 			default:
-				return errors.ErrCloseConnection
+				return http.ErrCloseConnection
 			}
 		case parser.RequestCompleted:
-			h.notifier <- headersCompleted
+			h.notifier <- eHeadersCompleted
 			// the reason why we have manually finalize body is that
 			// parser has not notified about request completion yet, so
 			// handler is not called, but parser already has to write
@@ -85,33 +86,24 @@ func (h httpServer) OnData(data []byte) (err error) {
 			h.parser.FinalizeBody()
 
 			switch <-h.notifier {
-			case processed:
-			case connHijack:
-				return errors.ErrHijackConn
+			case eProcessed:
+			case eConnHijack:
+				return http.ErrHijackConn
 			default:
-				return errors.ErrCloseConnection
+				return http.ErrCloseConnection
 			}
 		case parser.ConnectionClose:
-			h.notifier <- closeConnection
+			h.err = http.ErrCloseConnection
+			h.notifier <- eError
 
 			return nil
 		case parser.Error:
-			switch err {
-			case errors.ErrBadRequest, errors.ErrURIDecoding:
-				h.notifier <- badRequest
-			case errors.ErrMethodNotImplemented:
-				h.notifier <- methodNotImplemented
-			case errors.ErrTooManyHeaders, errors.ErrTooLarge:
-				h.notifier <- requestEntityTooLarge
-			case errors.ErrURITooLong:
-				h.notifier <- requestURITooLong
-			case errors.ErrHeaderFieldsTooLarge:
-				h.notifier <- requestHeaderFieldsTooLarge
-			case errors.ErrUnsupportedProtocol:
-				h.notifier <- unsupportedProtocol
-			default:
-				h.notifier <- badRequest
+			if err == http.ErrURIDecoding {
+				err = http.ErrBadRequest
 			}
+
+			h.err = err
+			h.notifier <- eError
 
 			// wait for processor to handle the error before connection will be closed
 			// for example, respond client with error
@@ -127,12 +119,12 @@ func (h httpServer) OnData(data []byte) (err error) {
 // requestProcessor is a top function in the whole userspace (requests processing
 // space), it receives a signal from notifier chan and decides what to do starting
 // from the actual signal. Also, when called, calls router OnStart() method
-func (h httpServer) requestProcessor() {
+func (h *httpServer) requestProcessor() {
 	h.router.OnStart()
 
 	for {
 		switch <-h.notifier {
-		case headersCompleted:
+		case eHeadersCompleted:
 			// in case connection was hijacked, router does not know about it,
 			// so he tries to write a response as usual. But he fails, because
 			// connection is (must be) already closed. He returns an error, but
@@ -141,40 +133,27 @@ func (h httpServer) requestProcessor() {
 			// ONLY here and ONLY because of hijacking)
 			if h.router.OnRequest(h.request, h.respWriter) != nil {
 				if h.notifier != nil {
-					h.notifier <- closeConnection
+					h.err = http.ErrCloseConnection
+					h.notifier <- eError
 				}
 
 				return
 			}
 			if err := h.request.Reset(); err != nil {
 				h.router.OnError(h.request, h.respWriter, err)
-				h.notifier <- closeConnection
+				h.err = http.ErrCloseConnection
+				h.notifier <- eError
 				return
 			}
 
-			h.notifier <- processed
-			continue
-		case closeConnection:
-			h.router.OnError(h.request, h.respWriter, errors.ErrCloseConnection)
-		case badRequest:
-			h.router.OnError(h.request, h.respWriter, errors.ErrBadRequest)
-		case methodNotImplemented:
-			h.router.OnError(h.request, h.respWriter, errors.ErrMethodNotImplemented)
-		case requestEntityTooLarge:
-			h.router.OnError(h.request, h.respWriter, errors.ErrTooLarge)
-		case requestHeaderFieldsTooLarge:
-			h.router.OnError(h.request, h.respWriter, errors.ErrHeaderFieldsTooLarge)
-		case requestURITooLong:
-			h.router.OnError(h.request, h.respWriter, errors.ErrURITooLong)
-		case unsupportedProtocol:
-			h.router.OnError(h.request, h.respWriter, errors.ErrUnsupportedProtocol)
+			h.notifier <- eProcessed
+		case eError:
+			h.router.OnError(h.request, h.respWriter, h.err)
+			h.notifier <- eProcessed
+			return
 		default:
 			panic("BUG: http/server/httpserver.go:requestProcessor(): received unknown state")
 		}
-
-		// most cases are doing this. Easier to add continue-statement somewhere
-		h.notifier <- processed
-		return
 	}
 }
 
@@ -190,7 +169,7 @@ func (h *httpServer) HijackConn() net.Conn {
 	// note: for successful connection hijacking, request body MUST BE read before.
 	//       Also, connection must be manually closed, otherwise router will write
 	//       a http response there
-	h.notifier <- connHijack
+	h.notifier <- eConnHijack
 	h.notifier = nil
 
 	return h.conn
