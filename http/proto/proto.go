@@ -3,10 +3,13 @@ package proto
 type Proto uint8
 
 const (
-	Unknown Proto = 0
-	HTTP09  Proto = iota + 9 // HTTP09 == 9, HTTP10 = 10, HTTP11 = 11
+	Unknown Proto = 1 << iota
+	HTTP09
 	HTTP10
 	HTTP11
+
+	HTTP1 = HTTP09 | HTTP10 | HTTP11
+
 	// HTTP2, HTTP3 - will be added when implemented
 )
 
@@ -16,17 +19,23 @@ var (
 	http11 = []byte("HTTP/1.1")
 )
 
-func Parse(proto string) Proto {
-	switch proto {
-	case "HTTP/0.9":
-		return HTTP09
-	case "HTTP/1.0":
-		return HTTP10
-	case "HTTP/1.1":
-		return HTTP11
-	default:
-		return Unknown
+func Parse(major, minor uint8) Proto {
+	switch major {
+	case 0:
+		switch minor {
+		case 9:
+			return HTTP09
+		}
+	case 1:
+		switch minor {
+		case 0:
+			return HTTP10
+		case 1:
+			return HTTP11
+		}
 	}
+
+	return Unknown
 }
 
 func ToBytes(proto Proto) []byte {
