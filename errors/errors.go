@@ -6,6 +6,7 @@ import (
 
 var (
 	ErrBadRequest           = errors.New("bad request")
+	ErrMethodNotImplemented = errors.New("request method is not supported")
 	ErrTooLarge             = errors.New("too large")
 	ErrHeaderFieldsTooLarge = errors.New("header fields too large")
 	ErrURITooLong           = errors.New("request URI too long")
