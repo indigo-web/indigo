@@ -17,6 +17,9 @@ type (
 		fun         HandlerFunc
 		middlewares []Middleware
 	}
+
+	ErrorHandler func(request *types.Request) types.Response
+	errHandlers  map[error]ErrorHandler
 )
 
 // DefaultRouter is a reference implementation of router for indigo

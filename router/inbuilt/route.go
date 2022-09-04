@@ -4,11 +4,10 @@ import (
 	"strings"
 
 	methods "github.com/fakefloordiv/indigo/http/method"
-	"github.com/fakefloordiv/indigo/http/status"
 )
 
 /*
-This file is responsible for registering handlers
+This file is responsible for registering both ordinary and error handlers
 */
 
 // Route is a base method for registering handlers
@@ -37,13 +36,16 @@ func (d *DefaultRouter) Route(
 }
 
 // RouteError adds an error handler. You can handle next errors:
-// - status.ConnectionClose
-// - status.BadRequest
-// - status.RequestEntityTooLarge
-// - status.RequestHeaderFieldsTooLarge
-// - status.RequestURITooLong
-// - status.HTTPVersionNotSupported
+// - http.ErrCloseConnection
+// - http.ErrBadRequest
+// - http.ErrMethodNotImplemented
+// - http.ErrTooLarge
+// - http.ErrHeaderFieldsTooLarge
+// - http.ErrURITooLong
+// - http.ErrUnsupportedProtocol
+// - http.ErrUnsupportedEncoding
+//
 // You can set your own handler and override default response
-func (d DefaultRouter) RouteError(code status.Code, handler ErrorHandler) {
-	d.errHandlers[code] = handler
+func (d DefaultRouter) RouteError(err error, handler ErrorHandler) {
+	d.root.errHandlers[err] = handler
 }
