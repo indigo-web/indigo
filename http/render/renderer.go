@@ -2,6 +2,7 @@ package render
 
 import (
 	"errors"
+	methods "github.com/fakefloordiv/indigo/http/method"
 	"io"
 	"math"
 	"os"
@@ -102,7 +103,10 @@ func (r *Renderer) Response(
 		return err
 	}
 
-	buff = renderContentLength(len(response.Body), buff)
+	if shouldAppendContentLength(request.Method, response.Code) {
+		buff = renderContentLength(len(response.Body), buff)
+	}
+
 	r.buff = append(append(buff, crlf...), response.Body...)
 
 	writerErr := writer(r.buff)
@@ -187,4 +191,13 @@ func isKeepAlive(request *types.Request) bool {
 	}
 
 	return false
+}
+
+// shouldAppendContentLength decides whether content length should be presented
+// in the response. Content-Length shouldn't be presented in message if at
+// least one of conditions below is true:
+// - Request method is HEAD
+// - Response code is 1xx (informational) or 304 (Not Modified)
+func shouldAppendContentLength(method methods.Method, respCode status.Code) bool {
+	return method != methods.HEAD && respCode >= 200 && respCode != 304
 }
