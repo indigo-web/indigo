@@ -25,23 +25,23 @@ func (d DefaultRouter) OnRequest(request *types.Request, respWriter types.Respon
 	if !found {
 		response := d.errHandlers[http.ErrNotFound](request)
 
-		return d.renderer.Response(request.Proto, response, respWriter)
+		return d.renderer.Response(request, response, respWriter)
 	}
 
 	handler, found := urlMethods[request.Method]
 	if !found {
 		response := d.errHandlers[http.ErrMethodNotAllowed](request)
 
-		return d.renderer.Response(request.Proto, response, respWriter)
+		return d.renderer.Response(request, response, respWriter)
 	}
 
-	return d.renderer.Response(request.Proto, handler.fun(request), respWriter)
+	return d.renderer.Response(request, handler.fun(request), respWriter)
 }
 
 // OnError receives error and decides, which error handler is better to use in this case
 func (d DefaultRouter) OnError(request *types.Request, respWriter types.ResponseWriter, err error) {
 	response := d.errHandlers[err](request)
-	_ = d.renderer.Response(request.Proto, response, respWriter)
+	_ = d.renderer.Response(request, response, respWriter)
 }
 
 // GetContentEncodings returns encodings.ContentEncodings object as it is

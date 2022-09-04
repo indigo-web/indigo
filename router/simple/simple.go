@@ -29,11 +29,11 @@ func NewRouter(handler inbuilt.HandlerFunc) router2.Router {
 func (router) OnStart() {}
 
 func (r router) OnRequest(request *types.Request, respWriter types.ResponseWriter) error {
-	return r.renderer.Response(request.Proto, r.handler(request), respWriter)
+	return r.renderer.Response(request, r.handler(request), respWriter)
 }
 
 func (r router) OnError(request *types.Request, respWriter types.ResponseWriter, _ error) {
-	_ = r.renderer.Response(request.Proto, defaultErrResponse, respWriter)
+	_ = r.renderer.Response(request, defaultErrResponse, respWriter)
 }
 
 func (router) GetContentEncodings() encodings.ContentEncodings {
