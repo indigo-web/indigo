@@ -38,9 +38,10 @@ type httpRequestsParser struct {
 	headerBuff     []byte
 	headersManager *headers.Manager
 
-	body    *internal.BodyGateway
-	codings encodings.ContentEncodings
-	decoder encodings.Decoder
+	body       *internal.BodyGateway
+	codings    encodings.ContentEncodings
+	decodeBody bool
+	decoder    encodings.Decoder
 }
 
 func NewHTTPRequestsParser(
@@ -424,10 +425,10 @@ func (p *httpRequestsParser) Parse(data []byte) (state parser.RequestState, extr
 				// TODO: parse header value
 				p.chunkedTransferEncoding = string(value) == "chunked"
 			case "content-encoding":
-				//decoder, found := p.codings.GetDecoder(internal.B2S(value))
-				//if !found {
-				//	return parser.Error, nil,
-				//}
+				p.decoder, p.decodeBody = p.codings.GetDecoder(internal.B2S(value))
+				if !p.decodeBody {
+					return parser.Error, nil, http.ErrUnsupportedEncoding
+				}
 			}
 
 			p.headerBuff = p.headerBuff[:0]
@@ -475,11 +476,17 @@ func (p *httpRequestsParser) Parse(data []byte) (state parser.RequestState, extr
 // lengths
 func (p *httpRequestsParser) parseBody(b []byte) (done bool, extra []byte, err error) {
 	if p.chunkedTransferEncoding {
+		// TODO: implement body decoding in chunked body parser by passing decoder here
 		return p.chunkedBodyParser.Parse(b)
 	}
 
 	if p.lengthCountdown <= uint(len(b)) {
-		p.body.Data <- b[:p.lengthCountdown]
+		piece := b[:p.lengthCountdown]
+		if p.decodeBody {
+			piece = p.decoder(piece)
+		}
+
+		p.body.Data <- piece
 		<-p.body.Data
 		extra = b[p.lengthCountdown:]
 		p.lengthCountdown = 0
@@ -487,7 +494,12 @@ func (p *httpRequestsParser) parseBody(b []byte) (done bool, extra []byte, err e
 		return true, extra, p.body.Err
 	}
 
-	p.body.Data <- b
+	piece := b
+	if p.decodeBody {
+		piece = p.decoder(b)
+	}
+
+	p.body.Data <- piece
 	<-p.body.Data
 	p.lengthCountdown -= uint(len(b))
 
@@ -509,5 +521,6 @@ func (p *httpRequestsParser) reset() {
 	p.headerBuff = p.headerBuff[:0]
 	p.contentLength = 0
 	p.chunkedTransferEncoding = false
+	p.decodeBody = false
 	p.state = eMethod
 }
