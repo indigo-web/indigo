@@ -1,9 +1,12 @@
 package headers
 
-import "github.com/fakefloordiv/indigo/settings"
+import (
+	"github.com/fakefloordiv/indigo/internal"
+	"github.com/fakefloordiv/indigo/settings"
+)
 
 type (
-	Headers       map[string][]byte
+	Headers       map[string]string
 	ValueAppender func(b []byte) int
 )
 
@@ -49,8 +52,8 @@ func (m *Manager) AppendValue(char byte) (exceeded bool) {
 
 // FinalizeValue just marks that we are done with our header value. It
 // takes provided key and adds a new entry into the headers map
-func (m Manager) FinalizeValue(key string) (finalValue []byte) {
-	finalValue = m.Values[m.valueBegin:]
+func (m Manager) FinalizeValue(key string) (finalValue string) {
+	finalValue = internal.B2S(m.Values[m.valueBegin:])
 	m.Headers[key] = finalValue
 
 	return finalValue
