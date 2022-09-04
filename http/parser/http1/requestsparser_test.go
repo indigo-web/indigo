@@ -1,6 +1,7 @@
 package http1
 
 import (
+	"github.com/fakefloordiv/indigo/http/encodings"
 	"testing"
 
 	"github.com/fakefloordiv/indigo/http"
@@ -32,8 +33,10 @@ func getParser() (httpparser.HTTPRequestsParser, *types.Request) {
 	settings := settings2.Default()
 	manager := headers.NewManager(settings.Headers)
 	request, gateway := types.NewRequest(&manager, url.Query{})
+	codings := encodings.NewContentEncodings()
+
 	return NewHTTPRequestsParser(
-		request, gateway, nil, nil, settings, &manager,
+		request, gateway, nil, nil, settings, &manager, codings,
 	), request
 }
 
