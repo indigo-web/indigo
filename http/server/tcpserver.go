@@ -1,10 +1,9 @@
 package server
 
 import (
+	"github.com/fakefloordiv/indigo/http"
 	"net"
 	"sync"
-
-	"github.com/fakefloordiv/indigo/errors"
 )
 
 type (
@@ -24,7 +23,7 @@ func StartTCPServer(sock net.Listener, handleConn connHandler, sd chan bool) err
 		select {
 		case <-sd:
 			wg.Wait()
-			return errors.ErrShutdown
+			return http.ErrShutdown
 		default:
 			conn, err := sock.Accept()
 			if err != nil {
@@ -54,7 +53,7 @@ func DefaultConnHandler(wg *sync.WaitGroup, conn net.Conn, buff []byte, handleDa
 		err2 := handleData(buff[:n])
 
 		if err2 != nil || err != nil || n == 0 {
-			if err2 != errors.ErrHijackConn {
+			if err2 != http.ErrHijackConn {
 				conn.Close()
 			}
 

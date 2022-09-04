@@ -1,9 +1,9 @@
 package http1
 
 import (
+	"github.com/fakefloordiv/indigo/http"
 	"testing"
 
-	"github.com/fakefloordiv/indigo/errors"
 	"github.com/fakefloordiv/indigo/http/headers"
 	methods "github.com/fakefloordiv/indigo/http/method"
 	httpparser "github.com/fakefloordiv/indigo/http/parser"
@@ -256,7 +256,7 @@ func TestHttpRequestsParser_Parse_Negative(t *testing.T) {
 		go readBody(request, ch)
 		state, _, err := parser.Parse(raw)
 
-		require.EqualError(t, err, errors.ErrBadRequest.Error())
+		require.EqualError(t, err, http.ErrBadRequest.Error())
 		require.Equal(t, httpparser.Error, state)
 	})
 
@@ -268,7 +268,7 @@ func TestHttpRequestsParser_Parse_Negative(t *testing.T) {
 		go readBody(request, ch)
 		state, _, err := parser.Parse(raw)
 
-		require.EqualError(t, err, errors.ErrBadRequest.Error())
+		require.EqualError(t, err, http.ErrBadRequest.Error())
 		require.Equal(t, httpparser.Error, state)
 	})
 
@@ -280,7 +280,7 @@ func TestHttpRequestsParser_Parse_Negative(t *testing.T) {
 		go readBody(request, ch)
 		state, _, err := parser.Parse(raw)
 
-		require.EqualError(t, err, errors.ErrBadRequest.Error())
+		require.EqualError(t, err, http.ErrBadRequest.Error())
 		require.Equal(t, httpparser.Error, state)
 	})
 
@@ -292,7 +292,7 @@ func TestHttpRequestsParser_Parse_Negative(t *testing.T) {
 		go readBody(request, ch)
 		state, _, err := parser.Parse(raw)
 
-		require.EqualError(t, err, errors.ErrMethodNotImplemented.Error())
+		require.EqualError(t, err, http.ErrMethodNotImplemented.Error())
 		require.Equal(t, httpparser.Error, state)
 	})
 
@@ -304,7 +304,7 @@ func TestHttpRequestsParser_Parse_Negative(t *testing.T) {
 		go readBody(request, ch)
 		state, _, err := parser.Parse(raw)
 
-		require.EqualError(t, err, errors.ErrBadRequest.Error())
+		require.EqualError(t, err, http.ErrBadRequest.Error())
 		require.Equal(t, httpparser.Error, state)
 	})
 
@@ -316,7 +316,7 @@ func TestHttpRequestsParser_Parse_Negative(t *testing.T) {
 		go readBody(request, ch)
 		state, _, err := parser.Parse(raw)
 
-		require.EqualError(t, err, errors.ErrUnsupportedProtocol.Error())
+		require.EqualError(t, err, http.ErrUnsupportedProtocol.Error())
 		require.Equal(t, httpparser.Error, state)
 	})
 
@@ -328,7 +328,7 @@ func TestHttpRequestsParser_Parse_Negative(t *testing.T) {
 		go readBody(request, ch)
 		state, _, err := parser.Parse(raw)
 
-		require.EqualError(t, err, errors.ErrUnsupportedProtocol.Error())
+		require.EqualError(t, err, http.ErrUnsupportedProtocol.Error())
 		require.Equal(t, httpparser.Error, state)
 	})
 
@@ -340,7 +340,7 @@ func TestHttpRequestsParser_Parse_Negative(t *testing.T) {
 		go readBody(request, ch)
 		state, _, err := parser.Parse(raw)
 
-		require.EqualError(t, err, errors.ErrUnsupportedProtocol.Error())
+		require.EqualError(t, err, http.ErrUnsupportedProtocol.Error())
 		require.Equal(t, httpparser.Error, state)
 	})
 
@@ -352,7 +352,7 @@ func TestHttpRequestsParser_Parse_Negative(t *testing.T) {
 		go readBody(request, ch)
 		state, _, err := parser.Parse(raw)
 
-		require.EqualError(t, err, errors.ErrBadRequest.Error())
+		require.EqualError(t, err, http.ErrBadRequest.Error())
 		require.Equal(t, httpparser.Error, state)
 	})
 
@@ -381,7 +381,7 @@ func TestHttpRequestsParser_Parse_Negative(t *testing.T) {
 		go readBody(request, ch)
 		state, _, err := parser.Parse(raw)
 
-		require.EqualError(t, errors.ErrBadRequest, err.Error())
+		require.EqualError(t, http.ErrBadRequest, err.Error())
 		require.Equal(t, httpparser.Error, state)
 	})
 
@@ -393,7 +393,7 @@ func TestHttpRequestsParser_Parse_Negative(t *testing.T) {
 		go readBody(request, ch)
 		state, _, err := parser.Parse(raw)
 
-		require.EqualError(t, errors.ErrBadRequest, err.Error())
+		require.EqualError(t, http.ErrBadRequest, err.Error())
 		require.Equal(t, httpparser.Error, state)
 	})
 }

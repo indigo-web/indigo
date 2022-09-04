@@ -1,7 +1,7 @@
 package url
 
 import (
-	"github.com/fakefloordiv/indigo/errors"
+	"github.com/fakefloordiv/indigo/http"
 	"github.com/fakefloordiv/indigo/http/url/queryparser"
 )
 
@@ -49,7 +49,7 @@ func (q *Query) Get(key string) (value []byte, err error) {
 
 	value, found := q.parsedQuery[key]
 	if !found {
-		err = errors.ErrNoSuchKey
+		err = http.ErrNoSuchKey
 	}
 
 	return value, err

@@ -1,9 +1,8 @@
 package url
 
 import (
+	"github.com/fakefloordiv/indigo/http"
 	"testing"
-
-	"github.com/fakefloordiv/indigo/errors"
 
 	"github.com/stretchr/testify/require"
 )
@@ -27,6 +26,6 @@ func TestQuery(t *testing.T) {
 
 	t.Run("GetNonExistingKey", func(t *testing.T) {
 		_, err := query.Get("lorem")
-		require.ErrorIs(t, err, errors.ErrNoSuchKey)
+		require.ErrorIs(t, err, http.ErrNoSuchKey)
 	})
 }

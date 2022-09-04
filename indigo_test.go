@@ -4,6 +4,7 @@ import (
 	"bytes"
 	stderrors "errors"
 	"fmt"
+	http2 "github.com/fakefloordiv/indigo/http"
 	"io"
 	"net"
 	"net/http"
@@ -12,7 +13,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/fakefloordiv/indigo/errors"
 	methods "github.com/fakefloordiv/indigo/http/method"
 	"github.com/fakefloordiv/indigo/http/proto"
 	"github.com/fakefloordiv/indigo/router"
@@ -179,7 +179,7 @@ func TestAllCases(t *testing.T) {
 	shutdown := make(chan bool)
 
 	go func() {
-		require.Equal(t, errors.ErrShutdown, app.Serve(r))
+		require.Equal(t, http2.ErrShutdown, app.Serve(r))
 		shutdown <- true
 	}()
 

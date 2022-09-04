@@ -1,7 +1,7 @@
 package http1
 
 import (
-	"github.com/fakefloordiv/indigo/errors"
+	"github.com/fakefloordiv/indigo/http"
 )
 
 // parseUint is a tiny implementation of strconv.Atoi, but reading
@@ -11,7 +11,7 @@ func parseUint(raw []byte) (num uint, err error) {
 		char -= '0'
 
 		if char > 9 {
-			return 0, errors.ErrBadRequest
+			return 0, http.ErrBadRequest
 		}
 
 		num = num*10 + uint(char)

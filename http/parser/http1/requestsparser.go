@@ -1,7 +1,7 @@
 package http1
 
 import (
-	"github.com/fakefloordiv/indigo/errors"
+	"github.com/fakefloordiv/indigo/http"
 	"github.com/fakefloordiv/indigo/http/encodings"
 	"github.com/fakefloordiv/indigo/http/headers"
 	methods "github.com/fakefloordiv/indigo/http/method"
@@ -64,7 +64,7 @@ func NewHTTPRequestsParser(
 
 func (p *httpRequestsParser) Parse(data []byte) (state parser.RequestState, extra []byte, err error) {
 	if len(data) == 0 {
-		p.body.WriteErr(errors.ErrCloseConnection)
+		p.body.WriteErr(http.ErrCloseConnection)
 
 		return parser.ConnectionClose, nil, nil
 	}
@@ -91,13 +91,13 @@ func (p *httpRequestsParser) Parse(data []byte) (state parser.RequestState, extr
 		case eMethod:
 			if data[i] == ' ' {
 				if len(p.startLineBuff) == 0 {
-					return parser.Error, nil, errors.ErrBadRequest
+					return parser.Error, nil, http.ErrBadRequest
 				}
 
 				p.request.Method = methods.Parse(internal.B2S(p.startLineBuff))
 
 				if p.request.Method == methods.Unknown {
-					return parser.Error, nil, errors.ErrMethodNotImplemented
+					return parser.Error, nil, http.ErrMethodNotImplemented
 				}
 
 				p.offset = len(p.startLineBuff)
@@ -106,7 +106,7 @@ func (p *httpRequestsParser) Parse(data []byte) (state parser.RequestState, extr
 			}
 
 			if len(p.startLineBuff) > len("CONNECT") { // the longest method, trust me
-				return parser.Error, nil, errors.ErrBadRequest
+				return parser.Error, nil, http.ErrBadRequest
 			}
 
 			p.startLineBuff = append(p.startLineBuff, data[i])
@@ -114,7 +114,7 @@ func (p *httpRequestsParser) Parse(data []byte) (state parser.RequestState, extr
 			switch data[i] {
 			case ' ':
 				if len(p.startLineBuff) == p.offset {
-					return parser.Error, nil, errors.ErrBadRequest
+					return parser.Error, nil, http.ErrBadRequest
 				}
 
 				p.request.Path = internal.B2S(p.startLineBuff[p.offset:])
@@ -140,27 +140,27 @@ func (p *httpRequestsParser) Parse(data []byte) (state parser.RequestState, extr
 				p.state = eFragment
 			case '\x00', '\n', '\r', '\t', '\b', '\a', '\v', '\f':
 				// request path MUST NOT include any non-printable characters
-				return parser.Error, nil, errors.ErrBadRequest
+				return parser.Error, nil, http.ErrBadRequest
 			default:
 				if uint16(len(p.startLineBuff)) >= p.settings.URL.Length.Maximal {
-					return parser.Error, nil, errors.ErrURITooLong
+					return parser.Error, nil, http.ErrURITooLong
 				}
 
 				p.startLineBuff = append(p.startLineBuff, data[i])
 			}
 		case ePathDecode1Char:
 			if !isHex(data[i]) {
-				return parser.Error, nil, errors.ErrURIDecoding
+				return parser.Error, nil, http.ErrURIDecoding
 			}
 
 			p.urlEncodedChar = unHex(data[i]) << 4
 			p.state = ePathDecode2Char
 		case ePathDecode2Char:
 			if !isHex(data[i]) {
-				return parser.Error, nil, errors.ErrURIDecoding
+				return parser.Error, nil, http.ErrURIDecoding
 			}
 			if uint16(len(p.startLineBuff)) >= p.settings.URL.Length.Maximal {
-				return parser.Error, nil, errors.ErrURITooLong
+				return parser.Error, nil, http.ErrURITooLong
 			}
 
 			p.startLineBuff = append(p.startLineBuff, p.urlEncodedChar|unHex(data[i]))
@@ -179,32 +179,32 @@ func (p *httpRequestsParser) Parse(data []byte) (state parser.RequestState, extr
 				p.state = eQueryDecode1Char
 			case '+':
 				if uint16(len(p.startLineBuff)) >= p.settings.URL.Length.Maximal {
-					return parser.Error, nil, errors.ErrURITooLong
+					return parser.Error, nil, http.ErrURITooLong
 				}
 
 				p.startLineBuff = append(p.startLineBuff, ' ')
 			case '\x00', '\n', '\r', '\t', '\b', '\a', '\v', '\f':
-				return parser.Error, nil, errors.ErrBadRequest
+				return parser.Error, nil, http.ErrBadRequest
 			default:
 				if uint16(len(p.startLineBuff)) >= p.settings.URL.Length.Maximal {
-					return parser.Error, nil, errors.ErrURITooLong
+					return parser.Error, nil, http.ErrURITooLong
 				}
 
 				p.startLineBuff = append(p.startLineBuff, data[i])
 			}
 		case eQueryDecode1Char:
 			if !isHex(data[i]) {
-				return parser.Error, nil, errors.ErrURIDecoding
+				return parser.Error, nil, http.ErrURIDecoding
 			}
 
 			p.urlEncodedChar = unHex(data[i]) << 4
 			p.state = eQueryDecode2Char
 		case eQueryDecode2Char:
 			if !isHex(data[i]) {
-				return parser.Error, nil, errors.ErrURIDecoding
+				return parser.Error, nil, http.ErrURIDecoding
 			}
 			if uint16(len(p.startLineBuff)) >= p.settings.URL.Length.Maximal {
-				return parser.Error, nil, errors.ErrURITooLong
+				return parser.Error, nil, http.ErrURITooLong
 			}
 
 			p.startLineBuff = append(p.startLineBuff, p.urlEncodedChar|unHex(data[i]))
@@ -219,27 +219,27 @@ func (p *httpRequestsParser) Parse(data []byte) (state parser.RequestState, extr
 			case '%':
 				p.state = eFragmentDecode1Char
 			case '\x00', '\n', '\r', '\t', '\b', '\a', '\v', '\f':
-				return parser.Error, nil, errors.ErrBadRequest
+				return parser.Error, nil, http.ErrBadRequest
 			default:
 				if uint16(len(p.startLineBuff)) >= p.settings.URL.Length.Maximal {
-					return parser.Error, nil, errors.ErrURITooLong
+					return parser.Error, nil, http.ErrURITooLong
 				}
 
 				p.startLineBuff = append(p.startLineBuff, data[i])
 			}
 		case eFragmentDecode1Char:
 			if !isHex(data[i]) {
-				return parser.Error, nil, errors.ErrURIDecoding
+				return parser.Error, nil, http.ErrURIDecoding
 			}
 
 			p.urlEncodedChar = unHex(data[i]) << 4
 			p.state = eFragmentDecode2Char
 		case eFragmentDecode2Char:
 			if !isHex(data[i]) {
-				return parser.Error, nil, errors.ErrURIDecoding
+				return parser.Error, nil, http.ErrURIDecoding
 			}
 			if uint16(len(p.startLineBuff)) >= p.settings.URL.Length.Maximal {
-				return parser.Error, nil, errors.ErrURITooLong
+				return parser.Error, nil, http.ErrURITooLong
 			}
 
 			p.startLineBuff = append(p.startLineBuff, p.urlEncodedChar|unHex(data[i]))
@@ -252,7 +252,7 @@ func (p *httpRequestsParser) Parse(data []byte) (state parser.RequestState, extr
 				// TODO: in case CR or LF is met here, it is most of all simple request.
 				//       But we do not support simple requests, so Bad Request currently
 				//       will be returned. Maybe, we _can_ support it?
-				return parser.Error, nil, errors.ErrBadRequest
+				return parser.Error, nil, http.ErrBadRequest
 			case 'H', 'h':
 				p.state = eH
 			}
@@ -261,28 +261,28 @@ func (p *httpRequestsParser) Parse(data []byte) (state parser.RequestState, extr
 			case 'T', 't':
 				p.state = eHT
 			default:
-				return parser.Error, nil, errors.ErrUnsupportedProtocol
+				return parser.Error, nil, http.ErrUnsupportedProtocol
 			}
 		case eHT:
 			switch data[i] {
 			case 'T', 't':
 				p.state = eHTT
 			default:
-				return parser.Error, nil, errors.ErrUnsupportedProtocol
+				return parser.Error, nil, http.ErrUnsupportedProtocol
 			}
 		case eHTT:
 			switch data[i] {
 			case 'P', 'p':
 				p.state = eHTTP
 			default:
-				return parser.Error, nil, errors.ErrUnsupportedProtocol
+				return parser.Error, nil, http.ErrUnsupportedProtocol
 			}
 		case eHTTP:
 			switch data[i] {
 			case '/':
 				p.state = eProtoMajor
 			default:
-				return parser.Error, nil, errors.ErrUnsupportedProtocol
+				return parser.Error, nil, http.ErrUnsupportedProtocol
 			}
 		case eProtoMajor:
 			if data[i] == '.' {
@@ -291,7 +291,7 @@ func (p *httpRequestsParser) Parse(data []byte) (state parser.RequestState, extr
 			}
 
 			if data[i]-'0' > 9 {
-				return parser.Error, nil, errors.ErrUnsupportedProtocol
+				return parser.Error, nil, http.ErrUnsupportedProtocol
 			}
 
 			was := p.protoMajor
@@ -299,7 +299,7 @@ func (p *httpRequestsParser) Parse(data []byte) (state parser.RequestState, extr
 
 			if p.protoMajor < was {
 				// overflow
-				return parser.Error, nil, errors.ErrUnsupportedProtocol
+				return parser.Error, nil, http.ErrUnsupportedProtocol
 			}
 		case eProtoMinor:
 			switch data[i] {
@@ -309,7 +309,7 @@ func (p *httpRequestsParser) Parse(data []byte) (state parser.RequestState, extr
 				p.state = eProtoCRLF
 			default:
 				if data[i]-'0' > 9 {
-					return parser.Error, nil, errors.ErrUnsupportedProtocol
+					return parser.Error, nil, http.ErrUnsupportedProtocol
 				}
 
 				was := p.protoMinor
@@ -317,19 +317,19 @@ func (p *httpRequestsParser) Parse(data []byte) (state parser.RequestState, extr
 
 				if p.protoMinor < was {
 					// overflow
-					return parser.Error, nil, errors.ErrUnsupportedProtocol
+					return parser.Error, nil, http.ErrUnsupportedProtocol
 				}
 			}
 		case eProtoCR:
 			if data[i] != '\n' {
-				return parser.Error, nil, errors.ErrBadRequest
+				return parser.Error, nil, http.ErrBadRequest
 			}
 
 			p.state = eProtoCRLF
 		case eProtoCRLF:
 			p.request.Proto = proto.Parse(p.protoMajor, p.protoMinor)
 			if p.request.Proto == proto.Unknown {
-				return parser.Error, nil, errors.ErrUnsupportedProtocol
+				return parser.Error, nil, http.ErrUnsupportedProtocol
 			}
 
 			p.protoMajor, p.protoMinor = 0, 0
@@ -355,20 +355,20 @@ func (p *httpRequestsParser) Parse(data []byte) (state parser.RequestState, extr
 
 				return parser.RequestCompleted, data[i+1:], nil
 			default:
-				return parser.Error, nil, errors.ErrBadRequest
+				return parser.Error, nil, http.ErrBadRequest
 			}
 		case eHeaderKey:
 			switch data[i] {
 			case ':':
 				if p.headersManager.BeginValue() {
-					return parser.Error, nil, errors.ErrTooManyHeaders
+					return parser.Error, nil, http.ErrTooManyHeaders
 				}
 				p.state = eHeaderColon
 			case '\r', '\n':
-				return parser.Error, nil, errors.ErrBadRequest
+				return parser.Error, nil, http.ErrBadRequest
 			default:
 				if len(p.headerBuff) >= int(p.settings.Headers.KeyLength.Maximal) {
-					return parser.Error, nil, errors.ErrHeaderFieldsTooLarge
+					return parser.Error, nil, http.ErrHeaderFieldsTooLarge
 				}
 
 				p.headerBuff = append(p.headerBuff, data[i]|0x20)
@@ -376,11 +376,11 @@ func (p *httpRequestsParser) Parse(data []byte) (state parser.RequestState, extr
 		case eHeaderColon:
 			switch data[i] {
 			case '\r', '\n':
-				return parser.Error, nil, errors.ErrBadRequest
+				return parser.Error, nil, http.ErrBadRequest
 			case ' ':
 			default:
 				if p.headersManager.AppendValue(data[i]) {
-					return parser.Error, nil, errors.ErrHeaderFieldsTooLarge
+					return parser.Error, nil, http.ErrHeaderFieldsTooLarge
 				}
 			}
 
@@ -393,7 +393,7 @@ func (p *httpRequestsParser) Parse(data []byte) (state parser.RequestState, extr
 				p.state = eHeaderValueCRLF
 			default:
 				if p.headersManager.AppendValue(data[i]) {
-					return parser.Error, nil, errors.ErrHeaderFieldsTooLarge
+					return parser.Error, nil, http.ErrHeaderFieldsTooLarge
 				}
 			}
 		case eHeaderValueCR:
@@ -401,7 +401,7 @@ func (p *httpRequestsParser) Parse(data []byte) (state parser.RequestState, extr
 			case '\n':
 				p.state = eHeaderValueCRLF
 			default:
-				return parser.Error, nil, errors.ErrBadRequest
+				return parser.Error, nil, http.ErrBadRequest
 			}
 		case eHeaderValueCRLF:
 			key := string(p.headerBuff)
@@ -415,7 +415,7 @@ func (p *httpRequestsParser) Parse(data []byte) (state parser.RequestState, extr
 					return parser.Error, nil, err
 				}
 				if p.contentLength > uint(p.settings.Body.Length.Maximal) {
-					return parser.Error, nil, errors.ErrTooLarge
+					return parser.Error, nil, http.ErrTooLarge
 				}
 				p.lengthCountdown = p.contentLength
 			case "connection":
@@ -462,7 +462,7 @@ func (p *httpRequestsParser) Parse(data []byte) (state parser.RequestState, extr
 
 				return parser.HeadersCompleted, data[i+1:], nil
 			default:
-				return parser.Error, nil, errors.ErrBadRequest
+				return parser.Error, nil, http.ErrBadRequest
 			}
 		}
 	}

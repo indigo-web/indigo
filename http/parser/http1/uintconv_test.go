@@ -1,9 +1,8 @@
 package http1
 
 import (
+	"github.com/fakefloordiv/indigo/http"
 	"testing"
-
-	"github.com/fakefloordiv/indigo/errors"
 
 	"github.com/stretchr/testify/require"
 )
@@ -38,12 +37,12 @@ func TestParseUIntInvalidCases(t *testing.T) {
 	t.Run("InvalidSingleChar", func(t *testing.T) {
 		num, err := parseUint([]byte("123g456"))
 		require.Equal(t, uint(0), num)
-		require.Equal(t, err, errors.ErrBadRequest)
+		require.Equal(t, err, http.ErrBadRequest)
 	})
 
 	t.Run("InvalidWholeNumber", func(t *testing.T) {
 		num, err := parseUint([]byte("hello, world!"))
 		require.Equal(t, uint(0), num)
-		require.Equal(t, err, errors.ErrBadRequest)
+		require.Equal(t, err, http.ErrBadRequest)
 	})
 }

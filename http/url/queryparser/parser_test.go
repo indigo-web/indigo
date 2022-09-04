@@ -1,9 +1,8 @@
 package queryparser
 
 import (
+	"github.com/fakefloordiv/indigo/http"
 	"testing"
-
-	"github.com/fakefloordiv/indigo/errors"
 
 	"github.com/stretchr/testify/require"
 )
@@ -52,18 +51,18 @@ func TestParse_Negative(t *testing.T) {
 	t.Run("EmptyName", func(t *testing.T) {
 		query := "=world"
 		_, err := Parse([]byte(query), defaultFactory)
-		require.ErrorIs(t, err, errors.ErrBadQuery)
+		require.ErrorIs(t, err, http.ErrBadQuery)
 	})
 
 	t.Run("AmpersandInTheEnd", func(t *testing.T) {
 		query := "hello=world&"
 		_, err := Parse([]byte(query), defaultFactory)
-		require.ErrorIs(t, err, errors.ErrBadQuery)
+		require.ErrorIs(t, err, http.ErrBadQuery)
 	})
 
 	t.Run("OnlyKeyInTheEnd", func(t *testing.T) {
 		query := "hello=world&lorem"
 		_, err := Parse([]byte(query), defaultFactory)
-		require.ErrorIs(t, err, errors.ErrBadQuery)
+		require.ErrorIs(t, err, http.ErrBadQuery)
 	})
 }
