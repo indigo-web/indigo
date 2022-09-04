@@ -29,7 +29,8 @@ var (
 // Also in case of file is being sent, it collects some meta about it,
 // and compresses using available on both server and client encoders
 type Renderer struct {
-	buff []byte
+	buff      []byte
+	keepAlive bool
 
 	defaultHeaders headers.Headers
 }
@@ -52,11 +53,18 @@ func (r *Renderer) SetDefaultHeaders(headers headers.Headers) {
 // 4) Add system-important headers, e.g. Content-Length
 // 5) Content encodings must be applied here
 // 6) Stream-based files uploading must be supported
+// 7) Handle closing connection in case protocol requires or has not specified the opposite
 func (r *Renderer) Response(
 	request *types.Request, response types.Response, writer types.ResponseWriter,
 ) (err error) {
-	if !isKeepAlive(request) {
-		err = http.ErrCloseConnection
+	if !r.keepAlive {
+		// in case this value is false, this can mean only 1 thing - it is not initialized
+		// and once it is initialized, it is supposed to be true, otherwise connection will
+		// be closed after this call anyway
+		r.keepAlive = isKeepAlive(request)
+		if !r.keepAlive {
+			err = http.ErrCloseConnection
+		}
 	}
 
 	buff := r.buff[:0]
@@ -169,6 +177,8 @@ func isKeepAlive(request *types.Request) bool {
 	case false:
 		switch request.Proto {
 		case proto.HTTP10:
+			// by default http/1.0 is not keep-alive. To be, it must
+			// specify it explicitly
 			return false
 		case proto.HTTP11:
 			return true
