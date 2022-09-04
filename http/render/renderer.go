@@ -74,14 +74,14 @@ func (r *Renderer) Response(
 	buff = append(append(buff, strconv.Itoa(int(response.Code))...), space...)
 	buff = append(append(buff, status.Text(response.Code)...), crlf...)
 
-	reqHeaders := response.Headers()
+	respHeaders := response.Headers()
 
-	for key, value := range reqHeaders {
+	for key, value := range respHeaders {
 		buff = append(renderHeader(key, value, buff), crlf...)
 	}
 
 	for key, value := range r.defaultHeaders {
-		_, found := reqHeaders[key]
+		_, found := respHeaders[key]
 		if !found {
 			buff = append(renderHeader(key, value, buff), crlf...)
 		}
