@@ -132,8 +132,11 @@ func (h *httpServer) requestProcessor() {
 			// here we are checking a notifier chan whether it's nil (it may be nil
 			// ONLY here and ONLY because of hijacking)
 			if h.router.OnRequest(h.request, h.respWriter) != nil {
+				// request object must be reset in any way because otherwise
+				// deadlock will happen here
+				_ = h.request.Reset()
+
 				if h.notifier != nil {
-					h.err = http.ErrCloseConnection
 					h.notifier <- eError
 				}
 
@@ -141,7 +144,6 @@ func (h *httpServer) requestProcessor() {
 			}
 			if err := h.request.Reset(); err != nil {
 				h.router.OnError(h.request, h.respWriter, err)
-				h.err = http.ErrCloseConnection
 				h.notifier <- eError
 				return
 			}
