@@ -1,8 +1,9 @@
 package http1
 
 import (
-	"github.com/fakefloordiv/indigo/http"
 	"testing"
+
+	"github.com/fakefloordiv/indigo/http"
 
 	"github.com/fakefloordiv/indigo/internal"
 	"github.com/fakefloordiv/indigo/settings"

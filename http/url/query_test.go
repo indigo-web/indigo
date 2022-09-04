@@ -1,8 +1,9 @@
 package url
 
 import (
-	"github.com/fakefloordiv/indigo/http"
 	"testing"
+
+	"github.com/fakefloordiv/indigo/http"
 
 	"github.com/stretchr/testify/require"
 )

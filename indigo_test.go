@@ -4,7 +4,6 @@ import (
 	"bytes"
 	stderrors "errors"
 	"fmt"
-	http2 "github.com/fakefloordiv/indigo/http"
 	"io"
 	"net"
 	"net/http"
@@ -12,6 +11,8 @@ import (
 	"os"
 	"testing"
 	"time"
+
+	http2 "github.com/fakefloordiv/indigo/http"
 
 	methods "github.com/fakefloordiv/indigo/http/method"
 	"github.com/fakefloordiv/indigo/http/proto"

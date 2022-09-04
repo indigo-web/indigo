@@ -2,6 +2,7 @@ package render
 
 import (
 	"errors"
+
 	"github.com/fakefloordiv/indigo/http"
 	"github.com/fakefloordiv/indigo/http/headers"
 	"github.com/fakefloordiv/indigo/http/proto"
