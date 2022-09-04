@@ -2,6 +2,7 @@ package indigo
 
 import (
 	"errors"
+	"github.com/fakefloordiv/indigo/http/encodings"
 	"net"
 	"sync"
 
@@ -32,8 +33,10 @@ func NewApp(addr string) Application {
 
 // Serve takes a router and someSettings, that must be only 0 or 1 elements
 // otherwise, error is returned
-func (a Application) Serve(router router.Router, someSettings ...settings2.Settings) error {
-	router.OnStart()
+func (a Application) Serve(r router.Router, someSettings ...settings2.Settings) error {
+	if onStart, ok := r.(router.OnStart); ok {
+		onStart.OnStart()
+	}
 
 	settings, err := getSettings(someSettings...)
 	if err != nil {
@@ -55,14 +58,22 @@ func (a Application) Serve(router router.Router, someSettings ...settings2.Setti
 		startLineBuff := make([]byte, 0, settings.URL.Length.Default)
 		headerBuff := make([]byte, 0, settings.Headers.KeyLength.Default)
 
+		var codings encodings.ContentEncodings
+
+		if getEncodings, ok := r.(router.GetContentEncodings); ok {
+			codings = getEncodings.GetContentEncodings()
+		} else {
+			codings = encodings.NewContentEncodings()
+		}
+
 		httpParser := http1.NewHTTPRequestsParser(
-			request, gateway, startLineBuff, headerBuff, settings, &headersManager,
+			request, gateway, startLineBuff, headerBuff, settings, &headersManager, codings,
 		)
 
 		httpServer := server.NewHTTPServer(request, func(b []byte) (err error) {
 			_, err = conn.Write(b)
 			return err
-		}, router, httpParser, conn)
+		}, r, httpParser, conn)
 		go httpServer.Run()
 
 		readBuff := make([]byte, settings.TCPServer.Read.Default)
