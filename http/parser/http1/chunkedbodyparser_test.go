@@ -4,7 +4,6 @@ import (
 	"testing"
 
 	"github.com/fakefloordiv/indigo/http"
-
 	"github.com/fakefloordiv/indigo/internal"
 	"github.com/fakefloordiv/indigo/settings"
 

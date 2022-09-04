@@ -2,6 +2,10 @@ package render
 
 import (
 	"errors"
+	"io"
+	"math"
+	"os"
+	"strconv"
 
 	"github.com/fakefloordiv/indigo/http"
 	"github.com/fakefloordiv/indigo/http/headers"

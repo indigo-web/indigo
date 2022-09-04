@@ -4,7 +4,6 @@ import (
 	"testing"
 
 	"github.com/fakefloordiv/indigo/http"
-
 	"github.com/fakefloordiv/indigo/http/headers"
 	methods "github.com/fakefloordiv/indigo/http/method"
 	httpparser "github.com/fakefloordiv/indigo/http/parser"
