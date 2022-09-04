@@ -384,7 +384,7 @@ func TestHttpRequestsParser_Parse_Negative(t *testing.T) {
 		go readBody(request, ch)
 		state, _, err := parser.Parse(raw)
 
-		require.EqualError(t, http.ErrBadRequest, err.Error())
+		require.EqualError(t, err, http.ErrBadRequest.Error())
 		require.Equal(t, httpparser.Error, state)
 	})
 
@@ -396,7 +396,31 @@ func TestHttpRequestsParser_Parse_Negative(t *testing.T) {
 		go readBody(request, ch)
 		state, _, err := parser.Parse(raw)
 
-		require.EqualError(t, http.ErrBadRequest, err.Error())
+		require.EqualError(t, err, http.ErrBadRequest.Error())
+		require.Equal(t, httpparser.Error, state)
+	})
+
+	t.Run("MajorHTTPVersionOverflow", func(t *testing.T) {
+		parser, request := getParser()
+
+		raw := []byte("GET / HTTP/335.1\r\n\r\n")
+		ch := make(chan []byte)
+		go readBody(request, ch)
+		state, _, err := parser.Parse(raw)
+
+		require.EqualError(t, err, http.ErrUnsupportedProtocol.Error())
+		require.Equal(t, httpparser.Error, state)
+	})
+
+	t.Run("MinorHTTPVersionOverflow", func(t *testing.T) {
+		parser, request := getParser()
+
+		raw := []byte("GET / HTTP/1.335\r\n\r\n")
+		ch := make(chan []byte)
+		go readBody(request, ch)
+		state, _, err := parser.Parse(raw)
+
+		require.EqualError(t, err, http.ErrUnsupportedProtocol.Error())
 		require.Equal(t, httpparser.Error, state)
 	})
 }
