@@ -36,14 +36,16 @@ func (d *DefaultRouter) Route(
 }
 
 // RouteError adds an error handler. You can handle next errors:
-// - http.ErrCloseConnection
 // - http.ErrBadRequest
-// - http.ErrMethodNotImplemented
+// - http.ErrNotFound
+// - http.ErrMethodNotAllowed
 // - http.ErrTooLarge
-// - http.ErrHeaderFieldsTooLarge
+// - http.ErrCloseConnection
 // - http.ErrURITooLong
+// - http.ErrHeaderFieldsTooLarge
 // - http.ErrUnsupportedProtocol
 // - http.ErrUnsupportedEncoding
+// - http.ErrMethodNotImplemented
 //
 // You can set your own handler and override default response
 func (d DefaultRouter) RouteError(err error, handler ErrorHandler) {
