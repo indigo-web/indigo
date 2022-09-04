@@ -40,21 +40,19 @@ type DefaultRouter struct {
 	errHandlers errHandlers
 
 	renderer *render.Renderer
-	codings  *encodings.ContentEncodings
+	codings  encodings.ContentEncodings
 }
 
 // NewRouter constructs a new instance of inbuilt router. Error handlers
 // by default are applied, renderer with a nil (as initial value) buffer constructed,
 // and new content encodings is created (single for all the groups)
 func NewRouter() *DefaultRouter {
-	contentEncodings := encodings.NewContentEncodings()
-
 	r := &DefaultRouter{
 		routes:      make(routesMap),
 		errHandlers: newErrHandlers(),
 		// let the first time response be rendered into the nil buffer
 		renderer: render.NewRenderer(nil),
-		codings:  &contentEncodings,
+		codings:  encodings.NewContentEncodings(),
 	}
 
 	r.root = r

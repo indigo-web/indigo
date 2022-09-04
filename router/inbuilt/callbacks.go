@@ -2,13 +2,15 @@ package inbuilt
 
 import (
 	"github.com/fakefloordiv/indigo/errors"
+	"github.com/fakefloordiv/indigo/http/encodings"
 	"github.com/fakefloordiv/indigo/http/status"
 	"github.com/fakefloordiv/indigo/types"
 )
 
 /*
-This file contains core-callbacks that are called by server, so it's
-like a core of the router
+This file contains core-callbacks that are called by server core.
+
+Methods listed here MUST NOT be called by user ever
 */
 
 // OnStart applies default headers and composes all the registered handlers with middlewares
@@ -58,4 +60,9 @@ func (d DefaultRouter) OnError(request *types.Request, respWriter types.Response
 
 	response := d.errHandlers[code](request)
 	_ = d.renderer.Response(request.Proto, response, respWriter)
+}
+
+// GetContentEncodings returns encodings.ContentEncodings object as it is
+func (d DefaultRouter) GetContentEncodings() encodings.ContentEncodings {
+	return d.codings
 }

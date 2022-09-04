@@ -1,6 +1,7 @@
 package router
 
 import (
+	"github.com/fakefloordiv/indigo/http/encodings"
 	"github.com/fakefloordiv/indigo/types"
 )
 
@@ -15,4 +16,5 @@ type Router interface {
 	OnStart()
 	OnRequest(request *types.Request, writer types.ResponseWriter) error
 	OnError(request *types.Request, writer types.ResponseWriter, err error)
+	GetContentEncodings() encodings.ContentEncodings
 }
