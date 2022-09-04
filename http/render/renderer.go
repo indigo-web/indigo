@@ -2,6 +2,7 @@ package render
 
 import (
 	"errors"
+	"github.com/fakefloordiv/indigo/http"
 	"github.com/fakefloordiv/indigo/http/headers"
 	"github.com/fakefloordiv/indigo/http/proto"
 	"github.com/fakefloordiv/indigo/http/status"
@@ -52,10 +53,14 @@ func (r *Renderer) SetDefaultHeaders(headers headers.Headers) {
 // 5) Content encodings must be applied here
 // 6) Stream-based files uploading must be supported
 func (r *Renderer) Response(
-	protocol proto.Proto, response types.Response, writer types.ResponseWriter,
-) error {
+	request *types.Request, response types.Response, writer types.ResponseWriter,
+) (err error) {
+	if !isKeepAlive(request) {
+		err = http.ErrCloseConnection
+	}
+
 	buff := r.buff[:0]
-	buff = append(append(buff, proto.ToBytes(protocol)...), space...)
+	buff = append(append(buff, proto.ToBytes(request.Proto)...), space...)
 	buff = append(append(buff, strconv.Itoa(int(response.Code))...), space...)
 	buff = append(append(buff, status.Text(response.Code)...), crlf...)
 
@@ -82,16 +87,21 @@ func (r *Renderer) Response(
 		default:
 			_, handler := response.File()
 
-			return r.Response(protocol, handler(err), writer)
+			return r.Response(request, handler(err), writer)
 		}
 
-		return nil
+		return err
 	}
 
 	buff = renderContentLength(len(response.Body), buff)
 	r.buff = append(append(buff, crlf...), response.Body...)
 
-	return writer(r.buff)
+	writerErr := writer(r.buff)
+	if writerErr != nil {
+		err = writerErr
+	}
+
+	return err
 }
 
 // renderFileInto opens a file in os.O_RDONLY mode, reading its size and appends
@@ -143,6 +153,27 @@ func renderContentLength(value int, buff []byte) []byte {
 	return append(append(append(buff, contentLength...), strconv.Itoa(value)...), crlf...)
 }
 
-func renderHeader(key string, value []byte, into []byte) []byte {
+func renderHeader(key, value string, into []byte) []byte {
 	return append(append(append(into, key...), colonSpace...), value...)
+}
+
+func isKeepAlive(request *types.Request) bool {
+	if request.Proto == proto.HTTP09 {
+		return false
+	}
+
+	keepAlive, found := request.Headers["connection"]
+	switch found {
+	case true:
+		return keepAlive == "keep-alive"
+	case false:
+		switch request.Proto {
+		case proto.HTTP10:
+			return false
+		case proto.HTTP11:
+			return true
+		}
+	}
+
+	return false
 }
