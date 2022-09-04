@@ -43,6 +43,7 @@ func (d *DefaultRouter) Route(
 // - http.ErrCloseConnection
 // - http.ErrURITooLong
 // - http.ErrHeaderFieldsTooLarge
+// - http.ErrTooManyHeaders
 // - http.ErrUnsupportedProtocol
 // - http.ErrUnsupportedEncoding
 // - http.ErrMethodNotImplemented
