@@ -1,9 +1,8 @@
 package inbuilt
 
 import (
-	"github.com/fakefloordiv/indigo/errors"
+	"github.com/fakefloordiv/indigo/http"
 	"github.com/fakefloordiv/indigo/http/encodings"
-	"github.com/fakefloordiv/indigo/http/status"
 	"github.com/fakefloordiv/indigo/types"
 )
 
@@ -24,12 +23,16 @@ func (d DefaultRouter) OnStart() {
 func (d DefaultRouter) OnRequest(request *types.Request, respWriter types.ResponseWriter) error {
 	urlMethods, found := d.routes[request.Path]
 	if !found {
-		return d.renderer.Response(request.Proto, defaultNotFound, respWriter)
+		response := d.errHandlers[http.ErrNotFound](request)
+
+		return d.renderer.Response(request.Proto, response, respWriter)
 	}
 
 	handler, found := urlMethods[request.Method]
 	if !found {
-		return d.renderer.Response(request.Proto, defaultMethodNotAllowed, respWriter)
+		response := d.errHandlers[http.ErrMethodNotAllowed](request)
+
+		return d.renderer.Response(request.Proto, response, respWriter)
 	}
 
 	return d.renderer.Response(request.Proto, handler.fun(request), respWriter)
@@ -37,28 +40,7 @@ func (d DefaultRouter) OnRequest(request *types.Request, respWriter types.Respon
 
 // OnError receives error and decides, which error handler is better to use in this case
 func (d DefaultRouter) OnError(request *types.Request, respWriter types.ResponseWriter, err error) {
-	var code status.Code
-
-	switch err {
-	case errors.ErrCloseConnection:
-		code = status.ConnectionClose
-	case errors.ErrBadRequest:
-		code = status.BadRequest
-	case errors.ErrTooLarge:
-		code = status.RequestEntityTooLarge
-	case errors.ErrHeaderFieldsTooLarge:
-		code = status.RequestHeaderFieldsTooLarge
-	case errors.ErrURITooLong:
-		code = status.RequestURITooLong
-	case errors.ErrUnsupportedProtocol:
-		code = status.HTTPVersionNotSupported
-	default:
-		// unknown error, but for consistent behaviour we must respond with
-		// something. Let it be some neutral error
-		code = status.BadRequest
-	}
-
-	response := d.errHandlers[code](request)
+	response := d.errHandlers[err](request)
 	_ = d.renderer.Response(request.Proto, response, respWriter)
 }
 
