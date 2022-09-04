@@ -58,6 +58,7 @@ func newErrHandlers() errHandlers {
 		http.ErrCloseConnection:      defaultConnectionClose,
 		http.ErrURITooLong:           defaultURITooLongHandler,
 		http.ErrHeaderFieldsTooLarge: defaultHeaderFieldsTooLargeHandler,
+		http.ErrTooManyHeaders:       defaultTooManyHeadersHandler,
 		http.ErrUnsupportedProtocol:  defaultUnsupportedProtocolHandler,
 		http.ErrUnsupportedEncoding:  defaultUnsupportedEncodingHandler,
 		http.ErrMethodNotImplemented: defaultNotImplementedHandler,
@@ -92,6 +93,10 @@ func defaultURITooLongHandler(_ *types.Request) types.Response {
 }
 
 func defaultHeaderFieldsTooLargeHandler(_ *types.Request) types.Response {
+	return defaultHeaderFieldsTooLarge
+}
+
+func defaultTooManyHeadersHandler(_ *types.Request) types.Response {
 	return defaultHeaderFieldsTooLarge
 }
 
