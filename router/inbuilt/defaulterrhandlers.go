@@ -38,6 +38,10 @@ var (
 	defaultUnsupportedProtocol = types.WithResponse.
 					WithCode(status.HTTPVersionNotSupported).
 					WithBody(`<h1 align="center">505 HTTP Version Not Supported</h1>`)
+
+	defaultNotImplemented = types.WithResponse.
+				WithCode(status.NotImplemented).
+				WithBody(`<h1 align="center">501 Not Implemented</h1>`)
 )
 
 type (
@@ -55,6 +59,7 @@ func newErrHandlers() errHandlers {
 		status.RequestURITooLong:           defaultURITooLongHandler,
 		status.RequestHeaderFieldsTooLarge: defaultHeaderFieldsTooLargeHandler,
 		status.HTTPVersionNotSupported:     defaultUnsupportedProtocolHandler,
+		status.NotImplemented:              defaultNotImplementedHandler,
 	}
 }
 
@@ -91,4 +96,8 @@ func defaultHeaderFieldsTooLargeHandler(_ *types.Request) types.Response {
 
 func defaultUnsupportedProtocolHandler(_ *types.Request) types.Response {
 	return defaultUnsupportedProtocol
+}
+
+func defaultNotImplementedHandler(_ *types.Request) types.Response {
+	return defaultNotImplemented
 }
