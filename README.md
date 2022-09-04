@@ -68,8 +68,10 @@ struct.
     - `HTTP09`
     - `HTTP10`
     - `HTTP11`
+    - `HTTP1`
+      - Just a shorthand for `HTTP09 | HTTP10 | HTTP11`
 - `Headers headers.Headers`
-  - Just a `map[string][]byte`
+  - Just a `map[string]string`
 - `OnBody(onBody onBodyCb, onComplete onCompleteCb) error`
   - `onBodyCb` is simply `func([]byte) error`
     - In case returned error is not nil, `onComplete` will be called with it and all the same error will be returned from method
