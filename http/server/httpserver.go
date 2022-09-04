@@ -52,7 +52,6 @@ func NewHTTPServer(
 // requests processor in blocking mode
 func (h *httpServer) Run() {
 	h.request.Hijack = types.Hijacker(h.request, h.HijackConn)
-
 	h.requestProcessor()
 }
 
@@ -121,8 +120,6 @@ func (h *httpServer) OnData(data []byte) (err error) {
 // space), it receives a signal from notifier chan and decides what to do starting
 // from the actual signal. Also, when called, calls router OnStart() method
 func (h *httpServer) requestProcessor() {
-	h.router.OnStart()
-
 	for {
 		switch <-h.notifier {
 		case eHeadersCompleted:
