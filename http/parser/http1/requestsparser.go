@@ -425,7 +425,7 @@ func (p *httpRequestsParser) Parse(data []byte) (state parser.RequestState, extr
 				// TODO: parse header value
 				p.chunkedTransferEncoding = string(value) == "chunked"
 			case "content-encoding":
-				p.decoder, p.decodeBody = p.codings.GetDecoder(internal.B2S(value))
+				p.decoder, p.decodeBody = p.codings.GetDecoder(value)
 				if !p.decodeBody {
 					return parser.Error, nil, http.ErrUnsupportedEncoding
 				}

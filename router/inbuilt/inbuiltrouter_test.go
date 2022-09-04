@@ -120,9 +120,9 @@ func TestDefaultHeaders(t *testing.T) {
 
 	t.Run("Custom", func(t *testing.T) {
 		headers := headers2.Headers{
-			"Server":     []byte("indigo-test"),
-			"Connection": []byte("idk maybe close"),
-			"Easter":     []byte("Egg"),
+			"Server":     "indigo-test",
+			"Connection": "idk maybe close",
+			"Easter":     "Egg",
 		}
 		r.SetDefaultHeaders(headers)
 		require.Equal(t, r.defaultHeaders, headers)

@@ -6,9 +6,9 @@ import (
 	"github.com/fakefloordiv/indigo/http/headers"
 )
 
-var (
-	server     = []byte("indigo")
-	connection = []byte("keep-alive")
+const (
+	server     = "indigo"
+	connection = "keep-alive"
 )
 
 // SetDefaultHeaders sets headers by default. This action overrides already set
@@ -29,7 +29,7 @@ func (d *DefaultRouter) applyDefaultHeaders() {
 		d.SetDefaultHeaders(headers.Headers{
 			"Server":          server,
 			"Connection":      connection,
-			"Accept-Encoding": []byte(encodings),
+			"Accept-Encoding": encodings,
 		})
 	}
 
