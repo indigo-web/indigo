@@ -68,9 +68,7 @@ const (
 	PreconditionRequired         Code = 428 // RFC 6585, 3
 	TooManyRequests              Code = 429 // RFC 6585, 4
 	RequestHeaderFieldsTooLarge  Code = 431 // RFC 6585, 5
-	// ConnectionClose is from nginx. It must be never used for routing
-	ConnectionClose            Code = 444
-	UnavailableForLegalReasons Code = 451 // RFC 7725, 3
+	UnavailableForLegalReasons   Code = 451 // RFC 7725, 3
 
 	InternalServerError           Code = 500 // RFC 9110, 15.6.1
 	NotImplemented                Code = 501 // RFC 9110, 15.6.2
@@ -189,8 +187,6 @@ func Text(code Code) Status {
 		return "Too Many Requests"
 	case RequestHeaderFieldsTooLarge:
 		return "Request Header Fields Too Large"
-	case ConnectionClose:
-		return "Connection Close"
 	case UnavailableForLegalReasons:
 		return "Unavailable For Legal Reasons"
 	case InternalServerError:
