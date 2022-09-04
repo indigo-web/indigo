@@ -99,6 +99,8 @@ func (h httpServer) OnData(data []byte) (err error) {
 			switch err {
 			case errors.ErrBadRequest, errors.ErrURIDecoding:
 				h.notifier <- badRequest
+			case errors.ErrMethodNotImplemented:
+				h.notifier <- methodNotImplemented
 			case errors.ErrTooManyHeaders, errors.ErrTooLarge:
 				h.notifier <- requestEntityTooLarge
 			case errors.ErrURITooLong:
@@ -151,31 +153,28 @@ func (h httpServer) requestProcessor() {
 			}
 
 			h.notifier <- processed
+			continue
 		case closeConnection:
 			h.router.OnError(h.request, h.respWriter, errors.ErrCloseConnection)
-			h.notifier <- processed
-			return
 		case badRequest:
 			h.router.OnError(h.request, h.respWriter, errors.ErrBadRequest)
-			h.notifier <- processed
-			return
+		case methodNotImplemented:
+			h.router.OnError(h.request, h.respWriter, errors.ErrMethodNotImplemented)
 		case requestEntityTooLarge:
 			h.router.OnError(h.request, h.respWriter, errors.ErrTooLarge)
-			h.notifier <- processed
-			return
 		case requestHeaderFieldsTooLarge:
 			h.router.OnError(h.request, h.respWriter, errors.ErrHeaderFieldsTooLarge)
-			h.notifier <- processed
-			return
 		case requestURITooLong:
 			h.router.OnError(h.request, h.respWriter, errors.ErrURITooLong)
-			h.notifier <- processed
-			return
 		case unsupportedProtocol:
 			h.router.OnError(h.request, h.respWriter, errors.ErrUnsupportedProtocol)
-			h.notifier <- processed
-			return
+		default:
+			panic("BUG: http/server/httpserver.go:requestProcessor(): received unknown state")
 		}
+
+		// most cases are doing this. Easier to add continue-statement somewhere
+		h.notifier <- processed
+		return
 	}
 }
 

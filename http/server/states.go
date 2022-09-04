@@ -7,6 +7,7 @@ const (
 	processed
 	closeConnection
 	badRequest
+	methodNotImplemented
 	requestEntityTooLarge
 	requestURITooLong
 	requestHeaderFieldsTooLarge
