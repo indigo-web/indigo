@@ -33,6 +33,8 @@ func NewApp(addr string) Application {
 // Serve takes a router and someSettings, that must be only 0 or 1 elements
 // otherwise, error is returned
 func (a Application) Serve(router router.Router, someSettings ...settings2.Settings) error {
+	router.OnStart()
+
 	settings, err := getSettings(someSettings...)
 	if err != nil {
 		return err
