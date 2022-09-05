@@ -59,12 +59,20 @@ func (r *Renderer) SetDefaultHeaders(headers headers.Headers) {
 func (r *Renderer) Response(
 	request *types.Request, response types.Response, writer types.ResponseWriter,
 ) (err error) {
-	if !r.keepAlive {
+	switch r.keepAlive {
+	case false:
 		// in case this value is false, this can mean only 1 thing - it is not initialized
 		// and once it is initialized, it is supposed to be true, otherwise connection will
 		// be closed after this call anyway
 		r.keepAlive = isKeepAlive(request)
 		if !r.keepAlive {
+			err = http.ErrCloseConnection
+		}
+	case true:
+		// in case request Connection header is set to close, this response must be the last
+		// one, after which one connection will be closed. It's better to close it silently
+		value, found := request.Headers["connection"]
+		if found && value == "close" {
 			err = http.ErrCloseConnection
 		}
 	}
@@ -170,6 +178,7 @@ func renderHeader(key, value string, into []byte) []byte {
 	return append(append(append(into, key...), colonSpace...), value...)
 }
 
+// isKeepAlive decides whether connection is keep-alive or not
 func isKeepAlive(request *types.Request) bool {
 	if request.Proto == proto.HTTP09 {
 		return false
