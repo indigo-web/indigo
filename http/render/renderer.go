@@ -189,7 +189,8 @@ func isKeepAlive(request *types.Request) bool {
 // in the response. Content-Length shouldn't be presented in message if at
 // least one of conditions below is true:
 // - Request method is HEAD
-// - Response code is 1xx (informational) or 304 (Not Modified)
+// - Response code is 1xx (informational), 204 (No Content) or 304 (Not Modified)
+// See rfc2068, 4.4
 func shouldAppendContentLength(method methods.Method, respCode status.Code) bool {
-	return method != methods.HEAD && respCode >= 200 && respCode != 304
+	return method != methods.HEAD && respCode >= 200 && respCode != 204 && respCode != 304
 }
