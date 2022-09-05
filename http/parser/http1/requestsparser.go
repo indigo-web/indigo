@@ -91,7 +91,12 @@ func (p *httpRequestsParser) Parse(data []byte) (state parser.RequestState, extr
 	for i := range data {
 		switch p.state {
 		case eMethod:
-			if data[i] == ' ' {
+			switch data[i] {
+			case '\r', '\n': // rfc2068, 4.1
+				if len(p.startLineBuff) > 0 {
+					return parser.Error, nil, http.ErrMethodNotImplemented
+				}
+			case ' ':
 				if len(p.startLineBuff) == 0 {
 					return parser.Error, nil, http.ErrBadRequest
 				}
@@ -104,14 +109,13 @@ func (p *httpRequestsParser) Parse(data []byte) (state parser.RequestState, extr
 
 				p.offset = len(p.startLineBuff)
 				p.state = ePath
-				continue
-			}
+			default:
+				if len(p.startLineBuff) > len("CONNECT") { // the longest method, trust me
+					return parser.Error, nil, http.ErrBadRequest
+				}
 
-			if len(p.startLineBuff) > len("CONNECT") { // the longest method, trust me
-				return parser.Error, nil, http.ErrBadRequest
+				p.startLineBuff = append(p.startLineBuff, data[i])
 			}
-
-			p.startLineBuff = append(p.startLineBuff, data[i])
 		case ePath:
 			switch data[i] {
 			case ' ':
