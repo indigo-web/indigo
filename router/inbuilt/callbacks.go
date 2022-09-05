@@ -2,7 +2,7 @@ package inbuilt
 
 import (
 	"github.com/fakefloordiv/indigo/http"
-	"github.com/fakefloordiv/indigo/http/encodings"
+	"github.com/fakefloordiv/indigo/http/headers"
 	"github.com/fakefloordiv/indigo/types"
 )
 
@@ -13,8 +13,9 @@ Methods listed here MUST NOT be called by user ever
 */
 
 // OnStart applies default headers and composes all the registered handlers with middlewares
-func (d DefaultRouter) OnStart() {
-	d.applyDefaultHeaders()
+// and sets passed default headers from application to renderer
+func (d DefaultRouter) OnStart(defaultHeaders headers.Headers) {
+	d.renderer.SetDefaultHeaders(defaultHeaders)
 	d.applyGroups()
 	d.applyMiddlewares()
 }
@@ -42,9 +43,4 @@ func (d DefaultRouter) OnRequest(request *types.Request, respWriter types.Respon
 func (d DefaultRouter) OnError(request *types.Request, respWriter types.ResponseWriter, err error) {
 	response := d.errHandlers[err](request)
 	_ = d.renderer.Response(request, response, respWriter)
-}
-
-// GetContentEncodings returns encodings.ContentEncodings object as it is
-func (d DefaultRouter) GetContentEncodings() encodings.ContentEncodings {
-	return d.codings
 }

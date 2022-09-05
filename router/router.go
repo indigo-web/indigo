@@ -1,7 +1,7 @@
 package router
 
 import (
-	"github.com/fakefloordiv/indigo/http/encodings"
+	"github.com/fakefloordiv/indigo/http/headers"
 	"github.com/fakefloordiv/indigo/types"
 )
 
@@ -19,11 +19,5 @@ type Router interface {
 // OnStart called when server is initialized and started. Can be implemented
 // optionally
 type OnStart interface {
-	OnStart()
-}
-
-// GetContentEncodings returns a struct with custom-set content encodings.
-// Can be implemented optionally
-type GetContentEncodings interface {
-	GetContentEncodings() encodings.ContentEncodings
+	OnStart(defaultHeaders headers.Headers)
 }

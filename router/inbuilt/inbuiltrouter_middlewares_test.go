@@ -139,7 +139,7 @@ func TestMiddlewares(t *testing.T) {
 	v2.Get("/world", nopHandler, pointApplied2mware)
 	v2.Use(local3mware)
 
-	r.OnStart()
+	r.OnStart(nil)
 
 	t.Run("/", func(t *testing.T) {
 		request, _ := getRequest()

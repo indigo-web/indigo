@@ -3,7 +3,6 @@ package inbuilt
 import (
 	"testing"
 
-	headers2 "github.com/fakefloordiv/indigo/http/headers"
 	methods "github.com/fakefloordiv/indigo/http/method"
 	"github.com/fakefloordiv/indigo/types"
 
@@ -100,31 +99,10 @@ func TestGroups(t *testing.T) {
 	v2 := api.Group("/v2")
 	v2.Get("/world", nopHandler)
 
-	r.OnStart()
+	r.OnStart(nil)
 
 	require.Contains(t, r.routes, "/")
 	require.Contains(t, r.routes, "/api/v1/hello")
 	require.Contains(t, r.routes, "/api/v2/world")
 	require.Equal(t, 3, len(r.routes))
-}
-
-func TestDefaultHeaders(t *testing.T) {
-	r := NewRouter()
-
-	t.Run("Default", func(t *testing.T) {
-		r.applyDefaultHeaders()
-		require.Contains(t, r.defaultHeaders, "Server")
-		require.Contains(t, r.defaultHeaders, "Connection")
-		require.Contains(t, r.defaultHeaders, "Accept-Encoding")
-	})
-
-	t.Run("Custom", func(t *testing.T) {
-		headers := headers2.Headers{
-			"Server":     "indigo-test",
-			"Connection": "idk maybe close",
-			"Easter":     "Egg",
-		}
-		r.SetDefaultHeaders(headers)
-		require.Equal(t, r.defaultHeaders, headers)
-	})
 }
