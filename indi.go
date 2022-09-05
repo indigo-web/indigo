@@ -3,9 +3,6 @@ package indigo
 import (
 	"errors"
 	"github.com/fakefloordiv/indigo/http/encodings"
-	"net"
-	"sync"
-
 	"github.com/fakefloordiv/indigo/http/headers"
 	"github.com/fakefloordiv/indigo/http/parser/http1"
 	"github.com/fakefloordiv/indigo/http/server"
@@ -13,29 +10,86 @@ import (
 	"github.com/fakefloordiv/indigo/router"
 	settings2 "github.com/fakefloordiv/indigo/settings"
 	"github.com/fakefloordiv/indigo/types"
+	"net"
+	"strings"
+	"sync"
 )
+
+const (
+	// not specifying version to avoid problems with vulnerable versions
+	// Also not specifying, because otherwise I should add an option to
+	// disable such a behaviour. I am too lazy for that. Preferring not
+	// specifying version at all
+	defaultServer = "indigo"
+
+	// Automatically specify connection as keep-alive. Maybe it is not
+	// a compulsory move from server, but still
+	defaultConnection = "keep-alive"
+
+	// actually, we don't know what content type of body user responds
+	// with, so due to rfc2068 7.2.1 it is supposed to be
+	// application/octet-stream, but we know that it is usually text/html,
+	// isn't it?
+	defaultContentType = "text/html"
+
+	// explicitly set a list of encodings are supported to avoid awkward
+	// situations
+	// Empty by default because this value is dynamic - depends on which
+	// encodings will user add. If it exists, it will be overridden. If
+	// it is not existing, this value will not be set
+	defaultAcceptEncodings = ""
+)
+
+var defaultHeaders = headers.Headers{
+	"Server":           defaultServer,
+	"Connection":       defaultConnection,
+	"Content-Type":     defaultContentType,
+	"Accept-Encodings": defaultAcceptEncodings,
+}
 
 // Application is just a struct with addr and shutdown channel that is currently
 // not used. Planning to replace it with context.WithCancel()
 type Application struct {
 	addr string
 
+	codings        encodings.ContentEncodings
+	defaultHeaders headers.Headers
+
 	shutdown chan bool
 }
 
 // NewApp returns a new application object with initialized shutdown chan
-func NewApp(addr string) Application {
-	return Application{
-		addr:     addr,
-		shutdown: make(chan bool),
+func NewApp(addr string) *Application {
+	return &Application{
+		addr:           addr,
+		codings:        encodings.NewContentEncodings(),
+		defaultHeaders: defaultHeaders,
+		shutdown:       make(chan bool),
 	}
+}
+
+// AddContentDecoder simply adds a new content decoder
+func (a Application) AddContentDecoder(token string, decoder encodings.Decoder) {
+	a.codings.AddDecoder(token, decoder)
+}
+
+// SetDefaultHeaders overrides default headers to a passed ones.
+// Doing this, make sure you know what are you doing
+func (a *Application) SetDefaultHeaders(headers headers.Headers) {
+	a.defaultHeaders = headers
 }
 
 // Serve takes a router and someSettings, that must be only 0 or 1 elements
 // otherwise, error is returned
+// Also, if specified, Accept-Encodings default header's value will be set here
 func (a Application) Serve(r router.Router, someSettings ...settings2.Settings) error {
+	if _, found := a.defaultHeaders["Accept-Encodings"]; found {
+		acceptable := strings.Join(a.codings.Acceptable(), ",")
+		a.defaultHeaders["Accept-Encodings"] = acceptable
+	}
+
 	if onStart, ok := r.(router.OnStart); ok {
-		onStart.OnStart()
+		onStart.OnStart(a.defaultHeaders)
 	}
 
 	settings, err := getSettings(someSettings...)
@@ -58,16 +112,8 @@ func (a Application) Serve(r router.Router, someSettings ...settings2.Settings) 
 		startLineBuff := make([]byte, 0, settings.URL.Length.Default)
 		headerBuff := make([]byte, 0, settings.Headers.KeyLength.Default)
 
-		var codings encodings.ContentEncodings
-
-		if getEncodings, ok := r.(router.GetContentEncodings); ok {
-			codings = getEncodings.GetContentEncodings()
-		} else {
-			codings = encodings.NewContentEncodings()
-		}
-
 		httpParser := http1.NewHTTPRequestsParser(
-			request, gateway, startLineBuff, headerBuff, settings, &headersManager, codings,
+			request, gateway, startLineBuff, headerBuff, settings, &headersManager, a.codings,
 		)
 
 		httpServer := server.NewHTTPServer(request, func(b []byte) (err error) {
