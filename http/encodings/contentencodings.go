@@ -23,23 +23,23 @@ func NewContentEncodings() ContentEncodings {
 
 // GetDecoder takes a string as an encoding token (name), returns
 // corresponding Decoder
-// in case x-gzip or x-compress is passed, decoder for gzip or compress is returned, see
-// https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/Content-Encoding#directives
 func (c ContentEncodings) GetDecoder(token string) (decoder Decoder, found bool) {
-	switch token {
-	case "x-gzip":
-		token = "gzip"
-	case "x-compress":
-		token = "compress"
-	}
-
 	decoder, found = c.encodings[token]
 	return decoder, found
 }
 
-// AddDecoder simply adds a new decoder
+// AddDecoder simply adds a new decoder. In case gzip or compress is
+// passed also x-gzip and x-compress keys will be automatically appended,
+// see https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/Content-Encoding#directives
 func (c ContentEncodings) AddDecoder(token string, decoder Decoder) {
 	c.encodings[token] = decoder
+
+	switch token {
+	case "gzip":
+		c.encodings["x-gzip"] = decoder
+	case "compress":
+		c.encodings["x-compress"] = decoder
+	}
 }
 
 // Acceptable returns a string with all the available decoders, listed
