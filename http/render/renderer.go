@@ -43,8 +43,8 @@ func NewRenderer(buff []byte) *Renderer {
 	}
 }
 
-func (r *Renderer) SetDefaultHeaders(headers headers.Headers) {
-	r.defaultHeaders = headers
+func (r *Renderer) SetDefaultHeaders(h headers.Headers) {
+	r.defaultHeaders = h
 }
 
 // Response method is rendering types.Response object into some buffer and then writes
@@ -82,17 +82,11 @@ func (r *Renderer) Response(
 	buff = append(append(buff, strconv.Itoa(int(response.Code))...), space...)
 	buff = append(append(buff, status.Text(response.Code)...), crlf...)
 
-	respHeaders := response.Headers()
+	customRespHeaders := response.Headers()
+	respHeaders := mergeHeaders(r.defaultHeaders, customRespHeaders)
 
 	for key, value := range respHeaders {
 		buff = append(renderHeader(key, value, buff), crlf...)
-	}
-
-	for key, value := range r.defaultHeaders {
-		_, found := respHeaders[key]
-		if !found {
-			buff = append(renderHeader(key, value, buff), crlf...)
-		}
 	}
 
 	if len(response.Filename) > 0 {
@@ -202,4 +196,19 @@ func isKeepAlive(request *types.Request) bool {
 // See rfc2068, 4.4
 func shouldAppendContentLength(method methods.Method, respCode status.Code) bool {
 	return method != methods.HEAD && respCode >= 200 && respCode != 204 && respCode != 304
+}
+
+// mergeHeaders allocates a new map with initial capacity of len(a)+len(b)
+// Values from b overrides values from a
+func mergeHeaders(a, b headers.Headers) headers.Headers {
+	into := make(headers.Headers, len(a)+len(b))
+
+	for k, v := range a {
+		into[k] = v
+	}
+	for k, v := range b {
+		into[k] = v
+	}
+
+	return into
 }
