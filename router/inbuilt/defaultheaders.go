@@ -7,8 +7,9 @@ import (
 )
 
 const (
-	server     = "indigo"
-	connection = "keep-alive"
+	server      = "indigo"
+	connection  = "keep-alive"
+	contentType = "text/html"
 )
 
 // SetDefaultHeaders sets headers by default. This action overrides already set
@@ -27,9 +28,20 @@ func (d *DefaultRouter) applyDefaultHeaders() {
 		encodings := strings.Join(d.codings.Acceptable(), ", ")
 
 		d.SetDefaultHeaders(headers.Headers{
-			"Server":          server,
-			"Connection":      connection,
+			// not specifying version to avoid problems with vulnerable versions
+			// Also not specifying, because otherwise I should add an option to
+			// disable such a behaviour. I am too lazy for that. Preferring not
+			// specifying version at all
+			"Server": server,
+			// Automatically specify connection as keep-alive. Maybe it is not
+			// a compulsory move from server, but still
+			"Connection": connection,
+			// explicitly set a list of encodings are supported to avoid awkward
+			// situations
 			"Accept-Encoding": encodings,
+			// content-type that is set by-default. In case you set a custom one
+			// this will be overridden
+			"Content-Type": contentType,
 		})
 	}
 
