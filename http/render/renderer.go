@@ -2,6 +2,7 @@ package render
 
 import (
 	"errors"
+	methods "github.com/fakefloordiv/indigo/http/method"
 	"io"
 	"math"
 	"os"
@@ -91,7 +92,7 @@ func (r *Renderer) Response(
 	if len(response.Filename) > 0 {
 		r.buff = buff
 
-		switch err := r.renderFileInto(writer, response); err {
+		switch err := r.renderFileInto(request.Method, writer, response); err {
 		case nil:
 		case errConnWrite:
 			return err
@@ -105,13 +106,20 @@ func (r *Renderer) Response(
 	}
 
 	buff = renderContentLength(len(response.Body), buff)
-	r.buff = append(append(buff, crlf...), response.Body...)
+	r.buff = append(buff, crlf...)
+
+	// HEAD requests MUST NOT contain message body - the main difference
+	// between HEAD and GET requests
+	// See rfc2068 9.4
+	if request.Method != methods.HEAD {
+		r.buff = append(r.buff, response.Body...)
+	}
 
 	writerErr := writer(r.buff)
 	if writerErr != nil {
 		err = writerErr
 	}
-
+	
 	return err
 }
 
@@ -124,7 +132,9 @@ func (r *Renderer) Response(
 // Not very elegant solution, but uploading files is not the main purpose of web-server.
 // For small and medium projects, this may be enough, for anything serious - most of all
 // nginx will be used (the same is about https)
-func (r *Renderer) renderFileInto(writer types.ResponseWriter, response types.Response) error {
+func (r *Renderer) renderFileInto(
+	method methods.Method, writer types.ResponseWriter, response types.Response,
+) error {
 	file, err := os.OpenFile(response.Filename, os.O_RDONLY, 69420) // anyway unused
 	if err != nil {
 		return err
@@ -139,6 +149,12 @@ func (r *Renderer) renderFileInto(writer types.ResponseWriter, response types.Re
 
 	if err = writer(append(r.buff, crlf...)); err != nil {
 		return errConnWrite
+	}
+
+	if method == methods.HEAD {
+		// once again, HEAD requests MUST NOT contain response bodies. They are just like
+		// GET request, but without response entities
+		return nil
 	}
 
 	// write by blocks 64kb each
