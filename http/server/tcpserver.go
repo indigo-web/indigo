@@ -83,9 +83,15 @@ func timeoutConnHandler(conn net.Conn, handleData dataHandler, timeout int, buff
 	ch := make(chan int)
 	go readFromConn(ch, conn, buff)
 
+	duration := time.Duration(timeout) * time.Second
+
 	for {
+		timer := time.NewTimer(duration)
+
 		select {
 		case n := <-ch:
+			timer.Stop()
+
 			if err := handleData(buff[:n]); err != nil || n == 0 {
 				if err != http.ErrHijackConn {
 					_ = conn.Close()
@@ -95,9 +101,10 @@ func timeoutConnHandler(conn net.Conn, handleData dataHandler, timeout int, buff
 			}
 
 			ch <- processed
-		case <-time.After(time.Duration(timeout) * time.Second):
+		case <-timer.C:
 			_ = conn.Close()
 			<-ch
+			timer.Stop()
 			return
 		}
 	}
