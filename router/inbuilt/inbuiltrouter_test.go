@@ -1,6 +1,7 @@
 package inbuilt
 
 import (
+	"github.com/fakefloordiv/indigo/http/status"
 	"testing"
 
 	methods "github.com/fakefloordiv/indigo/http/method"
@@ -9,8 +10,12 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+const respBody = "some body" // once told me
+
+// handler that does nothing, used in cases when we need nothing
+// but handler also must not be nil
 func nopHandler(_ *types.Request) types.Response {
-	return types.WithResponse
+	return types.WithResponse.WithBody(respBody)
 }
 
 func TestRoute(t *testing.T) {
@@ -44,6 +49,18 @@ func TestRoute(t *testing.T) {
 		require.Equal(t, 1, len(r.routes["/hello"]))
 		require.Contains(t, r.routes["/hello"], methods.POST)
 		require.NotNil(t, r.routes["/hello"][methods.POST])
+	})
+
+	t.Run("HEAD", func(t *testing.T) {
+		request, _ := getRequest()
+		request.Method = methods.HEAD
+		request.Path = "/"
+
+		resp := r.processRequest(request)
+		// we have not registered any HEAD-method handler yet, so GET method
+		// is expected to be called (but without body)
+		require.Equal(t, status.OK, resp.Code)
+		require.Equal(t, respBody, string(resp.Body))
 	})
 }
 
