@@ -10,6 +10,10 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+func nopDecoder(b []byte) ([]byte, error) {
+	return b, nil
+}
+
 func bodyReader(gateway *internal.BodyGateway, ch chan []byte) {
 	var body []byte
 
@@ -40,7 +44,7 @@ func testDifferentPartSizes(t *testing.T, request []byte, wantBody string) {
 
 		parts := splitIntoParts(request, i)
 		for j, part := range parts {
-			done, extra, err := parser.Parse(part)
+			done, extra, err := parser.Parse(part, nopDecoder)
 			require.Empty(t, extra)
 			require.NoErrorf(t, err, "happened with part size: %d", i)
 
@@ -75,7 +79,7 @@ func TestChunkedBodyParser_Parse_Negative(t *testing.T) {
 		go bodyReader(gateway, ch)
 
 		parser := newChunkedBodyParser(gateway, settings.Default())
-		done, extra, err := parser.Parse(chunked)
+		done, extra, err := parser.Parse(chunked, nopDecoder)
 		require.True(t, done)
 		require.Empty(t, extra)
 		require.EqualError(t, err, http.ErrBadRequest.Error())

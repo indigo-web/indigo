@@ -7,6 +7,8 @@ import (
 	"os"
 	"strconv"
 
+	methods "github.com/fakefloordiv/indigo/http/method"
+
 	"github.com/fakefloordiv/indigo/http"
 	"github.com/fakefloordiv/indigo/http/headers"
 	"github.com/fakefloordiv/indigo/http/proto"
@@ -42,8 +44,8 @@ func NewRenderer(buff []byte) *Renderer {
 	}
 }
 
-func (r *Renderer) SetDefaultHeaders(headers headers.Headers) {
-	r.defaultHeaders = headers
+func (r *Renderer) SetDefaultHeaders(h headers.Headers) {
+	r.defaultHeaders = h
 }
 
 // Response method is rendering types.Response object into some buffer and then writes
@@ -58,12 +60,20 @@ func (r *Renderer) SetDefaultHeaders(headers headers.Headers) {
 func (r *Renderer) Response(
 	request *types.Request, response types.Response, writer types.ResponseWriter,
 ) (err error) {
-	if !r.keepAlive {
+	switch r.keepAlive {
+	case false:
 		// in case this value is false, this can mean only 1 thing - it is not initialized
 		// and once it is initialized, it is supposed to be true, otherwise connection will
 		// be closed after this call anyway
 		r.keepAlive = isKeepAlive(request)
 		if !r.keepAlive {
+			err = http.ErrCloseConnection
+		}
+	case true:
+		// in case request Connection header is set to close, this response must be the last
+		// one, after which one connection will be closed. It's better to close it silently
+		value, found := request.Headers["connection"]
+		if found && value[0] == "close" {
 			err = http.ErrCloseConnection
 		}
 	}
@@ -73,23 +83,18 @@ func (r *Renderer) Response(
 	buff = append(append(buff, strconv.Itoa(int(response.Code))...), space...)
 	buff = append(append(buff, status.Text(response.Code)...), crlf...)
 
-	reqHeaders := response.Headers()
+	customRespHeaders := response.Headers()
+	// TODO: this shit decreses performance from 75-77k rps to 68-70k
+	respHeaders := mergeHeaders(r.defaultHeaders, customRespHeaders)
 
-	for key, value := range reqHeaders {
+	for key, value := range respHeaders {
 		buff = append(renderHeader(key, value, buff), crlf...)
-	}
-
-	for key, value := range r.defaultHeaders {
-		_, found := reqHeaders[key]
-		if !found {
-			buff = append(renderHeader(key, value, buff), crlf...)
-		}
 	}
 
 	if len(response.Filename) > 0 {
 		r.buff = buff
 
-		switch err := r.renderFileInto(writer, response); err {
+		switch err := r.renderFileInto(request.Method, writer, response); err {
 		case nil:
 		case errConnWrite:
 			return err
@@ -103,7 +108,14 @@ func (r *Renderer) Response(
 	}
 
 	buff = renderContentLength(len(response.Body), buff)
-	r.buff = append(append(buff, crlf...), response.Body...)
+	r.buff = append(buff, crlf...)
+
+	// HEAD requests MUST NOT contain message body - the main difference
+	// between HEAD and GET requests
+	// See rfc2068 9.4
+	if request.Method != methods.HEAD {
+		r.buff = append(r.buff, response.Body...)
+	}
 
 	writerErr := writer(r.buff)
 	if writerErr != nil {
@@ -122,7 +134,9 @@ func (r *Renderer) Response(
 // Not very elegant solution, but uploading files is not the main purpose of web-server.
 // For small and medium projects, this may be enough, for anything serious - most of all
 // nginx will be used (the same is about https)
-func (r *Renderer) renderFileInto(writer types.ResponseWriter, response types.Response) error {
+func (r *Renderer) renderFileInto(
+	method methods.Method, writer types.ResponseWriter, response types.Response,
+) error {
 	file, err := os.OpenFile(response.Filename, os.O_RDONLY, 69420) // anyway unused
 	if err != nil {
 		return err
@@ -137,6 +151,12 @@ func (r *Renderer) renderFileInto(writer types.ResponseWriter, response types.Re
 
 	if err = writer(append(r.buff, crlf...)); err != nil {
 		return errConnWrite
+	}
+
+	if method == methods.HEAD {
+		// once again, HEAD requests MUST NOT contain response bodies. They are just like
+		// GET request, but without response entities
+		return nil
 	}
 
 	// write by blocks 64kb each
@@ -162,29 +182,43 @@ func renderContentLength(value int, buff []byte) []byte {
 	return append(append(append(buff, contentLength...), strconv.Itoa(value)...), crlf...)
 }
 
-func renderHeader(key, value string, into []byte) []byte {
-	return append(append(append(into, key...), colonSpace...), value...)
+func renderHeader(key string, values []string, into []byte) []byte {
+	into = append(append(into, key...), colonSpace...)
+
+	for i := 0; i < len(values)-1; i++ {
+		into = append(append(into, values[i]...), ',')
+	}
+
+	return append(into, values[len(values)-1]...)
 }
 
+// isKeepAlive decides whether connection is keep-alive or not
 func isKeepAlive(request *types.Request) bool {
 	if request.Proto == proto.HTTP09 {
 		return false
 	}
 
 	keepAlive, found := request.Headers["connection"]
-	switch found {
-	case true:
-		return keepAlive == "keep-alive"
-	case false:
-		switch request.Proto {
-		case proto.HTTP10:
-			// by default http/1.0 is not keep-alive. To be, it must
-			// specify it explicitly
-			return false
-		case proto.HTTP11:
-			return true
-		}
+	if found {
+		return keepAlive[0] == "keep-alive"
 	}
 
-	return false
+	// because HTTP/1.0 by default is not keep-alive. And if no Connection
+	// is specified, it is absolutely not keep-alive
+	return request.Proto == proto.HTTP11
+}
+
+// mergeHeaders allocates a new map with initial capacity of len(a)+len(b)
+// Values from b overrides values from a
+func mergeHeaders(a, b headers.Headers) headers.Headers {
+	into := make(headers.Headers, len(a)+len(b))
+
+	for k, v := range a {
+		into[k] = v
+	}
+	for k, v := range b {
+		into[k] = v
+	}
+
+	return into
 }

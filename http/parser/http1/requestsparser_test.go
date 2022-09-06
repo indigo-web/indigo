@@ -3,6 +3,8 @@ package http1
 import (
 	"testing"
 
+	"github.com/fakefloordiv/indigo/http/encodings"
+
 	"github.com/fakefloordiv/indigo/http"
 	"github.com/fakefloordiv/indigo/http/headers"
 	methods "github.com/fakefloordiv/indigo/http/method"
@@ -16,13 +18,20 @@ import (
 )
 
 var (
-	simpleGET = []byte("GET / HTTP/1.1\r\n\r\n")
-	biggerGET = []byte("GET / HTTP/1.1\r\nHello: World!\r\n\r\n")
+	simpleGET            = []byte("GET / HTTP/1.1\r\n\r\n")
+	simpleGETLeadingCRLF = []byte("\r\n\r\nGET / HTTP/1.1\r\n\r\n")
+	simpleGETAbsPath     = []byte("GET http://www.w3.org/pub/WWW/TheProject.html HTTP/1.1\r\n\r\n")
+	biggerGET            = []byte("GET / HTTP/1.1\r\nHello: World!\r\n\r\n")
 
 	biggerGETOnlyLF     = []byte("GET / HTTP/1.1\nHello: World!\n\n")
 	biggerGETURLEncoded = []byte("GET /hello%20world HTTP/1.1\r\n\r\n")
 
 	somePOST = []byte("POST / HTTP/1.1\r\nHello: World!\r\nContent-Length: 13\r\n\r\nHello, World!")
+
+	commaSplitHeader           = []byte("GET / HTTP/1.1\r\nAccept: one,two, three\r\n\r\n")
+	commaInQuotedHeaderValue   = []byte("GET / HTTP/1.1\r\nAccept: one,\"two, or more\",three\r\n\r\n")
+	commaSPInQuotedHeaderValue = []byte("GET / HTTP/1.1\r\nAccept: one, \"two, or more\",three\r\n\r\n")
+	quoteEscapeChar            = []byte("GET / HTTP/1.1\r\nAccept: \\\"one, two,\\\"three\r\n\r\n")
 
 	ordinaryChunkedBody = "d\r\nHello, world!\r\n1a\r\nBut what's wrong with you?\r\nf\r\nFinally am here\r\n0\r\n\r\n"
 	ordinaryChunked     = []byte("POST / HTTP/1.1\r\nTransfer-Encoding: chunked\r\n\r\n" + ordinaryChunkedBody)
@@ -32,8 +41,10 @@ func getParser() (httpparser.HTTPRequestsParser, *types.Request) {
 	settings := settings2.Default()
 	manager := headers.NewManager(settings.Headers)
 	request, gateway := types.NewRequest(&manager, url.Query{})
+	codings := encodings.NewContentEncodings()
+
 	return NewHTTPRequestsParser(
-		request, gateway, nil, nil, settings, &manager,
+		request, gateway, nil, nil, settings, &manager, codings,
 	), request
 }
 
@@ -42,7 +53,7 @@ func readBody(request *types.Request, ch chan []byte) {
 	ch <- body
 }
 
-type testHeaders map[string]string
+type testHeaders map[string][]string
 
 type wantedRequest struct {
 	Method   methods.Method
@@ -57,9 +68,9 @@ func compareRequests(t *testing.T, wanted wantedRequest, actual *types.Request) 
 	require.Equal(t, wanted.Protocol, actual.Proto)
 
 	for key, value := range wanted.Headers {
-		actualValue, found := actual.Headers[key]
+		actualValues, found := actual.Headers[key]
 		require.True(t, found)
-		require.Equal(t, value, string(actualValue))
+		require.Equal(t, value, actualValues)
 	}
 }
 
@@ -130,6 +141,28 @@ func TestHttpRequestsParser_Parse_GET(t *testing.T) {
 		require.NoError(t, request.Reset())
 	})
 
+	t.Run("SimpleGETLeadingCRLF", func(t *testing.T) {
+		ch := make(chan []byte)
+		go readBody(request, ch)
+		state, extra, err := parser.Parse(simpleGETLeadingCRLF)
+		parser.FinalizeBody()
+
+		require.NoError(t, err)
+		require.Equal(t, httpparser.RequestCompleted, state)
+		require.Empty(t, extra)
+		require.Empty(t, <-ch)
+
+		wanted := wantedRequest{
+			Method:   methods.GET,
+			Path:     "/",
+			Protocol: proto.HTTP11,
+			Headers:  testHeaders{},
+		}
+
+		compareRequests(t, wanted, request)
+		require.NoError(t, request.Reset())
+	})
+
 	t.Run("BiggerGET", func(t *testing.T) {
 		ch := make(chan []byte)
 		go readBody(request, ch)
@@ -146,12 +179,52 @@ func TestHttpRequestsParser_Parse_GET(t *testing.T) {
 			Path:     "/",
 			Protocol: proto.HTTP11,
 			Headers: testHeaders{
-				"hello": "World!",
+				"hello": {"World!"},
 			},
 		}
 
 		compareRequests(t, wanted, request)
 		require.NoError(t, request.Reset())
+	})
+
+	commaTest := func(t *testing.T, req []byte, values []string) {
+		ch := make(chan []byte)
+		go readBody(request, ch)
+		state, extra, err := parser.Parse(req)
+		parser.FinalizeBody()
+
+		require.NoError(t, err)
+		require.Equal(t, httpparser.RequestCompleted, state)
+		require.Empty(t, extra)
+		require.Empty(t, <-ch)
+
+		wanted := wantedRequest{
+			Method:   methods.GET,
+			Path:     "/",
+			Protocol: proto.HTTP11,
+			Headers: testHeaders{
+				"accept": values,
+			},
+		}
+
+		compareRequests(t, wanted, request)
+		require.NoError(t, request.Reset())
+	}
+
+	t.Run("CommaSplitHeaderValue", func(t *testing.T) {
+		commaTest(t, commaSplitHeader, []string{"one", "two", "three"})
+	})
+
+	t.Run("QuotedCommaSplitHeaderValue", func(t *testing.T) {
+		commaTest(t, commaInQuotedHeaderValue, []string{"one", "\"two, or more\"", "three"})
+	})
+
+	t.Run("SPQuotedCommaSplitHeaderValue", func(t *testing.T) {
+		commaTest(t, commaSPInQuotedHeaderValue, []string{"one", "\"two, or more\"", "three"})
+	})
+
+	t.Run("EscapingQuote", func(t *testing.T) {
+		commaTest(t, quoteEscapeChar, []string{"\"one", "two", "\"three"})
 	})
 
 	t.Run("BiggerGETOnlyLF", func(t *testing.T) {
@@ -170,7 +243,7 @@ func TestHttpRequestsParser_Parse_GET(t *testing.T) {
 			Path:     "/",
 			Protocol: proto.HTTP11,
 			Headers: testHeaders{
-				"hello": "World!",
+				"hello": {"World!"},
 			},
 		}
 
@@ -212,13 +285,35 @@ func TestHttpRequestsParser_Parse_GET(t *testing.T) {
 				Path:     "/",
 				Protocol: proto.HTTP11,
 				Headers: testHeaders{
-					"hello": "World!",
+					"hello": {"World!"},
 				},
 			}
 
 			compareRequests(t, wanted, request)
 			require.NoError(t, request.Reset())
 		}
+	})
+
+	t.Run("SimpleGETWithAbsolutePath", func(t *testing.T) {
+		ch := make(chan []byte)
+		go readBody(request, ch)
+		state, extra, err := parser.Parse(simpleGETAbsPath)
+		parser.FinalizeBody()
+
+		require.NoError(t, err)
+		require.Equal(t, httpparser.RequestCompleted, state)
+		require.Empty(t, extra)
+		require.Empty(t, <-ch)
+
+		wanted := wantedRequest{
+			Method:   methods.GET,
+			Path:     "http://www.w3.org/pub/WWW/TheProject.html",
+			Protocol: proto.HTTP11,
+			Headers:  testHeaders{},
+		}
+
+		compareRequests(t, wanted, request)
+		require.NoError(t, request.Reset())
 	})
 }
 
@@ -237,7 +332,7 @@ func TestHttpRequestsParser_ParsePOST(t *testing.T) {
 				Path:     "/",
 				Protocol: proto.HTTP11,
 				Headers: testHeaders{
-					"hello": "World!",
+					"hello": {"World!"},
 				},
 			}
 
@@ -381,7 +476,7 @@ func TestHttpRequestsParser_Parse_Negative(t *testing.T) {
 		go readBody(request, ch)
 		state, _, err := parser.Parse(raw)
 
-		require.EqualError(t, http.ErrBadRequest, err.Error())
+		require.EqualError(t, err, http.ErrBadRequest.Error())
 		require.Equal(t, httpparser.Error, state)
 	})
 
@@ -393,7 +488,31 @@ func TestHttpRequestsParser_Parse_Negative(t *testing.T) {
 		go readBody(request, ch)
 		state, _, err := parser.Parse(raw)
 
-		require.EqualError(t, http.ErrBadRequest, err.Error())
+		require.EqualError(t, err, http.ErrBadRequest.Error())
+		require.Equal(t, httpparser.Error, state)
+	})
+
+	t.Run("MajorHTTPVersionOverflow", func(t *testing.T) {
+		parser, request := getParser()
+
+		raw := []byte("GET / HTTP/335.1\r\n\r\n")
+		ch := make(chan []byte)
+		go readBody(request, ch)
+		state, _, err := parser.Parse(raw)
+
+		require.EqualError(t, err, http.ErrUnsupportedProtocol.Error())
+		require.Equal(t, httpparser.Error, state)
+	})
+
+	t.Run("MinorHTTPVersionOverflow", func(t *testing.T) {
+		parser, request := getParser()
+
+		raw := []byte("GET / HTTP/1.335\r\n\r\n")
+		ch := make(chan []byte)
+		go readBody(request, ch)
+		state, _, err := parser.Parse(raw)
+
+		require.EqualError(t, err, http.ErrUnsupportedProtocol.Error())
 		require.Equal(t, httpparser.Error, state)
 	})
 }

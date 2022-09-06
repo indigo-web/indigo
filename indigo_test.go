@@ -9,8 +9,11 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"strings"
 	"testing"
 	"time"
+
+	"github.com/fakefloordiv/indigo/settings"
 
 	http2 "github.com/fakefloordiv/indigo/http"
 
@@ -83,9 +86,14 @@ func getRouter(t *testing.T) router.Router {
 		return types.WithResponse
 	})
 
+	r.Get("/get-resp-body", func(_ *types.Request) types.Response {
+		return types.WithResponse.WithBody(testRequestBody)
+	})
+
 	r.Get("/get-read-body", func(request *types.Request) types.Response {
 		require.Contains(t, request.Headers, testHeaderKey)
-		require.Equal(t, testHeaderValue, string(request.Headers[testHeaderKey]))
+		requestHeader := strings.Join(request.Headers[testHeaderKey], ",")
+		require.Equal(t, testHeaderValue, requestHeader)
 
 		body, err := request.Body()
 		require.NoError(t, err)
@@ -175,12 +183,14 @@ func TestAllCases(t *testing.T) {
 	// is a lot of time)
 
 	r := getRouter(t)
+	s := settings.Default()
+	s.TCPServer.IDLEConnLifetime = 2
 	app := NewApp(addr)
 
 	shutdown := make(chan bool)
 
 	go func() {
-		require.Equal(t, http2.ErrShutdown, app.Serve(r))
+		require.Equal(t, http2.ErrShutdown, app.Serve(r, s))
 		shutdown <- true
 	}()
 
@@ -210,6 +220,37 @@ func TestAllCases(t *testing.T) {
 		require.Contains(t, resp.Header, "Server")
 		require.Equal(t, 1, len(resp.Header["Server"]))
 		require.Equal(t, "indigo", resp.Header["Server"][0])
+	})
+
+	t.Run("/get-resp-body", func(t *testing.T) {
+		resp, err := http.DefaultClient.Get(URL + "/get-resp-body")
+		require.NoError(t, err)
+		defer func() {
+			_ = resp.Body.Close()
+		}()
+
+		body, err := io.ReadAll(resp.Body)
+		require.NoError(t, err)
+		require.Equal(t, testRequestBody, string(body))
+	})
+
+	t.Run("/head", func(t *testing.T) {
+		resp, err := http.DefaultClient.Head(URL + "/get-resp-body")
+		require.NoError(t, err)
+		defer func() {
+			_ = resp.Body.Close()
+		}()
+
+		require.Equal(t, http.StatusOK, resp.StatusCode)
+		require.Equal(t, "200 "+http.StatusText(http.StatusOK), resp.Status)
+		require.Equal(t, "HTTP/1.1", resp.Proto)
+		require.Contains(t, resp.Header, "Server")
+		require.Equal(t, 1, len(resp.Header["Server"]))
+		require.Equal(t, "indigo", resp.Header["Server"][0])
+
+		body, err := io.ReadAll(resp.Body)
+		require.NoError(t, err)
+		require.Empty(t, string(body))
 	})
 
 	t.Run("/get-read-body", func(t *testing.T) {
@@ -294,6 +335,16 @@ func TestAllCases(t *testing.T) {
 		data, err := io.ReadAll(resp.Body)
 		require.NoError(t, err)
 		require.Equal(t, testFileIfNotFound, string(data))
+	})
+
+	t.Run("/test-idle-disconnect", func(t *testing.T) {
+		conn, err := net.Dial("tcp4", addr)
+		require.NoError(t, err)
+
+		buff := make([]byte, 10)
+		n, err := conn.Read(buff)
+		require.Zero(t, n)
+		require.EqualError(t, err, io.EOF.Error())
 	})
 
 	http.DefaultClient.CloseIdleConnections()

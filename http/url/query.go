@@ -1,9 +1,12 @@
 package url
 
 import (
-	"github.com/fakefloordiv/indigo/http"
+	"errors"
+
 	"github.com/fakefloordiv/indigo/http/url/queryparser"
 )
+
+var ErrNoSuchKey = errors.New("requested key is not presented")
 
 type (
 	rawQuery    []byte
@@ -49,7 +52,7 @@ func (q *Query) Get(key string) (value []byte, err error) {
 
 	value, found := q.parsedQuery[key]
 	if !found {
-		err = http.ErrNoSuchKey
+		err = ErrNoSuchKey
 	}
 
 	return value, err

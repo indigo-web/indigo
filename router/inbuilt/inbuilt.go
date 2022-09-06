@@ -1,8 +1,6 @@
 package inbuilt
 
 import (
-	"github.com/fakefloordiv/indigo/http/encodings"
-	"github.com/fakefloordiv/indigo/http/headers"
 	methods "github.com/fakefloordiv/indigo/http/method"
 	"github.com/fakefloordiv/indigo/http/render"
 	"github.com/fakefloordiv/indigo/types"
@@ -37,25 +35,20 @@ type DefaultRouter struct {
 	prefix      string
 	middlewares []Middleware
 
-	defaultHeaders headers.Headers
-
 	routes      routesMap
 	errHandlers errHandlers
 
 	renderer *render.Renderer
-	codings  encodings.ContentEncodings
 }
 
 // NewRouter constructs a new instance of inbuilt router. Error handlers
-// by default are applied, renderer with a nil (as initial value) buffer constructed,
-// and new content encodings is created (single for all the groups)
+// by default are applied, renderer with a nil (as initial value) buffer constructed
 func NewRouter() *DefaultRouter {
 	r := &DefaultRouter{
 		routes:      make(routesMap),
 		errHandlers: newErrHandlers(),
 		// let the first time response be rendered into the nil buffer
 		renderer: render.NewRenderer(nil),
-		codings:  encodings.NewContentEncodings(),
 	}
 
 	r.root = r

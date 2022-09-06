@@ -52,12 +52,12 @@ func (r Response) WithStatus(status status.Status) Response {
 	return r
 }
 
-func (r Response) WithHeader(key, value string) Response {
+func (r Response) WithHeader(key string, values ...string) Response {
 	if r.headers == nil {
 		r.headers = make(headers.Headers, initialRespHeadersSize)
 	}
 
-	r.headers[key] = value
+	r.headers[key] = values
 
 	return r
 }
@@ -65,8 +65,8 @@ func (r Response) WithHeader(key, value string) Response {
 func (r Response) WithHeaders(headers headers.Headers) Response {
 	response := r
 
-	for key, value := range headers {
-		response = response.WithHeader(key, value)
+	for key, values := range headers {
+		response = response.WithHeader(key, values...)
 	}
 
 	return response

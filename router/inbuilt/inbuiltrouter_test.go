@@ -3,15 +3,20 @@ package inbuilt
 import (
 	"testing"
 
-	headers2 "github.com/fakefloordiv/indigo/http/headers"
+	"github.com/fakefloordiv/indigo/http/status"
+
 	methods "github.com/fakefloordiv/indigo/http/method"
 	"github.com/fakefloordiv/indigo/types"
 
 	"github.com/stretchr/testify/require"
 )
 
+const respBody = "some body" // once told me
+
+// handler that does nothing, used in cases when we need nothing
+// but handler also must not be nil
 func nopHandler(_ *types.Request) types.Response {
-	return types.WithResponse
+	return types.WithResponse.WithBody(respBody)
 }
 
 func TestRoute(t *testing.T) {
@@ -45,6 +50,18 @@ func TestRoute(t *testing.T) {
 		require.Equal(t, 1, len(r.routes["/hello"]))
 		require.Contains(t, r.routes["/hello"], methods.POST)
 		require.NotNil(t, r.routes["/hello"][methods.POST])
+	})
+
+	t.Run("HEAD", func(t *testing.T) {
+		request, _ := getRequest()
+		request.Method = methods.HEAD
+		request.Path = "/"
+
+		resp := r.processRequest(request)
+		// we have not registered any HEAD-method handler yet, so GET method
+		// is expected to be called (but without body)
+		require.Equal(t, status.OK, resp.Code)
+		require.Equal(t, respBody, string(resp.Body))
 	})
 }
 
@@ -100,31 +117,10 @@ func TestGroups(t *testing.T) {
 	v2 := api.Group("/v2")
 	v2.Get("/world", nopHandler)
 
-	r.OnStart()
+	r.OnStart(nil)
 
 	require.Contains(t, r.routes, "/")
 	require.Contains(t, r.routes, "/api/v1/hello")
 	require.Contains(t, r.routes, "/api/v2/world")
 	require.Equal(t, 3, len(r.routes))
-}
-
-func TestDefaultHeaders(t *testing.T) {
-	r := NewRouter()
-
-	t.Run("Default", func(t *testing.T) {
-		r.applyDefaultHeaders()
-		require.Contains(t, r.defaultHeaders, "Server")
-		require.Contains(t, r.defaultHeaders, "Connection")
-		require.Contains(t, r.defaultHeaders, "Accept-Encoding")
-	})
-
-	t.Run("Custom", func(t *testing.T) {
-		headers := headers2.Headers{
-			"Server":     "indigo-test",
-			"Connection": "idk maybe close",
-			"Easter":     "Egg",
-		}
-		r.SetDefaultHeaders(headers)
-		require.Equal(t, r.defaultHeaders, headers)
-	})
 }

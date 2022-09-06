@@ -20,8 +20,6 @@ var (
 
 	ErrNotFound         = errors.New("not found")
 	ErrMethodNotAllowed = errors.New("method is not allowed")
-	ErrNoSuchKey        = errors.New("requested key is not presented")
-	ErrRead             = errors.New("body has been already read")
 
 	ErrShutdown   = errors.New("graceful shutdown")
 	ErrHijackConn = errors.New("connection hijacking (don't move stay straight)")

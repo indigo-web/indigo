@@ -2,6 +2,7 @@ package http1
 
 import (
 	"github.com/fakefloordiv/indigo/http"
+	"github.com/fakefloordiv/indigo/http/encodings"
 	"github.com/fakefloordiv/indigo/internal"
 	"github.com/fakefloordiv/indigo/settings"
 )
@@ -29,7 +30,13 @@ func newChunkedBodyParser(gateway *internal.BodyGateway, settings settings.Setti
 // Parse takes only body as it is. Returns a flag whether parsing is done,
 // extra that are extra-bytes related to a next one request, and err if
 // occurred
-func (c *chunkedBodyParser) Parse(data []byte) (done bool, extra []byte, err error) {
+func (c *chunkedBodyParser) Parse(data []byte, decoder encodings.Decoder) (done bool, extra []byte, err error) {
+	if decoder == nil {
+		decoder = func(b []byte) ([]byte, error) {
+			return b, nil
+		}
+	}
+
 	for i := range data {
 		switch c.state {
 		case eChunkLength1Char:
@@ -83,7 +90,12 @@ func (c *chunkedBodyParser) Parse(data []byte) (done bool, extra []byte, err err
 			c.chunkLength--
 
 			if c.chunkLength == 0 {
-				c.gateway.Data <- data[c.bodyOffset:i]
+				decoded, err := decoder(data[c.bodyOffset:i])
+				if err != nil {
+					return true, nil, err
+				}
+
+				c.gateway.Data <- decoded
 				<-c.gateway.Data
 				if c.gateway.Err != nil {
 					return true, nil, c.gateway.Err
@@ -134,7 +146,12 @@ func (c *chunkedBodyParser) Parse(data []byte) (done bool, extra []byte, err err
 	}
 
 	if c.state == eChunkBody {
-		c.gateway.Data <- data[c.bodyOffset:]
+		decoded, err := decoder(data[c.bodyOffset:])
+		if err != nil {
+			return true, nil, err
+		}
+
+		c.gateway.Data <- decoded
 		<-c.gateway.Data
 		if c.gateway.Err != nil {
 			return true, nil, c.gateway.Err

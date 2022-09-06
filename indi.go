@@ -5,6 +5,7 @@ import (
 	"net"
 	"sync"
 
+	"github.com/fakefloordiv/indigo/http/encodings"
 	"github.com/fakefloordiv/indigo/http/headers"
 	"github.com/fakefloordiv/indigo/http/parser/http1"
 	"github.com/fakefloordiv/indigo/http/server"
@@ -14,26 +15,81 @@ import (
 	"github.com/fakefloordiv/indigo/types"
 )
 
+const (
+	// not specifying version to avoid problems with vulnerable versions
+	// Also not specifying, because otherwise I should add an option to
+	// disable such a behaviour. I am too lazy for that. Preferring not
+	// specifying version at all
+	defaultServer = "indigo"
+
+	// Automatically specify connection as keep-alive. Maybe it is not
+	// a compulsory move from server, but still
+	defaultConnection = "keep-alive"
+
+	// actually, we don't know what content type of body user responds
+	// with, so due to rfc2068 7.2.1 it is supposed to be
+	// application/octet-stream, but we know that it is usually text/html,
+	// isn't it?
+	defaultContentType = "text/html"
+
+	// explicitly set a list of encodings are supported to avoid awkward
+	// situations
+	// Empty by default because this value is dynamic - depends on which
+	// encodings will user add. If it exists, it will be overridden. If
+	// it is not existing, this value will not be set
+	defaultAcceptEncodings = ""
+)
+
+var defaultHeaders = headers.Headers{
+	"Server":           []string{defaultServer},
+	"Connection":       []string{defaultConnection},
+	"Content-Type":     []string{defaultContentType},
+	"Accept-Encodings": []string{defaultAcceptEncodings},
+}
+
 // Application is just a struct with addr and shutdown channel that is currently
 // not used. Planning to replace it with context.WithCancel()
 type Application struct {
 	addr string
 
+	codings        encodings.ContentEncodings
+	defaultHeaders headers.Headers
+
 	shutdown chan bool
 }
 
 // NewApp returns a new application object with initialized shutdown chan
-func NewApp(addr string) Application {
-	return Application{
-		addr:     addr,
-		shutdown: make(chan bool),
+func NewApp(addr string) *Application {
+	return &Application{
+		addr:           addr,
+		codings:        encodings.NewContentEncodings(),
+		defaultHeaders: defaultHeaders,
+		shutdown:       make(chan bool),
 	}
+}
+
+// AddContentDecoder simply adds a new content decoder
+func (a Application) AddContentDecoder(token string, decoder encodings.Decoder) {
+	a.codings.AddDecoder(token, decoder)
+}
+
+// SetDefaultHeaders overrides default headers to a passed ones.
+// Doing this, make sure you know what are you doing
+func (a *Application) SetDefaultHeaders(headers headers.Headers) {
+	a.defaultHeaders = headers
 }
 
 // Serve takes a router and someSettings, that must be only 0 or 1 elements
 // otherwise, error is returned
-func (a Application) Serve(router router.Router, someSettings ...settings2.Settings) error {
-	router.OnStart()
+// Also, if specified, Accept-Encodings default header's value will be set here
+func (a Application) Serve(r router.Router, someSettings ...settings2.Settings) error {
+	if _, found := a.defaultHeaders["Accept-Encodings"]; found {
+		a.defaultHeaders["Accept-Encodings"] = a.codings.Acceptable()
+	}
+
+	if onStart, ok := r.(router.OnStart); ok {
+		onStart.OnStart(a.defaultHeaders)
+	}
 
 	settings, err := getSettings(someSettings...)
 	if err != nil {
@@ -56,17 +112,19 @@ func (a Application) Serve(router router.Router, someSettings ...settings2.Setti
 		headerBuff := make([]byte, 0, settings.Headers.KeyLength.Default)
 
 		httpParser := http1.NewHTTPRequestsParser(
-			request, gateway, startLineBuff, headerBuff, settings, &headersManager,
+			request, gateway, startLineBuff, headerBuff, settings, &headersManager, a.codings,
 		)
 
 		httpServer := server.NewHTTPServer(request, func(b []byte) (err error) {
 			_, err = conn.Write(b)
 			return err
-		}, router, httpParser, conn)
+		}, r, httpParser, conn)
 		go httpServer.Run()
 
 		readBuff := make([]byte, settings.TCPServer.Read.Default)
-		server.DefaultConnHandler(wg, conn, readBuff, httpServer.OnData)
+		server.DefaultConnHandler(
+			wg, conn, settings.TCPServer.IDLEConnLifetime, httpServer.OnData, readBuff,
+		)
 	}, a.shutdown)
 }
 

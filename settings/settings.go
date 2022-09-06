@@ -93,6 +93,11 @@ type (
 
 	TCPServer struct {
 		Read TCPServerRead
+		// IDLEConnLifetime is a timer in seconds, after expiration of which one IDLE
+		// connection will be actively closed by server.
+		// IDLE conn is a connection that does not send anything
+		// -1 as value disables timeouts at all
+		IDLEConnLifetime int
 	}
 
 	Body struct {
@@ -146,6 +151,7 @@ func Default() Settings {
 			Read: TCPServerRead{
 				Default: 2048,
 			},
+			IDLEConnLifetime: 90,
 		},
 		Body: Body{
 			Length: BodyLength{
@@ -185,6 +191,8 @@ func Fill(original Settings) (modified Settings) {
 		original.URL.Query.Number.Default, defaultSettings.URL.Query.Number.Default)
 	original.TCPServer.Read.Default = customOrDefault(
 		original.TCPServer.Read.Default, defaultSettings.TCPServer.Read.Default)
+	original.TCPServer.IDLEConnLifetime = customOrDefault(
+		original.TCPServer.IDLEConnLifetime, defaultSettings.TCPServer.IDLEConnLifetime)
 	original.Body.Length.Default = customOrDefault(
 		original.Body.Length.Default, defaultSettings.Body.Length.Default)
 	original.Body.Length.Maximal = customOrDefault(

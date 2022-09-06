@@ -3,6 +3,7 @@ package server
 import (
 	"net"
 	"sync"
+	"time"
 
 	"github.com/fakefloordiv/indigo/http"
 )
@@ -11,6 +12,8 @@ type (
 	connHandler func(*sync.WaitGroup, net.Conn)
 	dataHandler func([]byte) error
 )
+
+const processed = 0
 
 // StartTCPServer just starts an accept-loop, starting a goroutine provided as a
 // handleConn callback for each connection
@@ -46,9 +49,23 @@ func StartTCPServer(sock net.Listener, handleConn connHandler, sd chan bool) err
 //    of disconnect (normally it is not possible)
 // Errors occurred while reading socket, will be ignored and user will only know that
 // client has disconnected, even if server is guilty
-func DefaultConnHandler(wg *sync.WaitGroup, conn net.Conn, buff []byte, handleData dataHandler) {
+//
+// In case timeout is -1 (disabled), ordinary tcp server will be started, removing
+// overhead from channels
+func DefaultConnHandler(
+	wg *sync.WaitGroup, conn net.Conn, timeout int, handleData dataHandler, buff []byte,
+) {
 	defer wg.Done()
 
+	switch timeout {
+	case -1:
+		noTimeoutConnHandler(conn, handleData, buff)
+	default:
+		timeoutConnHandler(conn, handleData, timeout, buff)
+	}
+}
+
+func noTimeoutConnHandler(conn net.Conn, handleData dataHandler, buff []byte) {
 	for {
 		n, err := conn.Read(buff)
 		err2 := handleData(buff[:n])
@@ -60,5 +77,56 @@ func DefaultConnHandler(wg *sync.WaitGroup, conn net.Conn, buff []byte, handleDa
 
 			return
 		}
+	}
+}
+
+// timeoutConnHandler on each read creates a new timer because time.After does not automatically
+// release its underlying timer, so this causes memory leaks. In case timeout occurred,
+// connection is closing, so both current and readFromConn goroutines are releasing
+func timeoutConnHandler(conn net.Conn, handleData dataHandler, timeout int, buff []byte) {
+	ch := make(chan int)
+	go readFromConn(ch, conn, buff)
+
+	duration := time.Duration(timeout) * time.Second
+
+	for {
+		timer := time.NewTimer(duration)
+
+		select {
+		case n := <-ch:
+			timer.Stop()
+
+			if err := handleData(buff[:n]); err != nil || n == 0 {
+				if err != http.ErrHijackConn {
+					_ = conn.Close()
+				}
+
+				return
+			}
+
+			ch <- processed
+		case <-timer.C:
+			_ = conn.Close()
+			<-ch
+			timer.Stop()
+			return
+		}
+	}
+}
+
+// readFromConn simply starts a reading loop, sending to a channel number of bytes
+// read. This works because we know that our byte-slice buffer has fixed size, so
+// it never grows. As a result, we can pass it by value, and it will always modify
+// a single underlying array for everyone
+func readFromConn(ch chan int, conn net.Conn, buff []byte) {
+	for {
+		n, err := conn.Read(buff)
+		if err != nil || n == 0 {
+			ch <- 0
+			return
+		}
+
+		ch <- n
+		<-ch
 	}
 }

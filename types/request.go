@@ -3,7 +3,6 @@ package types
 import (
 	"net"
 
-	"github.com/fakefloordiv/indigo/http"
 	"github.com/fakefloordiv/indigo/http/headers"
 	methods "github.com/fakefloordiv/indigo/http/method"
 	"github.com/fakefloordiv/indigo/http/proto"
@@ -100,7 +99,7 @@ func Hijacker(request *Request, hijacker hijackConn) func() (net.Conn, error) {
 		// the body until complete server will not transfer into the state
 		// we need so this step is anyway compulsory
 		switch err := request.body.Reset(); err {
-		case nil, http.ErrRead:
+		case nil, ErrRead:
 		default:
 			return nil, err
 		}
