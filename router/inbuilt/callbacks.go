@@ -3,6 +3,7 @@ package inbuilt
 import (
 	"github.com/fakefloordiv/indigo/http"
 	"github.com/fakefloordiv/indigo/http/headers"
+	methods "github.com/fakefloordiv/indigo/http/method"
 	"github.com/fakefloordiv/indigo/types"
 )
 
@@ -22,21 +23,33 @@ func (d DefaultRouter) OnStart(defaultHeaders headers.Headers) {
 
 // OnRequest routes the request
 func (d DefaultRouter) OnRequest(request *types.Request, respWriter types.ResponseWriter) error {
+	return d.renderer.Response(request, d.processRequest(request), respWriter)
+}
+
+func (d DefaultRouter) processRequest(request *types.Request) types.Response {
 	urlMethods, found := d.routes[request.Path]
 	if !found {
-		response := d.errHandlers[http.ErrNotFound](request)
-
-		return d.renderer.Response(request, response, respWriter)
+		return d.errHandlers[http.ErrNotFound](request)
 	}
 
 	handler, found := urlMethods[request.Method]
-	if !found {
-		response := d.errHandlers[http.ErrMethodNotAllowed](request)
+	switch found {
+	case true:
+		return handler.fun(request)
+	default:
+		// by default, if no handler for HEAD method is registered, automatically
+		// call a corresponding GET method - renderer anyway will discard request
+		// body and leave only response line with headers, just like rfc2068, 9.4
+		// wants
+		if request.Method == methods.HEAD {
+			handler, found = urlMethods[methods.GET]
+			if found {
+				return handler.fun(request)
+			}
+		}
 
-		return d.renderer.Response(request, response, respWriter)
+		return d.errHandlers[http.ErrMethodNotAllowed](request)
 	}
-
-	return d.renderer.Response(request, handler.fun(request), respWriter)
 }
 
 // OnError receives error and decides, which error handler is better to use in this case
