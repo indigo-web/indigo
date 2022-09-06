@@ -6,7 +6,7 @@ import (
 )
 
 type (
-	Headers       map[string]string
+	Headers       map[string][]string
 	ValueAppender func(b []byte) int
 )
 
@@ -54,7 +54,13 @@ func (m *Manager) AppendValue(char byte) (exceeded bool) {
 // takes provided key and adds a new entry into the headers map
 func (m Manager) FinalizeValue(key string) (finalValue string) {
 	finalValue = internal.B2S(m.Values[m.valueBegin:])
-	m.Headers[key] = finalValue
+
+	values, found := m.Headers[key]
+	if !found {
+		m.Headers[key] = []string{finalValue}
+	} else {
+		m.Headers[key] = append(values, finalValue)
+	}
 
 	return finalValue
 }

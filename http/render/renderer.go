@@ -72,7 +72,7 @@ func (r *Renderer) Response(
 		// in case request Connection header is set to close, this response must be the last
 		// one, after which one connection will be closed. It's better to close it silently
 		value, found := request.Headers["connection"]
-		if found && value == "close" {
+		if found && value[0] == "close" {
 			err = http.ErrCloseConnection
 		}
 	}
@@ -83,6 +83,7 @@ func (r *Renderer) Response(
 	buff = append(append(buff, status.Text(response.Code)...), crlf...)
 
 	customRespHeaders := response.Headers()
+	// TODO: this shit decreses performance from 75-77k rps to 68-70k
 	respHeaders := mergeHeaders(r.defaultHeaders, customRespHeaders)
 
 	for key, value := range respHeaders {
@@ -119,7 +120,7 @@ func (r *Renderer) Response(
 	if writerErr != nil {
 		err = writerErr
 	}
-	
+
 	return err
 }
 
@@ -180,8 +181,14 @@ func renderContentLength(value int, buff []byte) []byte {
 	return append(append(append(buff, contentLength...), strconv.Itoa(value)...), crlf...)
 }
 
-func renderHeader(key, value string, into []byte) []byte {
-	return append(append(append(into, key...), colonSpace...), value...)
+func renderHeader(key string, values []string, into []byte) []byte {
+	into = append(append(into, key...), colonSpace...)
+
+	for i := 0; i < len(values)-1; i++ {
+		into = append(append(into, values[i]...), ',')
+	}
+
+	return append(into, values[len(values)-1]...)
 }
 
 // isKeepAlive decides whether connection is keep-alive or not
@@ -192,7 +199,7 @@ func isKeepAlive(request *types.Request) bool {
 
 	keepAlive, found := request.Headers["connection"]
 	if found {
-		return keepAlive == "keep-alive"
+		return keepAlive[0] == "keep-alive"
 	}
 
 	// because HTTP/1.0 by default is not keep-alive. And if no Connection

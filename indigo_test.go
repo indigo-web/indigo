@@ -10,6 +10,7 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"strings"
 	"testing"
 	"time"
 
@@ -90,7 +91,8 @@ func getRouter(t *testing.T) router.Router {
 
 	r.Get("/get-read-body", func(request *types.Request) types.Response {
 		require.Contains(t, request.Headers, testHeaderKey)
-		require.Equal(t, testHeaderValue, request.Headers[testHeaderKey])
+		requestHeader := strings.Join(request.Headers[testHeaderKey], ",")
+		require.Equal(t, testHeaderValue, requestHeader)
 
 		body, err := request.Body()
 		require.NoError(t, err)

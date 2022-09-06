@@ -11,7 +11,6 @@ import (
 	settings2 "github.com/fakefloordiv/indigo/settings"
 	"github.com/fakefloordiv/indigo/types"
 	"net"
-	"strings"
 	"sync"
 )
 
@@ -41,10 +40,10 @@ const (
 )
 
 var defaultHeaders = headers.Headers{
-	"Server":           defaultServer,
-	"Connection":       defaultConnection,
-	"Content-Type":     defaultContentType,
-	"Accept-Encodings": defaultAcceptEncodings,
+	"Server":           []string{defaultServer},
+	"Connection":       []string{defaultConnection},
+	"Content-Type":     []string{defaultContentType},
+	"Accept-Encodings": []string{defaultAcceptEncodings},
 }
 
 // Application is just a struct with addr and shutdown channel that is currently
@@ -84,8 +83,7 @@ func (a *Application) SetDefaultHeaders(headers headers.Headers) {
 // Also, if specified, Accept-Encodings default header's value will be set here
 func (a Application) Serve(r router.Router, someSettings ...settings2.Settings) error {
 	if _, found := a.defaultHeaders["Accept-Encodings"]; found {
-		acceptable := strings.Join(a.codings.Acceptable(), ",")
-		a.defaultHeaders["Accept-Encodings"] = acceptable
+		a.defaultHeaders["Accept-Encodings"] = a.codings.Acceptable()
 	}
 
 	if onStart, ok := r.(router.OnStart); ok {

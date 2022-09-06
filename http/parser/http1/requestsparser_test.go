@@ -2,6 +2,7 @@ package http1
 
 import (
 	"github.com/fakefloordiv/indigo/http/encodings"
+	"strings"
 	"testing"
 
 	"github.com/fakefloordiv/indigo/http"
@@ -62,7 +63,8 @@ func compareRequests(t *testing.T, wanted wantedRequest, actual *types.Request) 
 	require.Equal(t, wanted.Protocol, actual.Proto)
 
 	for key, value := range wanted.Headers {
-		actualValue, found := actual.Headers[key]
+		actualValues, found := actual.Headers[key]
+		actualValue := strings.Join(actualValues, ",")
 		require.True(t, found)
 		require.Equal(t, value, actualValue)
 	}
