@@ -64,7 +64,7 @@ func compareRequests(t *testing.T, wanted wantedRequest, actual *types.Request) 
 	for key, value := range wanted.Headers {
 		actualValue, found := actual.Headers[key]
 		require.True(t, found)
-		require.Equal(t, value, string(actualValue))
+		require.Equal(t, value, actualValue)
 	}
 }
 

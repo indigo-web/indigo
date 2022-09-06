@@ -90,7 +90,7 @@ func getRouter(t *testing.T) router.Router {
 
 	r.Get("/get-read-body", func(request *types.Request) types.Response {
 		require.Contains(t, request.Headers, testHeaderKey)
-		require.Equal(t, testHeaderValue, string(request.Headers[testHeaderKey]))
+		require.Equal(t, testHeaderValue, request.Headers[testHeaderKey])
 
 		body, err := request.Body()
 		require.NoError(t, err)
