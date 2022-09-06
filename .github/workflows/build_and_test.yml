@@ -28,7 +28,7 @@ jobs:
         run: go test -coverprofile=cover.out ./...
 
   report-codecov:
-    needs: run-tests
+    needs: [setup, run-tests]
     runs-on: ubuntu-latest
     steps:
       - name: Code coverage report
