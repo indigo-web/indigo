@@ -1,8 +1,9 @@
 package inbuilt
 
 import (
-	"github.com/fakefloordiv/indigo/http/status"
 	"testing"
+
+	"github.com/fakefloordiv/indigo/http/status"
 
 	methods "github.com/fakefloordiv/indigo/http/method"
 	"github.com/fakefloordiv/indigo/types"

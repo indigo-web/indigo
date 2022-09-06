@@ -2,6 +2,7 @@ package url
 
 import (
 	"errors"
+
 	"github.com/fakefloordiv/indigo/http/url/queryparser"
 )
 

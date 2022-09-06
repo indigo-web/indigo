@@ -2,6 +2,9 @@ package indigo
 
 import (
 	"errors"
+	"net"
+	"sync"
+
 	"github.com/fakefloordiv/indigo/http/encodings"
 	"github.com/fakefloordiv/indigo/http/headers"
 	"github.com/fakefloordiv/indigo/http/parser/http1"
@@ -10,8 +13,6 @@ import (
 	"github.com/fakefloordiv/indigo/router"
 	settings2 "github.com/fakefloordiv/indigo/settings"
 	"github.com/fakefloordiv/indigo/types"
-	"net"
-	"sync"
 )
 
 const (

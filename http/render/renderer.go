@@ -2,11 +2,12 @@ package render
 
 import (
 	"errors"
-	methods "github.com/fakefloordiv/indigo/http/method"
 	"io"
 	"math"
 	"os"
 	"strconv"
+
+	methods "github.com/fakefloordiv/indigo/http/method"
 
 	"github.com/fakefloordiv/indigo/http"
 	"github.com/fakefloordiv/indigo/http/headers"
