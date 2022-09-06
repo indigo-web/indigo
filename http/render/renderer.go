@@ -2,7 +2,6 @@ package render
 
 import (
 	"errors"
-	methods "github.com/fakefloordiv/indigo/http/method"
 	"io"
 	"math"
 	"os"
@@ -105,10 +104,7 @@ func (r *Renderer) Response(
 		return err
 	}
 
-	if shouldAppendContentLength(request.Method, response.Code) {
-		buff = renderContentLength(len(response.Body), buff)
-	}
-
+	buff = renderContentLength(len(response.Body), buff)
 	r.buff = append(append(buff, crlf...), response.Body...)
 
 	writerErr := writer(r.buff)
@@ -186,16 +182,6 @@ func isKeepAlive(request *types.Request) bool {
 	// because HTTP/1.0 by default is not keep-alive. And if no Connection
 	// is specified, it is absolutely not keep-alive
 	return request.Proto == proto.HTTP11
-}
-
-// shouldAppendContentLength decides whether content length should be presented
-// in the response. Content-Length shouldn't be presented in message if at
-// least one of conditions below is true:
-// - Request method is HEAD
-// - Response code is 1xx (informational), 204 (No Content) or 304 (Not Modified)
-// See rfc2068, 4.4
-func shouldAppendContentLength(method methods.Method, respCode status.Code) bool {
-	return method != methods.HEAD && respCode >= 200 && respCode != 204 && respCode != 304
 }
 
 // mergeHeaders allocates a new map with initial capacity of len(a)+len(b)
