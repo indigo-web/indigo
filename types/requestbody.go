@@ -1,7 +1,7 @@
 package types
 
 import (
-	"github.com/fakefloordiv/indigo/http"
+	"errors"
 	"github.com/fakefloordiv/indigo/internal"
 )
 
@@ -9,6 +9,8 @@ type (
 	onBodyCallback     func(b []byte) error
 	onCompleteCallback func(err error)
 )
+
+var ErrRead = errors.New("body has been already read")
 
 // requestBody is a struct that handles request body. Separated from types.Request
 // because contains a lot of internal logic and conventions
@@ -40,7 +42,7 @@ func newRequestBody() (requestBody, *internal.BodyGateway) {
 // to notify server back when we processed it because it has no sense
 func (r *requestBody) Read(onBody onBodyCallback, onComplete onCompleteCallback) (err error) {
 	if r.read {
-		return http.ErrRead
+		return ErrRead
 	}
 
 	r.read = true
