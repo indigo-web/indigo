@@ -84,6 +84,10 @@ func getRouter(t *testing.T) router.Router {
 		return types.WithResponse
 	})
 
+	r.Get("/get-resp-body", func(_ *types.Request) types.Response {
+		return types.WithResponse.WithBody(testRequestBody)
+	})
+
 	r.Get("/get-read-body", func(request *types.Request) types.Response {
 		require.Contains(t, request.Headers, testHeaderKey)
 		require.Equal(t, testHeaderValue, string(request.Headers[testHeaderKey]))
@@ -213,6 +217,37 @@ func TestAllCases(t *testing.T) {
 		require.Contains(t, resp.Header, "Server")
 		require.Equal(t, 1, len(resp.Header["Server"]))
 		require.Equal(t, "indigo", resp.Header["Server"][0])
+	})
+
+	t.Run("/get-resp-body", func(t *testing.T) {
+		resp, err := http.DefaultClient.Get(URL + "/get-resp-body")
+		require.NoError(t, err)
+		defer func() {
+			_ = resp.Body.Close()
+		}()
+
+		body, err := io.ReadAll(resp.Body)
+		require.NoError(t, err)
+		require.Equal(t, testRequestBody, string(body))
+	})
+
+	t.Run("/head", func(t *testing.T) {
+		resp, err := http.DefaultClient.Head(URL + "/get-resp-body")
+		require.NoError(t, err)
+		defer func() {
+			_ = resp.Body.Close()
+		}()
+
+		require.Equal(t, http.StatusOK, resp.StatusCode)
+		require.Equal(t, "200 "+http.StatusText(http.StatusOK), resp.Status)
+		require.Equal(t, "HTTP/1.1", resp.Proto)
+		require.Contains(t, resp.Header, "Server")
+		require.Equal(t, 1, len(resp.Header["Server"]))
+		require.Equal(t, "indigo", resp.Header["Server"][0])
+
+		body, err := io.ReadAll(resp.Body)
+		require.NoError(t, err)
+		require.Empty(t, string(body))
 	})
 
 	t.Run("/get-read-body", func(t *testing.T) {
