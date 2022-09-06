@@ -5,7 +5,7 @@ import (
 )
 
 type (
-	Decoder func([]byte) []byte
+	Decoder func([]byte) ([]byte, error)
 )
 
 // ContentEncodings is just a structure that encapsulates containing

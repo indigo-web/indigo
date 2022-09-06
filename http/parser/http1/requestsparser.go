@@ -481,14 +481,16 @@ func (p *httpRequestsParser) Parse(data []byte) (state parser.RequestState, extr
 // lengths
 func (p *httpRequestsParser) parseBody(b []byte) (done bool, extra []byte, err error) {
 	if p.chunkedTransferEncoding {
-		// TODO: implement body decoding in chunked body parser by passing decoder here
-		return p.chunkedBodyParser.Parse(b)
+		return p.chunkedBodyParser.Parse(b, p.decoder)
 	}
 
 	if p.lengthCountdown <= uint(len(b)) {
 		piece := b[:p.lengthCountdown]
 		if p.decodeBody {
-			piece = p.decoder(piece)
+			piece, err = p.decoder(piece)
+			if err != nil {
+				return true, nil, err
+			}
 		}
 
 		p.body.Data <- piece
@@ -501,7 +503,10 @@ func (p *httpRequestsParser) parseBody(b []byte) (done bool, extra []byte, err e
 
 	piece := b
 	if p.decodeBody {
-		piece = p.decoder(b)
+		piece, err = p.decoder(b)
+		if err != nil {
+			return true, nil, err
+		}
 	}
 
 	p.body.Data <- piece
