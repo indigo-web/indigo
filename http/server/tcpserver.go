@@ -79,6 +79,9 @@ func noTimeoutConnHandler(conn net.Conn, handleData dataHandler, buff []byte) {
 	}
 }
 
+// timeoutConnHandler on each read creates a new timer because time.After does not automatically
+// release its underlying timer, so this causes memory leaks. In case timeout occurred,
+// connection is closing, so both current and readFromConn goroutines are releasing
 func timeoutConnHandler(conn net.Conn, handleData dataHandler, timeout int, buff []byte) {
 	ch := make(chan int)
 	go readFromConn(ch, conn, buff)
@@ -110,6 +113,10 @@ func timeoutConnHandler(conn net.Conn, handleData dataHandler, timeout int, buff
 	}
 }
 
+// readFromConn simply starts a reading loop, sending to a channel number of bytes
+// read. This works because we know that our byte-slice buffer has fixed size, so
+// it never grows. As a result, we can pass it by value, and it will always modify
+// a single underlying array for everyone
 func readFromConn(ch chan int, conn net.Conn, buff []byte) {
 	for {
 		n, err := conn.Read(buff)
