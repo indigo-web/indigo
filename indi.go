@@ -123,7 +123,9 @@ func (a Application) Serve(r router.Router, someSettings ...settings2.Settings) 
 		go httpServer.Run()
 
 		readBuff := make([]byte, settings.TCPServer.Read.Default)
-		server.DefaultConnHandler(wg, conn, readBuff, httpServer.OnData)
+		server.DefaultConnHandler(
+			wg, conn, settings.TCPServer.IDLEConnLifetime, httpServer.OnData, readBuff,
+		)
 	}, a.shutdown)
 }
 

@@ -96,7 +96,8 @@ type (
 		// IDLEConnLifetime is a timer in seconds, after expiration of which one IDLE
 		// connection will be actively closed by server.
 		// IDLE conn is a connection that does not send anything
-		IDLEConnLifetime uint
+		// -1 as value disables timeouts at all
+		IDLEConnLifetime int
 	}
 
 	Body struct {

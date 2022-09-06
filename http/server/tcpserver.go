@@ -1,16 +1,18 @@
 package server
 
 import (
+	"github.com/fakefloordiv/indigo/http"
 	"net"
 	"sync"
-
-	"github.com/fakefloordiv/indigo/http"
+	"time"
 )
 
 type (
 	connHandler func(*sync.WaitGroup, net.Conn)
 	dataHandler func([]byte) error
 )
+
+const processed = 0
 
 // StartTCPServer just starts an accept-loop, starting a goroutine provided as a
 // handleConn callback for each connection
@@ -46,9 +48,23 @@ func StartTCPServer(sock net.Listener, handleConn connHandler, sd chan bool) err
 //    of disconnect (normally it is not possible)
 // Errors occurred while reading socket, will be ignored and user will only know that
 // client has disconnected, even if server is guilty
-func DefaultConnHandler(wg *sync.WaitGroup, conn net.Conn, buff []byte, handleData dataHandler) {
+//
+// In case timeout is -1 (disabled), ordinary tcp server will be started, removing
+// overhead from channels
+func DefaultConnHandler(
+	wg *sync.WaitGroup, conn net.Conn, timeout int, handleData dataHandler, buff []byte,
+) {
 	defer wg.Done()
 
+	switch timeout {
+	case -1:
+		noTimeoutConnHandler(conn, handleData, buff)
+	default:
+		timeoutConnHandler(conn, handleData, timeout, buff)
+	}
+}
+
+func noTimeoutConnHandler(conn net.Conn, handleData dataHandler, buff []byte) {
 	for {
 		n, err := conn.Read(buff)
 		err2 := handleData(buff[:n])
@@ -60,5 +76,42 @@ func DefaultConnHandler(wg *sync.WaitGroup, conn net.Conn, buff []byte, handleDa
 
 			return
 		}
+	}
+}
+
+func timeoutConnHandler(conn net.Conn, handleData dataHandler, timeout int, buff []byte) {
+	ch := make(chan int)
+	go readFromConn(ch, conn, buff)
+
+	for {
+		select {
+		case n := <-ch:
+			if err := handleData(buff[:n]); err != nil || n == 0 {
+				if err != http.ErrHijackConn {
+					_ = conn.Close()
+				}
+
+				return
+			}
+
+			ch <- processed
+		case <-time.After(time.Duration(timeout) * time.Second):
+			_ = conn.Close()
+			<-ch
+			return
+		}
+	}
+}
+
+func readFromConn(ch chan int, conn net.Conn, buff []byte) {
+	for {
+		n, err := conn.Read(buff)
+		if err != nil || n == 0 {
+			ch <- 0
+			return
+		}
+
+		ch <- n
+		<-ch
 	}
 }
