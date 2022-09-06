@@ -4,6 +4,7 @@ import (
 	"bytes"
 	stderrors "errors"
 	"fmt"
+	"github.com/fakefloordiv/indigo/settings"
 	"io"
 	"net"
 	"net/http"
@@ -175,12 +176,14 @@ func TestAllCases(t *testing.T) {
 	// is a lot of time)
 
 	r := getRouter(t)
+	s := settings.Default()
+	s.TCPServer.IDLEConnLifetime = 2
 	app := NewApp(addr)
 
 	shutdown := make(chan bool)
 
 	go func() {
-		require.Equal(t, http2.ErrShutdown, app.Serve(r))
+		require.Equal(t, http2.ErrShutdown, app.Serve(r, s))
 		shutdown <- true
 	}()
 
@@ -294,6 +297,16 @@ func TestAllCases(t *testing.T) {
 		data, err := io.ReadAll(resp.Body)
 		require.NoError(t, err)
 		require.Equal(t, testFileIfNotFound, string(data))
+	})
+
+	t.Run("/test-idle-disconnect", func(t *testing.T) {
+		conn, err := net.Dial("tcp4", addr)
+		require.NoError(t, err)
+
+		buff := make([]byte, 10)
+		n, err := conn.Read(buff)
+		require.Zero(t, n)
+		require.EqualError(t, err, io.EOF.Error())
 	})
 
 	http.DefaultClient.CloseIdleConnections()
