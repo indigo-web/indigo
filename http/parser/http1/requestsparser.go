@@ -412,7 +412,6 @@ func (p *httpRequestsParser) Parse(data []byte) (state parser.RequestState, extr
 		case eHeaderValueCRLF:
 			key := string(p.headerBuff)
 			value := p.headersManager.FinalizeValue(key)
-			p.request.Headers[key] = value
 
 			switch internal.B2S(p.headerBuff) {
 			case "content-length":
