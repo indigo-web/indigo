@@ -1,7 +1,6 @@
 package router
 
 import (
-	"github.com/fakefloordiv/indigo/http/headers"
 	"github.com/fakefloordiv/indigo/types"
 )
 
@@ -12,12 +11,12 @@ import (
 //         and when you are ready, just notify core that he can safely close
 //         the connection (even if it's already closed from client side)
 type Router interface {
-	OnRequest(request *types.Request, writer types.ResponseWriter) error
-	OnError(request *types.Request, writer types.ResponseWriter, err error)
+	OnRequest(request *types.Request, render types.Render) error
+	OnError(request *types.Request, render types.Render, err error)
 }
 
 // OnStart called when server is initialized and started. Can be implemented
 // optionally
 type OnStart interface {
-	OnStart(defaultHeaders headers.Headers)
+	OnStart()
 }
