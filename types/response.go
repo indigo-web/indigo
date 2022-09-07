@@ -7,7 +7,8 @@ import (
 )
 
 type (
-	ResponseWriter func([]byte) error
+	ResponseWriter func(b []byte) error
+	Render         func(response Response) error
 	FileErrHandler func(err error) Response
 )
 
@@ -85,6 +86,10 @@ func (r Response) WithFile(path string, handler FileErrHandler) Response {
 	r.Filename = path
 	r.handler = handler
 	return r
+}
+
+func (r Response) WithError(err error) Response {
+	return r.WithCode(status.InternalServerError).WithBody(err.Error())
 }
 
 func (r Response) Headers() headers.Headers {
