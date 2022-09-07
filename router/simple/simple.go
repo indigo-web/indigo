@@ -27,7 +27,7 @@ func (r router) OnRequest(request *types.Request, render types.Render) error {
 	return render(r.handler(request))
 }
 
-func (r router) OnError(_ *types.Request, render types.Render, _ error) {
+func (router) OnError(_ *types.Request, render types.Render, _ error) {
 	_ = render(defaultErrResponse)
 }
 
