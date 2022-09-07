@@ -1,8 +1,9 @@
 package server
 
 import (
-	"github.com/fakefloordiv/indigo/http/render"
 	"net"
+
+	"github.com/fakefloordiv/indigo/http/render"
 
 	"github.com/fakefloordiv/indigo/http"
 
