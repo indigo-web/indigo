@@ -21,7 +21,7 @@ var (
 	simpleGET            = []byte("GET / HTTP/1.1\r\n\r\n")
 	simpleGETLeadingCRLF = []byte("\r\n\r\nGET / HTTP/1.1\r\n\r\n")
 	simpleGETAbsPath     = []byte("GET http://www.w3.org/pub/WWW/TheProject.html HTTP/1.1\r\n\r\n")
-	biggerGET            = []byte("GET / HTTP/1.1\r\nHello: World!\r\n\r\n")
+	biggerGET            = []byte("GET / HTTP/1.1\r\nHello: World!\r\nEaster: Egg\r\n\r\n")
 
 	simpleGETQuery = []byte("GET /path?hel+lo=wor+ld HTTP/1.1\r\n\r\n")
 
@@ -76,10 +76,6 @@ func compareRequests(t *testing.T, wanted wantedRequest, actual *types.Request) 
 	}
 }
 
-func copySlice(src []byte) (copied []byte) {
-	return append(copied, src...)
-}
-
 func splitIntoParts(req []byte, n int) (parts [][]byte) {
 	for i := 0; i < len(req); i += n {
 		end := i + n
@@ -87,7 +83,7 @@ func splitIntoParts(req []byte, n int) (parts [][]byte) {
 			end = len(req)
 		}
 
-		parts = append(parts, copySlice(req[i:end]))
+		parts = append(parts, req[i:end])
 	}
 
 	return parts
