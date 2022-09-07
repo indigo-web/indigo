@@ -17,7 +17,6 @@ func (d DefaultRouter) Group(prefix string) *DefaultRouter {
 		middlewares: append(newMiddlewares, d.middlewares...),
 		routes:      make(routesMap),
 		errHandlers: d.errHandlers,
-		renderer:    d.renderer,
 	}
 
 	d.root.groups = append(d.root.groups, *r)
