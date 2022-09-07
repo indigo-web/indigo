@@ -23,6 +23,8 @@ var (
 	simpleGETAbsPath     = []byte("GET http://www.w3.org/pub/WWW/TheProject.html HTTP/1.1\r\n\r\n")
 	biggerGET            = []byte("GET / HTTP/1.1\r\nHello: World!\r\n\r\n")
 
+	simpleGETQuery = []byte("GET /path?hel+lo=wor+ld HTTP/1.1\r\n\r\n")
+
 	biggerGETOnlyLF     = []byte("GET / HTTP/1.1\nHello: World!\n\n")
 	biggerGETURLEncoded = []byte("GET /hello%20world HTTP/1.1\r\n\r\n")
 
@@ -339,6 +341,29 @@ func TestHttpRequestsParser_ParsePOST(t *testing.T) {
 			compareRequests(t, wanted, request)
 			require.NoError(t, request.Reset())
 		}
+	})
+
+	t.Run("SimpleGETWithQuery", func(t *testing.T) {
+		ch := make(chan []byte)
+		go readBody(request, ch)
+		state, extra, err := parser.Parse(simpleGETQuery)
+		parser.FinalizeBody()
+
+		require.NoError(t, err)
+		require.Equal(t, httpparser.RequestCompleted, state)
+		require.Empty(t, extra)
+		require.Empty(t, <-ch)
+
+		wanted := wantedRequest{
+			Method:   methods.GET,
+			Path:     "/path",
+			Protocol: proto.HTTP11,
+			Headers:  testHeaders{},
+		}
+
+		compareRequests(t, wanted, request)
+		require.Equal(t, "hel lo=wor ld", string(request.Query.Raw()))
+		require.NoError(t, request.Reset())
 	})
 }
 
