@@ -1,6 +1,7 @@
 package server
 
 import (
+	"github.com/fakefloordiv/indigo/http/render"
 	"net"
 
 	"github.com/fakefloordiv/indigo/http"
@@ -10,13 +11,14 @@ import (
 	"github.com/fakefloordiv/indigo/types"
 )
 
-// HTTPServer provides 2 methods:
+// HTTPServer provides 3 methods:
 // - Run: starts requests processor, or what they need I don't know.
 //        Method is supposed to be blocking, so in a separated goroutine
 //        expected to be started
 // - OnData: main thing here. It parses request, and sends a signal into
 //           the gateway to notify requests processor goroutine, or what
 //           they need I don't know
+// - HijackConn: connection hijacker, of course
 type HTTPServer interface {
 	Run()
 	OnData(b []byte) error
@@ -29,22 +31,27 @@ type httpServer struct {
 	router     router.Router
 	parser     parser.HTTPRequestsParser
 	conn       net.Conn
+	renderer   *render.Renderer
 
 	notifier chan serverState
 	err      error
 }
 
 func NewHTTPServer(
-	req *types.Request, respWriter types.ResponseWriter, router router.Router,
-	parser parser.HTTPRequestsParser, conn net.Conn,
+	req *types.Request, router router.Router, parser parser.HTTPRequestsParser,
+	conn net.Conn, renderer *render.Renderer,
 ) HTTPServer {
 	return &httpServer{
-		request:    req,
-		respWriter: respWriter,
-		router:     router,
-		parser:     parser,
-		conn:       conn,
-		notifier:   make(chan serverState),
+		request: req,
+		respWriter: func(b []byte) error {
+			_, err := conn.Write(b)
+			return err
+		},
+		router:   router,
+		parser:   parser,
+		conn:     conn,
+		renderer: renderer,
+		notifier: make(chan serverState),
 	}
 }
 
@@ -110,6 +117,8 @@ func (h *httpServer) OnData(data []byte) (err error) {
 			<-h.notifier
 
 			return err
+		default:
+			panic("BUG: http/server/httpserver.go:OnData(): received unknown state")
 		}
 	}
 
@@ -120,6 +129,10 @@ func (h *httpServer) OnData(data []byte) (err error) {
 // space), it receives a signal from notifier chan and decides what to do starting
 // from the actual signal. Also, when called, calls router OnStart() method
 func (h *httpServer) requestProcessor() {
+	renderer := func(response types.Response) error {
+		return h.renderer.Response(h.request, response, h.respWriter)
+	}
+
 	for {
 		switch <-h.notifier {
 		case eHeadersCompleted:
@@ -129,7 +142,7 @@ func (h *httpServer) requestProcessor() {
 			// request processor... Also doesn't know about hijacking! That's why
 			// here we are checking a notifier chan whether it's nil (it may be nil
 			// ONLY here and ONLY because of hijacking)
-			if h.router.OnRequest(h.request, h.respWriter) != nil {
+			if h.router.OnRequest(h.request, renderer) != nil {
 				// request object must be reset in any way because otherwise
 				// deadlock will happen here
 				_ = h.request.Reset()
@@ -141,14 +154,14 @@ func (h *httpServer) requestProcessor() {
 				return
 			}
 			if err := h.request.Reset(); err != nil {
-				h.router.OnError(h.request, h.respWriter, err)
+				h.router.OnError(h.request, renderer, err)
 				h.notifier <- eError
 				return
 			}
 
 			h.notifier <- eProcessed
 		case eError:
-			h.router.OnError(h.request, h.respWriter, h.err)
+			h.router.OnError(h.request, renderer, h.err)
 			h.notifier <- eProcessed
 			return
 		default:
