@@ -2,7 +2,6 @@ package simple
 
 import (
 	"github.com/fakefloordiv/indigo/http/encodings"
-	"github.com/fakefloordiv/indigo/http/render"
 	"github.com/fakefloordiv/indigo/http/status"
 	router2 "github.com/fakefloordiv/indigo/router"
 	"github.com/fakefloordiv/indigo/router/inbuilt"
@@ -15,23 +14,21 @@ var defaultErrResponse = types.WithResponse.
 
 // router TODO: add error handler and content encodings setter. Simple does not mean castrated
 type router struct {
-	handler  inbuilt.HandlerFunc
-	renderer *render.Renderer
+	handler inbuilt.HandlerFunc
 }
 
 func NewRouter(handler inbuilt.HandlerFunc) router2.Router {
 	return router{
-		handler:  handler,
-		renderer: render.NewRenderer(nil),
+		handler: handler,
 	}
 }
 
-func (r router) OnRequest(request *types.Request, respWriter types.ResponseWriter) error {
-	return r.renderer.Response(request, r.handler(request), respWriter)
+func (r router) OnRequest(request *types.Request, render types.Render) error {
+	return render(r.handler(request))
 }
 
-func (r router) OnError(request *types.Request, respWriter types.ResponseWriter, _ error) {
-	_ = r.renderer.Response(request, defaultErrResponse, respWriter)
+func (r router) OnError(_ *types.Request, render types.Render, _ error) {
+	_ = render(defaultErrResponse)
 }
 
 func (router) GetContentEncodings() encodings.ContentEncodings {
