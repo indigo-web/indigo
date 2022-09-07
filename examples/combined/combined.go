@@ -31,8 +31,7 @@ func IndexSay(request *types.Request) types.Response {
 
 	body, err := request.Body()
 	if err != nil {
-		// TODO: add WithError to pass directly error
-		return types.WithResponse.WithCode(status.BadRequest)
+		return types.WithResponse.WithError(err)
 	}
 
 	fmt.Println("Somebody said:", strconv.Quote(string(body)))

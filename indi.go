@@ -5,6 +5,8 @@ import (
 	"net"
 	"sync"
 
+	"github.com/fakefloordiv/indigo/http/render"
+
 	"github.com/fakefloordiv/indigo/http/encodings"
 	"github.com/fakefloordiv/indigo/http/headers"
 	"github.com/fakefloordiv/indigo/http/parser/http1"
@@ -88,7 +90,7 @@ func (a Application) Serve(r router.Router, someSettings ...settings2.Settings) 
 	}
 
 	if onStart, ok := r.(router.OnStart); ok {
-		onStart.OnStart(a.defaultHeaders)
+		onStart.OnStart()
 	}
 
 	settings, err := getSettings(someSettings...)
@@ -115,10 +117,9 @@ func (a Application) Serve(r router.Router, someSettings ...settings2.Settings) 
 			request, gateway, startLineBuff, headerBuff, settings, &headersManager, a.codings,
 		)
 
-		httpServer := server.NewHTTPServer(request, func(b []byte) (err error) {
-			_, err = conn.Write(b)
-			return err
-		}, r, httpParser, conn)
+		renderer := render.NewRenderer(nil, a.defaultHeaders)
+
+		httpServer := server.NewHTTPServer(request, r, httpParser, conn, renderer)
 		go httpServer.Run()
 
 		readBuff := make([]byte, settings.TCPServer.Read.Default)

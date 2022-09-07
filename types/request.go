@@ -85,7 +85,8 @@ func (r *Request) Body() ([]byte, error) {
 	return r.bodyBuff, err
 }
 
-// Reset resets request object. It is made to clear the object between requests
+// Reset resets request headers and reads body into nowhere until completed.
+// It is implemented to clear the request object between requests
 func (r *Request) Reset() error {
 	r.headersManager.Reset()
 	r.Headers = r.headersManager.Headers

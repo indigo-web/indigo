@@ -2,7 +2,6 @@ package inbuilt
 
 import (
 	"github.com/fakefloordiv/indigo/http"
-	"github.com/fakefloordiv/indigo/http/headers"
 	methods "github.com/fakefloordiv/indigo/http/method"
 	"github.com/fakefloordiv/indigo/types"
 )
@@ -13,17 +12,15 @@ This file contains core-callbacks that are called by server core.
 Methods listed here MUST NOT be called by user ever
 */
 
-// OnStart applies default headers and composes all the registered handlers with middlewares
-// and sets passed default headers from application to renderer
-func (d DefaultRouter) OnStart(defaultHeaders headers.Headers) {
-	d.renderer.SetDefaultHeaders(defaultHeaders)
+// OnStart composes all the registered handlers with middlewares
+func (d DefaultRouter) OnStart() {
 	d.applyGroups()
 	d.applyMiddlewares()
 }
 
 // OnRequest routes the request
-func (d DefaultRouter) OnRequest(request *types.Request, respWriter types.ResponseWriter) error {
-	return d.renderer.Response(request, d.processRequest(request), respWriter)
+func (d DefaultRouter) OnRequest(request *types.Request, render types.Render) error {
+	return render(d.processRequest(request))
 }
 
 func (d DefaultRouter) processRequest(request *types.Request) types.Response {
@@ -53,7 +50,7 @@ func (d DefaultRouter) processRequest(request *types.Request) types.Response {
 }
 
 // OnError receives error and decides, which error handler is better to use in this case
-func (d DefaultRouter) OnError(request *types.Request, respWriter types.ResponseWriter, err error) {
+func (d DefaultRouter) OnError(request *types.Request, render types.Render, err error) {
 	response := d.errHandlers[err](request)
-	_ = d.renderer.Response(request, response, respWriter)
+	_ = render(response)
 }

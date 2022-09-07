@@ -2,7 +2,6 @@ package inbuilt
 
 import (
 	methods "github.com/fakefloordiv/indigo/http/method"
-	"github.com/fakefloordiv/indigo/http/render"
 	"github.com/fakefloordiv/indigo/types"
 )
 
@@ -37,8 +36,6 @@ type DefaultRouter struct {
 
 	routes      routesMap
 	errHandlers errHandlers
-
-	renderer *render.Renderer
 }
 
 // NewRouter constructs a new instance of inbuilt router. Error handlers
@@ -47,8 +44,6 @@ func NewRouter() *DefaultRouter {
 	r := &DefaultRouter{
 		routes:      make(routesMap),
 		errHandlers: newErrHandlers(),
-		// let the first time response be rendered into the nil buffer
-		renderer: render.NewRenderer(nil),
 	}
 
 	r.root = r

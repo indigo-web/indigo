@@ -6,6 +6,8 @@ import (
 )
 
 func Parse(data []byte, queryMapFactory func() map[string][]byte) (queries map[string][]byte, err error) {
+	// TODO: make queryMapFactory map[string][]string, just like headers
+
 	var (
 		offset int
 		key    string
@@ -13,6 +15,10 @@ func Parse(data []byte, queryMapFactory func() map[string][]byte) (queries map[s
 
 	state := eKey
 	queries = queryMapFactory()
+
+	if len(data) == 0 {
+		return queries, nil
+	}
 
 	for i := range data {
 		switch state {

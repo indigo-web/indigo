@@ -38,14 +38,11 @@ type Renderer struct {
 	defaultHeaders headers.Headers
 }
 
-func NewRenderer(buff []byte) *Renderer {
+func NewRenderer(buff []byte, defaultHeaders headers.Headers) *Renderer {
 	return &Renderer{
-		buff: buff,
+		buff:           buff,
+		defaultHeaders: defaultHeaders,
 	}
-}
-
-func (r *Renderer) SetDefaultHeaders(h headers.Headers) {
-	r.defaultHeaders = h
 }
 
 // Response method is rendering types.Response object into some buffer and then writes
