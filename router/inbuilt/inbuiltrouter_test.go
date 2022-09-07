@@ -117,7 +117,7 @@ func TestGroups(t *testing.T) {
 	v2 := api.Group("/v2")
 	v2.Get("/world", nopHandler)
 
-	r.OnStart(nil)
+	r.OnStart()
 
 	require.Contains(t, r.routes, "/")
 	require.Contains(t, r.routes, "/api/v1/hello")

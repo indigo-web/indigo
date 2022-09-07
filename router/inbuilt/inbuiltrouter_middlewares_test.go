@@ -19,7 +19,7 @@ of specific stuff for testing only middlewares. Decided it's better to
 separate it from all the other tests
 */
 
-func nopRespWriter(_ []byte) error {
+func nopRespWriter(_ types.Response) error {
 	return nil
 }
 
@@ -139,7 +139,7 @@ func TestMiddlewares(t *testing.T) {
 	v2.Get("/world", nopHandler, pointApplied2mware)
 	v2.Use(local3mware)
 
-	r.OnStart(nil)
+	r.OnStart()
 
 	t.Run("/", func(t *testing.T) {
 		request, _ := getRequest()
