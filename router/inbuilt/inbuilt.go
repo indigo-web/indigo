@@ -27,6 +27,7 @@ type (
 // 4) Encoding/decoding incoming content
 // 5) Routing by path and method. If path not found, 404 Not Found is returned.
 //    If path is found, but no method attached, 413 Method Not Allowed is returned.
+// TODO: add PUT-request handlers
 type DefaultRouter struct {
 	root   *DefaultRouter
 	groups []DefaultRouter
