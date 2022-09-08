@@ -62,27 +62,69 @@ func (r Response) WithStatus(status status.Status) Response {
 	return r
 }
 
-// WithHeader sets header values to a key. In case it already exists it will
-// be overridden
+// WithHeader sets header values to a key. In case it already exists the value will
+// be appended
 func (r Response) WithHeader(key string, values ...string) Response {
 	if r.headers == nil {
 		r.headers = make(headers.Headers, initialRespHeadersSize)
 	}
 
-	r.headers[key] = values
+	hdrs, found := r.headers[key]
+	if !found {
+		r.headers[key] = strHeaders2Headers(values...)
+	} else {
+		r.headers[key] = append(hdrs, strHeaders2Headers(values...)...)
+	}
 
 	return r
 }
 
-// WithHeaders applies WithHeader to a whole map
-func (r Response) WithHeaders(headers headers.Headers) Response {
-	response := r
+func (r Response) WithHeaderQ(key string, value string, q uint8) Response {
+	if r.headers == nil {
+		r.headers = make(headers.Headers, initialRespHeadersSize)
+		r.headers[key] = []headers.Header{
+			{
+				Value: value,
+				Q:     q,
+			},
+		}
 
-	for key, values := range headers {
-		response = response.WithHeader(key, values...)
+		return r
 	}
 
-	return response
+	hdrs, found := r.headers[key]
+	if !found {
+		r.headers[key] = []headers.Header{
+			{
+				Value: value,
+				Q:     q,
+			},
+		}
+	} else {
+		r.headers[key] = append(hdrs, headers.Header{
+			Value: value,
+			Q:     q,
+		})
+	}
+
+	return r
+}
+
+// WithHeaders simply merges passed headers into response. Also, it is the only
+// way to specify a quality marker of value. In case headers were not initialized
+// before, response headers will be set to a passed map, so editing this map
+// will affect response
+func (r Response) WithHeaders(headers headers.Headers) Response {
+	if r.headers == nil {
+		r.headers = headers
+		return r
+	}
+
+	for k, v := range headers {
+		r.headers[k] = v
+	}
+
+	return r
 }
 
 // WithBody sets a string as a response body. This will override already-existing
@@ -136,4 +178,16 @@ func (r Response) Headers() headers.Headers {
 // File returns response filename and error handler
 func (r Response) File() (string, FileErrHandler) {
 	return r.Filename, r.handler
+}
+
+func strHeaders2Headers(strHeaders ...string) []headers.Header {
+	hdrs := make([]headers.Header, len(strHeaders))
+
+	for i := range strHeaders {
+		hdrs[i] = headers.Header{
+			Value: strHeaders[i],
+		}
+	}
+
+	return hdrs
 }
