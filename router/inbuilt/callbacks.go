@@ -54,6 +54,7 @@ func (d DefaultRouter) processRequest(request *types.Request) types.Response {
 			return renderRequest(request)
 		}
 
+		// TODO: add request ctx so I can pass a list of allowed methods here
 		return d.errHandlers[http.ErrMethodNotAllowed](request)
 	}
 }
@@ -82,10 +83,10 @@ func renderHeadersInto(headers headers.Headers, response types.Response) types.R
 		response = response.WithBodyAppend(k).WithBodyAppend(http.COLON).WithBodyAppend(http.SP)
 
 		for i := 0; i < len(v)-1; i++ {
-			response = response.WithBodyAppend(v[i] + http.COMMA)
+			response = response.WithBodyAppend(v[i].Value + http.COMMA)
 		}
 
-		response = response.WithBodyAppend(v[len(v)-1]).WithBodyByteAppend(http.CRLF)
+		response = response.WithBodyAppend(v[len(v)-1].Value).WithBodyByteAppend(http.CRLF)
 	}
 
 	return response

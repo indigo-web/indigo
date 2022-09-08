@@ -42,10 +42,18 @@ const (
 )
 
 var defaultHeaders = headers.Headers{
-	"Server":           []string{defaultServer},
-	"Connection":       []string{defaultConnection},
-	"Content-Type":     []string{defaultContentType},
-	"Accept-Encodings": []string{defaultAcceptEncodings},
+	"Server": []headers.Header{
+		{Value: defaultServer},
+	},
+	"Connection": []headers.Header{
+		{Value: defaultConnection},
+	},
+	"Content-Type": []headers.Header{
+		{Value: defaultContentType},
+	},
+	"Accept-Encodings": []headers.Header{
+		{Value: defaultAcceptEncodings},
+	},
 }
 
 // Application is just a struct with addr and shutdown channel that is currently
@@ -85,7 +93,7 @@ func (a *Application) SetDefaultHeaders(headers headers.Headers) {
 // Also, if specified, Accept-Encodings default header's value will be set here
 func (a Application) Serve(r router.Router, someSettings ...settings2.Settings) error {
 	if _, found := a.defaultHeaders["Accept-Encodings"]; found {
-		a.defaultHeaders["Accept-Encodings"] = a.codings.Acceptable()
+		a.defaultHeaders["Accept-Encodings"] = acceptableCodingsHeader(a.codings.Acceptable())
 	}
 
 	if onStart, ok := r.(router.OnStart); ok {
@@ -147,4 +155,14 @@ func getSettings(settings ...settings2.Settings) (settings2.Settings, error) {
 	default:
 		return settings2.Settings{}, errors.New("too many settings (none or single struct is expected)")
 	}
+}
+
+func acceptableCodingsHeader(acceptable []string) (values []headers.Header) {
+	for i := range acceptable {
+		values = append(values, headers.Header{
+			Value: acceptable[i],
+		})
+	}
+
+	return values
 }

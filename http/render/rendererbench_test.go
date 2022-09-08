@@ -15,22 +15,50 @@ func nopWriter(_ []byte) error {
 func BenchmarkRenderer_Response(b *testing.B) {
 	buff := make([]byte, 0, 1024)
 	defaultHeadersSmall := headers.Headers{
-		"Server": {"indigo"},
+		"Server": []headers.Header{
+			{Value: "indigo"},
+		},
 	}
 	defaultHeadersMedium := headers.Headers{
-		"Server":           {"indigo"},
-		"Connection":       {"keep-alive"},
-		"Accept-Encodings": {"identity"},
+		"Server": []headers.Header{
+			{Value: "indigo"},
+		},
+		"Connection": []headers.Header{
+			{Value: "keep-alive"},
+		},
+		"Accept-Encodings": []headers.Header{
+			{Value: "identity"},
+		},
 	}
 	defaultHeadersBig := headers.Headers{
-		"Server":           {"indigo"},
-		"Connection":       {"keep-alive"},
-		"Accept-Encodings": {"identity"},
-		"Easter":           {"Egg"},
-		"Multiple":         {"choices", "variants", "ways"},
-		"Something":        {"is not happening"},
-		"Talking":          {"allowed"},
-		"Lorem":            {"ipsum", "doremi"},
+		"Server": []headers.Header{
+			{Value: "indigo"},
+		},
+		"Connection": []headers.Header{
+			{Value: "keep-alive"},
+		},
+		"Accept-Encodings": []headers.Header{
+			{Value: "identity"},
+		},
+		"Easter": []headers.Header{
+			{Value: "Egg"},
+		},
+		"Multiple": []headers.Header{
+			{Value: "choices"},
+			{Value: "variants"},
+			{Value: "ways"},
+			{Value: "solutions"},
+		},
+		"Something": []headers.Header{
+			{Value: "is not happening"},
+		},
+		"Talking": []headers.Header{
+			{Value: "allowed"},
+		},
+		"Lorem": []headers.Header{
+			{Value: "ipsum"},
+			{Value: "doremi"},
+		},
 	}
 
 	manager := headers.NewManager(settings.Default().Headers)
