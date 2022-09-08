@@ -407,6 +407,11 @@ func (p *httpRequestsParser) Parse(data []byte) (state parser.RequestState, extr
 				// In case it is a system header like Content-Length, Connection, etc., we just ignore it
 				// because they anyway must not include commas in their values
 				p.state = eHeaderValueComma
+
+				if p.quality == 0 {
+					p.quality = 10
+				}
+
 				// TODO: only Accept header is allowed here, but currently we do not
 				//       support it. Check whether there are more system headers we have
 				//       to recognize
@@ -435,6 +440,11 @@ func (p *httpRequestsParser) Parse(data []byte) (state parser.RequestState, extr
 				p.state = eHeaderValueBackslash
 			case ',':
 				p.state = eHeaderValueComma
+
+				if p.quality == 0 {
+					p.quality = 10
+				}
+
 				_ = p.headersManager.FinalizeValue(string(p.headerBuff), p.quality)
 				p.quality = 0
 				_ = p.headersManager.BeginValue()
@@ -461,6 +471,11 @@ func (p *httpRequestsParser) Parse(data []byte) (state parser.RequestState, extr
 				p.state = eHeaderValueBackslash
 			case ',':
 				p.state = eHeaderValueComma
+
+				if p.quality == 0 {
+					p.quality = 10
+				}
+
 				_ = p.headersManager.FinalizeValue(string(p.headerBuff), p.quality)
 				p.quality = 0
 				_ = p.headersManager.BeginValue()
@@ -505,6 +520,10 @@ func (p *httpRequestsParser) Parse(data []byte) (state parser.RequestState, extr
 			case '\n':
 				p.state = eHeaderValueCRLF
 			case ',':
+				if p.quality == 0 {
+					p.quality = 10
+				}
+
 				_ = p.headersManager.FinalizeValue(string(p.headerBuff), p.quality)
 				p.quality = 0
 				_ = p.headersManager.BeginValue()
@@ -570,6 +589,10 @@ func (p *httpRequestsParser) Parse(data []byte) (state parser.RequestState, extr
 				return parser.Error, nil, http.ErrBadRequest
 			}
 		case eHeaderValueCRLF:
+			if p.quality == 0 {
+				p.quality = 10
+			}
+
 			key := string(p.headerBuff)
 			value := p.headersManager.FinalizeValue(key, p.quality)
 			p.quality = 0
