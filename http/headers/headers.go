@@ -3,10 +3,49 @@ package headers
 import (
 	"github.com/fakefloordiv/indigo/internal"
 	"github.com/fakefloordiv/indigo/settings"
+	"strconv"
 )
 
+type Header struct {
+	// Value is a value of header
+	Value string
+	// Q is a quality marker. It is an integer 0..9 that represents a floating
+	// part of q float value. 1.0 float is not supported, max 0.9
+	Q uint8
+}
+
+func (h Header) QualityString() string {
+	switch h.Q {
+	case 0:
+		return "0"
+	case 1:
+		return "1"
+	case 2:
+		return "2"
+	case 3:
+		return "3"
+	case 4:
+		return "4"
+	case 5:
+		return "5"
+	case 6:
+		return "6"
+	case 7:
+		return "7"
+	case 8:
+		return "8"
+	case 9:
+		return "9"
+	case 10:
+		return "10"
+	default:
+		// this must not happen, but in case - fallback to a slower variant
+		return strconv.Itoa(int(h.Q))
+	}
+}
+
 type (
-	Headers       map[string][]string
+	Headers       map[string][]Header
 	ValueAppender func(b []byte) int
 )
 
@@ -52,14 +91,16 @@ func (m *Manager) AppendValue(char byte) (exceeded bool) {
 
 // FinalizeValue just marks that we are done with our header value. It
 // takes provided key and adds a new entry into the headers map
-func (m Manager) FinalizeValue(key string) (finalValue string) {
+func (m Manager) FinalizeValue(key string, q uint8) (finalValue string) {
 	finalValue = internal.B2S(m.Values[m.valueBegin:])
 
-	values, found := m.Headers[key]
+	headers, found := m.Headers[key]
 	if !found {
-		m.Headers[key] = []string{finalValue}
+		m.Headers[key] = []Header{
+			{finalValue, q},
+		}
 	} else {
-		m.Headers[key] = append(values, finalValue)
+		m.Headers[key] = append(headers, Header{finalValue, q})
 	}
 
 	return finalValue
