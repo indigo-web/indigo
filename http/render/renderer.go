@@ -69,8 +69,8 @@ func (r *Renderer) Response(
 	case true:
 		// in case request Connection header is set to close, this response must be the last
 		// one, after which one connection will be closed. It's better to close it silently
-		value, found := request.Headers["connection"]
-		if found && value[0] == "close" {
+		connection, found := request.Headers["connection"]
+		if found && connection[0].Value == "close" {
 			err = http.ErrCloseConnection
 		}
 	}
@@ -84,8 +84,8 @@ func (r *Renderer) Response(
 	// TODO: this shit decreses performance from 75-77k rps to 68-70k
 	respHeaders := mergeHeaders(r.defaultHeaders, customRespHeaders)
 
-	for key, value := range respHeaders {
-		buff = append(renderHeader(key, value, buff), crlf...)
+	for key, values := range respHeaders {
+		buff = append(renderHeader(key, values, buff), crlf...)
 	}
 
 	if len(response.Filename) > 0 {
@@ -179,14 +179,27 @@ func renderContentLength(value int, buff []byte) []byte {
 	return append(append(append(buff, contentLength...), strconv.Itoa(value)...), crlf...)
 }
 
-func renderHeader(key string, values []string, into []byte) []byte {
+func renderHeader(key string, hdrs []headers.Header, into []byte) []byte {
 	into = append(append(into, key...), colonSpace...)
 
-	for i := 0; i < len(values)-1; i++ {
-		into = append(append(into, values[i]...), ',')
+	for i := 0; i < len(hdrs)-1; i++ {
+		into = append(into, hdrs[i].Value...)
+
+		if hdrs[i].Q > 0 {
+			into = append(append(into, ";q=0."...), hdrs[i].QualityString()...)
+		}
+
+		into = append(into, ',')
 	}
 
-	return append(into, values[len(values)-1]...)
+	lastHeader := hdrs[len(hdrs)-1]
+	into = append(into, lastHeader.Value...)
+
+	if lastHeader.Q > 0 {
+		into = append(append(into, ";q=0."...), lastHeader.QualityString()...)
+	}
+
+	return into
 }
 
 // isKeepAlive decides whether connection is keep-alive or not
@@ -197,7 +210,7 @@ func isKeepAlive(request *types.Request) bool {
 
 	keepAlive, found := request.Headers["connection"]
 	if found {
-		return keepAlive[0] == "keep-alive"
+		return keepAlive[0].Value == "keep-alive"
 	}
 
 	// because HTTP/1.0 by default is not keep-alive. And if no Connection
