@@ -1,9 +1,10 @@
 package headers
 
 import (
+	"strconv"
+
 	"github.com/fakefloordiv/indigo/internal"
 	"github.com/fakefloordiv/indigo/settings"
-	"strconv"
 )
 
 type Header struct {
