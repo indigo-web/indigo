@@ -1,11 +1,12 @@
 package render
 
 import (
+	"testing"
+
 	"github.com/fakefloordiv/indigo/http/headers"
 	"github.com/fakefloordiv/indigo/http/url"
 	"github.com/fakefloordiv/indigo/settings"
 	"github.com/fakefloordiv/indigo/types"
-	"testing"
 )
 
 func nopWriter(_ []byte) error {
