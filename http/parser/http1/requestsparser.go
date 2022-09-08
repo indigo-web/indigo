@@ -34,6 +34,7 @@ type httpRequestsParser struct {
 	offset                 int
 	urlEncodedChar         uint8
 	protoMajor, protoMinor uint8
+	quality                uint8
 
 	headerBuff     []byte
 	headersManager *headers.Manager
@@ -399,6 +400,8 @@ func (p *httpRequestsParser) Parse(data []byte) (state parser.RequestState, extr
 				p.state = eHeaderValueCRLF
 			case '\\':
 				p.state = eHeaderValueBackslash
+			case ';':
+				p.state = eHeaderValueSemicolon
 			case ',':
 				// When comma is met, current header is finalized, and a new one started with the same key
 				// In case it is a system header like Content-Length, Connection, etc., we just ignore it
@@ -407,7 +410,8 @@ func (p *httpRequestsParser) Parse(data []byte) (state parser.RequestState, extr
 				// TODO: only Accept header is allowed here, but currently we do not
 				//       support it. Check whether there are more system headers we have
 				//       to recognize
-				_ = p.headersManager.FinalizeValue(string(p.headerBuff))
+				_ = p.headersManager.FinalizeValue(string(p.headerBuff), p.quality)
+				p.quality = 0
 				// number of headers is anyway not exceeded here because this is the same header
 				_ = p.headersManager.BeginValue()
 			default:
@@ -418,6 +422,95 @@ func (p *httpRequestsParser) Parse(data []byte) (state parser.RequestState, extr
 				if char == '"' {
 					p.state = eHeaderValueQuoted
 				}
+			}
+		case eHeaderValueSemicolon:
+			switch char := data[i]; char {
+			case 'q', 'Q':
+				p.state = eHeaderValueSemicolonQ
+			case '\r':
+				p.state = eHeaderValueCR
+			case '\n':
+				p.state = eHeaderValueCRLF
+			case '\\':
+				p.state = eHeaderValueBackslash
+			case ',':
+				p.state = eHeaderValueComma
+				_ = p.headersManager.FinalizeValue(string(p.headerBuff), p.quality)
+				p.quality = 0
+				_ = p.headersManager.BeginValue()
+			default:
+				if p.headersManager.AppendValue(';') || p.headersManager.AppendValue(char) {
+					return parser.Error, nil, http.ErrHeaderFieldsTooLarge
+				}
+
+				if char == '"' {
+					p.state = eHeaderValueQuoted
+				} else {
+					p.state = eHeaderValue
+				}
+			}
+		case eHeaderValueSemicolonQ:
+			switch char := data[i]; char {
+			case '=':
+				p.state = eHeaderQualityMajor
+			case '\r':
+				p.state = eHeaderValueCR
+			case '\n':
+				p.state = eHeaderValueCRLF
+			case '\\':
+				p.state = eHeaderValueBackslash
+			case ',':
+				p.state = eHeaderValueComma
+				_ = p.headersManager.FinalizeValue(string(p.headerBuff), p.quality)
+				p.quality = 0
+				_ = p.headersManager.BeginValue()
+			default:
+				if p.headersManager.AppendValue(';') ||
+					p.headersManager.AppendValue('q') ||
+					p.headersManager.AppendValue(char) {
+					return parser.Error, nil, http.ErrHeaderFieldsTooLarge
+				}
+
+				if char == '"' {
+					p.state = eHeaderValueQuoted
+				} else {
+					p.state = eHeaderValue
+				}
+			}
+		case eHeaderQualityMajor:
+			if data[i] < '0' || data[i] > '9' {
+				return parser.Error, nil, http.ErrBadRequest
+			}
+
+			p.quality = (data[i] - '0') * 10
+			p.state = eHeaderQualityDot
+		case eHeaderQualityDot:
+			if data[i] != '.' {
+				return parser.Error, nil, http.ErrBadRequest
+			}
+
+			p.state = eHeaderQualityMinor
+		case eHeaderQualityMinor:
+			// only floats with one numeral after the dot are supported
+			if data[i] < '0' || data[i] > '9' {
+				return parser.Error, nil, http.ErrBadRequest
+			}
+
+			p.quality += data[i] - '0'
+			p.state = eHeaderQualitySplitter
+		case eHeaderQualitySplitter:
+			switch data[i] {
+			case '\r':
+				p.state = eHeaderValueCR
+			case '\n':
+				p.state = eHeaderValueCRLF
+			case ',':
+				_ = p.headersManager.FinalizeValue(string(p.headerBuff), p.quality)
+				p.quality = 0
+				_ = p.headersManager.BeginValue()
+				p.state = eHeaderValueComma
+			default:
+				return parser.Error, nil, http.ErrBadRequest
 			}
 		case eHeaderValueComma:
 			switch char := data[i]; char {
@@ -478,7 +571,8 @@ func (p *httpRequestsParser) Parse(data []byte) (state parser.RequestState, extr
 			}
 		case eHeaderValueCRLF:
 			key := string(p.headerBuff)
-			value := p.headersManager.FinalizeValue(key)
+			value := p.headersManager.FinalizeValue(key, p.quality)
+			p.quality = 0
 
 			switch key {
 			case "content-length":
