@@ -24,7 +24,7 @@ func Index(_ *types.Request) types.Response {
 }
 
 func IndexSay(request *types.Request) types.Response {
-	if value, found := request.Headers["talking"]; !found || value[0] != "allowed" {
+	if talking, found := request.Headers["talking"]; !found || talking[0].Value != "allowed" {
 		return types.WithResponse.
 			WithCode(status.UnavailableForLegalReasons)
 	}
