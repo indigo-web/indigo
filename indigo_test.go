@@ -2,11 +2,11 @@ package indigo
 
 import (
 	"bytes"
-	stderrors "errors"
+	"errors"
 	"fmt"
 	"io"
 	"net"
-	"net/http"
+	stdhttp "net/http"
 	"net/url"
 	"os"
 	"strings"
@@ -15,7 +15,7 @@ import (
 
 	"github.com/fakefloordiv/indigo/settings"
 
-	http2 "github.com/fakefloordiv/indigo/http"
+	"github.com/fakefloordiv/indigo/http"
 
 	methods "github.com/fakefloordiv/indigo/http/method"
 	"github.com/fakefloordiv/indigo/http/proto"
@@ -68,7 +68,7 @@ func readN(conn net.Conn, n int) ([]byte, error) {
 		if len(receivedBuff) == n {
 			return receivedBuff, nil
 		} else if len(receivedBuff) > n {
-			return nil, stderrors.New("received too much data")
+			return nil, errors.New("received too much data")
 		}
 	}
 }
@@ -92,7 +92,12 @@ func getRouter(t *testing.T) router.Router {
 
 	r.Get("/get-read-body", func(request *types.Request) types.Response {
 		require.Contains(t, request.Headers, testHeaderKey)
-		requestHeader := strings.Join(request.Headers[testHeaderKey], ",")
+
+		var stringValues []string
+		for _, v := range request.Headers[testHeaderKey] {
+			stringValues = append(stringValues, v.Value)
+		}
+		requestHeader := strings.Join(stringValues, ",")
 		require.Equal(t, testHeaderValue, requestHeader)
 
 		body, err := request.Body()
@@ -190,7 +195,7 @@ func TestAllCases(t *testing.T) {
 	shutdown := make(chan bool)
 
 	go func() {
-		require.Equal(t, http2.ErrShutdown, app.Serve(r, s))
+		require.Equal(t, http.ErrShutdown, app.Serve(r, s))
 		shutdown <- true
 	}()
 
@@ -209,13 +214,13 @@ func TestAllCases(t *testing.T) {
 	time.Sleep(200 * time.Millisecond)
 
 	t.Run("/simple-get", func(t *testing.T) {
-		resp, err := http.DefaultClient.Get(URL + "/simple-get")
+		resp, err := stdhttp.DefaultClient.Get(URL + "/simple-get")
 		require.NoError(t, err)
 		defer func() {
 			_ = resp.Body.Close()
 		}()
-		require.Equal(t, http.StatusOK, resp.StatusCode)
-		require.Equal(t, "200 "+http.StatusText(http.StatusOK), resp.Status)
+		require.Equal(t, stdhttp.StatusOK, resp.StatusCode)
+		require.Equal(t, "200 "+stdhttp.StatusText(stdhttp.StatusOK), resp.Status)
 		require.Equal(t, "HTTP/1.1", resp.Proto)
 		require.Contains(t, resp.Header, "Server")
 		require.Equal(t, 1, len(resp.Header["Server"]))
@@ -223,7 +228,7 @@ func TestAllCases(t *testing.T) {
 	})
 
 	t.Run("/get-resp-body", func(t *testing.T) {
-		resp, err := http.DefaultClient.Get(URL + "/get-resp-body")
+		resp, err := stdhttp.DefaultClient.Get(URL + "/get-resp-body")
 		require.NoError(t, err)
 		defer func() {
 			_ = resp.Body.Close()
@@ -235,14 +240,14 @@ func TestAllCases(t *testing.T) {
 	})
 
 	t.Run("/head", func(t *testing.T) {
-		resp, err := http.DefaultClient.Head(URL + "/get-resp-body")
+		resp, err := stdhttp.DefaultClient.Head(URL + "/get-resp-body")
 		require.NoError(t, err)
 		defer func() {
 			_ = resp.Body.Close()
 		}()
 
-		require.Equal(t, http.StatusOK, resp.StatusCode)
-		require.Equal(t, "200 "+http.StatusText(http.StatusOK), resp.Status)
+		require.Equal(t, stdhttp.StatusOK, resp.StatusCode)
+		require.Equal(t, "200 "+stdhttp.StatusText(stdhttp.StatusOK), resp.Status)
 		require.Equal(t, "HTTP/1.1", resp.Proto)
 		require.Contains(t, resp.Header, "Server")
 		require.Equal(t, 1, len(resp.Header["Server"]))
@@ -254,8 +259,8 @@ func TestAllCases(t *testing.T) {
 	})
 
 	t.Run("/get-read-body", func(t *testing.T) {
-		request := &http.Request{
-			Method: http.MethodGet,
+		request := &stdhttp.Request{
+			Method: stdhttp.MethodGet,
 			URL: &url.URL{
 				Scheme: "http",
 				Host:   addr,
@@ -264,49 +269,49 @@ func TestAllCases(t *testing.T) {
 			Proto:      "HTTP/1.1",
 			ProtoMajor: 1,
 			ProtoMinor: 1,
-			Header: http.Header{
+			Header: stdhttp.Header{
 				"Hello": {"World!"},
 			},
 			Host:       addr,
 			RemoteAddr: addr,
 		}
-		resp, err := http.DefaultClient.Do(request)
+		resp, err := stdhttp.DefaultClient.Do(request)
 		require.NoError(t, err)
 		defer func() {
 			_ = resp.Body.Close()
 		}()
-		require.Equal(t, http.StatusOK, resp.StatusCode)
+		require.Equal(t, stdhttp.StatusOK, resp.StatusCode)
 	})
 
 	t.Run("/with-query", func(t *testing.T) {
-		resp, err := http.DefaultClient.Get(URL + "/with-query?hel+lo=wor+ld")
+		resp, err := stdhttp.DefaultClient.Get(URL + "/with-query?hel+lo=wor+ld")
 		require.NoError(t, err)
 		defer func() {
 			_ = resp.Body.Close()
 		}()
-		require.Equal(t, http.StatusOK, resp.StatusCode)
+		require.Equal(t, stdhttp.StatusOK, resp.StatusCode)
 	})
 
 	t.Run("/read-body", func(t *testing.T) {
 		body := new(bytes.Buffer)
 		body.Write([]byte(testRequestBody))
-		resp, err := http.DefaultClient.Post(URL+"/read-body", "", body)
+		resp, err := stdhttp.DefaultClient.Post(URL+"/read-body", "", body)
 		require.NoError(t, err)
 		defer func() {
 			_ = resp.Body.Close()
 		}()
-		require.Equal(t, http.StatusOK, resp.StatusCode)
+		require.Equal(t, stdhttp.StatusOK, resp.StatusCode)
 	})
 
 	t.Run("/do-not-read-body", func(t *testing.T) {
 		body := new(bytes.Buffer)
 		body.Write([]byte(testRequestBody))
-		resp, err := http.DefaultClient.Post(URL+"/read-body", "", body)
+		resp, err := stdhttp.DefaultClient.Post(URL+"/read-body", "", body)
 		require.NoError(t, err)
 		defer func() {
 			_ = resp.Body.Close()
 		}()
-		require.Equal(t, http.StatusOK, resp.StatusCode)
+		require.Equal(t, stdhttp.StatusOK, resp.StatusCode)
 	})
 
 	t.Run("/hijack-conn-no-body-read", func(t *testing.T) {
@@ -318,7 +323,7 @@ func TestAllCases(t *testing.T) {
 	})
 
 	t.Run("/with-file", func(t *testing.T) {
-		resp, err := http.DefaultClient.Get(URL + "/with-file")
+		resp, err := stdhttp.DefaultClient.Get(URL + "/with-file")
 		require.NoError(t, err)
 
 		data, err := io.ReadAll(resp.Body)
@@ -329,7 +334,7 @@ func TestAllCases(t *testing.T) {
 	})
 
 	t.Run("/with-file-notfound", func(t *testing.T) {
-		resp, err := http.DefaultClient.Get(URL + "/with-file-notfound")
+		resp, err := stdhttp.DefaultClient.Get(URL + "/with-file-notfound")
 		require.NoError(t, err)
 
 		data, err := io.ReadAll(resp.Body)
@@ -347,7 +352,57 @@ func TestAllCases(t *testing.T) {
 		require.EqualError(t, err, io.EOF.Error())
 	})
 
-	http.DefaultClient.CloseIdleConnections()
+	t.Run("/trace", func(t *testing.T) {
+		request := &stdhttp.Request{
+			Method: stdhttp.MethodTrace,
+			URL: &url.URL{
+				Scheme: "http",
+				Host:   addr,
+				Path:   "/trace",
+			},
+			Proto:      "HTTP/1.1",
+			ProtoMajor: 1,
+			ProtoMinor: 1,
+			Header: stdhttp.Header{
+				"Hello": {"World!"},
+			},
+			Host:       addr,
+			RemoteAddr: addr,
+		}
+		resp, err := stdhttp.DefaultClient.Do(request)
+		require.NoError(t, err)
+
+		require.Contains(t, resp.Header, "Content-Type")
+		require.Equal(t, 1, len(resp.Header["Content-Type"]), "too many content-type values")
+		require.Equal(t, "message/http", resp.Header["Content-Type"][0])
+
+		dataBytes, err := io.ReadAll(resp.Body)
+		data := string(dataBytes)
+		require.NoError(t, err)
+
+		wantRequestLine := "TRACE /trace HTTP/1.1\r\n"
+		require.True(t, len(data) > len(wantRequestLine))
+		require.True(t, data[:len(wantRequestLine)] == wantRequestLine)
+
+		headerLines := strings.Split(data[len(wantRequestLine):], "\r\n")
+		// request is terminated with \r\n\r\n, so 2 last values in headerLines
+		// are empty strings. Remove them
+		headerLines = headerLines[:len(headerLines)-2]
+		wantHeaderLines := []string{
+			"hello: World!",
+			"host: " + addr,
+			"user-agent: Go-http-client/1.1",
+			"accept-encoding: gzip",
+		}
+
+		require.Equal(t, len(wantHeaderLines), len(headerLines))
+
+		for _, line := range headerLines {
+			require.True(t, contains(wantHeaderLines, line), "unwanted header line: "+line)
+		}
+	})
+
+	stdhttp.DefaultClient.CloseIdleConnections()
 
 	// at this point server is supposed to be closed, but who knows, who knows
 }
@@ -360,10 +415,22 @@ func sendSimpleRequest(t *testing.T, path string) {
 
 	_, err = conn.Write([]byte(request))
 	require.NoError(t, err)
-	_, err = conn.Read(make([]byte, 1))
+	buff := make([]byte, 1)
+	_, err = conn.Read(buff)
 	require.NoError(t, err)
+	require.Equal(t, buff, []byte{'a'})
 	_, err = conn.Write([]byte(testRequestBody))
 	require.NoError(t, err)
 
 	_ = conn.Close()
+}
+
+func contains(strs []string, substr string) bool {
+	for _, str := range strs {
+		if str == substr {
+			return true
+		}
+	}
+
+	return false
 }

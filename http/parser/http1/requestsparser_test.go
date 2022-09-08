@@ -23,6 +23,15 @@ var (
 	simpleGETAbsPath     = []byte("GET http://www.w3.org/pub/WWW/TheProject.html HTTP/1.1\r\n\r\n")
 	biggerGET            = []byte("GET / HTTP/1.1\r\nHello: World!\r\nEaster: Egg\r\n\r\n")
 
+	headerQ       = []byte("GET / HTTP/1.1\r\nHeader: world;q=0.7,value;q=0.1\r\n\r\n")
+	headerOneQ    = []byte("GET / HTTP/1.1\r\nHeader: world;q=0.7,value\r\n\r\n")
+	headerSecondQ = []byte("GET / HTTP/1.1\r\nHeader: world,value;q=0.1\r\n\r\n")
+
+	headerInvalidQMajor = []byte("GET / HTTP/1.1\r\nHeader: world;q=17.1\r\n\r\n")
+	headerInvalidQNoDot = []byte("GET / HTTP/1.1\r\nHeader: world;q=171\r\n\r\n")
+	headerInvalidQMinor = []byte("GET / HTTP/1.1\r\nHeader: world;q=0.17\r\n\r\n")
+	headerNotQ          = []byte("GET / HTTP/1.1\r\nHeader: world;charset=utf8,value\r\n\r\n")
+
 	simpleGETQuery = []byte("GET /path?hel+lo=wor+ld HTTP/1.1\r\n\r\n")
 
 	biggerGETOnlyLF     = []byte("GET / HTTP/1.1\nHello: World!\n\n")
@@ -55,13 +64,11 @@ func readBody(request *types.Request, ch chan []byte) {
 	ch <- body
 }
 
-type testHeaders map[string][]string
-
 type wantedRequest struct {
 	Method   methods.Method
 	Path     string
 	Protocol proto.Proto
-	Headers  testHeaders
+	Headers  headers.Headers
 }
 
 func compareRequests(t *testing.T, wanted wantedRequest, actual *types.Request) {
@@ -69,10 +76,10 @@ func compareRequests(t *testing.T, wanted wantedRequest, actual *types.Request) 
 	require.Equal(t, wanted.Path, actual.Path)
 	require.Equal(t, wanted.Protocol, actual.Proto)
 
-	for key, value := range wanted.Headers {
+	for key, values := range wanted.Headers {
 		actualValues, found := actual.Headers[key]
 		require.True(t, found)
-		require.Equal(t, value, actualValues)
+		require.Equal(t, values, actualValues)
 	}
 }
 
@@ -132,7 +139,7 @@ func TestHttpRequestsParser_Parse_GET(t *testing.T) {
 			Method:   methods.GET,
 			Path:     "/",
 			Protocol: proto.HTTP11,
-			Headers:  testHeaders{},
+			Headers:  headers.Headers{},
 		}
 
 		compareRequests(t, wanted, request)
@@ -154,7 +161,7 @@ func TestHttpRequestsParser_Parse_GET(t *testing.T) {
 			Method:   methods.GET,
 			Path:     "/",
 			Protocol: proto.HTTP11,
-			Headers:  testHeaders{},
+			Headers:  headers.Headers{},
 		}
 
 		compareRequests(t, wanted, request)
@@ -176,8 +183,10 @@ func TestHttpRequestsParser_Parse_GET(t *testing.T) {
 			Method:   methods.GET,
 			Path:     "/",
 			Protocol: proto.HTTP11,
-			Headers: testHeaders{
-				"hello": {"World!"},
+			Headers: headers.Headers{
+				"hello": []headers.Header{
+					{Value: "World!"},
+				},
 			},
 		}
 
@@ -196,12 +205,20 @@ func TestHttpRequestsParser_Parse_GET(t *testing.T) {
 		require.Empty(t, extra)
 		require.Empty(t, <-ch)
 
+		accept := make([]headers.Header, len(values))
+
+		for i, value := range values {
+			accept[i] = headers.Header{
+				Value: value,
+			}
+		}
+
 		wanted := wantedRequest{
 			Method:   methods.GET,
 			Path:     "/",
 			Protocol: proto.HTTP11,
-			Headers: testHeaders{
-				"accept": values,
+			Headers: headers.Headers{
+				"accept": accept,
 			},
 		}
 
@@ -240,8 +257,10 @@ func TestHttpRequestsParser_Parse_GET(t *testing.T) {
 			Method:   methods.GET,
 			Path:     "/",
 			Protocol: proto.HTTP11,
-			Headers: testHeaders{
-				"hello": {"World!"},
+			Headers: headers.Headers{
+				"hello": []headers.Header{
+					{Value: "World!"},
+				},
 			},
 		}
 
@@ -264,7 +283,7 @@ func TestHttpRequestsParser_Parse_GET(t *testing.T) {
 			Method:   methods.GET,
 			Path:     "/hello world",
 			Protocol: proto.HTTP11,
-			Headers:  testHeaders{},
+			Headers:  headers.Headers{},
 		}
 
 		compareRequests(t, wanted, request)
@@ -282,8 +301,10 @@ func TestHttpRequestsParser_Parse_GET(t *testing.T) {
 				Method:   methods.GET,
 				Path:     "/",
 				Protocol: proto.HTTP11,
-				Headers: testHeaders{
-					"hello": {"World!"},
+				Headers: headers.Headers{
+					"hello": []headers.Header{
+						{Value: "World!"},
+					},
 				},
 			}
 
@@ -307,7 +328,103 @@ func TestHttpRequestsParser_Parse_GET(t *testing.T) {
 			Method:   methods.GET,
 			Path:     "http://www.w3.org/pub/WWW/TheProject.html",
 			Protocol: proto.HTTP11,
-			Headers:  testHeaders{},
+			Headers:  headers.Headers{},
+		}
+
+		compareRequests(t, wanted, request)
+		require.NoError(t, request.Reset())
+	})
+
+	t.Run("HeadersQ", func(t *testing.T) {
+		ch := make(chan []byte)
+		go readBody(request, ch)
+		_, _, err := parser.Parse(headerQ)
+		parser.FinalizeBody()
+		require.NoError(t, err)
+		require.Empty(t, <-ch)
+
+		wanted := wantedRequest{
+			Method:   methods.GET,
+			Path:     "/",
+			Protocol: proto.HTTP11,
+			Headers: headers.Headers{
+				"header": []headers.Header{
+					{Value: "world", Q: 7},
+					{Value: "value", Q: 1},
+				},
+			},
+		}
+
+		compareRequests(t, wanted, request)
+		require.NoError(t, request.Reset())
+	})
+
+	t.Run("HeadersOneQ", func(t *testing.T) {
+		ch := make(chan []byte)
+		go readBody(request, ch)
+		_, _, err := parser.Parse(headerOneQ)
+		parser.FinalizeBody()
+		require.NoError(t, err)
+		require.Empty(t, <-ch)
+
+		wanted := wantedRequest{
+			Method:   methods.GET,
+			Path:     "/",
+			Protocol: proto.HTTP11,
+			Headers: headers.Headers{
+				"header": []headers.Header{
+					{Value: "world", Q: 7},
+					{Value: "value"},
+				},
+			},
+		}
+
+		compareRequests(t, wanted, request)
+		require.NoError(t, request.Reset())
+	})
+
+	t.Run("HeadersSecondQ", func(t *testing.T) {
+		ch := make(chan []byte)
+		go readBody(request, ch)
+		_, _, err := parser.Parse(headerSecondQ)
+		parser.FinalizeBody()
+		require.NoError(t, err)
+		require.Empty(t, <-ch)
+
+		wanted := wantedRequest{
+			Method:   methods.GET,
+			Path:     "/",
+			Protocol: proto.HTTP11,
+			Headers: headers.Headers{
+				"header": []headers.Header{
+					{Value: "world"},
+					{Value: "value", Q: 1},
+				},
+			},
+		}
+
+		compareRequests(t, wanted, request)
+		require.NoError(t, request.Reset())
+	})
+
+	t.Run("HeadersNotQ", func(t *testing.T) {
+		ch := make(chan []byte)
+		go readBody(request, ch)
+		_, _, err := parser.Parse(headerNotQ)
+		parser.FinalizeBody()
+		require.NoError(t, err)
+		require.Empty(t, <-ch)
+
+		wanted := wantedRequest{
+			Method:   methods.GET,
+			Path:     "/",
+			Protocol: proto.HTTP11,
+			Headers: headers.Headers{
+				"header": []headers.Header{
+					{Value: "world;charset=utf8"},
+					{Value: "value"},
+				},
+			},
 		}
 
 		compareRequests(t, wanted, request)
@@ -329,8 +446,10 @@ func TestHttpRequestsParser_ParsePOST(t *testing.T) {
 				Method:   methods.POST,
 				Path:     "/",
 				Protocol: proto.HTTP11,
-				Headers: testHeaders{
-					"hello": {"World!"},
+				Headers: headers.Headers{
+					"hello": []headers.Header{
+						{Value: "World!"},
+					},
 				},
 			}
 
@@ -354,7 +473,7 @@ func TestHttpRequestsParser_ParsePOST(t *testing.T) {
 			Method:   methods.GET,
 			Path:     "/path",
 			Protocol: proto.HTTP11,
-			Headers:  testHeaders{},
+			Headers:  headers.Headers{},
 		}
 
 		compareRequests(t, wanted, request)
@@ -535,6 +654,24 @@ func TestHttpRequestsParser_Parse_Negative(t *testing.T) {
 
 		require.EqualError(t, err, http.ErrUnsupportedProtocol.Error())
 		require.Equal(t, httpparser.Error, state)
+	})
+
+	t.Run("HeadersInvalidQMajor", func(t *testing.T) {
+		parser, _ := getParser()
+		_, _, err := parser.Parse(headerInvalidQMajor)
+		require.EqualError(t, err, http.ErrBadRequest.Error())
+	})
+
+	t.Run("HeadersInvalidQMinor", func(t *testing.T) {
+		parser, _ := getParser()
+		_, _, err := parser.Parse(headerInvalidQMinor)
+		require.EqualError(t, err, http.ErrBadRequest.Error())
+	})
+
+	t.Run("HeadersInvalidQNoDot", func(t *testing.T) {
+		parser, _ := getParser()
+		_, _, err := parser.Parse(headerInvalidQNoDot)
+		require.EqualError(t, err, http.ErrBadRequest.Error())
 	})
 }
 
