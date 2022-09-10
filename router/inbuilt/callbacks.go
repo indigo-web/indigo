@@ -30,13 +30,15 @@ func (d Router) OnRequest(request *types.Request, render types.Render) error {
 }
 
 func (d Router) processRequest(request *types.Request) types.Response {
+	ctx := context2.Background()
+
 	urlMethods, found := d.routes[request.Path]
 	if !found {
 		if request.Method == methods.TRACE {
 			return renderRequest(request)
 		}
 
-		return d.errHandlers[http.ErrNotFound](request)
+		return d.errHandlers[http.ErrNotFound](ctx, request)
 	}
 
 	handler, found := urlMethods[request.Method]
@@ -52,14 +54,15 @@ func (d Router) processRequest(request *types.Request) types.Response {
 			// wants
 			handler, found = urlMethods[methods.GET]
 			if found {
-				return handler.fun(context2.Background(), request)
+				return handler.fun(ctx, request)
 			}
 		case methods.TRACE:
 			return renderRequest(request)
 		}
 
-		// TODO: add request ctx so I can pass a list of allowed methods here
-		return d.errHandlers[http.ErrMethodNotAllowed](request)
+		ctx = context2.WithValue(ctx, "allow", d.allowedMethods[request.Path])
+
+		return d.errHandlers[http.ErrMethodNotAllowed](ctx, request)
 	}
 }
 
@@ -67,7 +70,7 @@ func (d Router) processRequest(request *types.Request) types.Response {
 // registered, otherwise panic is raised.
 // Luckily (for user), we have all the default handlers registered
 func (d Router) OnError(request *types.Request, render types.Render, err error) {
-	response := d.errHandlers[err](request)
+	response := d.errHandlers[err](context2.Background(), request)
 	_ = render(response)
 }
 
@@ -97,8 +100,6 @@ func renderHeadersInto(headers headers.Headers, response types.Response) types.R
 }
 
 func (d Router) loadAllowedMethods() {
-	d.allowedMethods = make(map[string]string, len(d.routes))
-
 	for k, v := range d.routes {
 		allowedMethods := mapconv.Keys[methods.Method, *handlerObject](v)
 		d.allowedMethods[k] = strings.Join(methods2string(allowedMethods...), ",")
@@ -106,7 +107,7 @@ func (d Router) loadAllowedMethods() {
 }
 
 func methods2string(ms ...methods.Method) []string {
-	out := make([]string, len(ms))
+	out := make([]string, 0, len(ms))
 
 	for _, method := range ms {
 		out = append(out, methods.ToString(method))

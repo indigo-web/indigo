@@ -75,8 +75,9 @@ func defaultNotFoundHandler(_ context.Context, _ *types.Request) types.Response 
 }
 
 func defaultMethodNotAllowedHandler(ctx context.Context, _ *types.Request) types.Response {
-	return defaultMethodNotAllowed
+	allow := ctx.Value("allow").(string)
 
+	return defaultMethodNotAllowed.WithHeader("Allow", allow)
 }
 
 func defaultRequestEntityTooLargeHandler(_ context.Context, _ *types.Request) types.Response {
