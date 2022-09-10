@@ -1,6 +1,7 @@
 package inbuilt
 
 import (
+	"context"
 	"github.com/fakefloordiv/indigo/http"
 	"github.com/fakefloordiv/indigo/http/headers"
 	methods "github.com/fakefloordiv/indigo/http/method"
@@ -30,7 +31,7 @@ func (d Router) OnRequest(request *types.Request, render types.Render) error {
 }
 
 func (d Router) processRequest(request *types.Request) types.Response {
-	ctx := context2.Background()
+	ctx := context.Background()
 
 	urlMethods, found := d.routes[request.Path]
 	if !found {
@@ -44,7 +45,7 @@ func (d Router) processRequest(request *types.Request) types.Response {
 	handler, found := urlMethods[request.Method]
 	switch found {
 	case true:
-		return handler.fun(context2.Background(), request)
+		return handler.fun(context.Background(), request)
 	default:
 		switch request.Method {
 		case methods.HEAD:
@@ -70,7 +71,7 @@ func (d Router) processRequest(request *types.Request) types.Response {
 // registered, otherwise panic is raised.
 // Luckily (for user), we have all the default handlers registered
 func (d Router) OnError(request *types.Request, render types.Render, err error) {
-	response := d.errHandlers[err](context2.Background(), request)
+	response := d.errHandlers[err](context.Background(), request)
 	_ = render(response)
 }
 
