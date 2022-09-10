@@ -2,6 +2,7 @@ package inbuilt
 
 import (
 	"context"
+
 	methods "github.com/fakefloordiv/indigo/http/method"
 	"github.com/fakefloordiv/indigo/types"
 )

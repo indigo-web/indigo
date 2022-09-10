@@ -2,8 +2,9 @@ package inbuilt
 
 import (
 	"context"
-	"github.com/fakefloordiv/indigo/internal/body"
 	"testing"
+
+	"github.com/fakefloordiv/indigo/internal/body"
 
 	"github.com/fakefloordiv/indigo/http/headers"
 	methods "github.com/fakefloordiv/indigo/http/method"
