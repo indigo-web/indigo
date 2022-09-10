@@ -1,6 +1,7 @@
 package inbuilt
 
 import (
+	"context"
 	"github.com/fakefloordiv/indigo/http"
 	"github.com/fakefloordiv/indigo/http/status"
 	"github.com/fakefloordiv/indigo/types"
@@ -65,49 +66,50 @@ func newErrHandlers() errHandlers {
 	}
 }
 
-func defaultBadRequestHandler(_ *types.Request) types.Response {
+func defaultBadRequestHandler(_ context.Context, _ *types.Request) types.Response {
 	return defaultBadRequest
 }
 
-func defaultNotFoundHandler(_ *types.Request) types.Response {
+func defaultNotFoundHandler(_ context.Context, _ *types.Request) types.Response {
 	return defaultNotFound
 }
 
-func defaultMethodNotAllowedHandler(_ *types.Request) types.Response {
+func defaultMethodNotAllowedHandler(ctx context.Context, _ *types.Request) types.Response {
 	return defaultMethodNotAllowed
+
 }
 
-func defaultRequestEntityTooLargeHandler(_ *types.Request) types.Response {
+func defaultRequestEntityTooLargeHandler(_ context.Context, _ *types.Request) types.Response {
 	return defaultRequestEntityTooLarge
 }
 
-func defaultConnectionClose(_ *types.Request) types.Response {
+func defaultConnectionClose(_ context.Context, _ *types.Request) types.Response {
 	// this is a special type of error handlers. Any response you return
 	// will not be sent or anything will be done with it because calling
 	// this handler means client has already disconnected
 	return types.WithResponse
 }
 
-func defaultURITooLongHandler(_ *types.Request) types.Response {
+func defaultURITooLongHandler(_ context.Context, _ *types.Request) types.Response {
 	return defaultURITooLong
 }
 
-func defaultHeaderFieldsTooLargeHandler(_ *types.Request) types.Response {
+func defaultHeaderFieldsTooLargeHandler(_ context.Context, _ *types.Request) types.Response {
 	return defaultHeaderFieldsTooLarge
 }
 
-func defaultTooManyHeadersHandler(_ *types.Request) types.Response {
+func defaultTooManyHeadersHandler(_ context.Context, _ *types.Request) types.Response {
 	return defaultHeaderFieldsTooLarge
 }
 
-func defaultUnsupportedProtocolHandler(_ *types.Request) types.Response {
+func defaultUnsupportedProtocolHandler(_ context.Context, _ *types.Request) types.Response {
 	return defaultUnsupportedProtocol
 }
 
-func defaultUnsupportedEncodingHandler(_ *types.Request) types.Response {
+func defaultUnsupportedEncodingHandler(_ context.Context, _ *types.Request) types.Response {
 	return defaultUnsupportedEncoding
 }
 
-func defaultNotImplementedHandler(_ *types.Request) types.Response {
+func defaultNotImplementedHandler(_ context.Context, _ *types.Request) types.Response {
 	return defaultNotImplemented
 }

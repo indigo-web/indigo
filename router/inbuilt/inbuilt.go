@@ -16,7 +16,7 @@ type (
 		middlewares []Middleware
 	}
 
-	ErrorHandler func(request *types.Request) types.Response
+	ErrorHandler func(context.Context, *types.Request) types.Response
 	errHandlers  map[error]ErrorHandler
 )
 
@@ -44,8 +44,9 @@ type Router struct {
 // by default are applied, renderer with a nil (as initial value) buffer constructed
 func NewRouter() *Router {
 	r := &Router{
-		routes:      make(routesMap),
-		errHandlers: newErrHandlers(),
+		routes:         make(routesMap),
+		errHandlers:    newErrHandlers(),
+		allowedMethods: make(map[string]string),
 	}
 
 	r.root = r
