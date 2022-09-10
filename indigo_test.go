@@ -403,6 +403,28 @@ func TestAllCases(t *testing.T) {
 		}
 	})
 
+	t.Run("/method-not-allowed-allow-header", func(t *testing.T) {
+		request := &stdhttp.Request{
+			Method: stdhttp.MethodDelete,
+			URL: &url.URL{
+				Scheme: "http",
+				Host:   addr,
+				Path:   "/simple-get",
+			},
+			Proto:      "HTTP/1.1",
+			ProtoMajor: 1,
+			ProtoMinor: 1,
+			Host:       addr,
+			RemoteAddr: addr,
+		}
+		resp, err := stdhttp.DefaultClient.Do(request)
+		require.NoError(t, err)
+
+		require.Contains(t, resp.Header, "Allow")
+		require.Equal(t, "GET", resp.Header["Allow"][0])
+		require.Equal(t, 1, len(resp.Header["Allow"]))
+	})
+
 	stdhttp.DefaultClient.CloseIdleConnections()
 
 	// at this point server is supposed to be closed, but who knows, who knows
