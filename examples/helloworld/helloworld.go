@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"log"
 
@@ -12,7 +13,7 @@ import (
 
 var addr = "localhost:9090"
 
-func MyHandler(_ *types.Request) types.Response {
+func MyHandler(_ context.Context, _ *types.Request) types.Response {
 	return types.WithResponse.
 		WithCode(status.OK).
 		WithHeader("Hello", "world").
