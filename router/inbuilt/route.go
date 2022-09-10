@@ -11,7 +11,7 @@ This file is responsible for registering both ordinary and error handlers
 */
 
 // Route is a base method for registering handlers
-func (d *DefaultRouter) Route(
+func (d *Router) Route(
 	method methods.Method, path string, handlerFunc HandlerFunc,
 	middlewares ...Middleware,
 ) {
@@ -49,6 +49,6 @@ func (d *DefaultRouter) Route(
 // - http.ErrMethodNotImplemented
 //
 // You can set your own handler and override default response
-func (d DefaultRouter) RouteError(err error, handler ErrorHandler) {
+func (d Router) RouteError(err error, handler ErrorHandler) {
 	d.root.errHandlers[err] = handler
 }

@@ -62,7 +62,7 @@ func (d DefaultRouter) processRequest(request *types.Request) types.Response {
 // OnError receives an error and calls a corresponding handler. Handler MUST BE
 // registered, otherwise panic is raised.
 // Luckily (for user), we have all the default handlers registered
-func (d DefaultRouter) OnError(request *types.Request, render types.Render, err error) {
+func (d Router) OnError(request *types.Request, render types.Render, err error) {
 	response := d.errHandlers[err](request)
 	_ = render(response)
 }

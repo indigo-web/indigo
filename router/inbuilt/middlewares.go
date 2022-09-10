@@ -25,7 +25,7 @@ func (d *DefaultRouter) Use(middleware Middleware) {
 	d.middlewares = append(d.middlewares, middleware)
 }
 
-func (d DefaultRouter) applyMiddlewares() {
+func (d Router) applyMiddlewares() {
 	for _, methods := range d.routes {
 		for _, handler := range methods {
 			handler.fun = compose(handler.fun, handler.middlewares)
