@@ -293,5 +293,34 @@ func (c *valueCtx) String() string {
 }
 
 func (c *valueCtx) Value(key any) any {
-	return c.Context.Value(key)
+	if c.key == key {
+		return c.val
+	}
+	return value(c.Context, key)
+}
+
+func value(c context.Context, key any) any {
+	for {
+		switch ctx := c.(type) {
+		case *valueCtx:
+			if key == ctx.key {
+				return ctx.val
+			}
+			c = ctx.Context
+		case *cancelCtx:
+			if key == &cancelCtxKey {
+				return c
+			}
+			c = ctx.Context
+		case *timerCtx:
+			if key == &cancelCtxKey {
+				return &ctx.cancelCtx
+			}
+			c = ctx.Context
+		case *emptyCtx:
+			return nil
+		default:
+			return c.Value(key)
+		}
+	}
 }
