@@ -1,6 +1,7 @@
 package inbuilt
 
 import (
+	"context"
 	"github.com/fakefloordiv/indigo/types"
 )
 
@@ -11,11 +12,11 @@ This file is responsible for middlewares
 // Middleware works like a chain of nested calls, next may be even directly
 // handler. But if we are not a closing middleware, we will call next
 // middleware that is simply a partial middleware with already provided next
-type Middleware func(next HandlerFunc, request *types.Request) types.Response
+type Middleware func(ctx context.Context, next HandlerFunc, request *types.Request) types.Response
 
 // Use adds a middleware into the global lists of group middlewares. They will
 // be applied when registered
-func (d *DefaultRouter) Use(middleware Middleware) {
+func (d *Router) Use(middleware Middleware) {
 	for _, methods := range d.routes {
 		for _, handler := range methods {
 			handler.middlewares = append(handler.middlewares, middleware)
@@ -42,9 +43,9 @@ func compose(handler HandlerFunc, middlewares []Middleware) HandlerFunc {
 		return handler
 	}
 
-	return func(request *types.Request) types.Response {
+	return func(ctx context.Context, request *types.Request) types.Response {
 		return middlewares[len(middlewares)-1](
-			compose(handler, middlewares[:len(middlewares)-1]), request,
+			ctx, compose(handler, middlewares[:len(middlewares)-1]), request,
 		)
 	}
 }

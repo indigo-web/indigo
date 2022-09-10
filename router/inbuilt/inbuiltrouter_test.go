@@ -1,6 +1,7 @@
 package inbuilt
 
 import (
+	"context"
 	"testing"
 
 	"github.com/fakefloordiv/indigo/http/status"
@@ -15,7 +16,7 @@ const respBody = "some body" // once told me
 
 // handler that does nothing, used in cases when we need nothing
 // but handler also must not be nil
-func nopHandler(_ *types.Request) types.Response {
+func nopHandler(_ context.Context, _ *types.Request) types.Response {
 	return types.WithResponse.WithBody(respBody)
 }
 
@@ -65,7 +66,7 @@ func TestRoute(t *testing.T) {
 	})
 }
 
-func testMethodPredicate(t *testing.T, router *DefaultRouter, route func(string, HandlerFunc, ...Middleware), method methods.Method) {
+func testMethodPredicate(t *testing.T, router *Router, route func(string, HandlerFunc, ...Middleware), method methods.Method) {
 	route("/", nopHandler)
 	require.Contains(t, router.routes, "/")
 	require.Contains(t, router.routes["/"], method)

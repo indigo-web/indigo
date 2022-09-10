@@ -5,7 +5,10 @@ import (
 	"github.com/fakefloordiv/indigo/http/headers"
 	methods "github.com/fakefloordiv/indigo/http/method"
 	"github.com/fakefloordiv/indigo/http/proto"
+	context2 "github.com/fakefloordiv/indigo/internal/context"
+	"github.com/fakefloordiv/indigo/internal/mapconv"
 	"github.com/fakefloordiv/indigo/types"
+	"strings"
 )
 
 /*
@@ -15,17 +18,18 @@ Methods listed here MUST NOT be called by user ever
 */
 
 // OnStart composes all the registered handlers with middlewares
-func (d DefaultRouter) OnStart() {
+func (d Router) OnStart() {
 	d.applyGroups()
 	d.applyMiddlewares()
+	d.loadAllowedMethods()
 }
 
 // OnRequest routes the request
-func (d DefaultRouter) OnRequest(request *types.Request, render types.Render) error {
+func (d Router) OnRequest(request *types.Request, render types.Render) error {
 	return render(d.processRequest(request))
 }
 
-func (d DefaultRouter) processRequest(request *types.Request) types.Response {
+func (d Router) processRequest(request *types.Request) types.Response {
 	urlMethods, found := d.routes[request.Path]
 	if !found {
 		if request.Method == methods.TRACE {
@@ -38,7 +42,7 @@ func (d DefaultRouter) processRequest(request *types.Request) types.Response {
 	handler, found := urlMethods[request.Method]
 	switch found {
 	case true:
-		return handler.fun(request)
+		return handler.fun(context2.Background(), request)
 	default:
 		switch request.Method {
 		case methods.HEAD:
@@ -48,7 +52,7 @@ func (d DefaultRouter) processRequest(request *types.Request) types.Response {
 			// wants
 			handler, found = urlMethods[methods.GET]
 			if found {
-				return handler.fun(request)
+				return handler.fun(context2.Background(), request)
 			}
 		case methods.TRACE:
 			return renderRequest(request)
@@ -90,4 +94,23 @@ func renderHeadersInto(headers headers.Headers, response types.Response) types.R
 	}
 
 	return response
+}
+
+func (d Router) loadAllowedMethods() {
+	d.allowedMethods = make(map[string]string, len(d.routes))
+
+	for k, v := range d.routes {
+		allowedMethods := mapconv.Keys[methods.Method, *handlerObject](v)
+		d.allowedMethods[k] = strings.Join(methods2string(allowedMethods...), ",")
+	}
+}
+
+func methods2string(ms ...methods.Method) []string {
+	out := make([]string, len(ms))
+
+	for _, method := range ms {
+		out = append(out, methods.ToString(method))
+	}
+
+	return out
 }

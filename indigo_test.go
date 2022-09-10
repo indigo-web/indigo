@@ -2,6 +2,7 @@ package indigo
 
 import (
 	"bytes"
+	"context"
 	"errors"
 	"fmt"
 	"io"
@@ -76,7 +77,7 @@ func readN(conn net.Conn, n int) ([]byte, error) {
 func getRouter(t *testing.T) router.Router {
 	r := inbuilt.NewRouter()
 
-	r.Get("/simple-get", func(request *types.Request) types.Response {
+	r.Get("/simple-get", func(_ context.Context, request *types.Request) types.Response {
 		require.Equal(t, methods.GET, request.Method)
 		_, err := request.Query.Get("some non-existing query key")
 		require.Error(t, err)
@@ -86,11 +87,11 @@ func getRouter(t *testing.T) router.Router {
 		return types.WithResponse
 	})
 
-	r.Get("/get-resp-body", func(_ *types.Request) types.Response {
+	r.Get("/get-resp-body", func(_ context.Context, _ *types.Request) types.Response {
 		return types.WithResponse.WithBody(testRequestBody)
 	})
 
-	r.Get("/get-read-body", func(request *types.Request) types.Response {
+	r.Get("/get-read-body", func(_ context.Context, request *types.Request) types.Response {
 		require.Contains(t, request.Headers, testHeaderKey)
 
 		var stringValues []string
@@ -109,7 +110,7 @@ func getRouter(t *testing.T) router.Router {
 
 	with := r.Group("/with-")
 
-	with.Get("query", func(request *types.Request) types.Response {
+	with.Get("query", func(_ context.Context, request *types.Request) types.Response {
 		value, err := request.Query.Get(testQueryKey)
 		require.NoError(t, err)
 		require.Equal(t, testQueryValue, string(value))
@@ -120,7 +121,7 @@ func getRouter(t *testing.T) router.Router {
 	// request.OnBody() is not tested because request.Body() (wrapper for OnBody)
 	// is tested, that is enough to make sure that requestbody works correct
 
-	r.Post("/read-body", func(request *types.Request) types.Response {
+	r.Post("/read-body", func(_ context.Context, request *types.Request) types.Response {
 		body, err := request.Body()
 		require.NoError(t, err)
 		require.Equal(t, testRequestBody, string(body))
@@ -128,11 +129,11 @@ func getRouter(t *testing.T) router.Router {
 		return types.WithResponse
 	})
 
-	r.Post("/do-not-read-body", func(request *types.Request) types.Response {
+	r.Post("/do-not-read-body", func(_ context.Context, request *types.Request) types.Response {
 		return types.WithResponse
 	})
 
-	r.Get("/hijack-conn-no-body-read", func(request *types.Request) types.Response {
+	r.Get("/hijack-conn-no-body-read", func(_ context.Context, request *types.Request) types.Response {
 		conn, err := request.Hijack()
 		require.NoError(t, err)
 
@@ -148,7 +149,7 @@ func getRouter(t *testing.T) router.Router {
 		return types.WithResponse
 	})
 
-	r.Get("/hijack-conn-with-body-read", func(request *types.Request) types.Response {
+	r.Get("/hijack-conn-with-body-read", func(_ context.Context, request *types.Request) types.Response {
 		_, _ = request.Body()
 
 		conn, err := request.Hijack()
@@ -165,7 +166,7 @@ func getRouter(t *testing.T) router.Router {
 		return types.WithResponse
 	})
 
-	r.Get("/with-file", func(request *types.Request) types.Response {
+	r.Get("/with-file", func(_ context.Context, request *types.Request) types.Response {
 		return types.WithResponse.WithFile(testFilename, func(err error) types.Response {
 			t.Fail() // this callback must never be called
 
@@ -173,7 +174,7 @@ func getRouter(t *testing.T) router.Router {
 		})
 	})
 
-	r.Get("/with-file-notfound", func(request *types.Request) types.Response {
+	r.Get("/with-file-notfound", func(_ context.Context, request *types.Request) types.Response {
 		return types.WithResponse.WithFile(testFilename+"notfound", func(err error) types.Response {
 			return types.WithResponse.WithBody(testFileIfNotFound)
 		})

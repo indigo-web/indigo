@@ -1,12 +1,13 @@
 package inbuilt
 
 import (
+	"context"
 	methods "github.com/fakefloordiv/indigo/http/method"
 	"github.com/fakefloordiv/indigo/types"
 )
 
 type (
-	HandlerFunc func(*types.Request) types.Response
+	HandlerFunc func(context.Context, *types.Request) types.Response
 	handlersMap map[methods.Method]*handlerObject
 	routesMap   map[string]handlersMap
 
