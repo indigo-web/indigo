@@ -1,7 +1,7 @@
-package internal
+package body
 
 /*
-BodyGateway is an embedded solution instead of pipe
+Gateway is an embedded solution instead of pipe
 
 The idea is:
 - Core pushes some data into the Data channel
@@ -11,19 +11,19 @@ The idea is:
 - Core waits for that nil, and when got, it checks whether Err is
   nil
 */
-type BodyGateway struct {
+type Gateway struct {
 	Data chan []byte
 	Err  error
 }
 
-func NewBodyGateway() *BodyGateway {
-	return &BodyGateway{
+func NewBodyGateway() *Gateway {
+	return &Gateway{
 		Data: make(chan []byte),
 	}
 }
 
 // WriteErr is simply a sugar for setting an error and sending nil to the channel
-func (b *BodyGateway) WriteErr(err error) {
+func (b *Gateway) WriteErr(err error) {
 	b.Err = err
 	b.Data <- nil
 }
