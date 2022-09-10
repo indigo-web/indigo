@@ -2,6 +2,7 @@ package simple
 
 import (
 	"context"
+
 	"github.com/fakefloordiv/indigo/http/encodings"
 	"github.com/fakefloordiv/indigo/http/status"
 	router2 "github.com/fakefloordiv/indigo/router"
