@@ -1,8 +1,9 @@
 package types
 
 import (
-	"github.com/fakefloordiv/indigo/internal/body"
 	"net"
+
+	"github.com/fakefloordiv/indigo/internal/body"
 
 	"github.com/fakefloordiv/indigo/http/headers"
 	methods "github.com/fakefloordiv/indigo/http/method"

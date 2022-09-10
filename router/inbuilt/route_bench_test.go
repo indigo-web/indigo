@@ -1,10 +1,11 @@
 package inbuilt
 
 import (
-	methods "github.com/fakefloordiv/indigo/http/method"
-	"github.com/fakefloordiv/indigo/types"
 	"strings"
 	"testing"
+
+	methods "github.com/fakefloordiv/indigo/http/method"
+	"github.com/fakefloordiv/indigo/types"
 )
 
 func nopRender(_ types.Response) error {
