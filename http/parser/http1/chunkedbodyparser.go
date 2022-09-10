@@ -3,7 +3,7 @@ package http1
 import (
 	"github.com/fakefloordiv/indigo/http"
 	"github.com/fakefloordiv/indigo/http/encodings"
-	"github.com/fakefloordiv/indigo/internal"
+	"github.com/fakefloordiv/indigo/internal/body"
 	"github.com/fakefloordiv/indigo/settings"
 )
 
@@ -12,14 +12,14 @@ import (
 // to leave the process here and let main parser parse only http requests
 type chunkedBodyParser struct {
 	state   chunkedBodyParserState
-	gateway *internal.BodyGateway
+	gateway *body.Gateway
 
 	settings    settings.Settings
 	chunkLength uint32
 	bodyOffset  int
 }
 
-func newChunkedBodyParser(gateway *internal.BodyGateway, settings settings.Settings) chunkedBodyParser {
+func newChunkedBodyParser(gateway *body.Gateway, settings settings.Settings) chunkedBodyParser {
 	return chunkedBodyParser{
 		state:    eChunkLength1Char,
 		gateway:  gateway,

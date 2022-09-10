@@ -8,6 +8,7 @@ import (
 	"github.com/fakefloordiv/indigo/http/parser"
 	"github.com/fakefloordiv/indigo/http/proto"
 	"github.com/fakefloordiv/indigo/internal"
+	"github.com/fakefloordiv/indigo/internal/body"
 	"github.com/fakefloordiv/indigo/settings"
 	"github.com/fakefloordiv/indigo/types"
 )
@@ -39,14 +40,14 @@ type httpRequestsParser struct {
 	headerBuff     []byte
 	headersManager *headers.Manager
 
-	body       *internal.BodyGateway
+	body       *body.Gateway
 	codings    encodings.ContentEncodings
 	decodeBody bool
 	decoder    encodings.Decoder
 }
 
 func NewHTTPRequestsParser(
-	request *types.Request, body *internal.BodyGateway,
+	request *types.Request, body *body.Gateway,
 	startLineBuff, headerBuff []byte, settings settings.Settings,
 	manager *headers.Manager, codings encodings.ContentEncodings,
 ) parser.HTTPRequestsParser {
