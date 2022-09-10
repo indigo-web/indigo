@@ -1,7 +1,7 @@
 package encodings
 
 import (
-	"github.com/fakefloordiv/indigo/internal"
+	"github.com/fakefloordiv/indigo/internal/mapconv"
 )
 
 type (
@@ -49,5 +49,5 @@ func (c ContentEncodings) Acceptable() []string {
 		return []string{"identity"}
 	}
 
-	return internal.Keys(c.encodings)
+	return mapconv.Keys(c.encodings)
 }
