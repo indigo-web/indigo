@@ -185,7 +185,7 @@ func TestHttpRequestsParser_Parse_GET(t *testing.T) {
 			Protocol: proto.HTTP11,
 			Headers: headers.Headers{
 				"hello": []headers.Header{
-					{Value: "World!"},
+					{Value: "World!", Q: 10},
 				},
 			},
 		}
@@ -209,7 +209,7 @@ func TestHttpRequestsParser_Parse_GET(t *testing.T) {
 
 		for i, value := range values {
 			accept[i] = headers.Header{
-				Value: value,
+				Value: value, Q: 10,
 			}
 		}
 
@@ -259,7 +259,7 @@ func TestHttpRequestsParser_Parse_GET(t *testing.T) {
 			Protocol: proto.HTTP11,
 			Headers: headers.Headers{
 				"hello": []headers.Header{
-					{Value: "World!"},
+					{Value: "World!", Q: 10},
 				},
 			},
 		}
@@ -303,7 +303,7 @@ func TestHttpRequestsParser_Parse_GET(t *testing.T) {
 				Protocol: proto.HTTP11,
 				Headers: headers.Headers{
 					"hello": []headers.Header{
-						{Value: "World!"},
+						{Value: "World!", Q: 10},
 					},
 				},
 			}
@@ -374,7 +374,7 @@ func TestHttpRequestsParser_Parse_GET(t *testing.T) {
 			Headers: headers.Headers{
 				"header": []headers.Header{
 					{Value: "world", Q: 7},
-					{Value: "value"},
+					{Value: "value", Q: 10},
 				},
 			},
 		}
@@ -397,7 +397,7 @@ func TestHttpRequestsParser_Parse_GET(t *testing.T) {
 			Protocol: proto.HTTP11,
 			Headers: headers.Headers{
 				"header": []headers.Header{
-					{Value: "world"},
+					{Value: "world", Q: 10},
 					{Value: "value", Q: 1},
 				},
 			},
@@ -421,8 +421,8 @@ func TestHttpRequestsParser_Parse_GET(t *testing.T) {
 			Protocol: proto.HTTP11,
 			Headers: headers.Headers{
 				"header": []headers.Header{
-					{Value: "world;charset=utf8"},
-					{Value: "value"},
+					{Value: "world;charset=utf8", Q: 10},
+					{Value: "value", Q: 10},
 				},
 			},
 		}
@@ -448,7 +448,7 @@ func TestHttpRequestsParser_ParsePOST(t *testing.T) {
 				Protocol: proto.HTTP11,
 				Headers: headers.Headers{
 					"hello": []headers.Header{
-						{Value: "World!"},
+						{Value: "World!", Q: 10},
 					},
 				},
 			}

@@ -3,7 +3,7 @@ package types
 import (
 	"errors"
 
-	"github.com/fakefloordiv/indigo/internal"
+	"github.com/fakefloordiv/indigo/internal/body"
 )
 
 type (
@@ -19,12 +19,12 @@ var ErrRead = errors.New("body has been already read")
 //       as a struct equal to this one, but sends signal about completion on a next
 //       Read() call (such a structure looks pretty unstable as for me, but no choice)
 type requestBody struct {
-	body *internal.BodyGateway
+	body *body.Gateway
 	read bool
 }
 
-func newRequestBody() (requestBody, *internal.BodyGateway) {
-	gateway := internal.NewBodyGateway()
+func newRequestBody() (requestBody, *body.Gateway) {
+	gateway := body.NewBodyGateway()
 
 	return requestBody{
 		body: gateway,

@@ -1,12 +1,14 @@
 package inbuilt
 
 import (
+	"context"
 	"testing"
+
+	"github.com/fakefloordiv/indigo/internal/body"
 
 	"github.com/fakefloordiv/indigo/http/headers"
 	methods "github.com/fakefloordiv/indigo/http/method"
 	"github.com/fakefloordiv/indigo/http/url"
-	"github.com/fakefloordiv/indigo/internal"
 	"github.com/fakefloordiv/indigo/settings"
 	"github.com/fakefloordiv/indigo/types"
 
@@ -52,62 +54,62 @@ func (c *callstack) Clear() {
 }
 
 func getGlobal1Middleware(stack *callstack) Middleware {
-	return func(next HandlerFunc, request *types.Request) types.Response {
+	return func(ctx context.Context, next HandlerFunc, request *types.Request) types.Response {
 		stack.Push(global1)
 
-		return next(request)
+		return next(ctx, request)
 	}
 }
 
 func getGlobal2Middleware(stack *callstack) Middleware {
-	return func(next HandlerFunc, request *types.Request) types.Response {
+	return func(ctx context.Context, next HandlerFunc, request *types.Request) types.Response {
 		stack.Push(global2)
 
-		return next(request)
+		return next(ctx, request)
 	}
 }
 
 func getLocal1Middleware(stack *callstack) Middleware {
-	return func(next HandlerFunc, request *types.Request) types.Response {
+	return func(ctx context.Context, next HandlerFunc, request *types.Request) types.Response {
 		stack.Push(local1)
 
-		return next(request)
+		return next(ctx, request)
 	}
 }
 
 func getLocal2Middleware(stack *callstack) Middleware {
-	return func(next HandlerFunc, request *types.Request) types.Response {
+	return func(ctx context.Context, next HandlerFunc, request *types.Request) types.Response {
 		stack.Push(local2)
 
-		return next(request)
+		return next(ctx, request)
 	}
 }
 
 func getLocal3Middleware(stack *callstack) Middleware {
-	return func(next HandlerFunc, request *types.Request) types.Response {
+	return func(ctx context.Context, next HandlerFunc, request *types.Request) types.Response {
 		stack.Push(local3)
 
-		return next(request)
+		return next(ctx, request)
 	}
 }
 
 func getPointApplied1Middleware(stack *callstack) Middleware {
-	return func(next HandlerFunc, request *types.Request) types.Response {
+	return func(ctx context.Context, next HandlerFunc, request *types.Request) types.Response {
 		stack.Push(pointApplied1)
 
-		return next(request)
+		return next(ctx, request)
 	}
 }
 
 func getPointApplied2Middleware(stack *callstack) Middleware {
-	return func(next HandlerFunc, request *types.Request) types.Response {
+	return func(ctx context.Context, next HandlerFunc, request *types.Request) types.Response {
 		stack.Push(pointApplied2)
 
-		return next(request)
+		return next(ctx, request)
 	}
 }
 
-func getRequest() (*types.Request, *internal.BodyGateway) {
+func getRequest() (*types.Request, *body.Gateway) {
 	manager := headers.NewManager(settings.Default().Headers)
 	query := url.NewQuery(nil)
 

@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"log"
 
@@ -11,23 +12,23 @@ import (
 
 var addr = "localhost:9090"
 
-func HelloWorldMiddleware(next inbuilt.HandlerFunc, request *types.Request) types.Response {
+func HelloWorldMiddleware(ctx context.Context, next inbuilt.HandlerFunc, request *types.Request) types.Response {
 	fmt.Println("running middleware before handler")
-	response := next(request)
+	response := next(ctx, request)
 	fmt.Println("running middleware after handler")
 
 	return response
 }
 
-func SecondMiddleware(next inbuilt.HandlerFunc, request *types.Request) types.Response {
+func SecondMiddleware(ctx context.Context, next inbuilt.HandlerFunc, request *types.Request) types.Response {
 	fmt.Println("running second middleware before first one")
-	response := next(request)
+	response := next(ctx, request)
 	fmt.Println("running second middleware after first one")
 
 	return response
 }
 
-func MyBeautifulHandler(_ *types.Request) types.Response {
+func MyBeautifulHandler(_ context.Context, _ *types.Request) types.Response {
 	fmt.Println("running handler")
 
 	return types.WithResponse

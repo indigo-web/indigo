@@ -3,8 +3,9 @@ package http1
 import (
 	"testing"
 
+	"github.com/fakefloordiv/indigo/internal/body"
+
 	"github.com/fakefloordiv/indigo/http"
-	"github.com/fakefloordiv/indigo/internal"
 	"github.com/fakefloordiv/indigo/settings"
 
 	"github.com/stretchr/testify/require"
@@ -14,7 +15,7 @@ func nopDecoder(b []byte) ([]byte, error) {
 	return b, nil
 }
 
-func bodyReader(gateway *internal.BodyGateway, ch chan []byte) {
+func bodyReader(gateway *body.Gateway, ch chan []byte) {
 	var body []byte
 
 	for {
@@ -30,13 +31,13 @@ func bodyReader(gateway *internal.BodyGateway, ch chan []byte) {
 	ch <- body
 }
 
-func finalize(gateway *internal.BodyGateway) {
+func finalize(gateway *body.Gateway) {
 	gateway.Data <- nil
 }
 
 func testDifferentPartSizes(t *testing.T, request []byte, wantBody string) {
 	for i := 1; i < len(request); i += 1 {
-		gateway := internal.NewBodyGateway()
+		gateway := body.NewBodyGateway()
 		ch := make(chan []byte)
 		go bodyReader(gateway, ch)
 
@@ -74,7 +75,7 @@ func TestChunkedBodyParser_Parse_LFOnly(t *testing.T) {
 func TestChunkedBodyParser_Parse_Negative(t *testing.T) {
 	t.Run("BeginWithCRLF", func(t *testing.T) {
 		chunked := []byte("\r\nd\r\nHello, world!\r\n1a\r\nBut what's wrong with you?\r\nf\r\nFinally am here\r\n0\r\n\r\n")
-		gateway := internal.NewBodyGateway()
+		gateway := body.NewBodyGateway()
 		ch := make(chan []byte)
 		go bodyReader(gateway, ch)
 

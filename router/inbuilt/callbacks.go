@@ -1,10 +1,15 @@
 package inbuilt
 
 import (
+	"context"
+	"strings"
+
 	"github.com/fakefloordiv/indigo/http"
 	"github.com/fakefloordiv/indigo/http/headers"
 	methods "github.com/fakefloordiv/indigo/http/method"
 	"github.com/fakefloordiv/indigo/http/proto"
+	context2 "github.com/fakefloordiv/indigo/internal/context"
+	"github.com/fakefloordiv/indigo/internal/mapconv"
 	"github.com/fakefloordiv/indigo/types"
 )
 
@@ -15,30 +20,33 @@ Methods listed here MUST NOT be called by user ever
 */
 
 // OnStart composes all the registered handlers with middlewares
-func (d DefaultRouter) OnStart() {
+func (d Router) OnStart() {
 	d.applyGroups()
 	d.applyMiddlewares()
+	d.loadAllowedMethods()
 }
 
 // OnRequest routes the request
-func (d DefaultRouter) OnRequest(request *types.Request, render types.Render) error {
+func (d Router) OnRequest(request *types.Request, render types.Render) error {
 	return render(d.processRequest(request))
 }
 
-func (d DefaultRouter) processRequest(request *types.Request) types.Response {
+func (d Router) processRequest(request *types.Request) types.Response {
+	ctx := context.Background()
+
 	urlMethods, found := d.routes[request.Path]
 	if !found {
 		if request.Method == methods.TRACE {
 			return renderRequest(request)
 		}
 
-		return d.errHandlers[http.ErrNotFound](request)
+		return d.errHandlers[http.ErrNotFound](ctx, request)
 	}
 
 	handler, found := urlMethods[request.Method]
 	switch found {
 	case true:
-		return handler.fun(request)
+		return handler.fun(context.Background(), request)
 	default:
 		switch request.Method {
 		case methods.HEAD:
@@ -48,22 +56,23 @@ func (d DefaultRouter) processRequest(request *types.Request) types.Response {
 			// wants
 			handler, found = urlMethods[methods.GET]
 			if found {
-				return handler.fun(request)
+				return handler.fun(ctx, request)
 			}
 		case methods.TRACE:
 			return renderRequest(request)
 		}
 
-		// TODO: add request ctx so I can pass a list of allowed methods here
-		return d.errHandlers[http.ErrMethodNotAllowed](request)
+		ctx = context2.WithValue(ctx, "allow", d.allowedMethods[request.Path])
+
+		return d.errHandlers[http.ErrMethodNotAllowed](ctx, request)
 	}
 }
 
 // OnError receives an error and calls a corresponding handler. Handler MUST BE
 // registered, otherwise panic is raised.
 // Luckily (for user), we have all the default handlers registered
-func (d DefaultRouter) OnError(request *types.Request, render types.Render, err error) {
-	response := d.errHandlers[err](request)
+func (d Router) OnError(request *types.Request, render types.Render, err error) {
+	response := d.errHandlers[err](context.Background(), request)
 	_ = render(response)
 }
 
@@ -90,4 +99,21 @@ func renderHeadersInto(headers headers.Headers, response types.Response) types.R
 	}
 
 	return response
+}
+
+func (d Router) loadAllowedMethods() {
+	for k, v := range d.routes {
+		allowedMethods := mapconv.Keys[methods.Method, *handlerObject](v)
+		d.allowedMethods[k] = strings.Join(methods2string(allowedMethods...), ",")
+	}
+}
+
+func methods2string(ms ...methods.Method) []string {
+	out := make([]string, 0, len(ms))
+
+	for _, method := range ms {
+		out = append(out, methods.ToString(method))
+	}
+
+	return out
 }

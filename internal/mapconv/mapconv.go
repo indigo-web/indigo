@@ -1,4 +1,4 @@
-package internal
+package mapconv
 
 // Keys is currently used only in http/encodings/contentencodings.go, but
 // this or other functions that may be added later may be used somewhere

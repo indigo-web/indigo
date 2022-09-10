@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"log"
 	"strconv"
@@ -13,7 +14,7 @@ import (
 
 var addr = "localhost:9090"
 
-func MyHandler(request *types.Request) types.Response {
+func MyHandler(_ context.Context, request *types.Request) types.Response {
 	conn, err := request.Hijack()
 	if err != nil {
 		return types.WithResponse.

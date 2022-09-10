@@ -3,11 +3,12 @@ package types
 import (
 	"net"
 
+	"github.com/fakefloordiv/indigo/internal/body"
+
 	"github.com/fakefloordiv/indigo/http/headers"
 	methods "github.com/fakefloordiv/indigo/http/method"
 	"github.com/fakefloordiv/indigo/http/proto"
 	"github.com/fakefloordiv/indigo/http/url"
-	"github.com/fakefloordiv/indigo/internal"
 )
 
 type (
@@ -49,7 +50,7 @@ type Request struct {
 // because it has only optional purposes and buff will be nil anyway
 // But maybe it's better to implement DI all the way we go? I don't know, maybe
 // someone will contribute and fix this
-func NewRequest(manager *headers.Manager, query url.Query) (*Request, *internal.BodyGateway) {
+func NewRequest(manager *headers.Manager, query url.Query) (*Request, *body.Gateway) {
 	requestBodyStruct, gateway := newRequestBody()
 	request := &Request{
 		Query:          query,

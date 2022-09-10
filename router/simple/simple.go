@@ -1,6 +1,8 @@
 package simple
 
 import (
+	"context"
+
 	"github.com/fakefloordiv/indigo/http/encodings"
 	"github.com/fakefloordiv/indigo/http/status"
 	router2 "github.com/fakefloordiv/indigo/router"
@@ -24,7 +26,7 @@ func NewRouter(handler inbuilt.HandlerFunc) router2.Router {
 }
 
 func (r router) OnRequest(request *types.Request, render types.Render) error {
-	return render(r.handler(request))
+	return render(r.handler(context.Background(), request))
 }
 
 func (router) OnError(_ *types.Request, render types.Render, _ error) {
