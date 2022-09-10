@@ -2,6 +2,7 @@ package context
 
 import (
 	"context"
+	"fmt"
 )
 
 // Copyright 2014 The Go Authors. All rights reserved.
@@ -42,7 +43,10 @@ type valueCtx struct {
 }
 
 func (c *valueCtx) String() string {
-	return "not implemented"
+	return fmt.Sprintf(
+		"github.com/fakefloordiv/indigo/internal/context:valueCtx{key: %s, value: %s}\n",
+		fmt.Sprint(c.key), fmt.Sprint(c.val),
+	)
 }
 
 func (c *valueCtx) Value(key any) any {
