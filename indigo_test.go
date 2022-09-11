@@ -343,16 +343,6 @@ func TestAllCases(t *testing.T) {
 		require.Equal(t, testFileIfNotFound, string(data))
 	})
 
-	t.Run("/test-idle-disconnect", func(t *testing.T) {
-		conn, err := net.Dial("tcp4", addr)
-		require.NoError(t, err)
-
-		buff := make([]byte, 10)
-		n, err := conn.Read(buff)
-		require.Zero(t, n)
-		require.EqualError(t, err, io.EOF.Error())
-	})
-
 	t.Run("/trace", func(t *testing.T) {
 		request := &stdhttp.Request{
 			Method: stdhttp.MethodTrace,
@@ -423,6 +413,19 @@ func TestAllCases(t *testing.T) {
 		require.Contains(t, resp.Header, "Allow")
 		require.Equal(t, "GET", resp.Header["Allow"][0])
 		require.Equal(t, 1, len(resp.Header["Allow"]))
+	})
+
+	// this test must ALWAYS be on the bottom as it is the longest-duration test
+	t.Run("/test-idle-disconnect", func(t *testing.T) {
+		conn, err := net.Dial("tcp4", addr)
+		require.NoError(t, err)
+
+		body, err := io.ReadAll(conn)
+		wantResponseLine := "HTTP/1.1 408 Request Timeout\r\n"
+		require.GreaterOrEqual(t, len(body), len(wantResponseLine))
+		require.Equal(t, wantResponseLine, string(body[:len(wantResponseLine)]))
+		// io.ReadAll() returns nil as an error in case error was io.EOF
+		require.NoError(t, err)
 	})
 
 	stdhttp.DefaultClient.CloseIdleConnections()
