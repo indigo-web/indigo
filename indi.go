@@ -116,7 +116,7 @@ func (a Application) Serve(r router.Router, someSettings ...settings2.Settings) 
 		query := url.NewQuery(func() map[string][]byte {
 			return make(map[string][]byte, settings.URL.Query.Number.Default)
 		})
-		request, gateway := types.NewRequest(&headersManager, query)
+		request, gateway := types.NewRequest(&headersManager, query, conn.RemoteAddr())
 
 		startLineBuff := make([]byte, 0, settings.URL.Length.Default)
 		headerBuff := make([]byte, 0, settings.Headers.KeyLength.Default)

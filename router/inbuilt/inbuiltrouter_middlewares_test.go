@@ -113,7 +113,7 @@ func getRequest() (*types.Request, *body.Gateway) {
 	manager := headers.NewManager(settings.Default().Headers)
 	query := url.NewQuery(nil)
 
-	return types.NewRequest(&manager, query)
+	return types.NewRequest(&manager, query, nil)
 }
 
 func TestMiddlewares(t *testing.T) {
