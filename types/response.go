@@ -1,6 +1,7 @@
 package types
 
 import (
+	"github.com/fakefloordiv/indigo/http"
 	"github.com/fakefloordiv/indigo/http/headers"
 	"github.com/fakefloordiv/indigo/http/status"
 	"github.com/fakefloordiv/indigo/internal"
@@ -167,7 +168,28 @@ func (r Response) WithFile(path string, handler FileErrHandler) Response {
 // WithError simply sets a code status.InternalServerError and response body
 // as an error text
 func (r Response) WithError(err error) Response {
-	return r.WithCode(status.InternalServerError).WithBody(err.Error())
+	resp := r.WithBody(err.Error())
+
+	switch err {
+	case http.ErrBadRequest:
+		return resp.WithCode(status.BadRequest)
+	case http.ErrNotFound:
+		return resp.WithCode(status.NotFound)
+	case http.ErrMethodNotAllowed:
+		return resp.WithCode(status.MethodNotAllowed)
+	case http.ErrTooLarge, http.ErrURITooLong:
+		return resp.WithCode(status.RequestEntityTooLarge)
+	case http.ErrHeaderFieldsTooLarge:
+		return resp.WithCode(status.RequestHeaderFieldsTooLarge)
+	case http.ErrUnsupportedProtocol:
+		return resp.WithCode(status.NotImplemented)
+	case http.ErrUnsupportedEncoding:
+		return resp.WithCode(status.NotAcceptable)
+	default:
+		// failed to determine actual error, most of all this is some
+		// user's error, so 500 Internal Server Error is good here
+		return r.WithCode(status.InternalServerError)
+	}
 }
 
 // Headers returns response headers map
