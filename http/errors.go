@@ -10,13 +10,14 @@ var (
 	ErrTooLarge             = errors.New("too large")
 	ErrHeaderFieldsTooLarge = errors.New("header fields too large")
 	ErrURITooLong           = errors.New("request URI too long")
-	ErrURIDecoding          = errors.New("invalid url encoding")
-	ErrBadQuery             = errors.New("bad query")
+	ErrURIDecoding          = errors.New("invalid URI encoding")
+	ErrBadQuery             = errors.New("bad URL query")
 	ErrUnsupportedProtocol  = errors.New("protocol is not supported")
 	ErrUnsupportedEncoding  = errors.New("content encoding is not supported")
-	ErrTooManyHeaders       = errors.New("too much headers")
+	ErrTooManyHeaders       = errors.New("too many headers")
 
-	ErrCloseConnection = errors.New("internal error as a signal")
+	ErrConnectionTimeout = errors.New("connection timed out")
+	ErrCloseConnection   = errors.New("internal error as a signal")
 
 	ErrNotFound         = errors.New("not found")
 	ErrMethodNotAllowed = errors.New("method is not allowed")

@@ -185,6 +185,8 @@ func (r Response) WithError(err error) Response {
 		return resp.WithCode(status.NotImplemented)
 	case http.ErrUnsupportedEncoding:
 		return resp.WithCode(status.NotAcceptable)
+	case http.ErrConnectionTimeout:
+		return resp.WithCode(status.RequestTimeout)
 	default:
 		// failed to determine actual error, most of all this is some
 		// user's error, so 500 Internal Server Error is good here

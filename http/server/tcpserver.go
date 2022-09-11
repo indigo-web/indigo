@@ -106,6 +106,13 @@ func timeoutConnHandler(conn net.Conn, handleData dataHandler, timeout int, buff
 
 			ch <- processed
 		case <-timer.C:
+			if err := handleData(nil); err != nil {
+				panic(
+					"BUG: http/server/tcpserver.go:timeoutConnHandler(): handleData(nil) " +
+						"returned non-nil error: " + err.Error(),
+				)
+			}
+
 			_ = conn.Close()
 			<-ch
 			timer.Stop()
