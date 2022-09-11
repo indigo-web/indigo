@@ -46,7 +46,7 @@ type Router struct {
 func NewRouter() *Router {
 	r := &Router{
 		routes:         make(routesMap),
-		errHandlers:    newErrHandlers(),
+		errHandlers:    newErrorHandlers(),
 		allowedMethods: make(map[string]string),
 	}
 
