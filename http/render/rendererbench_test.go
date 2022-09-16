@@ -63,7 +63,7 @@ func BenchmarkRenderer_Response(b *testing.B) {
 	}
 
 	manager := headers.NewManager(settings.Default().Headers)
-	defaultRequest, _ := types.NewRequest(&manager, url.NewQuery(nil))
+	defaultRequest, _ := types.NewRequest(&manager, url.NewQuery(nil), nil)
 
 	b.Run("DefaultResponse_NoDefHeaders", func(b *testing.B) {
 		renderer := NewRenderer(buff, nil)

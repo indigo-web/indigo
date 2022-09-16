@@ -40,7 +40,7 @@ func (d Router) processRequest(request *types.Request) types.Response {
 			return renderRequest(request)
 		}
 
-		return d.errHandlers[http.ErrNotFound](ctx, request)
+		return d.processError(ctx, request, http.ErrNotFound)
 	}
 
 	handler, found := urlMethods[request.Method]
@@ -64,7 +64,7 @@ func (d Router) processRequest(request *types.Request) types.Response {
 
 		ctx = context2.WithValue(ctx, "allow", d.allowedMethods[request.Path])
 
-		return d.errHandlers[http.ErrMethodNotAllowed](ctx, request)
+		return d.processError(ctx, request, http.ErrMethodNotAllowed)
 	}
 }
 
@@ -72,8 +72,18 @@ func (d Router) processRequest(request *types.Request) types.Response {
 // registered, otherwise panic is raised.
 // Luckily (for user), we have all the default handlers registered
 func (d Router) OnError(request *types.Request, render types.Render, err error) {
-	response := d.errHandlers[err](context.Background(), request)
-	_ = render(response)
+	_ = render(d.processError(context.Background(), request, err))
+}
+
+func (d Router) processError(ctx context.Context, request *types.Request, err error) types.Response {
+	handler, found := d.errHandlers[err]
+	if !found {
+		return types.WithResponse.WithError(err)
+	}
+
+	ctx = context2.WithValue(ctx, "error", err)
+
+	return handler(ctx, request)
 }
 
 func renderRequest(request *types.Request) types.Response {

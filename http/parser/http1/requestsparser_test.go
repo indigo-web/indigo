@@ -51,7 +51,7 @@ var (
 func getParser() (httpparser.HTTPRequestsParser, *types.Request) {
 	settings := settings2.Default()
 	manager := headers.NewManager(settings.Headers)
-	request, gateway := types.NewRequest(&manager, url.Query{})
+	request, gateway := types.NewRequest(&manager, url.Query{}, nil)
 	codings := encodings.NewContentEncodings()
 
 	return NewHTTPRequestsParser(

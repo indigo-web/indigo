@@ -47,6 +47,7 @@ func (d *Router) Route(
 // - http.ErrUnsupportedProtocol
 // - http.ErrUnsupportedEncoding
 // - http.ErrMethodNotImplemented
+// - http.ErrConnectionTimeout
 //
 // You can set your own handler and override default response
 func (d Router) RouteError(err error, handler ErrorHandler) {

@@ -68,6 +68,14 @@ func (h *httpServer) Run() {
 // to the parser state returned, decides what to do
 // TODO: check whether passed data is nil. In case it is, return 408 Request Timeout
 func (h *httpServer) OnData(data []byte) (err error) {
+	if data == nil {
+		h.err = http.ErrConnectionTimeout
+		h.notifier <- eError
+		<-h.notifier
+
+		return nil
+	}
+
 	var state parser.RequestState
 
 	for len(data) > 0 {
@@ -104,6 +112,7 @@ func (h *httpServer) OnData(data []byte) (err error) {
 		case parser.ConnectionClose:
 			h.err = http.ErrCloseConnection
 			h.notifier <- eError
+			<-h.notifier
 
 			return nil
 		case parser.Error:
