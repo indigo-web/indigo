@@ -20,13 +20,14 @@ const processed = 0
 // If a value from sd (ShutDown channel) is received (no matter which one), server
 // will wait until all the goroutines will die and only then release an execution
 // flow
-func StartTCPServer(sock net.Listener, handleConn connHandler, sd chan bool) error {
+func StartTCPServer(sock net.Listener, handleConn connHandler, sd chan struct{}) error {
 	wg := new(sync.WaitGroup)
 
 	for {
 		select {
 		case <-sd:
 			wg.Wait()
+			sd <- struct{}{}
 			return http.ErrShutdown
 		default:
 			conn, err := sock.Accept()
@@ -72,7 +73,7 @@ func noTimeoutConnHandler(conn net.Conn, handleData dataHandler, buff []byte) {
 
 		if err2 != nil || err != nil || n == 0 {
 			if err2 != http.ErrHijackConn {
-				conn.Close()
+				_ = conn.Close()
 			}
 
 			return

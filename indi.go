@@ -65,7 +65,7 @@ type Application struct {
 	codings        encodings.ContentEncodings
 	defaultHeaders headers.Headers
 
-	shutdown chan bool
+	shutdown chan struct{}
 }
 
 // NewApp returns a new application object with initialized shutdown chan
@@ -74,7 +74,7 @@ func NewApp(addr string) *Application {
 		addr:           addr,
 		codings:        encodings.NewContentEncodings(),
 		defaultHeaders: defaultHeaders,
-		shutdown:       make(chan bool),
+		shutdown:       make(chan struct{}, 1),
 	}
 }
 
@@ -144,7 +144,12 @@ func (a Application) Serve(r router.Router, someSettings ...settings2.Settings) 
 // tcp server will wait until all the existing connections will be
 // closed
 func (a Application) Shutdown() {
-	a.shutdown <- true
+	a.shutdown <- struct{}{}
+}
+
+// Wait waits for tcp server to shut down
+func (a Application) Wait() {
+	<-a.shutdown
 }
 
 func getSettings(settings ...settings2.Settings) (settings2.Settings, error) {
