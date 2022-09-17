@@ -680,6 +680,16 @@ func TestHttpRequestsParser_Parse_Negative(t *testing.T) {
 		_, _, err := parser.Parse([]byte(req))
 		require.EqualError(t, err, http.ErrBadRequest.Error())
 	})
+
+	t.Run("SimpleRequest", func(t *testing.T) {
+		// Simple Requests are not supported, because our server is
+		// HTTP/1.1-oriented, and in 1.1 simple request/response is
+		// something like a deprecated mechanism
+		parser, _ := getParser()
+		req := "GET / \r\n"
+		_, _, err := parser.Parse([]byte(req))
+		require.EqualError(t, err, http.ErrBadRequest.Error())
+	})
 }
 
 func TestHttpRequestsParser_Chunked(t *testing.T) {
