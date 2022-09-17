@@ -673,6 +673,13 @@ func TestHttpRequestsParser_Parse_Negative(t *testing.T) {
 		_, _, err := parser.Parse(headerInvalidQNoDot)
 		require.EqualError(t, err, http.ErrBadRequest.Error())
 	})
+
+	t.Run("HeadersInvalidContentLength", func(t *testing.T) {
+		parser, _ := getParser()
+		req := "GET / HTTP/1.1\r\nContent-Length: 1f5\r\n\r\n"
+		_, _, err := parser.Parse([]byte(req))
+		require.EqualError(t, err, http.ErrBadRequest.Error())
+	})
 }
 
 func TestHttpRequestsParser_Chunked(t *testing.T) {
