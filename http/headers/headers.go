@@ -84,8 +84,8 @@ func (m *Manager) BeginValue() (exceeded bool) {
 // AppendValue appends a char to values slice and returns bool that
 // signalizes whether current value exceeds max header value length
 // limit
-func (m *Manager) AppendValue(char byte) (exceeded bool) {
-	m.Values = append(m.Values, char)
+func (m *Manager) AppendValue(chars ...byte) (exceeded bool) {
+	m.Values = append(m.Values, chars...)
 
 	return uint16(len(m.Values)-m.valueBegin) >= m.headersSettings.ValueLength.Maximal
 }
