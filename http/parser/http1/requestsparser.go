@@ -2,6 +2,7 @@ package http1
 
 import (
 	"bytes"
+
 	"github.com/fakefloordiv/indigo/http"
 	"github.com/fakefloordiv/indigo/http/encodings"
 	"github.com/fakefloordiv/indigo/http/headers"
