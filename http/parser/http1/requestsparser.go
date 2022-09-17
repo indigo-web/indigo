@@ -629,10 +629,6 @@ func (p *httpRequestsParser) Parse(data []byte) (state parser.RequestState, extr
 				if !p.decodeBody {
 					return parser.Error, nil, http.ErrUnsupportedEncoding
 				}
-			default:
-				if len(value) == 0 {
-					return parser.Error, nil, http.ErrBadRequest
-				}
 			}
 
 			p.headerBuff = p.headerBuff[:0]
