@@ -25,6 +25,8 @@ const (
 	eProtoCRLFCR
 	eHeaderKey
 	eHeaderColon
+	eContentLength
+	eContentLengthCR
 	eHeaderValue
 	eHeaderValueSemicolon
 	eHeaderValueSemicolonQ
