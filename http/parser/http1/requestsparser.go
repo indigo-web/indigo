@@ -258,9 +258,6 @@ func (p *httpRequestsParser) Parse(data []byte) (state parser.RequestState, extr
 		case eProto:
 			switch data[i] {
 			case '\r', '\n':
-				// TODO: in case CR or LF is met here, it is most of all simple request.
-				//       But we do not support simple requests, so Bad Request currently
-				//       will be returned. Maybe, we _can_ support it?
 				return parser.Error, nil, http.ErrBadRequest
 			case 'H', 'h':
 				p.state = eH
