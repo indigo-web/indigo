@@ -27,6 +27,13 @@ type (
 	// Maximal value is a maximal possible length for header
 	HeadersValueLength Setting[uint16]
 
+	// HeadersCharsetBuffSize is responsible for a buffer size of charset
+	// provided as a parameter of value. Of course, it allocates a new buffer
+	// for every parameter, but to avoid at least a few extra allocations
+	// we can by allocating a buffer with some minimal size
+	// Default value is the only used
+	HeadersCharsetBuffSize Setting[uint8]
+
 	// URLLength is responsible for URL buffer
 	// Default value is an initial size of URL buffer
 	// Maximal value is a maximal length of URL (protocol and method are
@@ -81,9 +88,10 @@ type (
 
 type (
 	Headers struct {
-		Number      HeadersNumber
-		KeyLength   HeadersKeyLength
-		ValueLength HeadersValueLength
+		Number          HeadersNumber
+		KeyLength       HeadersKeyLength
+		ValueLength     HeadersValueLength
+		CharsetBuffSize HeadersCharsetBuffSize
 	}
 
 	URL struct {
@@ -130,6 +138,9 @@ func Default() Settings {
 			ValueLength: HeadersValueLength{
 				Default: 4096,
 				Maximal: 8192,
+			},
+			CharsetBuffSize: HeadersCharsetBuffSize{
+				Default: 10,
 			},
 		},
 		URL: URL{
@@ -181,6 +192,8 @@ func Fill(original Settings) (modified Settings) {
 		original.Headers.ValueLength.Default, defaultSettings.Headers.ValueLength.Default)
 	original.Headers.ValueLength.Maximal = customOrDefault(
 		original.Headers.ValueLength.Maximal, defaultSettings.Headers.ValueLength.Maximal)
+	original.Headers.CharsetBuffSize.Default = customOrDefault(
+		original.Headers.CharsetBuffSize.Default, defaultSettings.Headers.CharsetBuffSize.Default)
 	original.URL.Length.Default = customOrDefault(
 		original.URL.Length.Default, defaultSettings.URL.Length.Default)
 	original.URL.Length.Maximal = customOrDefault(
