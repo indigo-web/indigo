@@ -331,6 +331,7 @@ func TestAllCases(t *testing.T) {
 		require.NoError(t, err)
 
 		actualContent, err := os.ReadFile(testFilename)
+		require.NoError(t, err)
 		require.Equal(t, string(actualContent), string(data))
 	})
 
