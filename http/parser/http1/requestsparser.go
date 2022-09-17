@@ -1,6 +1,8 @@
 package http1
 
 import (
+	"bytes"
+
 	"github.com/fakefloordiv/indigo/http"
 	"github.com/fakefloordiv/indigo/http/encodings"
 	"github.com/fakefloordiv/indigo/http/headers"
@@ -12,6 +14,8 @@ import (
 	"github.com/fakefloordiv/indigo/settings"
 	"github.com/fakefloordiv/indigo/types"
 )
+
+var contentLength = []byte("content-length")
 
 // httpRequestsParser is a stream-based http requests parser. It modifies
 // request object by pointer in performance purposes. Decodes url-encoded
@@ -25,7 +29,6 @@ type httpRequestsParser struct {
 
 	settings settings.Settings
 
-	contentLength           uint
 	lengthCountdown         uint
 	closeConnection         bool
 	chunkedTransferEncoding bool
@@ -254,12 +257,8 @@ func (p *httpRequestsParser) Parse(data []byte) (state parser.RequestState, extr
 			p.urlEncodedChar = 0
 			p.state = eFragment
 		case eProto:
-
 			switch data[i] {
 			case '\r', '\n':
-				// TODO: in case CR or LF is met here, it is most of all simple request.
-				//       But we do not support simple requests, so Bad Request currently
-				//       will be returned. Maybe, we _can_ support it?
 				return parser.Error, nil, http.ErrBadRequest
 			case 'H', 'h':
 				p.state = eH
@@ -371,6 +370,12 @@ func (p *httpRequestsParser) Parse(data []byte) (state parser.RequestState, extr
 				if p.headersManager.BeginValue() {
 					return parser.Error, nil, http.ErrTooManyHeaders
 				}
+
+				if bytes.Equal(p.headerBuff, contentLength) {
+					p.state = eContentLength
+					continue
+				}
+
 				p.state = eHeaderColon
 			case '\r', '\n':
 				return parser.Error, nil, http.ErrBadRequest
@@ -393,6 +398,20 @@ func (p *httpRequestsParser) Parse(data []byte) (state parser.RequestState, extr
 			}
 
 			p.state = eHeaderValue
+		case eContentLength:
+			switch char := data[i]; char {
+			case ' ':
+			case '\r':
+				p.state = eHeaderValueCR
+			case '\n':
+				p.state = eHeaderValueCRLF
+			default:
+				if char < '0' || char > '9' {
+					return parser.Error, nil, http.ErrBadRequest
+				}
+
+				p.lengthCountdown = p.lengthCountdown*10 + uint(char-'0')
+			}
 		case eHeaderValue:
 			switch char := data[i]; char {
 			case '\r':
@@ -413,9 +432,6 @@ func (p *httpRequestsParser) Parse(data []byte) (state parser.RequestState, extr
 					p.quality = 10
 				}
 
-				// TODO: only Accept header is allowed here, but currently we do not
-				//       support it. Check whether there are more system headers we have
-				//       to recognize
 				_ = p.headersManager.FinalizeValue(string(p.headerBuff), p.quality)
 				p.quality = 0
 				// number of headers is anyway not exceeded here because this is the same header
@@ -600,14 +616,7 @@ func (p *httpRequestsParser) Parse(data []byte) (state parser.RequestState, extr
 
 			switch key {
 			case "content-length":
-				p.contentLength, err = parseUint(value)
-				if err != nil {
-					return parser.Error, nil, err
-				}
-				if p.contentLength > uint(p.settings.Body.Length.Maximal) {
-					return parser.Error, nil, http.ErrTooLarge
-				}
-				p.lengthCountdown = p.contentLength
+				p.request.ContentLength = p.lengthCountdown
 			case "connection":
 				p.closeConnection = string(value) == "close"
 			case "transfer-encoding":
@@ -624,7 +633,7 @@ func (p *httpRequestsParser) Parse(data []byte) (state parser.RequestState, extr
 
 			switch data[i] {
 			case '\n':
-				if p.contentLength == 0 && !p.chunkedTransferEncoding {
+				if p.lengthCountdown == 0 && !p.chunkedTransferEncoding {
 					p.reset()
 
 					return parser.RequestCompleted, data[i+1:], nil
@@ -642,7 +651,7 @@ func (p *httpRequestsParser) Parse(data []byte) (state parser.RequestState, extr
 		case eHeaderValueCRLFCR:
 			switch data[i] {
 			case '\n':
-				if p.contentLength == 0 && !p.chunkedTransferEncoding {
+				if p.lengthCountdown == 0 && !p.chunkedTransferEncoding {
 					p.reset()
 
 					return parser.RequestCompleted, data[i+1:], nil
@@ -713,7 +722,6 @@ func (p *httpRequestsParser) reset() {
 	p.startLineBuff = p.startLineBuff[:0]
 	p.offset = 0
 	p.headerBuff = p.headerBuff[:0]
-	p.contentLength = 0
 	p.chunkedTransferEncoding = false
 	p.decodeBody = false
 	p.state = eMethod
