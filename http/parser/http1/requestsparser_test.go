@@ -185,7 +185,7 @@ func TestHttpRequestsParser_Parse_GET(t *testing.T) {
 			Protocol: proto.HTTP11,
 			Headers: headers.Headers{
 				"hello": []headers.Header{
-					{Value: "World!", Q: 10},
+					{Value: "World!", Q: 10, Charset: string(defaultCharset)},
 				},
 			},
 		}
@@ -209,7 +209,7 @@ func TestHttpRequestsParser_Parse_GET(t *testing.T) {
 
 		for i, value := range values {
 			accept[i] = headers.Header{
-				Value: value, Q: 10,
+				Value: value, Q: 10, Charset: string(defaultCharset),
 			}
 		}
 
@@ -259,7 +259,7 @@ func TestHttpRequestsParser_Parse_GET(t *testing.T) {
 			Protocol: proto.HTTP11,
 			Headers: headers.Headers{
 				"hello": []headers.Header{
-					{Value: "World!", Q: 10},
+					{Value: "World!", Q: 10, Charset: string(defaultCharset)},
 				},
 			},
 		}
@@ -303,7 +303,7 @@ func TestHttpRequestsParser_Parse_GET(t *testing.T) {
 				Protocol: proto.HTTP11,
 				Headers: headers.Headers{
 					"hello": []headers.Header{
-						{Value: "World!", Q: 10},
+						{Value: "World!", Q: 10, Charset: string(defaultCharset)},
 					},
 				},
 			}
@@ -349,8 +349,8 @@ func TestHttpRequestsParser_Parse_GET(t *testing.T) {
 			Protocol: proto.HTTP11,
 			Headers: headers.Headers{
 				"header": []headers.Header{
-					{Value: "world", Q: 7},
-					{Value: "value", Q: 1},
+					{Value: "world", Q: 7, Charset: string(defaultCharset)},
+					{Value: "value", Q: 1, Charset: string(defaultCharset)},
 				},
 			},
 		}
@@ -373,8 +373,8 @@ func TestHttpRequestsParser_Parse_GET(t *testing.T) {
 			Protocol: proto.HTTP11,
 			Headers: headers.Headers{
 				"header": []headers.Header{
-					{Value: "world", Q: 7},
-					{Value: "value", Q: 10},
+					{Value: "world", Q: 7, Charset: string(defaultCharset)},
+					{Value: "value", Q: 10, Charset: string(defaultCharset)},
 				},
 			},
 		}
@@ -397,8 +397,8 @@ func TestHttpRequestsParser_Parse_GET(t *testing.T) {
 			Protocol: proto.HTTP11,
 			Headers: headers.Headers{
 				"header": []headers.Header{
-					{Value: "world", Q: 10},
-					{Value: "value", Q: 1},
+					{Value: "world", Q: 10, Charset: string(defaultCharset)},
+					{Value: "value", Q: 1, Charset: string(defaultCharset)},
 				},
 			},
 		}
@@ -421,8 +421,8 @@ func TestHttpRequestsParser_Parse_GET(t *testing.T) {
 			Protocol: proto.HTTP11,
 			Headers: headers.Headers{
 				"header": []headers.Header{
-					{Value: "world;charset=utf8", Q: 10},
-					{Value: "value", Q: 10},
+					{Value: "world", Q: 10, Charset: "utf8"},
+					{Value: "value", Q: 10, Charset: string(defaultCharset)},
 				},
 			},
 		}
@@ -448,7 +448,7 @@ func TestHttpRequestsParser_ParsePOST(t *testing.T) {
 				Protocol: proto.HTTP11,
 				Headers: headers.Headers{
 					"hello": []headers.Header{
-						{Value: "World!", Q: 10},
+						{Value: "World!", Q: 10, Charset: string(defaultCharset)},
 					},
 				},
 			}
@@ -689,6 +689,77 @@ func TestHttpRequestsParser_Parse_Negative(t *testing.T) {
 		req := "GET / \r\n"
 		_, _, err := parser.Parse([]byte(req))
 		require.EqualError(t, err, http.ErrBadRequest.Error())
+	})
+
+	t.Run("IncompleteCharset_C", func(t *testing.T) {
+		parser, request := getParser()
+		req := "GET / HTTP/1.1\r\nContent-Type: text/html;c\r\n\r\n"
+		_, _, err := parser.Parse([]byte(req))
+		require.NoError(t, err)
+		require.Equal(t, "text/html;c", request.Headers["content-type"][0].Value)
+	})
+
+	t.Run("IncompleteCharset_Ch", func(t *testing.T) {
+		parser, request := getParser()
+		req := "GET / HTTP/1.1\r\nContent-Type: text/html;ch\r\n\r\n"
+		_, _, err := parser.Parse([]byte(req))
+		require.NoError(t, err)
+		require.Equal(t, "text/html;ch", request.Headers["content-type"][0].Value)
+	})
+
+	t.Run("IncompleteCharset_Cha", func(t *testing.T) {
+		parser, request := getParser()
+		req := "GET / HTTP/1.1\r\nContent-Type: text/html;cha\r\n\r\n"
+		_, _, err := parser.Parse([]byte(req))
+		require.NoError(t, err)
+		require.Equal(t, "text/html;cha", request.Headers["content-type"][0].Value)
+	})
+
+	t.Run("IncompleteCharset_Char", func(t *testing.T) {
+		parser, request := getParser()
+		req := "GET / HTTP/1.1\r\nContent-Type: text/html;char\r\n\r\n"
+		_, _, err := parser.Parse([]byte(req))
+		require.NoError(t, err)
+		require.Equal(t, "text/html;char", request.Headers["content-type"][0].Value)
+	})
+
+	t.Run("IncompleteCharset_Chars", func(t *testing.T) {
+		parser, request := getParser()
+		req := "GET / HTTP/1.1\r\nContent-Type: text/html;chars\r\n\r\n"
+		_, _, err := parser.Parse([]byte(req))
+		require.NoError(t, err)
+		require.Equal(t, "text/html;chars", request.Headers["content-type"][0].Value)
+	})
+
+	t.Run("IncompleteCharset_Charse", func(t *testing.T) {
+		parser, request := getParser()
+		req := "GET / HTTP/1.1\r\nContent-Type: text/html;charse\r\n\r\n"
+		_, _, err := parser.Parse([]byte(req))
+		require.NoError(t, err)
+		require.Equal(t, "text/html;charse", request.Headers["content-type"][0].Value)
+	})
+
+	t.Run("IncompleteCharset_Charset", func(t *testing.T) {
+		parser, request := getParser()
+		req := "GET / HTTP/1.1\r\nContent-Type: text/html;charset\r\n\r\n"
+		_, _, err := parser.Parse([]byte(req))
+		require.NoError(t, err)
+		require.Equal(t, "text/html;charset", request.Headers["content-type"][0].Value)
+	})
+
+	t.Run("IncompleteCharset_char=hello", func(t *testing.T) {
+		parser, request := getParser()
+		req := "GET / HTTP/1.1\r\nContent-Type: text/html;char=hello\r\n\r\n"
+		_, _, err := parser.Parse([]byte(req))
+		require.NoError(t, err)
+		require.Equal(t, "text/html;char=hello", request.Headers["content-type"][0].Value)
+	})
+
+	t.Run("CharsetBuffOverflow", func(t *testing.T) {
+		parser, _ := getParser()
+		req := "GET / HTTP/1.1\r\nContent-Type: text/html;charset=some-very-very-long-non-existing-charset\r\n\r\n"
+		_, _, err := parser.Parse([]byte(req))
+		require.EqualError(t, err, http.ErrHeaderFieldsTooLarge.Error())
 	})
 }
 

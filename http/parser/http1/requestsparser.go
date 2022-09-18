@@ -15,7 +15,10 @@ import (
 	"github.com/fakefloordiv/indigo/types"
 )
 
-var contentLength = []byte("content-length")
+var (
+	contentLength  = []byte("content-length")
+	defaultCharset = []byte("iso-8859-1")
+)
 
 // httpRequestsParser is a stream-based http requests parser. It modifies
 // request object by pointer in performance purposes. Decodes url-encoded
@@ -39,6 +42,7 @@ type httpRequestsParser struct {
 	urlEncodedChar         uint8
 	protoMajor, protoMinor uint8
 	quality                uint8
+	charset                []byte
 
 	headerBuff     []byte
 	headersManager *headers.Manager
@@ -64,6 +68,8 @@ func NewHTTPRequestsParser(
 		headerBuff:        headerBuff,
 		headersManager:    manager,
 		codings:           codings,
+
+		charset: defaultCharset,
 
 		body: body,
 	}
@@ -432,8 +438,9 @@ func (p *httpRequestsParser) Parse(data []byte) (state parser.RequestState, extr
 					p.quality = 10
 				}
 
-				_ = p.headersManager.FinalizeValue(string(p.headerBuff), p.quality)
+				_ = p.headersManager.FinalizeValue(string(p.headerBuff), p.quality, internal.B2S(p.charset))
 				p.quality = 0
+				p.charset = defaultCharset
 				// number of headers is anyway not exceeded here because this is the same header
 				_ = p.headersManager.BeginValue()
 			default:
@@ -449,6 +456,8 @@ func (p *httpRequestsParser) Parse(data []byte) (state parser.RequestState, extr
 			switch char := data[i]; char {
 			case 'q', 'Q':
 				p.state = eHeaderValueSemicolonQ
+			case 'c', 'C':
+				p.state = eHeaderValueSemicolonC
 			case '\r':
 				p.state = eHeaderValueCR
 			case '\n':
@@ -462,11 +471,12 @@ func (p *httpRequestsParser) Parse(data []byte) (state parser.RequestState, extr
 					p.quality = 10
 				}
 
-				_ = p.headersManager.FinalizeValue(string(p.headerBuff), p.quality)
+				_ = p.headersManager.FinalizeValue(string(p.headerBuff), p.quality, internal.B2S(p.charset))
 				p.quality = 0
+				p.charset = defaultCharset
 				_ = p.headersManager.BeginValue()
 			default:
-				if p.headersManager.AppendValue(';') || p.headersManager.AppendValue(char) {
+				if p.headersManager.AppendValue(';', char) {
 					return parser.Error, nil, http.ErrHeaderFieldsTooLarge
 				}
 
@@ -493,13 +503,12 @@ func (p *httpRequestsParser) Parse(data []byte) (state parser.RequestState, extr
 					p.quality = 10
 				}
 
-				_ = p.headersManager.FinalizeValue(string(p.headerBuff), p.quality)
+				_ = p.headersManager.FinalizeValue(string(p.headerBuff), p.quality, internal.B2S(p.charset))
 				p.quality = 0
+				p.charset = defaultCharset
 				_ = p.headersManager.BeginValue()
 			default:
-				if p.headersManager.AppendValue(';') ||
-					p.headersManager.AppendValue('q') ||
-					p.headersManager.AppendValue(char) {
+				if p.headersManager.AppendValue(';', 'q', char) {
 					return parser.Error, nil, http.ErrHeaderFieldsTooLarge
 				}
 
@@ -541,12 +550,205 @@ func (p *httpRequestsParser) Parse(data []byte) (state parser.RequestState, extr
 					p.quality = 10
 				}
 
-				_ = p.headersManager.FinalizeValue(string(p.headerBuff), p.quality)
+				_ = p.headersManager.FinalizeValue(string(p.headerBuff), p.quality, internal.B2S(p.charset))
 				p.quality = 0
+				p.charset = defaultCharset
 				_ = p.headersManager.BeginValue()
 				p.state = eHeaderValueComma
 			default:
 				return parser.Error, nil, http.ErrBadRequest
+			}
+		case eHeaderValueSemicolonC:
+			switch data[i] {
+			case 'h', 'H':
+				p.state = eHeaderValueSemicolonCh
+			default:
+				if p.headersManager.AppendValue(';', 'c') {
+					return parser.Error, nil, http.ErrHeaderFieldsTooLarge
+				}
+
+				switch data[i] {
+				case '\r':
+					p.state = eHeaderValueCR
+				case '\n':
+					p.state = eHeaderValueCRLF
+				case ',':
+					p.state = eHeaderValueComma
+				default:
+					if p.headersManager.AppendValue(data[i]) {
+						return parser.Error, nil, http.ErrHeaderFieldsTooLarge
+					}
+
+					p.state = eHeaderValue
+				}
+			}
+		case eHeaderValueSemicolonCh:
+			switch data[i] {
+			case 'a', 'A':
+				p.state = eHeaderValueSemicolonCha
+			default:
+				if p.headersManager.AppendValue(';', 'c', 'h') {
+					return parser.Error, nil, http.ErrHeaderFieldsTooLarge
+				}
+
+				switch data[i] {
+				case '\r':
+					p.state = eHeaderValueCR
+				case '\n':
+					p.state = eHeaderValueCRLF
+				case ',':
+					p.state = eHeaderValueComma
+				default:
+					if p.headersManager.AppendValue(data[i]) {
+						return parser.Error, nil, http.ErrHeaderFieldsTooLarge
+					}
+
+					p.state = eHeaderValue
+				}
+			}
+		case eHeaderValueSemicolonCha:
+			switch data[i] {
+			case 'r', 'R':
+				p.state = eHeaderValueSemicolonChar
+			default:
+				if p.headersManager.AppendValue(';', 'c', 'h', 'a') {
+					return parser.Error, nil, http.ErrHeaderFieldsTooLarge
+				}
+
+				switch data[i] {
+				case '\r':
+					p.state = eHeaderValueCR
+				case '\n':
+					p.state = eHeaderValueCRLF
+				case ',':
+					p.state = eHeaderValueComma
+				default:
+					if p.headersManager.AppendValue(data[i]) {
+						return parser.Error, nil, http.ErrHeaderFieldsTooLarge
+					}
+
+					p.state = eHeaderValue
+				}
+			}
+		case eHeaderValueSemicolonChar:
+			switch data[i] {
+			case 's', 'S':
+				p.state = eHeaderValueSemicolonChars
+			default:
+				if p.headersManager.AppendValue(';', 'c', 'h', 'a', 'r') {
+					return parser.Error, nil, http.ErrHeaderFieldsTooLarge
+				}
+
+				switch data[i] {
+				case '\r':
+					p.state = eHeaderValueCR
+				case '\n':
+					p.state = eHeaderValueCRLF
+				case ',':
+					p.state = eHeaderValueComma
+				default:
+					if p.headersManager.AppendValue(data[i]) {
+						return parser.Error, nil, http.ErrHeaderFieldsTooLarge
+					}
+
+					p.state = eHeaderValue
+				}
+			}
+		case eHeaderValueSemicolonChars:
+			switch data[i] {
+			case 'e', 'E':
+				p.state = eHeaderValueSemicolonCharse
+			default:
+				if p.headersManager.AppendValue(';', 'c', 'h', 'a', 'r', 's') {
+					return parser.Error, nil, http.ErrHeaderFieldsTooLarge
+				}
+
+				switch data[i] {
+				case '\r':
+					p.state = eHeaderValueCR
+				case '\n':
+					p.state = eHeaderValueCRLF
+				case ',':
+					p.state = eHeaderValueComma
+				default:
+					if p.headersManager.AppendValue(data[i]) {
+						return parser.Error, nil, http.ErrHeaderFieldsTooLarge
+					}
+
+					p.state = eHeaderValue
+				}
+			}
+		case eHeaderValueSemicolonCharse:
+			switch data[i] {
+			case 't', 'T':
+				p.state = eHeaderValueSemicolonCharset
+			default:
+				if p.headersManager.AppendValue(';', 'c', 'h', 'a', 'r', 's', 'e') {
+					return parser.Error, nil, http.ErrHeaderFieldsTooLarge
+				}
+
+				switch data[i] {
+				case '\r':
+					p.state = eHeaderValueCR
+				case '\n':
+					p.state = eHeaderValueCRLF
+				case ',':
+					p.state = eHeaderValueComma
+				default:
+					if p.headersManager.AppendValue(data[i]) {
+						return parser.Error, nil, http.ErrHeaderFieldsTooLarge
+					}
+
+					p.state = eHeaderValue
+				}
+			}
+		case eHeaderValueSemicolonCharset:
+			switch data[i] {
+			case '=':
+				p.charset = make([]byte, 0, p.settings.Headers.CharsetBuffSize.Default)
+				p.state = eValueCharset
+			default:
+				if p.headersManager.AppendValue(';', 'c', 'h', 'a', 'r', 's', 'e', 't') {
+					return parser.Error, nil, http.ErrHeaderFieldsTooLarge
+				}
+
+				switch data[i] {
+				case '\r':
+					p.state = eHeaderValueCR
+				case '\n':
+					p.state = eHeaderValueCRLF
+				case ',':
+					p.state = eHeaderValueComma
+				default:
+					if p.headersManager.AppendValue(data[i]) {
+						return parser.Error, nil, http.ErrHeaderFieldsTooLarge
+					}
+
+					p.state = eHeaderValue
+				}
+			}
+		case eValueCharset:
+			switch data[i] {
+			case '\r':
+				p.state = eHeaderValueCR
+			case '\n':
+				p.state = eHeaderValueCRLF
+			case ',':
+				if p.quality == 0 {
+					p.quality = 10
+				}
+
+				_ = p.headersManager.FinalizeValue(string(p.headerBuff), p.quality, internal.B2S(p.charset))
+				p.quality = 0
+				p.charset = defaultCharset
+				_ = p.headersManager.BeginValue()
+				p.state = eHeaderValueComma
+			default:
+				p.charset = append(p.charset, data[i]|0x20)
+
+				if len(p.charset) == cap(p.charset) {
+					return parser.Error, nil, http.ErrHeaderFieldsTooLarge
+				}
 			}
 		case eHeaderValueComma:
 			switch char := data[i]; char {
@@ -611,8 +813,9 @@ func (p *httpRequestsParser) Parse(data []byte) (state parser.RequestState, extr
 			}
 
 			key := string(p.headerBuff)
-			value := p.headersManager.FinalizeValue(key, p.quality)
+			value := p.headersManager.FinalizeValue(key, p.quality, internal.B2S(p.charset))
 			p.quality = 0
+			p.charset = defaultCharset
 
 			switch key {
 			case "content-length":
