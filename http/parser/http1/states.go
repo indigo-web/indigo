@@ -62,4 +62,8 @@ const (
 	eChunkBodyCR
 	eChunkBodyCRLF
 	eLastChunkCR
+	eFooter
+	eFooterCR
+	eFooterCRLF
+	eFooterCRLFCR
 )
