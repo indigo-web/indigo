@@ -44,8 +44,15 @@ var (
 	commaSPInQuotedHeaderValue = []byte("GET / HTTP/1.1\r\nAccept: one, \"two, or more\",three\r\n\r\n")
 	quoteEscapeChar            = []byte("GET / HTTP/1.1\r\nAccept: \\\"one, two,\\\"three\r\n\r\n")
 
-	ordinaryChunkedBody = "d\r\nHello, world!\r\n1a\r\nBut what's wrong with you?\r\nf\r\nFinally am here\r\n0\r\n\r\n"
-	ordinaryChunked     = []byte("POST / HTTP/1.1\r\nTransfer-Encoding: chunked\r\n\r\n" + ordinaryChunkedBody)
+	ordinaryChunkedBody  = "d\r\nHello, world!\r\n1a\r\nBut what's wrong with you?\r\nf\r\nFinally am here\r\n0\r\n\r\n"
+	traileredChunkedBody = "7\r\nMozilla\r\n9\r\nDeveloper\r\n7\r\nNetwork\r\n0\r\nExpires: date here\r\n\r\n"
+	ordinaryChunked      = []byte("POST / HTTP/1.1\r\nTransfer-Encoding: chunked\r\n\r\n" + ordinaryChunkedBody)
+	chunkedWithTrailers  = []byte(
+		"POST / HTTP/1.1\r\n" +
+			"Transfer-Encoding: chunked\r\n" +
+			"Trailer: Expires, Something-Else\r\n\r\n" +
+			traileredChunkedBody,
+	)
 )
 
 func getParser() (httpparser.HTTPRequestsParser, *types.Request) {
@@ -778,5 +785,21 @@ func TestHttpRequestsParser_Chunked(t *testing.T) {
 		require.Equal(t, httpparser.BodyCompleted, state)
 		require.Empty(t, extra)
 		require.Equal(t, "Hello, world!But what's wrong with you?Finally am here", string(<-ch))
+	})
+
+	t.Run("ChunkedWithTrailers", func(t *testing.T) {
+		parser, request := getParser()
+
+		ch := make(chan []byte)
+		go readBody(request, ch)
+		state, extra, err := parser.Parse(chunkedWithTrailers)
+		require.NoError(t, err)
+		require.Equal(t, httpparser.HeadersCompleted, state)
+
+		state, extra, err = parser.Parse(extra)
+		require.NoError(t, err)
+		require.Equal(t, httpparser.BodyCompleted, state)
+		require.Empty(t, extra)
+		require.Equal(t, "MozillaDeveloperNetwork", string(<-ch))
 	})
 }

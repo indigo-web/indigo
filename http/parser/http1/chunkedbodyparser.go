@@ -30,7 +30,9 @@ func newChunkedBodyParser(gateway *body.Gateway, settings settings.Settings) chu
 // Parse takes only body as it is. Returns a flag whether parsing is done,
 // extra that are extra-bytes related to a next one request, and err if
 // occurred
-func (c *chunkedBodyParser) Parse(data []byte, decoder encodings.Decoder) (done bool, extra []byte, err error) {
+func (c *chunkedBodyParser) Parse(
+	data []byte, decoder encodings.Decoder, trailer bool,
+) (done bool, extra []byte, err error) {
 	if decoder == nil {
 		decoder = func(b []byte) ([]byte, error) {
 			return b, nil
@@ -79,8 +81,13 @@ func (c *chunkedBodyParser) Parse(data []byte, decoder encodings.Decoder) (done 
 
 					return true, data[i+1:], nil
 				default:
-					return true, nil, http.ErrBadRequest
+					if !trailer {
+						return true, nil, http.ErrBadRequest
+					}
+
+					c.state = eFooter
 				}
+
 				continue
 			}
 
@@ -122,9 +129,13 @@ func (c *chunkedBodyParser) Parse(data []byte, decoder encodings.Decoder) (done 
 			case '\r':
 				c.state = eLastChunkCR
 			case '\n':
-				c.state = eChunkLength1Char
+				if !trailer {
+					c.state = eChunkLength1Char
 
-				return true, data[i+1:], nil
+					return true, data[i+1:], nil
+				}
+
+				c.state = eFooter
 			default:
 				c.chunkLength = uint32(unHex(data[i]))
 				if c.chunkLength > c.settings.Body.ChunkSize.Maximal {
@@ -136,11 +147,49 @@ func (c *chunkedBodyParser) Parse(data []byte, decoder encodings.Decoder) (done 
 		case eLastChunkCR:
 			switch data[i] {
 			case '\n':
+				if !trailer {
+					c.state = eChunkLength1Char
+
+					return true, data[i+1:], nil
+				}
+
+				c.state = eFooter
+			default:
+				return true, nil, http.ErrBadRequest
+			}
+		case eFooter:
+			switch data[i] {
+			case '\r':
+				c.state = eFooterCR
+			case '\n':
+				c.state = eFooterCRLF
+			}
+		case eFooterCR:
+			switch data[i] {
+			case '\n':
+				c.state = eFooterCRLF
+			default:
+				return true, nil, http.ErrBadRequest
+			}
+		case eFooterCRLF:
+			switch data[i] {
+			case '\r':
+				c.state = eFooterCRLFCR
+			case '\n':
 				c.state = eChunkLength1Char
 
 				return true, data[i+1:], nil
 			default:
-				return true, nil, http.ErrBadRequest
+				c.state = eFooter
+			}
+		case eFooterCRLFCR:
+			switch data[i] {
+			case '\n':
+				c.state = eChunkLength1Char
+
+				return true, data[i+1:], nil
+			default:
+				return done, nil, http.ErrBadRequest
 			}
 		}
 	}

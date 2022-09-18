@@ -35,6 +35,7 @@ type httpRequestsParser struct {
 	lengthCountdown         uint
 	closeConnection         bool
 	chunkedTransferEncoding bool
+	trailer                 bool
 	chunkedBodyParser       chunkedBodyParser
 
 	startLineBuff          []byte
@@ -830,6 +831,8 @@ func (p *httpRequestsParser) Parse(data []byte) (state parser.RequestState, extr
 				if !p.decodeBody {
 					return parser.Error, nil, http.ErrUnsupportedEncoding
 				}
+			case "trailer":
+				p.trailer = true
 			}
 
 			p.headerBuff = p.headerBuff[:0]
@@ -877,7 +880,7 @@ func (p *httpRequestsParser) Parse(data []byte) (state parser.RequestState, extr
 // lengths
 func (p *httpRequestsParser) parseBody(b []byte) (done bool, extra []byte, err error) {
 	if p.chunkedTransferEncoding {
-		return p.chunkedBodyParser.Parse(b, p.decoder)
+		return p.chunkedBodyParser.Parse(b, p.decoder, p.trailer)
 	}
 
 	if p.lengthCountdown <= uint(len(b)) {
@@ -927,5 +930,6 @@ func (p *httpRequestsParser) reset() {
 	p.headerBuff = p.headerBuff[:0]
 	p.chunkedTransferEncoding = false
 	p.decodeBody = false
+	p.trailer = false
 	p.state = eMethod
 }
