@@ -1,6 +1,7 @@
 package types
 
 import (
+	"io"
 	"net"
 
 	"github.com/fakefloordiv/indigo/internal/body"
@@ -38,7 +39,7 @@ type Request struct {
 
 	ContentLength uint
 
-	body     requestBody
+	body     *requestBody
 	bodyBuff []byte
 
 	Hijack ConnectionHijacker
@@ -88,6 +89,12 @@ func (r *Request) Body() ([]byte, error) {
 	})
 
 	return r.bodyBuff, err
+}
+
+// Reader returns io.Reader for request body. This method may be called multiple times,
+// but reading from multiple readers leads to Undefined Behaviour
+func (r *Request) Reader() io.Reader {
+	return newBodyReader(r.body)
 }
 
 // Reset resets request headers and reads body into nowhere until completed.

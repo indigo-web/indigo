@@ -2,6 +2,7 @@ package types
 
 import (
 	"errors"
+	"io"
 
 	"github.com/fakefloordiv/indigo/internal/body"
 )
@@ -15,18 +16,15 @@ var ErrRead = errors.New("body has been already read")
 
 // requestBody is a struct that handles request body. Separated from types.Request
 // because contains a lot of internal logic and conventions
-// TODO: add some struct that implements io.Reader interface. I propose implement it
-//       as a struct equal to this one, but sends signal about completion on a next
-//       Read() call (such a structure looks pretty unstable as for me, but no choice)
 type requestBody struct {
 	body *body.Gateway
 	read bool
 }
 
-func newRequestBody() (requestBody, *body.Gateway) {
+func newRequestBody() (*requestBody, *body.Gateway) {
 	gateway := body.NewBodyGateway()
 
-	return requestBody{
+	return &requestBody{
 		body: gateway,
 	}, gateway
 }
@@ -80,5 +78,44 @@ func (r *requestBody) Reset() error {
 		if <-r.body.Data == nil {
 			return r.body.Err
 		}
+	}
+}
+
+type bodyReader struct {
+	rbody *requestBody
+	sync  bool
+}
+
+func (b *bodyReader) Read(buff []byte) (n int, err error) {
+	if b.rbody.read {
+		return 0, ErrRead
+	}
+
+	if b.sync {
+		b.rbody.body.Data <- nil
+	} else {
+		b.sync = true
+	}
+
+	data := <-b.rbody.body.Data
+	if data == nil {
+		b.rbody.read = true
+		err = b.rbody.body.Err
+
+		if err == nil {
+			err = io.EOF
+		}
+
+		return 0, err
+	}
+
+	copy(buff, data)
+
+	return len(data), nil
+}
+
+func newBodyReader(rbody *requestBody) io.Reader {
+	return &bodyReader{
+		rbody: rbody,
 	}
 }

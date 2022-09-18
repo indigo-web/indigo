@@ -66,7 +66,6 @@ func (h *httpServer) Run() {
 // OnData is a core-core function here, because does all the main stuff
 // core must do. It parses a data provided by tcp server, and according
 // to the parser state returned, decides what to do
-// TODO: check whether passed data is nil. In case it is, return 408 Request Timeout
 func (h *httpServer) OnData(data []byte) (err error) {
 	if data == nil {
 		h.err = http.ErrConnectionTimeout
