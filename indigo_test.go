@@ -129,6 +129,15 @@ func getRouter(t *testing.T) router.Router {
 		return types.WithResponse
 	})
 
+	r.Post("/body-reader", func(_ context.Context, request *types.Request) types.Response {
+		reader := request.Reader()
+		body, err := io.ReadAll(reader)
+		require.NoError(t, err)
+		require.Equal(t, testRequestBody, string(body))
+
+		return types.WithResponse
+	})
+
 	r.Post("/do-not-read-body", func(_ context.Context, request *types.Request) types.Response {
 		return types.WithResponse
 	})
@@ -297,6 +306,17 @@ func TestAllCases(t *testing.T) {
 		body := new(bytes.Buffer)
 		body.Write([]byte(testRequestBody))
 		resp, err := stdhttp.DefaultClient.Post(URL+"/read-body", "text/html", body)
+		require.NoError(t, err)
+		defer func() {
+			_ = resp.Body.Close()
+		}()
+		require.Equal(t, stdhttp.StatusOK, resp.StatusCode)
+	})
+
+	t.Run("/body-reader", func(t *testing.T) {
+		body := new(bytes.Buffer)
+		body.Write([]byte(testRequestBody))
+		resp, err := stdhttp.DefaultClient.Post(URL+"/body-reader", "text/html", body)
 		require.NoError(t, err)
 		defer func() {
 			_ = resp.Body.Close()
