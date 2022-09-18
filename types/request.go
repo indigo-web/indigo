@@ -36,6 +36,8 @@ type Request struct {
 	Headers        headers.Headers
 	headersManager *headers.Manager
 
+	ContentLength uint
+
 	body     requestBody
 	bodyBuff []byte
 

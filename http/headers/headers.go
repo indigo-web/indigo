@@ -13,6 +13,9 @@ type Header struct {
 	// Q is a quality marker. It is an integer 0..9 that represents a floating
 	// part of q float value. 1.0 float is not supported, max 0.9
 	Q uint8
+	// Charset is an encoding provided in header value, always in lowercase.
+	// By default, iso-8859-1
+	Charset string
 }
 
 func (h Header) QualityString() string {
@@ -84,24 +87,29 @@ func (m *Manager) BeginValue() (exceeded bool) {
 // AppendValue appends a char to values slice and returns bool that
 // signalizes whether current value exceeds max header value length
 // limit
-func (m *Manager) AppendValue(char byte) (exceeded bool) {
-	m.Values = append(m.Values, char)
+func (m *Manager) AppendValue(chars ...byte) (exceeded bool) {
+	m.Values = append(m.Values, chars...)
 
 	return uint16(len(m.Values)-m.valueBegin) >= m.headersSettings.ValueLength.Maximal
 }
 
 // FinalizeValue just marks that we are done with our header value. It
-// takes provided key and adds a new entry into the headers map
-func (m Manager) FinalizeValue(key string, q uint8) (finalValue string) {
+// takes provided key and adds a new entry into the headers map.
+// In case value is empty, returning also empty string WITHOUT appending
+// it to headers
+func (m Manager) FinalizeValue(key string, q uint8, charset string) (finalValue string) {
 	finalValue = internal.B2S(m.Values[m.valueBegin:])
+	if len(finalValue) == 0 {
+		return finalValue
+	}
 
 	headers, found := m.Headers[key]
 	if !found {
 		m.Headers[key] = []Header{
-			{finalValue, q},
+			{finalValue, q, charset},
 		}
 	} else {
-		m.Headers[key] = append(headers, Header{finalValue, q})
+		m.Headers[key] = append(headers, Header{finalValue, q, charset})
 	}
 
 	return finalValue

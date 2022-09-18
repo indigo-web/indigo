@@ -134,7 +134,7 @@ func (r *Renderer) Response(
 func (r *Renderer) renderFileInto(
 	method methods.Method, writer types.ResponseWriter, response types.Response,
 ) error {
-	file, err := os.OpenFile(response.Filename, os.O_RDONLY, 69420) // anyway unused
+	file, err := os.OpenFile(response.Filename, os.O_RDONLY, 0)
 	if err != nil {
 		return err
 	}

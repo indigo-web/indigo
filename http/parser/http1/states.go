@@ -25,6 +25,7 @@ const (
 	eProtoCRLFCR
 	eHeaderKey
 	eHeaderColon
+	eContentLength
 	eHeaderValue
 	eHeaderValueSemicolon
 	eHeaderValueSemicolonQ
@@ -32,6 +33,14 @@ const (
 	eHeaderQualityDot
 	eHeaderQualityMinor
 	eHeaderQualitySplitter
+	eHeaderValueSemicolonC
+	eHeaderValueSemicolonCh
+	eHeaderValueSemicolonCha
+	eHeaderValueSemicolonChar
+	eHeaderValueSemicolonChars
+	eHeaderValueSemicolonCharse
+	eHeaderValueSemicolonCharset
+	eValueCharset
 	eHeaderValueComma
 	eHeaderValueBackslash
 	eHeaderValueQuoted
@@ -53,4 +62,8 @@ const (
 	eChunkBodyCR
 	eChunkBodyCRLF
 	eLastChunkCR
+	eFooter
+	eFooterCR
+	eFooterCRLF
+	eFooterCRLFCR
 )
