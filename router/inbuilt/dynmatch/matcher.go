@@ -6,6 +6,7 @@ import (
 	"fmt"
 	context2 "github.com/fakefloordiv/indigo/internal/context"
 	"strconv"
+	"strings"
 )
 
 var (
@@ -101,22 +102,15 @@ func (t Template) Match(ctx context.Context, path string) (context.Context, bool
 			return ctx, false
 		}
 
-		var hasSlash bool
 		dynamicPart := path[len(staticPart):]
 
-		for i := range dynamicPart {
-			if dynamicPart[i] == '/' {
-				if name := t.markerNames[staticIndex]; len(name) > 0 {
-					ctx = context2.WithValue(ctx, name, dynamicPart[:i])
-				}
-				
-				path = dynamicPart[i:]
-				hasSlash = true
-				break
+		if slash := strings.IndexByte(dynamicPart, '/'); slash != -1 {
+			if name := t.markerNames[staticIndex]; len(name) > 0 {
+				ctx = context2.WithValue(ctx, name, dynamicPart[:slash])
 			}
-		}
 
-		if !hasSlash {
+			path = dynamicPart[slash:]
+		} else {
 			if name := t.markerNames[staticIndex]; len(name) > 0 {
 				ctx = context2.WithValue(ctx, name, dynamicPart)
 			}
