@@ -32,34 +32,35 @@ func WithValue[K comparable, V any](parent context.Context, key K, val V) contex
 		panic("cannot create context from nil parent")
 	}
 
-	return &valueCtx{parent, key, val}
+	return valueCtx[K, V]{parent, key, val}
 }
 
 // A valueCtx carries a key-value pair. It implements Value for that key and
 // delegates all other calls to the embedded Context.
-type valueCtx struct {
+type valueCtx[K comparable, V any] struct {
 	context.Context
-	key, val any
+	key K
+	val V
 }
 
-func (c *valueCtx) String() string {
+func (c valueCtx[K, V]) String() string {
 	return fmt.Sprintf(
 		"github.com/fakefloordiv/indigo/internal/context:valueCtx{key: %s, value: %s}\n",
 		fmt.Sprint(c.key), fmt.Sprint(c.val),
 	)
 }
 
-func (c *valueCtx) Value(key any) any {
+func (c valueCtx[K, V]) Value(key any) any {
 	if c.key == key {
 		return c.val
 	}
-	return value(c.Context, key)
+	return value[K, V](c.Context, key)
 }
 
-func value(c context.Context, key any) any {
+func value[K comparable, V any](c context.Context, key any) any {
 	for {
 		switch ctx := c.(type) {
-		case *valueCtx:
+		case valueCtx[K, V]:
 			if key == ctx.key {
 				return ctx.val
 			}
