@@ -5,9 +5,7 @@ import (
 	"strings"
 
 	"github.com/fakefloordiv/indigo/http"
-	"github.com/fakefloordiv/indigo/http/headers"
 	methods "github.com/fakefloordiv/indigo/http/method"
-	"github.com/fakefloordiv/indigo/http/proto"
 	context2 "github.com/fakefloordiv/indigo/internal/context"
 	"github.com/fakefloordiv/indigo/internal/mapconv"
 	"github.com/fakefloordiv/indigo/types"
@@ -27,17 +25,19 @@ func (d Router) OnStart() {
 }
 
 // OnRequest routes the request
-func (d Router) OnRequest(request *types.Request, render types.Render) error {
+func (d *Router) OnRequest(request *types.Request, render types.Render) error {
 	return render(d.processRequest(request))
 }
 
-func (d Router) processRequest(request *types.Request) types.Response {
+func (d *Router) processRequest(request *types.Request) types.Response {
 	ctx := context.Background()
 
 	urlMethods, found := d.routes[request.Path]
 	if !found {
 		if request.Method == methods.TRACE {
-			return renderRequest(request)
+			d.traceBuff = renderHTTPRequest(request, d.traceBuff)
+
+			return traceResponse(d.traceBuff)
 		}
 
 		return d.processError(ctx, request, http.ErrNotFound)
@@ -59,7 +59,9 @@ func (d Router) processRequest(request *types.Request) types.Response {
 				return handler.fun(ctx, request)
 			}
 		case methods.TRACE:
-			return renderRequest(request)
+			d.traceBuff = renderHTTPRequest(request, d.traceBuff)
+
+			return traceResponse(d.traceBuff)
 		}
 
 		ctx = context2.WithValue(ctx, "allow", d.allowedMethods[request.Path])
@@ -84,31 +86,6 @@ func (d Router) processError(ctx context.Context, request *types.Request, err er
 	ctx = context2.WithValue(ctx, "error", err)
 
 	return handler(ctx, request)
-}
-
-func renderRequest(request *types.Request) types.Response {
-	requestLine := types.WithResponse.
-		WithHeader("Content-Type", "message/http").
-		WithBody(methods.ToString(request.Method) + http.SP).
-		WithBodyAppend(request.Path + http.SP).
-		WithBodyByteAppend(proto.ToBytes(request.Proto)).
-		WithBodyByteAppend(http.CRLF)
-
-	return renderHeadersInto(request.Headers, requestLine).WithBodyByteAppend(http.CRLF)
-}
-
-func renderHeadersInto(headers headers.Headers, response types.Response) types.Response {
-	for k, v := range headers {
-		response = response.WithBodyAppend(k).WithBodyAppend(http.COLON).WithBodyAppend(http.SP)
-
-		for i := 0; i < len(v)-1; i++ {
-			response = response.WithBodyAppend(v[i].Value + http.COMMA)
-		}
-
-		response = response.WithBodyAppend(v[len(v)-1].Value).WithBodyByteAppend(http.CRLF)
-	}
-
-	return response
 }
 
 func (d Router) loadAllowedMethods() {

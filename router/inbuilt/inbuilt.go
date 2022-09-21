@@ -39,6 +39,8 @@ type Router struct {
 	routes         routesMap
 	errHandlers    errHandlers
 	allowedMethods map[string]string
+
+	traceBuff []byte
 }
 
 // NewRouter constructs a new instance of inbuilt router. Error handlers
