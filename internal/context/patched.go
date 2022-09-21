@@ -54,19 +54,5 @@ func (c valueCtx[K, V]) Value(key any) any {
 	if c.key == key {
 		return c.val
 	}
-	return value[K, V](c.Context, key)
-}
-
-func value[K comparable, V any](c context.Context, key any) any {
-	for {
-		switch ctx := c.(type) {
-		case valueCtx[K, V]:
-			if key == ctx.key {
-				return ctx.val
-			}
-			c = ctx.Context
-		default:
-			return c.Value(key)
-		}
-	}
+	return c.Context.Value(key)
 }
