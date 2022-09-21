@@ -393,8 +393,8 @@ func TestAllCases(t *testing.T) {
 		require.NoError(t, err)
 
 		wantRequestLine := "TRACE /trace HTTP/1.1\r\n"
-		require.True(t, len(data) > len(wantRequestLine))
-		require.True(t, data[:len(wantRequestLine)] == wantRequestLine)
+		require.Greater(t, len(data), len(wantRequestLine))
+		require.Equal(t, wantRequestLine, data[:len(wantRequestLine)])
 
 		headerLines := strings.Split(data[len(wantRequestLine):], "\r\n")
 		// request is terminated with \r\n\r\n, so 2 last values in headerLines
@@ -405,6 +405,7 @@ func TestAllCases(t *testing.T) {
 			"host: " + addr,
 			"user-agent: Go-http-client/1.1",
 			"accept-encoding: gzip",
+			"content-length: 0",
 		}
 
 		require.Equal(t, len(wantHeaderLines), len(headerLines))
