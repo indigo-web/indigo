@@ -22,6 +22,7 @@ func nopHandler(_ context.Context, _ *types.Request) types.Response {
 
 func TestRoute(t *testing.T) {
 	r := NewRouter()
+	r.OnStart()
 
 	t.Run("NewRoute", func(t *testing.T) {
 		r.Route(methods.GET, "/", nopHandler)
@@ -58,7 +59,7 @@ func TestRoute(t *testing.T) {
 		request.Method = methods.HEAD
 		request.Path = "/"
 
-		resp := r.processRequest(request)
+		resp := r.requestProcessor(request)
 		// we have not registered any HEAD-method handler yet, so GET method
 		// is expected to be called (but without body)
 		require.Equal(t, status.OK, resp.Code)

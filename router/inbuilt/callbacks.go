@@ -4,7 +4,6 @@ import (
 	"context"
 	"strings"
 
-	"github.com/fakefloordiv/indigo/http"
 	methods "github.com/fakefloordiv/indigo/http/method"
 	context2 "github.com/fakefloordiv/indigo/internal/context"
 	"github.com/fakefloordiv/indigo/internal/mapconv"
@@ -18,67 +17,27 @@ Methods listed here MUST NOT be called by user ever
 */
 
 // OnStart composes all the registered handlers with middlewares
-func (d Router) OnStart() {
-	d.applyGroups()
-	d.applyMiddlewares()
-	d.loadAllowedMethods()
+func (r *Router) OnStart() {
+	r.requestProcessor = r.staticProcessor
+	r.applyGroups()
+	r.applyMiddlewares()
+	r.loadAllowedMethods()
 }
 
 // OnRequest routes the request
-func (d *Router) OnRequest(request *types.Request, render types.Render) error {
-	return render(d.processRequest(request))
-}
-
-func (d *Router) processRequest(request *types.Request) types.Response {
-	ctx := context.Background()
-
-	urlMethods, found := d.routes[request.Path]
-	if !found {
-		if request.Method == methods.TRACE {
-			d.traceBuff = renderHTTPRequest(request, d.traceBuff)
-
-			return traceResponse(d.traceBuff)
-		}
-
-		return d.processError(ctx, request, http.ErrNotFound)
-	}
-
-	handler, found := urlMethods[request.Method]
-	switch found {
-	case true:
-		return handler.fun(context.Background(), request)
-	default:
-		switch request.Method {
-		case methods.HEAD:
-			// by default, if no handler for HEAD method is registered, automatically
-			// call a corresponding GET method - renderer anyway will discard request
-			// body and leave only response line with headers, just like rfc2068, 9.4
-			// wants
-			handler, found = urlMethods[methods.GET]
-			if found {
-				return handler.fun(ctx, request)
-			}
-		case methods.TRACE:
-			d.traceBuff = renderHTTPRequest(request, d.traceBuff)
-
-			return traceResponse(d.traceBuff)
-		}
-
-		ctx = context2.WithValue(ctx, "allow", d.allowedMethods[request.Path])
-
-		return d.processError(ctx, request, http.ErrMethodNotAllowed)
-	}
+func (r *Router) OnRequest(request *types.Request, render types.Render) error {
+	return render(r.requestProcessor(request))
 }
 
 // OnError receives an error and calls a corresponding handler. Handler MUST BE
 // registered, otherwise panic is raised.
 // Luckily (for user), we have all the default handlers registered
-func (d Router) OnError(request *types.Request, render types.Render, err error) {
-	_ = render(d.processError(context.Background(), request, err))
+func (r Router) OnError(request *types.Request, render types.Render, err error) {
+	_ = render(r.processError(context.Background(), request, err))
 }
 
-func (d Router) processError(ctx context.Context, request *types.Request, err error) types.Response {
-	handler, found := d.errHandlers[err]
+func (r Router) processError(ctx context.Context, request *types.Request, err error) types.Response {
+	handler, found := r.errHandlers[err]
 	if !found {
 		return types.WithResponse.WithError(err)
 	}
@@ -88,10 +47,10 @@ func (d Router) processError(ctx context.Context, request *types.Request, err er
 	return handler(ctx, request)
 }
 
-func (d Router) loadAllowedMethods() {
-	for k, v := range d.routes {
+func (r Router) loadAllowedMethods() {
+	for k, v := range r.routes {
 		allowedMethods := mapconv.Keys[methods.Method, *handlerObject](v)
-		d.allowedMethods[k] = strings.Join(methods2string(allowedMethods...), ",")
+		r.allowedMethods[k] = strings.Join(methods2string(allowedMethods...), ",")
 	}
 }
 

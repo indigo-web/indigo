@@ -19,6 +19,8 @@ type (
 
 	ErrorHandler func(context.Context, *types.Request) types.Response
 	errHandlers  map[error]ErrorHandler
+
+	requestProcessor func(*types.Request) types.Response
 )
 
 // Router is a reference implementation of router for indigo
@@ -35,6 +37,8 @@ type Router struct {
 
 	prefix      string
 	middlewares []Middleware
+
+	requestProcessor requestProcessor
 
 	routes         routesMap
 	errHandlers    errHandlers

@@ -11,25 +11,25 @@ This file is responsible for registering both ordinary and error handlers
 */
 
 // Route is a base method for registering handlers
-func (d *Router) Route(
+func (r *Router) Route(
 	method methods.Method, path string, handlerFunc HandlerFunc,
 	middlewares ...Middleware,
 ) {
-	if path != "*" && !strings.HasPrefix(path, "/") && d.prefix == "" {
+	if path != "*" && !strings.HasPrefix(path, "/") && r.prefix == "" {
 		// applying prefix slash only if we are not in group
 		path = "/" + path
 	}
 
-	urlPath := d.prefix + path
-	methodsMap, found := d.routes[urlPath]
+	urlPath := r.prefix + path
+	methodsMap, found := r.routes[urlPath]
 	if !found {
 		methodsMap = make(handlersMap)
-		d.routes[urlPath] = methodsMap
+		r.routes[urlPath] = methodsMap
 	}
 
 	handlerStruct := &handlerObject{
 		fun:         handlerFunc,
-		middlewares: append(middlewares, d.middlewares...),
+		middlewares: append(middlewares, r.middlewares...),
 	}
 
 	methodsMap[method] = handlerStruct
@@ -50,6 +50,6 @@ func (d *Router) Route(
 // - http.ErrConnectionTimeout
 //
 // You can set your own handler and override default response
-func (d Router) RouteError(err error, handler ErrorHandler) {
-	d.root.errHandlers[err] = handler
+func (r Router) RouteError(err error, handler ErrorHandler) {
+	r.root.errHandlers[err] = handler
 }

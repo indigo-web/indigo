@@ -17,18 +17,18 @@ type Middleware func(ctx context.Context, next HandlerFunc, request *types.Reque
 
 // Use adds a middleware into the global lists of group middlewares. They will
 // be applied when registered
-func (d *Router) Use(middleware Middleware) {
-	for _, methods := range d.routes {
+func (r *Router) Use(middleware Middleware) {
+	for _, methods := range r.routes {
 		for _, handler := range methods {
 			handler.middlewares = append(handler.middlewares, middleware)
 		}
 	}
 
-	d.middlewares = append(d.middlewares, middleware)
+	r.middlewares = append(r.middlewares, middleware)
 }
 
-func (d Router) applyMiddlewares() {
-	for _, methods := range d.routes {
+func (r Router) applyMiddlewares() {
+	for _, methods := range r.routes {
 		for _, handler := range methods {
 			handler.fun = compose(handler.fun, handler.middlewares)
 		}
