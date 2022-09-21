@@ -4,8 +4,8 @@ import (
 	"context"
 	"github.com/fakefloordiv/indigo/http"
 	methods "github.com/fakefloordiv/indigo/http/method"
-	context2 "github.com/fakefloordiv/indigo/internal/context"
 	"github.com/fakefloordiv/indigo/types"
+	context2 "github.com/fakefloordiv/indigo/valuectx"
 )
 
 /*

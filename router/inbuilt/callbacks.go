@@ -2,10 +2,10 @@ package inbuilt
 
 import (
 	"context"
+	context2 "github.com/fakefloordiv/indigo/valuectx"
 	"strings"
 
 	methods "github.com/fakefloordiv/indigo/http/method"
-	context2 "github.com/fakefloordiv/indigo/internal/context"
 	"github.com/fakefloordiv/indigo/internal/mapconv"
 	"github.com/fakefloordiv/indigo/types"
 )

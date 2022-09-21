@@ -4,7 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	context2 "github.com/fakefloordiv/indigo/internal/context"
+	context2 "github.com/fakefloordiv/indigo/valuectx"
 	"strconv"
 	"strings"
 )
