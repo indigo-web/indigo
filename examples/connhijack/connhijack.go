@@ -17,7 +17,7 @@ var addr = "localhost:9090"
 func MyHandler(_ context.Context, request *types.Request) types.Response {
 	conn, err := request.Hijack()
 	if err != nil {
-		return types.WithResponse.
+		return types.
 			WithCode(status.BadRequest).
 			WithBody("bad body")
 	}
@@ -29,7 +29,7 @@ func MyHandler(_ context.Context, request *types.Request) types.Response {
 		if n == 0 || err != nil {
 			conn.Close()
 
-			return types.WithResponse
+			return types.OK()
 		}
 
 		fmt.Println("somebody says:", strconv.Quote(string(readBuff[:n])))

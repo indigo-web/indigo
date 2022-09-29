@@ -31,7 +31,7 @@ func SecondMiddleware(ctx context.Context, next inbuilt.HandlerFunc, request *ty
 func MyBeautifulHandler(_ context.Context, _ *types.Request) types.Response {
 	fmt.Println("running handler")
 
-	return types.WithResponse
+	return types.OK()
 }
 
 func main() {
