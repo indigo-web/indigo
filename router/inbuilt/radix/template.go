@@ -1,18 +1,33 @@
-package main
+package radix
 
 import (
 	"context"
 	"errors"
-	"fmt"
 	context2 "github.com/fakefloordiv/indigo/valuectx"
-	"strconv"
 	"strings"
 )
 
+type templateParserState uint8
+
+const (
+	eStatic templateParserState = iota + 1
+	ePartName
+	eFinishPartName
+)
+
 var (
-	ErrNotImplemented  = errors.New("current implementation does not allows static text between slashes")
-	ErrInvalidTemplate = errors.New("invalid template")
-	ErrEmptyPath       = errors.New("path template cannot be empty")
+	ErrNeedLeadingSlash = errors.New(
+		"leading slash is compulsory",
+	)
+	ErrInvalidPartName = errors.New(
+		"slashes or figure braces are not allowed inside of the template part name",
+	)
+	ErrEmptyPath = errors.New(
+		"template cannot be empty",
+	)
+	ErrMustEndWithSlash = errors.New(
+		"a following slash is compulsory after the end of dynamic part",
+	)
 )
 
 // Template is a parsed template. It simply contains static parts, and marker names
@@ -36,7 +51,7 @@ func Parse(tmpl string) (Template, error) {
 	for i, char := range tmpl {
 		if i == 0 {
 			if char != '/' {
-				return template, ErrInvalidTemplate
+				return template, ErrNeedLeadingSlash
 			}
 
 			// skip leading slash
@@ -46,44 +61,45 @@ func Parse(tmpl string) (Template, error) {
 		switch state {
 		case eStatic:
 			switch char {
-			case '/':
-				state = eSlash
-			case '{':
-				return template, ErrNotImplemented
-			}
-		case eSlash:
-			switch char {
 			case '{':
 				template.staticParts = append(template.staticParts, tmpl[offset:i])
+
 				offset = i + 1
 				state = ePartName
-			default:
-				state = eStatic
 			}
 		case ePartName:
 			switch char {
 			case '}':
 				template.markerNames = append(template.markerNames, tmpl[offset:i])
 				offset = i + 1
-				state = eEndPartName
-			case '/':
-				return template, ErrInvalidTemplate
+				state = eFinishPartName
+			case '/', '{':
+				return template, ErrInvalidPartName
 			}
-		case eEndPartName:
+		case eFinishPartName:
 			switch char {
 			case '/':
-				state = eSlash
+				state = eStatic
 			default:
-				return template, ErrNotImplemented
+				return template, ErrMustEndWithSlash
 			}
 		}
 	}
 
-	if state == eStatic || state == eSlash {
-		template.staticParts = append(template.staticParts, tmpl)
+	if state == eStatic && offset < len(tmpl)-1 {
+		template.staticParts = append(template.staticParts, tmpl[offset:])
 	}
 
 	return template, nil
+}
+
+func MustParse(tmpl string) Template {
+	template, err := Parse(tmpl)
+	if err != nil {
+		panic(err.Error())
+	}
+
+	return template
 }
 
 func (t Template) Match(ctx context.Context, path string) (context.Context, bool) {
@@ -94,6 +110,14 @@ func (t Template) Match(ctx context.Context, path string) (context.Context, bool
 	var (
 		staticIndex int
 	)
+
+	if len(t.staticParts) > len(t.markerNames) {
+		if newPath := strings.TrimSuffix(path, t.staticParts[len(t.staticParts)-1]); newPath != path {
+			path = newPath
+		} else {
+			return ctx, false
+		}
+	}
 
 	for staticIndex < len(t.staticParts) {
 		staticPart := t.staticParts[staticIndex]
@@ -122,17 +146,4 @@ func (t Template) Match(ctx context.Context, path string) (context.Context, bool
 	}
 
 	return ctx, true
-}
-
-func main() {
-	tmpl := "/hello/{world}/{ok}/good/{name}"
-	fmt.Println("parsing:", strconv.Quote(tmpl))
-
-	template, err := Parse(tmpl)
-	fmt.Println("template:", template, "err:", err)
-
-	sample := "/hello/world-world/ok-perfect/good/name-Akakiy"
-	_, matched := template.Match(context.Background(), sample)
-	fmt.Println("Sample:", sample)
-	fmt.Println("matches:", matched)
 }
