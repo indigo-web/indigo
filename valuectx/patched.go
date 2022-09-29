@@ -45,7 +45,7 @@ type valueCtx[K comparable, V any] struct {
 
 func (c valueCtx[K, V]) String() string {
 	return fmt.Sprintf(
-		"github.com/fakefloordiv/indigo/internal/context:valueCtx{key: %s, value: %s}\n",
+		"github.com/fakefloordiv/indigo/internal/context:valueCtx{key: %s, value: %s}",
 		fmt.Sprint(c.key), fmt.Sprint(c.val),
 	)
 }
