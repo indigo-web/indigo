@@ -14,6 +14,14 @@ import (
 // instead of any and reflection. This increases performance a
 // lot
 
+// A valueCtx carries a key-value pair. It implements Value for that key and
+// delegates all other calls to the embedded Context.
+type valueCtx[K comparable, V any] struct {
+	context.Context
+	key K
+	val V
+}
+
 // WithValue returns a copy of parent in which the value associated with key is
 // val.
 //
@@ -35,24 +43,16 @@ func WithValue[K comparable, V any](parent context.Context, key K, val V) contex
 	return valueCtx[K, V]{parent, key, val}
 }
 
-// A valueCtx carries a key-value pair. It implements Value for that key and
-// delegates all other calls to the embedded Context.
-type valueCtx[K comparable, V any] struct {
-	context.Context
-	key K
-	val V
-}
-
-func (c valueCtx[K, V]) String() string {
-	return fmt.Sprintf(
-		"github.com/fakefloordiv/indigo/internal/context:valueCtx{key: %s, value: %s}",
-		fmt.Sprint(c.key), fmt.Sprint(c.val),
-	)
-}
-
 func (c valueCtx[K, V]) Value(key any) any {
 	if c.key == key {
 		return c.val
 	}
 	return c.Context.Value(key)
+}
+
+func (c valueCtx[K, V]) String() string {
+	return fmt.Sprintf(
+		"github.com/fakefloordiv/indigo/valuectx/patched.go:valueCtx{key: %s, value: %s}",
+		fmt.Sprint(c.key), fmt.Sprint(c.val),
+	)
 }
