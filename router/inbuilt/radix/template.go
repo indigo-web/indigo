@@ -1,23 +1,21 @@
 package radix
 
 import (
-	"context"
 	"errors"
-	context2 "github.com/fakefloordiv/indigo/valuectx"
-	"strings"
 )
 
 type templateParserState uint8
 
 const (
 	eStatic templateParserState = iota + 1
-	ePartName
-	eFinishPartName
+	eSlash
+	eDynamic
+	eFinishDynamic
 )
 
 var (
 	ErrNeedLeadingSlash = errors.New(
-		"leading slash is compulsory",
+		"a leading slash is compulsory",
 	)
 	ErrInvalidPartName = errors.New(
 		"slashes or figure braces are not allowed inside of the template part name",
@@ -28,18 +26,25 @@ var (
 	ErrMustEndWithSlash = errors.New(
 		"a following slash is compulsory after the end of dynamic part",
 	)
+	ErrDynamicMustBeWholeSection = errors.New(
+		"dynamic part must be a whole path section, without prefixes and suffixes",
+	)
 )
+
+type Segment struct {
+	IsDynamic bool
+	Payload   string
+}
 
 // Template is a parsed template. It simply contains static parts, and marker names
 // index of each corresponds to index of static part (first static part, then marker)
 type Template struct {
-	staticParts []string
-	markerNames []string
+	segments []Segment
 }
 
 func Parse(tmpl string) (Template, error) {
 	var (
-		offset   int
+		offset   = 1
 		template = Template{}
 		state    = eStatic
 	)
@@ -61,25 +66,41 @@ func Parse(tmpl string) (Template, error) {
 		switch state {
 		case eStatic:
 			switch char {
-			case '{':
-				template.staticParts = append(template.staticParts, tmpl[offset:i])
-
+			case '/':
+				template.segments = append(template.segments, Segment{
+					IsDynamic: false,
+					Payload:   tmpl[offset:i],
+				})
 				offset = i + 1
-				state = ePartName
+				state = eSlash
+			case '{':
+				return template, ErrDynamicMustBeWholeSection
 			}
-		case ePartName:
+		case eSlash:
+			switch char {
+			case '/':
+			case '{':
+				offset = i + 1
+				state = eDynamic
+			default:
+				state = eStatic
+			}
+		case eDynamic:
 			switch char {
 			case '}':
-				template.markerNames = append(template.markerNames, tmpl[offset:i])
-				offset = i + 1
-				state = eFinishPartName
+				template.segments = append(template.segments, Segment{
+					IsDynamic: true,
+					Payload:   tmpl[offset:i],
+				})
+				state = eFinishDynamic
 			case '/', '{':
 				return template, ErrInvalidPartName
 			}
-		case eFinishPartName:
+		case eFinishDynamic:
 			switch char {
 			case '/':
-				state = eStatic
+				offset = i + 1
+				state = eSlash
 			default:
 				return template, ErrMustEndWithSlash
 			}
@@ -87,7 +108,10 @@ func Parse(tmpl string) (Template, error) {
 	}
 
 	if state == eStatic && offset < len(tmpl)-1 {
-		template.staticParts = append(template.staticParts, tmpl[offset:])
+		template.segments = append(template.segments, Segment{
+			IsDynamic: false,
+			Payload:   tmpl[offset:],
+		})
 	}
 
 	return template, nil
@@ -100,50 +124,4 @@ func MustParse(tmpl string) Template {
 	}
 
 	return template
-}
-
-func (t Template) Match(ctx context.Context, path string) (context.Context, bool) {
-	if len(t.staticParts) == 1 {
-		return ctx, path == t.staticParts[0]
-	}
-
-	var (
-		staticIndex int
-	)
-
-	if len(t.staticParts) > len(t.markerNames) {
-		if newPath := strings.TrimSuffix(path, t.staticParts[len(t.staticParts)-1]); newPath != path {
-			path = newPath
-		} else {
-			return ctx, false
-		}
-	}
-
-	for staticIndex < len(t.staticParts) {
-		staticPart := t.staticParts[staticIndex]
-
-		if len(path) < len(staticPart) || path[:len(staticPart)] != staticPart {
-			return ctx, false
-		}
-
-		dynamicPart := path[len(staticPart):]
-
-		if slash := strings.IndexByte(dynamicPart, '/'); slash != -1 {
-			if name := t.markerNames[staticIndex]; len(name) > 0 {
-				ctx = context2.WithValue(ctx, name, dynamicPart[:slash])
-			}
-
-			path = dynamicPart[slash:]
-		} else {
-			if name := t.markerNames[staticIndex]; len(name) > 0 {
-				ctx = context2.WithValue(ctx, name, dynamicPart)
-			}
-
-			return ctx, staticIndex+1 == len(t.staticParts)
-		}
-
-		staticIndex++
-	}
-
-	return ctx, true
 }

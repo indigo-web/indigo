@@ -5,146 +5,126 @@ import (
 	"errors"
 	"github.com/fakefloordiv/indigo/types"
 	"github.com/fakefloordiv/indigo/valuectx"
-	"strings"
 )
 
 var (
-	ErrNotImplemented = errors.New("different dynamic names for the same static prefix is not allowed")
+	ErrNotImplemented = errors.New(
+		"different dynamic segment names are not allowed for common path prefix",
+	)
 )
 
 type Handler func(ctx context.Context, request *types.Request) types.Response
 
 type Node struct {
-	DynamicName string
-	IsDynamic   bool
-	Handler     Handler
-	Branches    map[string]*Node
+	staticSegments map[string]*Node
+	isDynamic      bool
+	dynamicName    string
+	// Next is used only in case current node is dynamic
+	next *Node
+
+	handler Handler
 }
 
 func NewTree() *Node {
-	return newNode(nil, "", false)
+	return newNode(nil, false, "")
 }
 
-func newNode(handler Handler, dynName string, isDyn bool) *Node {
+func newNode(handler Handler, isDyn bool, dynName string) *Node {
 	return &Node{
-		DynamicName: dynName,
-		IsDynamic:   isDyn,
-		Handler:     handler,
-		Branches:    make(map[string]*Node),
+		staticSegments: make(map[string]*Node),
+		isDynamic:      isDyn,
+		dynamicName:    dynName,
+		handler:        handler,
 	}
 }
 
 func (n *Node) Insert(template Template, handler Handler) error {
-	return n.insertRecursively(template, handler)
+	return n.insertRecursively(template.segments, handler)
 }
 
-func (n *Node) insertRecursively(template Template, handler Handler) error {
-	if len(template.markerNames) == 0 {
-		if len(template.staticParts) == 0 {
-			n.Handler = handler
-
-			return nil
-		}
-
-		static := template.staticParts[0]
-
-		if node, found := n.Branches[static]; found {
-			node.Handler = handler
-
-			return nil
-		}
-
-		n.Branches[static] = newNode(handler, "", false)
+func (n *Node) insertRecursively(segments []Segment, handler Handler) error {
+	if len(segments) == 0 {
+		n.handler = handler
 
 		return nil
 	}
 
-	static := template.staticParts[0]
-	dynamic := template.markerNames[0]
+	segment := segments[0]
 
-	if node, found := n.Branches[static]; found {
-		if node.IsDynamic {
-			if node.DynamicName != dynamic {
-				return ErrNotImplemented
-			}
-
-			return node.Insert(nextTemplate(template), handler)
-		} else {
-			node.IsDynamic = true
-			node.DynamicName = dynamic
-
-			return node.Insert(nextTemplate(template), handler)
+	if segment.IsDynamic {
+		if n.isDynamic && segment.Payload != n.dynamicName {
+			return ErrNotImplemented
 		}
-	} else {
-		node = newNode(nil, dynamic, true)
-		n.Branches[static] = node
 
-		return node.Insert(nextTemplate(template), handler)
+		n.isDynamic = true
+		n.dynamicName = segment.Payload
+
+		if n.next == nil {
+			n.next = newNode(nil, false, "")
+		}
+
+		return n.next.insertRecursively(segments[1:], handler)
 	}
+
+	if node, found := n.staticSegments[segment.Payload]; found {
+		return node.insertRecursively(segments[1:], handler)
+	}
+
+	node := newNode(nil, false, "")
+	n.staticSegments[segment.Payload] = node
+
+	return node.insertRecursively(segments[1:], handler)
 }
 
 func (n *Node) Match(ctx context.Context, path string) (context.Context, Handler) {
-	var (
-		currentNode = n
-	)
-
-	for len(path) > 0 {
-		if currentNode.IsDynamic {
-			var dynPart string
-			dynPart, path = getDynPart(path)
-
-			if len(dynPart) == 0 {
-				return ctx, nil
-			}
-
-			if len(currentNode.DynamicName) > 0 {
-				ctx = valuectx.WithValue(ctx, currentNode.DynamicName, dynPart)
-			}
-
-			if len(path) == 0 {
-				return ctx, currentNode.Handler
-			}
-		}
-
-		node, newPath, found := getBranch(path, currentNode.Branches)
-		if !found || node == nil {
-			return ctx, currentNode.Handler
-		}
-
-		path = newPath
-		currentNode = node
-	}
-
-	if currentNode.IsDynamic {
+	if path[0] != '/' {
+		// all http request paths MUST have a leading slash
 		return ctx, nil
 	}
 
-	return ctx, currentNode.Handler
-}
+	path = path[1:]
 
-func getBranch(str string, branches map[string]*Node) (*Node, string, bool) {
-	for prefix, node := range branches {
-		if strings.HasPrefix(str, prefix) {
-			return node, str[len(prefix):], true
-		}
-	}
+	var (
+		offset int
+		node   = n
+	)
 
-	return nil, str, false
-}
-
-func getDynPart(path string) (string, string) {
 	for i := range path {
 		if path[i] == '/' {
-			return path[:i], path[i:]
+			var ok bool
+
+			ctx, node, ok = processSegment(ctx, path[offset:i], node)
+			if !ok {
+				return ctx, nil
+			}
+
+			offset = i + 1
 		}
 	}
 
-	return path, ""
+	if offset < len(path) {
+		var ok bool
+		ctx, node, ok = processSegment(ctx, path[offset:], node)
+		if !ok {
+			return ctx, nil
+		}
+	}
+
+	return ctx, node.handler
 }
 
-func nextTemplate(template Template) Template {
-	return Template{
-		staticParts: template.staticParts[1:],
-		markerNames: template.markerNames[1:],
+func processSegment(ctx context.Context, segment string, node *Node) (context.Context, *Node, bool) {
+	if nextNode, found := node.staticSegments[segment]; found {
+		return ctx, nextNode, true
 	}
+
+	if !node.isDynamic {
+		return ctx, nil, false
+	}
+
+	if len(node.dynamicName) > 0 {
+		ctx = valuectx.WithValue(ctx, node.dynamicName, segment)
+	}
+
+	return ctx, node.next, true
 }
