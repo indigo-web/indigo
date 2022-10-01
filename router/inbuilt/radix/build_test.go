@@ -10,52 +10,61 @@ func TestParse(t *testing.T) {
 		sample := "/hello/world"
 		template, err := Parse(sample)
 		require.NoError(t, err)
-		require.Equal(t, 1, len(template.staticParts), "only 1 static part is expected")
-		require.Empty(t, template.markerNames)
-		require.Equal(t, sample, template.staticParts[0])
+		require.Equal(t, 2, len(template.segments), "2 segments are expected")
+
+		require.False(t, template.segments[0].IsDynamic)
+		require.Equal(t, "hello", template.segments[0].Payload)
+
+		require.False(t, template.segments[1].IsDynamic)
+		require.Equal(t, "world", template.segments[1].Payload)
 	})
 
 	t.Run("OneStaticOneDynamic", func(t *testing.T) {
 		sample := "/hello/{world}"
 		template, err := Parse(sample)
 		require.NoError(t, err)
-		require.Equal(t, 1, len(template.staticParts), "only 1 static part is expected")
-		require.Equal(t, 1, len(template.markerNames), "only 1 marker name is expected")
-		require.Equal(t, "/hello/", template.staticParts[0])
-		require.Equal(t, "world", template.markerNames[0])
+		require.Equal(t, 2, len(template.segments), "2 segments are expected")
+
+		require.False(t, template.segments[0].IsDynamic)
+		require.Equal(t, "hello", template.segments[0].Payload)
+
+		require.True(t, template.segments[1].IsDynamic)
+		require.Equal(t, "world", template.segments[1].Payload)
 	})
 
 	t.Run("TwoStaticOneDynamic", func(t *testing.T) {
 		sample := "/hello/{world}/greet"
 		template, err := Parse(sample)
 		require.NoError(t, err)
-		require.Equal(t, 2, len(template.staticParts), "only 2 static parts are expected")
-		require.Equal(t, 1, len(template.markerNames), "only 1 marker name is expected")
-		require.Equal(t, "/hello/", template.staticParts[0])
-		require.Equal(t, "/greet", template.staticParts[1])
-		require.Equal(t, "world", template.markerNames[0])
+		require.Equal(t, 3, len(template.segments), "3 segments are expected")
+
+		require.False(t, template.segments[0].IsDynamic)
+		require.Equal(t, "hello", template.segments[0].Payload)
+
+		require.True(t, template.segments[1].IsDynamic)
+		require.Equal(t, "world", template.segments[1].Payload)
+
+		require.False(t, template.segments[2].IsDynamic)
+		require.Equal(t, "greet", template.segments[2].Payload)
 	})
 
 	t.Run("TwoStaticTwoDynamic", func(t *testing.T) {
 		sample := "/hello/{world}/greet/{name}"
 		template, err := Parse(sample)
 		require.NoError(t, err)
-		require.Equal(t, 2, len(template.staticParts), "only 2 static parts are expected")
-		require.Equal(t, 2, len(template.markerNames), "only 2 marker names are expected")
-		require.Equal(t, "/hello/", template.staticParts[0])
-		require.Equal(t, "/greet/", template.staticParts[1])
-		require.Equal(t, "world", template.markerNames[0])
-		require.Equal(t, "name", template.markerNames[1])
-	})
+		require.Equal(t, 4, len(template.segments), "4 segments are expected")
 
-	t.Run("StaticPrefixInsideOfPart", func(t *testing.T) {
-		sample := "/hello/name-of-{world}"
-		template, err := Parse(sample)
-		require.NoError(t, err)
-		require.Equal(t, 1, len(template.staticParts), "only 1 static part is expected")
-		require.Equal(t, 1, len(template.markerNames), "only 1 marker name is expected")
-		require.Equal(t, "/hello/name-of-", template.staticParts[0])
-		require.Equal(t, "world", template.markerNames[0])
+		require.False(t, template.segments[0].IsDynamic)
+		require.Equal(t, "hello", template.segments[0].Payload)
+
+		require.True(t, template.segments[1].IsDynamic)
+		require.Equal(t, "world", template.segments[1].Payload)
+
+		require.False(t, template.segments[2].IsDynamic)
+		require.Equal(t, "greet", template.segments[2].Payload)
+
+		require.True(t, template.segments[3].IsDynamic)
+		require.Equal(t, "name", template.segments[3].Payload)
 	})
 }
 
@@ -93,6 +102,12 @@ func TestParse_Negative(t *testing.T) {
 	t.Run("NoSlashAfterDynamicPart", func(t *testing.T) {
 		sample := "/hello/{world}name/greet"
 		_, err := Parse(sample)
-		require.EqualError(t, err, ErrMustEndWithSlash.Error())
+		require.EqualError(t, err, ErrDynamicMustBeWholeSection.Error())
+	})
+
+	t.Run("DynamicWithPrefix", func(t *testing.T) {
+		sample := "/hello-{world}/greet"
+		_, err := Parse(sample)
+		require.EqualError(t, err, ErrDynamicMustBeWholeSection.Error())
 	})
 }
