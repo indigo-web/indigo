@@ -102,7 +102,7 @@ func Parse(tmpl string) (Template, error) {
 				offset = i + 1
 				state = eSlash
 			default:
-				return template, ErrMustEndWithSlash
+				return template, ErrDynamicMustBeWholeSection
 			}
 		}
 	}
