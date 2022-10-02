@@ -3,7 +3,7 @@ package radix
 import (
 	"context"
 	"errors"
-	"github.com/fakefloordiv/indigo/types"
+	routertypes "github.com/fakefloordiv/indigo/router/inbuilt/types"
 	"github.com/fakefloordiv/indigo/valuectx"
 )
 
@@ -13,7 +13,11 @@ var (
 	)
 )
 
-type Handler func(ctx context.Context, request *types.Request) types.Response
+type Tree interface {
+	Insert(Template, routertypes.HandlerFunc) error
+	MustInsert(Template, routertypes.HandlerFunc)
+	Match(context.Context, string) (context.Context, routertypes.HandlerFunc)
+}
 
 type Node struct {
 	staticSegments map[string]*Node
@@ -22,14 +26,14 @@ type Node struct {
 	// Next is used only in case current node is dynamic
 	next *Node
 
-	handler Handler
+	handler routertypes.HandlerFunc
 }
 
-func NewTree() *Node {
+func NewTree() Tree {
 	return newNode(nil, false, "")
 }
 
-func newNode(handler Handler, isDyn bool, dynName string) *Node {
+func newNode(handler routertypes.HandlerFunc, isDyn bool, dynName string) *Node {
 	return &Node{
 		staticSegments: make(map[string]*Node),
 		isDynamic:      isDyn,
@@ -38,11 +42,17 @@ func newNode(handler Handler, isDyn bool, dynName string) *Node {
 	}
 }
 
-func (n *Node) Insert(template Template, handler Handler) error {
+func (n *Node) Insert(template Template, handler routertypes.HandlerFunc) error {
 	return n.insertRecursively(template.segments, handler)
 }
 
-func (n *Node) insertRecursively(segments []Segment, handler Handler) error {
+func (n *Node) MustInsert(template Template, handler routertypes.HandlerFunc) {
+	if err := n.Insert(template, handler); err != nil {
+		panic(err.Error())
+	}
+}
+
+func (n *Node) insertRecursively(segments []Segment, handler routertypes.HandlerFunc) error {
 	if len(segments) == 0 {
 		n.handler = handler
 
@@ -76,7 +86,7 @@ func (n *Node) insertRecursively(segments []Segment, handler Handler) error {
 	return node.insertRecursively(segments[1:], handler)
 }
 
-func (n *Node) Match(ctx context.Context, path string) (context.Context, Handler) {
+func (n *Node) Match(ctx context.Context, path string) (context.Context, routertypes.HandlerFunc) {
 	if path[0] != '/' {
 		// all http request paths MUST have a leading slash
 		return ctx, nil
@@ -118,7 +128,7 @@ func processSegment(ctx context.Context, segment string, node *Node) (context.Co
 		return ctx, nextNode, true
 	}
 
-	if !node.isDynamic {
+	if !node.isDynamic || len(segment) == 0 {
 		return ctx, nil, false
 	}
 
