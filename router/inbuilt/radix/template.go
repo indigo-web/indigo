@@ -122,3 +122,13 @@ func MustParse(tmpl string) Template {
 
 	return template
 }
+
+func (t Template) IsStatic() bool {
+	for _, segment := range t.segments {
+		if segment.IsDynamic {
+			return false
+		}
+	}
+
+	return true
+}
