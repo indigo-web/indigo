@@ -2,7 +2,7 @@ package radix
 
 import (
 	"context"
-	"github.com/fakefloordiv/indigo/types"
+	routertypes "github.com/fakefloordiv/indigo/router/inbuilt/types"
 	"testing"
 )
 
@@ -22,17 +22,14 @@ var (
 	longSample         = "/hello/world-finally-became/very/good-as-fuck/ok-let-it-be/i-wanna-/somestatic/finally-matcher-is-here/good"
 )
 
-func nopHandler(context.Context, *types.Request) types.Response {
-	return types.OK()
-}
-
 func BenchmarkTreeMatch(b *testing.B) {
 	tree := NewTree()
 
-	tree.MustInsert(MustParse(staticSample), nopHandler)
-	tree.MustInsert(MustParse(shortTemplateSample), nopHandler)
-	tree.MustInsert(MustParse(mediumTemplateSample), nopHandler)
-	tree.MustInsert(MustParse(longTemplateSample), nopHandler)
+	payload := routertypes.MethodsMap{}
+	tree.MustInsert(MustParse(staticSample), payload)
+	tree.MustInsert(MustParse(shortTemplateSample), payload)
+	tree.MustInsert(MustParse(mediumTemplateSample), payload)
+	tree.MustInsert(MustParse(longTemplateSample), payload)
 
 	b.Run("OnlyStatic", func(b *testing.B) {
 		for i := 0; i < b.N; i++ {

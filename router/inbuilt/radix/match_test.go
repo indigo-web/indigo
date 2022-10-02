@@ -2,6 +2,7 @@ package radix
 
 import (
 	"context"
+	routertypes "github.com/fakefloordiv/indigo/router/inbuilt/types"
 	"github.com/stretchr/testify/require"
 	"testing"
 )
@@ -9,11 +10,12 @@ import (
 func TestNode_Match_Positive(t *testing.T) {
 	tree := NewTree()
 
-	tree.MustInsert(MustParse(staticSample), nopHandler)
-	tree.MustInsert(MustParse(unnamedTemplateSample), nopHandler)
-	tree.MustInsert(MustParse(shortTemplateSample), nopHandler)
-	tree.MustInsert(MustParse(mediumTemplateSample), nopHandler)
-	tree.MustInsert(MustParse(longTemplateSample), nopHandler)
+	payload := routertypes.MethodsMap{}
+	tree.MustInsert(MustParse(staticSample), payload)
+	tree.MustInsert(MustParse(unnamedTemplateSample), payload)
+	tree.MustInsert(MustParse(shortTemplateSample), payload)
+	tree.MustInsert(MustParse(mediumTemplateSample), payload)
+	tree.MustInsert(MustParse(longTemplateSample), payload)
 
 	t.Run("StaticMatch", func(t *testing.T) {
 		_, handler := tree.Match(context.Background(), staticSample)
@@ -44,10 +46,11 @@ func TestNode_Match_Positive(t *testing.T) {
 func TestNode_Match_Negative(t *testing.T) {
 	tree := NewTree()
 
-	tree.MustInsert(MustParse(staticSample), nopHandler)
-	tree.MustInsert(MustParse(shortTemplateSample), nopHandler)
-	tree.MustInsert(MustParse(mediumTemplateSample), nopHandler)
-	tree.MustInsert(MustParse(longTemplateSample), nopHandler)
+	payload := routertypes.MethodsMap{}
+	tree.MustInsert(MustParse(staticSample), payload)
+	tree.MustInsert(MustParse(shortTemplateSample), payload)
+	tree.MustInsert(MustParse(mediumTemplateSample), payload)
+	tree.MustInsert(MustParse(longTemplateSample), payload)
 
 	t.Run("EmptyDynamicPath_WithTrailingSlash", func(t *testing.T) {
 		_, handler := tree.Match(context.Background(), "/hello/")
