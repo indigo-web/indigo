@@ -23,9 +23,6 @@ var (
 	ErrEmptyPath = errors.New(
 		"template cannot be empty",
 	)
-	ErrMustEndWithSlash = errors.New(
-		"a following slash is compulsory after the end of dynamic part",
-	)
 	ErrDynamicMustBeWholeSection = errors.New(
 		"dynamic part must be a whole path section, without prefixes and suffixes",
 	)
