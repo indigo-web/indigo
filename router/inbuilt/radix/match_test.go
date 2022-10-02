@@ -16,6 +16,7 @@ func TestNode_Match_Positive(t *testing.T) {
 	tree.MustInsert(MustParse(shortTemplateSample), payload)
 	tree.MustInsert(MustParse(mediumTemplateSample), payload)
 	tree.MustInsert(MustParse(longTemplateSample), payload)
+	tree.MustInsert(MustParse("/"), payload)
 
 	t.Run("StaticMatch", func(t *testing.T) {
 		_, handler := tree.Match(context.Background(), staticSample)
@@ -40,6 +41,11 @@ func TestNode_Match_Positive(t *testing.T) {
 		require.Equal(t, "world-finally-became", ctx.Value("world"))
 		require.Equal(t, "good-as-fuck", ctx.Value("good"))
 		require.Equal(t, "ok-let-it-be", ctx.Value("ok"))
+	})
+
+	t.Run("Root", func(t *testing.T) {
+		_, handler := tree.Match(context.Background(), "/")
+		require.NotNil(t, handler)
 	})
 }
 
