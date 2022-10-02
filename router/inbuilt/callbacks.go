@@ -20,7 +20,7 @@ func (r *Router) OnStart() {
 	r.applyGroups()
 	r.applyMiddlewares()
 
-	r.obtainer = obtainer.StaticObtainer(r.routes)
+	r.obtainer = obtainer.Auto(r.routes)
 }
 
 // OnRequest routes the request
