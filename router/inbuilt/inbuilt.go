@@ -2,25 +2,14 @@ package inbuilt
 
 import (
 	"context"
-
-	methods "github.com/fakefloordiv/indigo/http/method"
+	"github.com/fakefloordiv/indigo/router/inbuilt/obtainer"
+	routertypes "github.com/fakefloordiv/indigo/router/inbuilt/types"
 	"github.com/fakefloordiv/indigo/types"
 )
 
 type (
-	HandlerFunc func(context.Context, *types.Request) types.Response
-	handlersMap map[methods.Method]*handlerObject
-	routesMap   map[string]handlersMap
-
-	handlerObject struct {
-		fun         HandlerFunc
-		middlewares []Middleware
-	}
-
 	ErrorHandler func(context.Context, *types.Request) types.Response
 	errHandlers  map[error]ErrorHandler
-
-	requestProcessor func(*types.Request) types.Response
 )
 
 // Router is a reference implementation of router for indigo
@@ -36,13 +25,12 @@ type Router struct {
 	groups []Router
 
 	prefix      string
-	middlewares []Middleware
+	middlewares []routertypes.Middleware
 
-	requestProcessor requestProcessor
+	obtainer obtainer.Obtainer
 
-	routes         routesMap
-	errHandlers    errHandlers
-	allowedMethods map[string]string
+	routes      routertypes.RoutesMap
+	errHandlers errHandlers
 
 	traceBuff []byte
 }
@@ -51,9 +39,8 @@ type Router struct {
 // by default are applied, renderer with a nil (as initial value) buffer constructed
 func NewRouter() *Router {
 	r := &Router{
-		routes:         make(routesMap),
-		errHandlers:    newErrorHandlers(),
-		allowedMethods: make(map[string]string),
+		routes:      make(routertypes.RoutesMap),
+		errHandlers: newErrorHandlers(),
 	}
 
 	r.root = r

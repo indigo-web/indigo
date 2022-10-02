@@ -2,6 +2,7 @@ package inbuilt
 
 import (
 	"context"
+	routertypes "github.com/fakefloordiv/indigo/router/inbuilt/types"
 	"testing"
 
 	"github.com/fakefloordiv/indigo/internal/body"
@@ -53,56 +54,56 @@ func (c *callstack) Clear() {
 	c.chain = c.chain[:0]
 }
 
-func getGlobal1Middleware(stack *callstack) Middleware {
-	return func(ctx context.Context, next HandlerFunc, request *types.Request) types.Response {
+func getGlobal1Middleware(stack *callstack) routertypes.Middleware {
+	return func(ctx context.Context, next routertypes.HandlerFunc, request *types.Request) types.Response {
 		stack.Push(global1)
 
 		return next(ctx, request)
 	}
 }
 
-func getGlobal2Middleware(stack *callstack) Middleware {
-	return func(ctx context.Context, next HandlerFunc, request *types.Request) types.Response {
+func getGlobal2Middleware(stack *callstack) routertypes.Middleware {
+	return func(ctx context.Context, next routertypes.HandlerFunc, request *types.Request) types.Response {
 		stack.Push(global2)
 
 		return next(ctx, request)
 	}
 }
 
-func getLocal1Middleware(stack *callstack) Middleware {
-	return func(ctx context.Context, next HandlerFunc, request *types.Request) types.Response {
+func getLocal1Middleware(stack *callstack) routertypes.Middleware {
+	return func(ctx context.Context, next routertypes.HandlerFunc, request *types.Request) types.Response {
 		stack.Push(local1)
 
 		return next(ctx, request)
 	}
 }
 
-func getLocal2Middleware(stack *callstack) Middleware {
-	return func(ctx context.Context, next HandlerFunc, request *types.Request) types.Response {
+func getLocal2Middleware(stack *callstack) routertypes.Middleware {
+	return func(ctx context.Context, next routertypes.HandlerFunc, request *types.Request) types.Response {
 		stack.Push(local2)
 
 		return next(ctx, request)
 	}
 }
 
-func getLocal3Middleware(stack *callstack) Middleware {
-	return func(ctx context.Context, next HandlerFunc, request *types.Request) types.Response {
+func getLocal3Middleware(stack *callstack) routertypes.Middleware {
+	return func(ctx context.Context, next routertypes.HandlerFunc, request *types.Request) types.Response {
 		stack.Push(local3)
 
 		return next(ctx, request)
 	}
 }
 
-func getPointApplied1Middleware(stack *callstack) Middleware {
-	return func(ctx context.Context, next HandlerFunc, request *types.Request) types.Response {
+func getPointApplied1Middleware(stack *callstack) routertypes.Middleware {
+	return func(ctx context.Context, next routertypes.HandlerFunc, request *types.Request) types.Response {
 		stack.Push(pointApplied1)
 
 		return next(ctx, request)
 	}
 }
 
-func getPointApplied2Middleware(stack *callstack) Middleware {
-	return func(ctx context.Context, next HandlerFunc, request *types.Request) types.Response {
+func getPointApplied2Middleware(stack *callstack) routertypes.Middleware {
+	return func(ctx context.Context, next routertypes.HandlerFunc, request *types.Request) types.Response {
 		stack.Push(pointApplied2)
 
 		return next(ctx, request)

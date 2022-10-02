@@ -2,6 +2,7 @@ package inbuilt
 
 import (
 	"context"
+	routertypes "github.com/fakefloordiv/indigo/router/inbuilt/types"
 	"testing"
 
 	"github.com/fakefloordiv/indigo/http/status"
@@ -59,7 +60,7 @@ func TestRoute(t *testing.T) {
 		request.Method = methods.HEAD
 		request.Path = "/"
 
-		resp := r.requestProcessor(request)
+		resp := r.processRequest(request)
 		// we have not registered any HEAD-method handler yet, so GET method
 		// is expected to be called (but without body)
 		require.Equal(t, status.OK, resp.Code)
@@ -67,7 +68,11 @@ func TestRoute(t *testing.T) {
 	})
 }
 
-func testMethodPredicate(t *testing.T, router *Router, route func(string, HandlerFunc, ...Middleware), method methods.Method) {
+func testMethodPredicate(
+	t *testing.T, router *Router,
+	route func(string, routertypes.HandlerFunc, ...routertypes.Middleware),
+	method methods.Method) {
+
 	route("/", nopHandler)
 	require.Contains(t, router.routes, "/")
 	require.Contains(t, router.routes["/"], method)

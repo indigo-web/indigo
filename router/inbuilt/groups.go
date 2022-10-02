@@ -1,5 +1,9 @@
 package inbuilt
 
+import (
+	routertypes "github.com/fakefloordiv/indigo/router/inbuilt/types"
+)
+
 /*
 This file is responsible for endpoint groups
 */
@@ -9,13 +13,13 @@ This file is responsible for endpoint groups
 // in a child group MUST NOT affect parent ones, so parent middlewares
 // are copied into child ones. Everything else is inherited from parent as it is
 func (r Router) Group(prefix string) *Router {
-	var newMiddlewares []Middleware
+	var newMiddlewares []routertypes.Middleware
 
 	router := &Router{
 		root:        r.root,
 		prefix:      r.prefix + prefix,
 		middlewares: append(newMiddlewares, r.middlewares...),
-		routes:      make(routesMap),
+		routes:      make(routertypes.RoutesMap),
 		errHandlers: r.errHandlers,
 	}
 
@@ -30,7 +34,7 @@ func (r Router) applyGroups() {
 	}
 }
 
-func mergeRoutes(into, values routesMap) {
+func mergeRoutes(into, values routertypes.RoutesMap) {
 	for key, value := range values {
 		into[key] = value
 	}

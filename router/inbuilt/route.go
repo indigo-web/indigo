@@ -1,6 +1,7 @@
 package inbuilt
 
 import (
+	routertypes "github.com/fakefloordiv/indigo/router/inbuilt/types"
 	"strings"
 
 	methods "github.com/fakefloordiv/indigo/http/method"
@@ -12,8 +13,8 @@ This file is responsible for registering both ordinary and error handlers
 
 // Route is a base method for registering handlers
 func (r *Router) Route(
-	method methods.Method, path string, handlerFunc HandlerFunc,
-	middlewares ...Middleware,
+	method methods.Method, path string, handlerFunc routertypes.HandlerFunc,
+	middlewares ...routertypes.Middleware,
 ) {
 	if path != "*" && !strings.HasPrefix(path, "/") && r.prefix == "" {
 		// applying prefix slash only if we are not in group
@@ -23,13 +24,13 @@ func (r *Router) Route(
 	urlPath := r.prefix + path
 	methodsMap, found := r.routes[urlPath]
 	if !found {
-		methodsMap = make(handlersMap)
+		methodsMap = make(routertypes.MethodsMap)
 		r.routes[urlPath] = methodsMap
 	}
 
-	handlerStruct := &handlerObject{
-		fun:         handlerFunc,
-		middlewares: append(middlewares, r.middlewares...),
+	handlerStruct := &routertypes.HandlerObject{
+		Fun:         handlerFunc,
+		Middlewares: append(middlewares, r.middlewares...),
 	}
 
 	methodsMap[method] = handlerStruct
