@@ -1,10 +1,8 @@
 package inbuilt
 
 import (
-	routertypes "github.com/fakefloordiv/indigo/router/inbuilt/types"
-	"strings"
-
 	methods "github.com/fakefloordiv/indigo/http/method"
+	routertypes "github.com/fakefloordiv/indigo/router/inbuilt/types"
 )
 
 /*
@@ -16,11 +14,6 @@ func (r *Router) Route(
 	method methods.Method, path string, handlerFunc routertypes.HandlerFunc,
 	middlewares ...routertypes.Middleware,
 ) {
-	if path != "*" && !strings.HasPrefix(path, "/") && r.prefix == "" {
-		// applying prefix slash only if we are not in group
-		path = "/" + path
-	}
-
 	urlPath := r.prefix + path
 	methodsMap, found := r.routes[urlPath]
 	if !found {
