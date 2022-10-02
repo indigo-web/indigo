@@ -3,7 +3,6 @@ package radix
 import (
 	"context"
 	"errors"
-	routertypes "github.com/fakefloordiv/indigo/router/inbuilt/types"
 	"github.com/fakefloordiv/indigo/valuectx"
 )
 
@@ -13,48 +12,48 @@ var (
 	)
 )
 
-type Tree interface {
-	Insert(Template, routertypes.HandlerFunc) error
-	MustInsert(Template, routertypes.HandlerFunc)
-	Match(context.Context, string) (context.Context, routertypes.HandlerFunc)
+type Tree[V any] interface {
+	Insert(Template, V) error
+	MustInsert(Template, V)
+	Match(context.Context, string) (context.Context, V)
 }
 
-type Node struct {
-	staticSegments map[string]*Node
+type Node[V any] struct {
+	staticSegments map[string]*Node[V]
 	isDynamic      bool
 	dynamicName    string
 	// Next is used only in case current node is dynamic
-	next *Node
+	next *Node[V]
 
-	handler routertypes.HandlerFunc
+	payload V
 }
 
-func NewTree() Tree {
-	return newNode(nil, false, "")
+func NewTree[V any]() Tree[V] {
+	return newNode[V](nil, false, "")
 }
 
-func newNode(handler routertypes.HandlerFunc, isDyn bool, dynName string) *Node {
-	return &Node{
-		staticSegments: make(map[string]*Node),
+func newNode[V any](payload V, isDyn bool, dynName string) *Node[V] {
+	return &Node[V]{
+		staticSegments: make(map[string]*Node[V]),
 		isDynamic:      isDyn,
 		dynamicName:    dynName,
-		handler:        handler,
+		payload:        payload,
 	}
 }
 
-func (n *Node) Insert(template Template, handler routertypes.HandlerFunc) error {
-	return n.insertRecursively(template.segments, handler)
+func (n *Node[V]) Insert(template Template, payload V) error {
+	return n.insertRecursively(template.segments, payload)
 }
 
-func (n *Node) MustInsert(template Template, handler routertypes.HandlerFunc) {
-	if err := n.Insert(template, handler); err != nil {
+func (n *Node[V]) MustInsert(template Template, payload V) {
+	if err := n.Insert(template, payload); err != nil {
 		panic(err.Error())
 	}
 }
 
-func (n *Node) insertRecursively(segments []Segment, handler routertypes.HandlerFunc) error {
+func (n *Node[V]) insertRecursively(segments []Segment, payload V) error {
 	if len(segments) == 0 {
-		n.handler = handler
+		n.payload = payload
 
 		return nil
 	}
@@ -70,23 +69,23 @@ func (n *Node) insertRecursively(segments []Segment, handler routertypes.Handler
 		n.dynamicName = segment.Payload
 
 		if n.next == nil {
-			n.next = newNode(nil, false, "")
+			n.next = newNode[V](nil, false, "")
 		}
 
-		return n.next.insertRecursively(segments[1:], handler)
+		return n.next.insertRecursively(segments[1:], payload)
 	}
 
 	if node, found := n.staticSegments[segment.Payload]; found {
-		return node.insertRecursively(segments[1:], handler)
+		return node.insertRecursively(segments[1:], payload)
 	}
 
-	node := newNode(nil, false, "")
+	node := newNode[V](nil, false, "")
 	n.staticSegments[segment.Payload] = node
 
-	return node.insertRecursively(segments[1:], handler)
+	return node.insertRecursively(segments[1:], payload)
 }
 
-func (n *Node) Match(ctx context.Context, path string) (context.Context, routertypes.HandlerFunc) {
+func (n *Node[V]) Match(ctx context.Context, path string) (context.Context, V) {
 	if path[0] != '/' {
 		// all http request paths MUST have a leading slash
 		return ctx, nil
@@ -120,10 +119,13 @@ func (n *Node) Match(ctx context.Context, path string) (context.Context, routert
 		}
 	}
 
-	return ctx, node.handler
+	return ctx, node.payload
 }
 
-func processSegment(ctx context.Context, segment string, node *Node) (context.Context, *Node, bool) {
+func processSegment[V any](
+	ctx context.Context, segment string, node *Node[V],
+) (context.Context, *Node[V], bool) {
+
 	if nextNode, found := node.staticSegments[segment]; found {
 		return ctx, nextNode, true
 	}
