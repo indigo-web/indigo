@@ -3,6 +3,7 @@ package radix
 import (
 	"context"
 	"errors"
+	routertypes "github.com/fakefloordiv/indigo/router/inbuilt/types"
 	"github.com/fakefloordiv/indigo/valuectx"
 )
 
@@ -12,46 +13,46 @@ var (
 	)
 )
 
-type Tree[V any] interface {
-	Insert(Template, V) error
-	MustInsert(Template, V)
-	Match(context.Context, string) (context.Context, V)
+type Tree interface {
+	Insert(Template, routertypes.MethodsMap) error
+	MustInsert(Template, routertypes.MethodsMap)
+	Match(context.Context, string) (context.Context, routertypes.MethodsMap)
 }
 
-type Node[V any] struct {
-	staticSegments map[string]*Node[V]
+type Node struct {
+	staticSegments map[string]*Node
 	isDynamic      bool
 	dynamicName    string
 	// Next is used only in case current node is dynamic
-	next *Node[V]
+	next *Node
 
-	payload V
+	payload routertypes.MethodsMap
 }
 
-func NewTree[V any]() Tree[V] {
-	return newNode[V](nil, false, "")
+func NewTree() Tree {
+	return newNode(nil, false, "")
 }
 
-func newNode[V any](payload V, isDyn bool, dynName string) *Node[V] {
-	return &Node[V]{
-		staticSegments: make(map[string]*Node[V]),
+func newNode(payload routertypes.MethodsMap, isDyn bool, dynName string) *Node {
+	return &Node{
+		staticSegments: make(map[string]*Node),
 		isDynamic:      isDyn,
 		dynamicName:    dynName,
 		payload:        payload,
 	}
 }
 
-func (n *Node[V]) Insert(template Template, payload V) error {
+func (n *Node) Insert(template Template, payload routertypes.MethodsMap) error {
 	return n.insertRecursively(template.segments, payload)
 }
 
-func (n *Node[V]) MustInsert(template Template, payload V) {
+func (n *Node) MustInsert(template Template, payload routertypes.MethodsMap) {
 	if err := n.Insert(template, payload); err != nil {
 		panic(err.Error())
 	}
 }
 
-func (n *Node[V]) insertRecursively(segments []Segment, payload V) error {
+func (n *Node) insertRecursively(segments []Segment, payload routertypes.MethodsMap) error {
 	if len(segments) == 0 {
 		n.payload = payload
 
@@ -69,7 +70,7 @@ func (n *Node[V]) insertRecursively(segments []Segment, payload V) error {
 		n.dynamicName = segment.Payload
 
 		if n.next == nil {
-			n.next = newNode[V](nil, false, "")
+			n.next = newNode(nil, false, "")
 		}
 
 		return n.next.insertRecursively(segments[1:], payload)
@@ -79,16 +80,16 @@ func (n *Node[V]) insertRecursively(segments []Segment, payload V) error {
 		return node.insertRecursively(segments[1:], payload)
 	}
 
-	node := newNode[V](nil, false, "")
+	node := newNode(nil, false, "")
 	n.staticSegments[segment.Payload] = node
 
 	return node.insertRecursively(segments[1:], payload)
 }
 
-func (n *Node[V]) Match(ctx context.Context, path string) (context.Context, V) {
+func (n *Node) Match(ctx context.Context, path string) (context.Context, routertypes.MethodsMap) {
 	if path[0] != '/' {
 		// all http request paths MUST have a leading slash
-		return ctx, nil
+		return ctx, n.payload
 	}
 
 	path = path[1:]
@@ -101,10 +102,9 @@ func (n *Node[V]) Match(ctx context.Context, path string) (context.Context, V) {
 	for i := range path {
 		if path[i] == '/' {
 			var ok bool
-
 			ctx, node, ok = processSegment(ctx, path[offset:i], node)
 			if !ok {
-				return ctx, nil
+				return ctx, node.payload
 			}
 
 			offset = i + 1
@@ -122,10 +122,7 @@ func (n *Node[V]) Match(ctx context.Context, path string) (context.Context, V) {
 	return ctx, node.payload
 }
 
-func processSegment[V any](
-	ctx context.Context, segment string, node *Node[V],
-) (context.Context, *Node[V], bool) {
-
+func processSegment(ctx context.Context, segment string, node *Node) (context.Context, *Node, bool) {
 	if nextNode, found := node.staticSegments[segment]; found {
 		return ctx, nextNode, true
 	}
