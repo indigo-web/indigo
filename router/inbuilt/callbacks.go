@@ -2,12 +2,11 @@ package inbuilt
 
 import (
 	"context"
-	context2 "github.com/fakefloordiv/indigo/valuectx"
-	"strings"
-
+	"github.com/fakefloordiv/indigo/http"
 	methods "github.com/fakefloordiv/indigo/http/method"
-	"github.com/fakefloordiv/indigo/internal/mapconv"
+	"github.com/fakefloordiv/indigo/router/inbuilt/obtainer"
 	"github.com/fakefloordiv/indigo/types"
+	"github.com/fakefloordiv/indigo/valuectx"
 )
 
 /*
@@ -18,48 +17,46 @@ Methods listed here MUST NOT be called by user ever
 
 // OnStart composes all the registered handlers with middlewares
 func (r *Router) OnStart() {
-	r.requestProcessor = r.staticProcessor
 	r.applyGroups()
 	r.applyMiddlewares()
-	r.loadAllowedMethods()
+
+	r.obtainer = obtainer.StaticObtainer(r.routes)
 }
 
 // OnRequest routes the request
 func (r *Router) OnRequest(request *types.Request, render types.Render) error {
-	return render(r.requestProcessor(request))
+	return render(r.processRequest(request))
+}
+
+func (r *Router) processRequest(request *types.Request) types.Response {
+	ctx, handler, err := r.obtainer(context.Background(), request)
+	if err != nil {
+		return r.processError(ctx, request, err)
+	}
+
+	return handler(ctx, request)
 }
 
 // OnError receives an error and calls a corresponding handler. Handler MUST BE
 // registered, otherwise panic is raised.
 // Luckily (for user), we have all the default handlers registered
-func (r Router) OnError(request *types.Request, render types.Render, err error) {
+func (r *Router) OnError(request *types.Request, render types.Render, err error) {
 	_ = render(r.processError(context.Background(), request, err))
 }
 
-func (r Router) processError(ctx context.Context, request *types.Request, err error) types.Response {
+func (r *Router) processError(ctx context.Context, request *types.Request, err error) types.Response {
+	if request.Method == methods.TRACE && err == http.ErrMethodNotAllowed {
+		r.traceBuff = renderHTTPRequest(request, r.traceBuff)
+
+		return traceResponse(r.traceBuff)
+	}
+
 	handler, found := r.errHandlers[err]
 	if !found {
-		return types.WithResponse.WithError(err)
+		return types.WithError(err)
 	}
 
-	ctx = context2.WithValue(ctx, "error", err)
+	ctx = valuectx.WithValue(ctx, "error", err)
 
 	return handler(ctx, request)
-}
-
-func (r Router) loadAllowedMethods() {
-	for k, v := range r.routes {
-		allowedMethods := mapconv.Keys[methods.Method, *handlerObject](v)
-		r.allowedMethods[k] = strings.Join(methods2string(allowedMethods...), ",")
-	}
-}
-
-func methods2string(ms ...methods.Method) []string {
-	out := make([]string, 0, len(ms))
-
-	for _, method := range ms {
-		out = append(out, methods.ToString(method))
-	}
-
-	return out
 }
