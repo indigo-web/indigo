@@ -370,7 +370,7 @@ func TestAllCases(t *testing.T) {
 			URL: &url.URL{
 				Scheme: "http",
 				Host:   addr,
-				Path:   "/trace",
+				Path:   "/simple-get",
 			},
 			Proto:      "HTTP/1.1",
 			ProtoMajor: 1,
@@ -392,7 +392,7 @@ func TestAllCases(t *testing.T) {
 		data := string(dataBytes)
 		require.NoError(t, err)
 
-		wantRequestLine := "TRACE /trace HTTP/1.1\r\n"
+		wantRequestLine := "TRACE /simple-get HTTP/1.1\r\n"
 		require.Greater(t, len(data), len(wantRequestLine))
 		require.Equal(t, wantRequestLine, data[:len(wantRequestLine)])
 
