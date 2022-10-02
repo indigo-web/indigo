@@ -104,7 +104,7 @@ func (n *Node) Match(ctx context.Context, path string) (context.Context, routert
 			var ok bool
 			ctx, node, ok = processSegment(ctx, path[offset:i], node)
 			if !ok {
-				return ctx, node.payload
+				return ctx, nil
 			}
 
 			offset = i + 1
