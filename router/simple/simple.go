@@ -6,16 +6,20 @@ import (
 	"github.com/fakefloordiv/indigo/types"
 )
 
-type Handler func(*types.Request) types.Response
+type (
+	Handler      func(*types.Request) types.Response
+	ErrorHandler func(*types.Request, error) types.Response
+)
 
-// router TODO: add error handler. Simple does not mean castrated
 type router struct {
-	handler Handler
+	handler    Handler
+	errHandler ErrorHandler
 }
 
-func NewRouter(handler Handler) router2.Router {
+func NewRouter(handler Handler, errHandler ErrorHandler) router2.Router {
 	return router{
-		handler: handler,
+		handler:    handler,
+		errHandler: errHandler,
 	}
 }
 
@@ -23,8 +27,8 @@ func (r router) OnRequest(request *types.Request) types.Response {
 	return r.handler(request)
 }
 
-func (router) OnError(_ *types.Request, err error) types.Response {
-	return types.WithError(err)
+func (r router) OnError(request *types.Request, err error) types.Response {
+	return r.errHandler(request, err)
 }
 
 func (router) GetContentEncodings() encodings.ContentEncodings {
