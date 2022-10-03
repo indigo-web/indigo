@@ -80,6 +80,8 @@ func (r Response) WithHeader(key string, values ...string) Response {
 	return r
 }
 
+// WithHeaderQ appends or creates a new response header value with a specified
+// quality-marker
 func (r Response) WithHeaderQ(key string, value string, q uint8) Response {
 	if r.headers == nil {
 		r.headers = make(headers.Headers, initialRespHeadersSize)
@@ -214,4 +216,79 @@ func strHeaders2Headers(strHeaders ...string) []headers.Header {
 	}
 
 	return hdrs
+}
+
+// OK returns a 200 OK response
+func OK() Response {
+	return WithResponse
+}
+
+// WithCode sets a response code and a corresponding status.
+// In case of unknown code, "Unknown Status Code" will be set as a status
+// code. In this case you should call WithStatus explicitly
+func WithCode(code status.Code) Response {
+	return WithResponse.WithCode(code)
+}
+
+// WithStatus sets a status text. Not compulsory, because http does not force
+// us strictly checking a response code, and Unknown Status Code is still a
+// valid response code, but you are better to do this. Be bro
+func WithStatus(status status.Status) Response {
+	return WithResponse.WithStatus(status)
+}
+
+// WithHeader sets header values to a key. In case it already exists the value will
+// be appended
+func WithHeader(key string, values ...string) Response {
+	return WithResponse.WithHeader(key, values...)
+}
+
+// WithHeaderQ appends or creates a new response header value with a specified
+// quality-marker
+func WithHeaderQ(key string, value string, q uint8) Response {
+	return WithResponse.WithHeaderQ(key, value, q)
+}
+
+// WithHeaders simply merges passed headers into response. Also, it is the only
+// way to specify a quality marker of value. In case headers were not initialized
+// before, response headers will be set to a passed map, so editing this map
+// will affect response
+func WithHeaders(headers headers.Headers) Response {
+	return WithResponse.WithHeaders(headers)
+}
+
+// WithBody sets a string as a response body. This will override already-existing
+// body if it was set
+func WithBody(body string) Response {
+	return WithResponse.WithBody(body)
+}
+
+// WithBodyAppend appends a string to already-existing body
+func WithBodyAppend(body string) Response {
+	return WithResponse.WithBodyAppend(body)
+}
+
+// WithBodyByte does all the same as WithBody does, but for byte slices
+func WithBodyByte(body []byte) Response {
+	return WithResponse.WithBodyByte(body)
+}
+
+// WithBodyByteAppend does all the same as WithBodyAppend does, but with byte slices
+func WithBodyByteAppend(body []byte) Response {
+	return WithResponse.WithBodyByteAppend(body)
+}
+
+// WithFile sets a file path as a file that is supposed to be uploaded as a
+// response. WithFile replaces a response body, so in case last one is specified,
+// it'll be ignored.
+// In case any error occurred (file not found, or error occurred during reading,
+// etc.), handler will be called with a raised error
+func WithFile(path string, handler FileErrHandler) Response {
+	return WithResponse.WithFile(path, handler)
+}
+
+// WithError simply sets a code status.InternalServerError and response body
+// as an error text
+func WithError(err error) Response {
+	return WithResponse.WithError(err)
 }

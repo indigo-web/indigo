@@ -2,45 +2,46 @@ package inbuilt
 
 import (
 	"github.com/fakefloordiv/indigo/http/method"
+	routertypes "github.com/fakefloordiv/indigo/router/inbuilt/types"
 )
 
 /*
-This file is responsible for methods predicates - shortcuts for Route method
+This file is responsible for methods shorthands - shortcuts for Route method
 with already set method taken from name of the method
 */
 
-func (d Router) Get(path string, handler HandlerFunc, middlewares ...Middleware) {
-	d.Route(methods.GET, path, handler, middlewares...)
+func (r Router) Get(path string, handler routertypes.HandlerFunc, middlewares ...routertypes.Middleware) {
+	r.Route(methods.GET, path, handler, middlewares...)
 }
 
-func (d Router) Head(path string, handler HandlerFunc, middlewares ...Middleware) {
-	d.Route(methods.HEAD, path, handler, middlewares...)
+func (r Router) Head(path string, handler routertypes.HandlerFunc, middlewares ...routertypes.Middleware) {
+	r.Route(methods.HEAD, path, handler, middlewares...)
 }
 
-func (d Router) Post(path string, handler HandlerFunc, middlewares ...Middleware) {
-	d.Route(methods.POST, path, handler, middlewares...)
+func (r Router) Post(path string, handler routertypes.HandlerFunc, middlewares ...routertypes.Middleware) {
+	r.Route(methods.POST, path, handler, middlewares...)
 }
 
-func (d Router) Put(path string, handler HandlerFunc, middlewares ...Middleware) {
-	d.Route(methods.PUT, path, handler, middlewares...)
+func (r Router) Put(path string, handler routertypes.HandlerFunc, middlewares ...routertypes.Middleware) {
+	r.Route(methods.PUT, path, handler, middlewares...)
 }
 
-func (d Router) Delete(path string, handler HandlerFunc, middlewares ...Middleware) {
-	d.Route(methods.DELETE, path, handler, middlewares...)
+func (r Router) Delete(path string, handler routertypes.HandlerFunc, middlewares ...routertypes.Middleware) {
+	r.Route(methods.DELETE, path, handler, middlewares...)
 }
 
-func (d Router) Connect(path string, handler HandlerFunc, middlewares ...Middleware) {
-	d.Route(methods.CONNECT, path, handler, middlewares...)
+func (r Router) Connect(path string, handler routertypes.HandlerFunc, middlewares ...routertypes.Middleware) {
+	r.Route(methods.CONNECT, path, handler, middlewares...)
 }
 
-func (d Router) Options(path string, handler HandlerFunc, middlewares ...Middleware) {
-	d.Route(methods.OPTIONS, path, handler, middlewares...)
+func (r Router) Options(path string, handler routertypes.HandlerFunc, middlewares ...routertypes.Middleware) {
+	r.Route(methods.OPTIONS, path, handler, middlewares...)
 }
 
-func (d Router) Trace(path string, handler HandlerFunc, middlewares ...Middleware) {
-	d.Route(methods.TRACE, path, handler, middlewares...)
+func (r Router) Trace(path string, handler routertypes.HandlerFunc, middlewares ...routertypes.Middleware) {
+	r.Route(methods.TRACE, path, handler, middlewares...)
 }
 
-func (d Router) Patch(path string, handler HandlerFunc, middlewares ...Middleware) {
-	d.Route(methods.PATCH, path, handler, middlewares...)
+func (r Router) Patch(path string, handler routertypes.HandlerFunc, middlewares ...routertypes.Middleware) {
+	r.Route(methods.PATCH, path, handler, middlewares...)
 }

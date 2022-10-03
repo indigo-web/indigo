@@ -1,4 +1,4 @@
-package context
+package valuectx
 
 import (
 	"context"
@@ -13,6 +13,14 @@ import (
 // With the only difference - using directly comparable-generic
 // instead of any and reflection. This increases performance a
 // lot
+
+// A valueCtx carries a key-value pair. It implements Value for that key and
+// delegates all other calls to the embedded Context.
+type valueCtx[K comparable, V any] struct {
+	context.Context
+	key K
+	val V
+}
 
 // WithValue returns a copy of parent in which the value associated with key is
 // val.
@@ -32,40 +40,19 @@ func WithValue[K comparable, V any](parent context.Context, key K, val V) contex
 		panic("cannot create context from nil parent")
 	}
 
-	return &valueCtx{parent, key, val}
+	return valueCtx[K, V]{parent, key, val}
 }
 
-// A valueCtx carries a key-value pair. It implements Value for that key and
-// delegates all other calls to the embedded Context.
-type valueCtx struct {
-	context.Context
-	key, val any
-}
-
-func (c *valueCtx) String() string {
-	return fmt.Sprintf(
-		"github.com/fakefloordiv/indigo/internal/context:valueCtx{key: %s, value: %s}\n",
-		fmt.Sprint(c.key), fmt.Sprint(c.val),
-	)
-}
-
-func (c *valueCtx) Value(key any) any {
+func (c valueCtx[K, V]) Value(key any) any {
 	if c.key == key {
 		return c.val
 	}
-	return value(c.Context, key)
+	return c.Context.Value(key)
 }
 
-func value(c context.Context, key any) any {
-	for {
-		switch ctx := c.(type) {
-		case *valueCtx:
-			if key == ctx.key {
-				return ctx.val
-			}
-			c = ctx.Context
-		default:
-			return c.Value(key)
-		}
-	}
+func (c valueCtx[K, V]) String() string {
+	return fmt.Sprintf(
+		"github.com/fakefloordiv/indigo/valuectx/patched.go:valueCtx{key: %s, value: %s}",
+		fmt.Sprint(c.key), fmt.Sprint(c.val),
+	)
 }

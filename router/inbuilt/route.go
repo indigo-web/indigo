@@ -1,9 +1,8 @@
 package inbuilt
 
 import (
-	"strings"
-
 	methods "github.com/fakefloordiv/indigo/http/method"
+	routertypes "github.com/fakefloordiv/indigo/router/inbuilt/types"
 )
 
 /*
@@ -11,25 +10,20 @@ This file is responsible for registering both ordinary and error handlers
 */
 
 // Route is a base method for registering handlers
-func (d *Router) Route(
-	method methods.Method, path string, handlerFunc HandlerFunc,
-	middlewares ...Middleware,
+func (r *Router) Route(
+	method methods.Method, path string, handlerFunc routertypes.HandlerFunc,
+	middlewares ...routertypes.Middleware,
 ) {
-	if path != "*" && !strings.HasPrefix(path, "/") && d.prefix == "" {
-		// applying prefix slash only if we are not in group
-		path = "/" + path
-	}
-
-	urlPath := d.prefix + path
-	methodsMap, found := d.routes[urlPath]
+	urlPath := r.prefix + path
+	methodsMap, found := r.routes[urlPath]
 	if !found {
-		methodsMap = make(handlersMap)
-		d.routes[urlPath] = methodsMap
+		methodsMap = make(routertypes.MethodsMap)
+		r.routes[urlPath] = methodsMap
 	}
 
-	handlerStruct := &handlerObject{
-		fun:         handlerFunc,
-		middlewares: append(middlewares, d.middlewares...),
+	handlerStruct := &routertypes.HandlerObject{
+		Fun:         handlerFunc,
+		Middlewares: append(middlewares, r.middlewares...),
 	}
 
 	methodsMap[method] = handlerStruct
@@ -50,6 +44,6 @@ func (d *Router) Route(
 // - http.ErrConnectionTimeout
 //
 // You can set your own handler and override default response
-func (d Router) RouteError(err error, handler ErrorHandler) {
-	d.root.errHandlers[err] = handler
+func (r Router) RouteError(err error, handler ErrorHandler) {
+	r.root.errHandlers[err] = handler
 }

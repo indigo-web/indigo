@@ -14,7 +14,7 @@ import (
 var addr = "localhost:9090"
 
 func MyHandler(_ context.Context, _ *types.Request) types.Response {
-	return types.WithResponse.
+	return types.
 		WithCode(status.OK).
 		WithHeader("Hello", "world").
 		WithBody("<h1>How are you doing?</h1>")

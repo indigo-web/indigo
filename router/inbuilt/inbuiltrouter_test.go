@@ -4,6 +4,8 @@ import (
 	"context"
 	"testing"
 
+	routertypes "github.com/fakefloordiv/indigo/router/inbuilt/types"
+
 	"github.com/fakefloordiv/indigo/http/status"
 
 	methods "github.com/fakefloordiv/indigo/http/method"
@@ -22,6 +24,7 @@ func nopHandler(_ context.Context, _ *types.Request) types.Response {
 
 func TestRoute(t *testing.T) {
 	r := NewRouter()
+	r.OnStart()
 
 	t.Run("NewRoute", func(t *testing.T) {
 		r.Route(methods.GET, "/", nopHandler)
@@ -66,7 +69,11 @@ func TestRoute(t *testing.T) {
 	})
 }
 
-func testMethodPredicate(t *testing.T, router *Router, route func(string, HandlerFunc, ...Middleware), method methods.Method) {
+func testMethodPredicate(
+	t *testing.T, router *Router,
+	route func(string, routertypes.HandlerFunc, ...routertypes.Middleware),
+	method methods.Method,
+) {
 	route("/", nopHandler)
 	require.Contains(t, router.routes, "/")
 	require.Contains(t, router.routes["/"], method)
