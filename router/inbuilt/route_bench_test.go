@@ -35,25 +35,25 @@ func BenchmarkRequestRouting(b *testing.B) {
 
 	b.Run("LongURI", func(b *testing.B) {
 		for i := 0; i < b.N; i++ {
-			_ = router.OnRequest(longURIRequest, nopRender)
+			router.OnRequest(longURIRequest)
 		}
 	})
 
 	b.Run("ShortURI", func(b *testing.B) {
 		for i := 0; i < b.N; i++ {
-			_ = router.OnRequest(shortURIRequest, nopRender)
+			router.OnRequest(shortURIRequest)
 		}
 	})
 
 	b.Run("UnknownURI", func(b *testing.B) {
 		for i := 0; i < b.N; i++ {
-			_ = router.OnRequest(unknownURIRequest, nopRender)
+			router.OnRequest(unknownURIRequest)
 		}
 	})
 
 	b.Run("UnknownMethod", func(b *testing.B) {
 		for i := 0; i < b.N; i++ {
-			_ = router.OnRequest(unknownMethodRequest, nopRender)
+			router.OnRequest(unknownMethodRequest)
 		}
 	})
 }
