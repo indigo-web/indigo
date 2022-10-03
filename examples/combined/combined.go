@@ -59,8 +59,9 @@ func Easter(_ context.Context, request *types.Request) types.Response {
 func main() {
 	r := inbuilt.NewRouter()
 
-	r.Get("/", Index)
-	r.Post("/", IndexSay)
+	root := r.Resource("/")
+	root.Get(Index)
+	root.Post(IndexSay)
 
 	hello := r.Group("/hello")
 	hello.Get("/world", World)
