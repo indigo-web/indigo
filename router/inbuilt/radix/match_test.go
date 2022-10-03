@@ -10,7 +10,10 @@ import (
 func TestNode_Match_Positive(t *testing.T) {
 	tree := NewTree()
 
-	payload := routertypes.MethodsMap{}
+	payload := Payload{
+		MethodsMap: routertypes.MethodsMap{},
+		Allow:      "",
+	}
 	tree.MustInsert(MustParse(staticSample), payload)
 	tree.MustInsert(MustParse(unnamedTemplateSample), payload)
 	tree.MustInsert(MustParse(shortTemplateSample), payload)
@@ -52,7 +55,10 @@ func TestNode_Match_Positive(t *testing.T) {
 func TestNode_Match_Negative(t *testing.T) {
 	tree := NewTree()
 
-	payload := routertypes.MethodsMap{}
+	payload := Payload{
+		MethodsMap: routertypes.MethodsMap{},
+		Allow:      "",
+	}
 	tree.MustInsert(MustParse(staticSample), payload)
 	tree.MustInsert(MustParse(shortTemplateSample), payload)
 	tree.MustInsert(MustParse(mediumTemplateSample), payload)

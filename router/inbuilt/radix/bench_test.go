@@ -25,7 +25,10 @@ var (
 func BenchmarkTreeMatch(b *testing.B) {
 	tree := NewTree()
 
-	payload := routertypes.MethodsMap{}
+	payload := Payload{
+		MethodsMap: routertypes.MethodsMap{},
+		Allow:      "",
+	}
 	tree.MustInsert(MustParse(staticSample), payload)
 	tree.MustInsert(MustParse(shortTemplateSample), payload)
 	tree.MustInsert(MustParse(mediumTemplateSample), payload)
