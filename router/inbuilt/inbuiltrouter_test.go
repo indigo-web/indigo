@@ -69,7 +69,7 @@ func TestRoute(t *testing.T) {
 	})
 }
 
-func testMethodPredicate(
+func testMethodShorthand(
 	t *testing.T, router *Router,
 	route func(string, routertypes.HandlerFunc, ...routertypes.Middleware),
 	method methods.Method,
@@ -80,35 +80,35 @@ func testMethodPredicate(
 	require.NotNil(t, router.routes["/"][method])
 }
 
-func TestMethodPredicates(t *testing.T) {
+func TestMethodShorthands(t *testing.T) {
 	r := NewRouter()
 
 	t.Run("GET", func(t *testing.T) {
-		testMethodPredicate(t, r, r.Get, methods.GET)
+		testMethodShorthand(t, r, r.Get, methods.GET)
 	})
 	t.Run("HEAD", func(t *testing.T) {
-		testMethodPredicate(t, r, r.Head, methods.HEAD)
+		testMethodShorthand(t, r, r.Head, methods.HEAD)
 	})
 	t.Run("POST", func(t *testing.T) {
-		testMethodPredicate(t, r, r.Post, methods.POST)
+		testMethodShorthand(t, r, r.Post, methods.POST)
 	})
 	t.Run("PUT", func(t *testing.T) {
-		testMethodPredicate(t, r, r.Put, methods.PUT)
+		testMethodShorthand(t, r, r.Put, methods.PUT)
 	})
 	t.Run("DELETE", func(t *testing.T) {
-		testMethodPredicate(t, r, r.Delete, methods.DELETE)
+		testMethodShorthand(t, r, r.Delete, methods.DELETE)
 	})
 	t.Run("CONNECT", func(t *testing.T) {
-		testMethodPredicate(t, r, r.Connect, methods.CONNECT)
+		testMethodShorthand(t, r, r.Connect, methods.CONNECT)
 	})
 	t.Run("OPTIONS", func(t *testing.T) {
-		testMethodPredicate(t, r, r.Options, methods.OPTIONS)
+		testMethodShorthand(t, r, r.Options, methods.OPTIONS)
 	})
 	t.Run("TRACE", func(t *testing.T) {
-		testMethodPredicate(t, r, r.Trace, methods.TRACE)
+		testMethodShorthand(t, r, r.Trace, methods.TRACE)
 	})
 	t.Run("PATCH", func(t *testing.T) {
-		testMethodPredicate(t, r, r.Patch, methods.PATCH)
+		testMethodShorthand(t, r, r.Patch, methods.PATCH)
 	})
 }
 
@@ -131,4 +131,57 @@ func TestGroups(t *testing.T) {
 	require.Contains(t, r.routes, "/api/v1/hello")
 	require.Contains(t, r.routes, "/api/v2/world")
 	require.Equal(t, 3, len(r.routes))
+}
+
+func TestResource(t *testing.T) {
+	r := NewRouter()
+	root := r.Resource("/")
+	root.Get(nopHandler)
+	root.Post(nopHandler)
+
+	api := r.Group("/api")
+	stat := api.Resource("/stat")
+	stat.Get(nopHandler)
+	stat.Post(nopHandler)
+
+	r.OnStart()
+
+	t.Run("Root", func(t *testing.T) {
+		require.Contains(t, r.routes, "/")
+		rootMethods := r.routes["/"]
+		require.Contains(t, rootMethods, methods.GET)
+		require.Contains(t, rootMethods, methods.POST)
+		require.Equal(
+			t, 2, len(rootMethods),
+			"only GET and POST methods are expected to be presented",
+		)
+	})
+
+	t.Run("Group", func(t *testing.T) {
+		require.Contains(t, r.routes, "/api/stat")
+		apiMethods := r.routes["/api/stat"]
+		require.Contains(t, apiMethods, methods.GET)
+		require.Contains(t, apiMethods, methods.POST)
+		require.Equal(
+			t, 2, len(apiMethods),
+			"only GET and POST methods are expected to be presented",
+		)
+	})
+}
+
+func TestResource_Methods(t *testing.T) {
+	r := NewRouter()
+	root := r.Resource("/")
+	root.Get(nopHandler)
+	root.Head(nopHandler)
+	root.Post(nopHandler)
+	root.Put(nopHandler)
+	root.Delete(nopHandler)
+	root.Connect(nopHandler)
+	root.Options(nopHandler)
+	root.Trace(nopHandler)
+	root.Patch(nopHandler)
+
+	require.Contains(t, r.routes, "/")
+	require.Equal(t, 9, len(r.routes["/"]))
 }
