@@ -4,6 +4,8 @@ import (
 	"context"
 	"testing"
 
+	"github.com/fakefloordiv/indigo/http/status"
+
 	routertypes "github.com/fakefloordiv/indigo/router/inbuilt/types"
 
 	"github.com/fakefloordiv/indigo/internal/body"
@@ -22,10 +24,6 @@ This file is separated because it is a bit specific and contains a lot
 of specific stuff for testing only middlewares. Decided it's better to
 separate it from all the other tests
 */
-
-func nopRespWriter(_ types.Response) error {
-	return nil
-}
 
 type middleware uint8
 
@@ -149,7 +147,9 @@ func TestMiddlewares(t *testing.T) {
 		request, _ := getRequest()
 		request.Method = methods.GET
 		request.Path = "/"
-		require.NoError(t, r.OnRequest(request, nopRespWriter))
+
+		response := r.OnRequest(request)
+		require.Equal(t, status.OK, response.Code)
 
 		wantChain := []middleware{
 			global1, global2,
@@ -163,7 +163,9 @@ func TestMiddlewares(t *testing.T) {
 		request, _ := getRequest()
 		request.Method = methods.GET
 		request.Path = "/api/v1/hello"
-		require.NoError(t, r.OnRequest(request, nopRespWriter))
+
+		response := r.OnRequest(request)
+		require.Equal(t, status.OK, response.Code)
 
 		wantChain := []middleware{
 			local2, local1, global1, pointApplied1,
@@ -177,7 +179,9 @@ func TestMiddlewares(t *testing.T) {
 		request, _ := getRequest()
 		request.Method = methods.GET
 		request.Path = "/api/v2/world"
-		require.NoError(t, r.OnRequest(request, nopRespWriter))
+
+		response := r.OnRequest(request)
+		require.Equal(t, status.OK, response.Code)
 
 		wantChain := []middleware{
 			local3, local1, global1, pointApplied2,
