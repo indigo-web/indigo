@@ -2,8 +2,9 @@ package inbuilt
 
 import (
 	"context"
-	"github.com/fakefloordiv/indigo/http/status"
 	"testing"
+
+	"github.com/fakefloordiv/indigo/http/status"
 
 	routertypes "github.com/fakefloordiv/indigo/router/inbuilt/types"
 
