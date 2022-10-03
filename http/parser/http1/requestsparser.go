@@ -824,7 +824,6 @@ func (p *httpRequestsParser) Parse(data []byte) (state parser.RequestState, extr
 			case "connection":
 				p.closeConnection = string(value) == "close"
 			case "transfer-encoding":
-				// TODO: parse header value
 				p.chunkedTransferEncoding = string(value) == "chunked"
 			case "content-encoding":
 				p.decoder, p.decodeBody = p.codings.GetDecoder(value)
