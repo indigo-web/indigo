@@ -2,6 +2,7 @@ package inbuilt
 
 import (
 	"context"
+
 	"github.com/fakefloordiv/indigo/http"
 	methods "github.com/fakefloordiv/indigo/http/method"
 	"github.com/fakefloordiv/indigo/router/inbuilt/obtainer"

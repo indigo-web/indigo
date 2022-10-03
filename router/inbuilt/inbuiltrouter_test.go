@@ -2,8 +2,9 @@ package inbuilt
 
 import (
 	"context"
-	routertypes "github.com/fakefloordiv/indigo/router/inbuilt/types"
 	"testing"
+
+	routertypes "github.com/fakefloordiv/indigo/router/inbuilt/types"
 
 	"github.com/fakefloordiv/indigo/http/status"
 
@@ -71,8 +72,8 @@ func TestRoute(t *testing.T) {
 func testMethodPredicate(
 	t *testing.T, router *Router,
 	route func(string, routertypes.HandlerFunc, ...routertypes.Middleware),
-	method methods.Method) {
-
+	method methods.Method,
+) {
 	route("/", nopHandler)
 	require.Contains(t, router.routes, "/")
 	require.Contains(t, router.routes["/"], method)

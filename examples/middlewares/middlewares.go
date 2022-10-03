@@ -3,8 +3,9 @@ package main
 import (
 	"context"
 	"fmt"
-	routertypes "github.com/fakefloordiv/indigo/router/inbuilt/types"
 	"log"
+
+	routertypes "github.com/fakefloordiv/indigo/router/inbuilt/types"
 
 	"github.com/fakefloordiv/indigo"
 	"github.com/fakefloordiv/indigo/router/inbuilt"

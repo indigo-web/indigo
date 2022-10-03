@@ -2,6 +2,8 @@ package obtainer
 
 import (
 	"context"
+	"strings"
+
 	"github.com/fakefloordiv/indigo/http"
 	methods "github.com/fakefloordiv/indigo/http/method"
 	"github.com/fakefloordiv/indigo/internal/functools"
@@ -10,7 +12,6 @@ import (
 	routertypes "github.com/fakefloordiv/indigo/router/inbuilt/types"
 	"github.com/fakefloordiv/indigo/types"
 	"github.com/fakefloordiv/indigo/valuectx"
-	"strings"
 )
 
 func DynamicObtainer(routes routertypes.RoutesMap) Obtainer {
