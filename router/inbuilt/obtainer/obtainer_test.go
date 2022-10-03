@@ -10,6 +10,7 @@ import (
 	settings2 "github.com/fakefloordiv/indigo/settings"
 	"github.com/fakefloordiv/indigo/types"
 	"github.com/stretchr/testify/require"
+	"reflect"
 	"testing"
 )
 
@@ -100,4 +101,27 @@ func TestDynamicObtainer(t *testing.T) {
 	t.Run("NegativeMatch_MethodNotAllowed", func(t *testing.T) {
 		testNegativeMatchMethodNotAllowed(t, obtainer)
 	})
+}
+
+func TestAuto(t *testing.T) {
+	onlyStatic := []string{
+		"/hello/world",
+		"/api/v1/",
+		"/something/good",
+	}
+
+	someDynamic := []string{
+		"/hello/world",
+		"/still/static",
+		"/finally/{dynamic part}",
+	}
+
+	staticObtainer := reflect.ValueOf(StaticObtainer).Pointer()
+	dynamicObtainer := reflect.ValueOf(DynamicObtainer).Pointer()
+
+	mustBeStatic := reflect.ValueOf(getObtainer(onlyStatic)).Pointer()
+	mustBeDynamic := reflect.ValueOf(getObtainer(someDynamic)).Pointer()
+
+	require.Equal(t, staticObtainer, mustBeStatic)
+	require.Equal(t, dynamicObtainer, mustBeDynamic)
 }
