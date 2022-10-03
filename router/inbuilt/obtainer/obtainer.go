@@ -2,6 +2,7 @@ package obtainer
 
 import (
 	"context"
+
 	"github.com/fakefloordiv/indigo/internal/mapconv"
 	"github.com/fakefloordiv/indigo/router/inbuilt/radix"
 	routertypes "github.com/fakefloordiv/indigo/router/inbuilt/types"

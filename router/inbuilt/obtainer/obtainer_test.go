@@ -2,6 +2,9 @@ package obtainer
 
 import (
 	"context"
+	"reflect"
+	"testing"
+
 	"github.com/fakefloordiv/indigo/http"
 	"github.com/fakefloordiv/indigo/http/headers"
 	methods "github.com/fakefloordiv/indigo/http/method"
@@ -10,8 +13,6 @@ import (
 	settings2 "github.com/fakefloordiv/indigo/settings"
 	"github.com/fakefloordiv/indigo/types"
 	"github.com/stretchr/testify/require"
-	"reflect"
-	"testing"
 )
 
 func nopHandler(context.Context, *types.Request) types.Response {

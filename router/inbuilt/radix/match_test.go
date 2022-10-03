@@ -2,9 +2,10 @@ package radix
 
 import (
 	"context"
+	"testing"
+
 	routertypes "github.com/fakefloordiv/indigo/router/inbuilt/types"
 	"github.com/stretchr/testify/require"
-	"testing"
 )
 
 func TestNode_Match_Positive(t *testing.T) {

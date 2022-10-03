@@ -2,8 +2,9 @@ package valuectx
 
 import (
 	"context"
-	"github.com/stretchr/testify/require"
 	"testing"
+
+	"github.com/stretchr/testify/require"
 )
 
 func TestWithValue(t *testing.T) {

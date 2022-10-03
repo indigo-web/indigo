@@ -2,6 +2,7 @@ package inbuilt
 
 import (
 	"context"
+
 	"github.com/fakefloordiv/indigo/router/inbuilt/obtainer"
 	routertypes "github.com/fakefloordiv/indigo/router/inbuilt/types"
 	"github.com/fakefloordiv/indigo/types"

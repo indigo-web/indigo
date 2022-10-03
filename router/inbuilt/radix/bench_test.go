@@ -2,8 +2,9 @@ package radix
 
 import (
 	"context"
-	routertypes "github.com/fakefloordiv/indigo/router/inbuilt/types"
 	"testing"
+
+	routertypes "github.com/fakefloordiv/indigo/router/inbuilt/types"
 )
 
 var (
