@@ -152,7 +152,7 @@ func (h *httpServer) requestProcessor() {
 			// request processor... Also doesn't know about hijacking! That's why
 			// here we are checking a notifier chan whether it's nil (it may be nil
 			// ONLY here and ONLY because of hijacking)
-			if h.router.OnRequest(h.request, renderer) != nil {
+			if renderer(h.router.OnRequest(h.request)) != nil {
 				// request object must be reset in any way because otherwise
 				// deadlock will happen here
 				_ = h.request.Reset()
@@ -164,14 +164,16 @@ func (h *httpServer) requestProcessor() {
 				return
 			}
 			if err := h.request.Reset(); err != nil {
-				h.router.OnError(h.request, renderer, err)
+				// we already sent a response that did not errored, so no way here
+				// to send one more response with error. Just ignore it
+				_ = h.router.OnError(h.request, err)
 				h.notifier <- eError
 				return
 			}
 
 			h.notifier <- eProcessed
 		case eError:
-			h.router.OnError(h.request, renderer, h.err)
+			_ = renderer(h.router.OnError(h.request, h.err))
 			h.notifier <- eProcessed
 			return
 		default:

@@ -25,8 +25,8 @@ func (r *Router) OnStart() {
 }
 
 // OnRequest routes the request
-func (r *Router) OnRequest(request *types.Request, render types.Render) error {
-	return render(r.processRequest(request))
+func (r *Router) OnRequest(request *types.Request) types.Response {
+	return r.processRequest(request)
 }
 
 func (r *Router) processRequest(request *types.Request) types.Response {
@@ -41,8 +41,8 @@ func (r *Router) processRequest(request *types.Request) types.Response {
 // OnError receives an error and calls a corresponding handler. Handler MUST BE
 // registered, otherwise panic is raised.
 // Luckily (for user), we have all the default handlers registered
-func (r *Router) OnError(request *types.Request, render types.Render, err error) {
-	_ = render(r.processError(context.Background(), request, err))
+func (r *Router) OnError(request *types.Request, err error) types.Response {
+	return r.processError(context.Background(), request, err)
 }
 
 func (r *Router) processError(ctx context.Context, request *types.Request, err error) types.Response {

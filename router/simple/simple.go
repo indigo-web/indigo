@@ -19,12 +19,12 @@ func NewRouter(handler Handler) router2.Router {
 	}
 }
 
-func (r router) OnRequest(request *types.Request, render types.Render) error {
-	return render(r.handler(request))
+func (r router) OnRequest(request *types.Request) types.Response {
+	return r.handler(request)
 }
 
-func (router) OnError(_ *types.Request, render types.Render, err error) {
-	_ = render(types.WithError(err))
+func (router) OnError(_ *types.Request, err error) types.Response {
+	return types.WithError(err)
 }
 
 func (router) GetContentEncodings() encodings.ContentEncodings {
