@@ -2,6 +2,10 @@ package server
 
 import (
 	"context"
+	"net"
+	"testing"
+	"time"
+
 	"github.com/fakefloordiv/indigo/http/encodings"
 	"github.com/fakefloordiv/indigo/http/headers"
 	"github.com/fakefloordiv/indigo/http/parser/http1"
@@ -10,9 +14,6 @@ import (
 	"github.com/fakefloordiv/indigo/router/inbuilt"
 	"github.com/fakefloordiv/indigo/settings"
 	"github.com/fakefloordiv/indigo/types"
-	"net"
-	"testing"
-	"time"
 )
 
 var (
@@ -61,37 +62,36 @@ func (c connMock) Read(b []byte) (n int, err error) {
 	return len(b), nil
 }
 
-func (c connMock) Write(b []byte) (n int, err error) {
+func (connMock) Write(b []byte) (n int, err error) {
 	return len(b), nil
 }
 
-func (c connMock) Close() error {
+func (connMock) Close() error {
 	return nil
 }
 
-func (c connMock) LocalAddr() net.Addr {
+func (connMock) LocalAddr() net.Addr {
 	return nil
 }
 
-func (c connMock) RemoteAddr() net.Addr {
+func (connMock) RemoteAddr() net.Addr {
 	return nil
 }
 
-func (c connMock) SetDeadline(time.Time) error {
+func (connMock) SetDeadline(time.Time) error {
 	return nil
 }
 
-func (c connMock) SetReadDeadline(time.Time) error {
+func (connMock) SetReadDeadline(time.Time) error {
 	return nil
 }
 
-func (c connMock) SetWriteDeadline(time.Time) error {
+func (connMock) SetWriteDeadline(time.Time) error {
 	return nil
 }
 
 func BenchmarkIndigo(b *testing.B) {
 	router := inbuilt.NewRouter()
-
 	root := router.Resource("/")
 	root.Get(func(context.Context, *types.Request) types.Response {
 		return types.OK()
@@ -100,7 +100,6 @@ func BenchmarkIndigo(b *testing.B) {
 		_ = request.OnBody(func([]byte) error {
 			return nil
 		}, func(error) {
-
 		})
 
 		return types.OK()
