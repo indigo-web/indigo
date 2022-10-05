@@ -100,6 +100,8 @@ func (r *Request) Reader() io.Reader {
 // Reset resets request headers and reads body into nowhere until completed.
 // It is implemented to clear the request object between requests
 func (r *Request) Reset() error {
+	r.Fragment = ""
+	r.Query.Set(nil)
 	r.headersManager.Reset()
 	r.Headers = r.headersManager.Headers
 

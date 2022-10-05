@@ -17,7 +17,7 @@ import (
 
 var (
 	contentLength  = []byte("content-length")
-	defaultCharset = []byte("iso-8859-1")
+	DefaultCharset = []byte("iso-8859-1")
 )
 
 // httpRequestsParser is a stream-based http requests parser. It modifies
@@ -70,7 +70,7 @@ func NewHTTPRequestsParser(
 		headersManager:    manager,
 		codings:           codings,
 
-		charset: defaultCharset,
+		charset: DefaultCharset,
 
 		body: body,
 	}
@@ -441,7 +441,7 @@ func (p *httpRequestsParser) Parse(data []byte) (state parser.RequestState, extr
 
 				_ = p.headersManager.FinalizeValue(string(p.headerBuff), p.quality, internal.B2S(p.charset))
 				p.quality = 0
-				p.charset = defaultCharset
+				p.charset = DefaultCharset
 				// number of headers is anyway not exceeded here because this is the same header
 				_ = p.headersManager.BeginValue()
 			default:
@@ -474,7 +474,7 @@ func (p *httpRequestsParser) Parse(data []byte) (state parser.RequestState, extr
 
 				_ = p.headersManager.FinalizeValue(string(p.headerBuff), p.quality, internal.B2S(p.charset))
 				p.quality = 0
-				p.charset = defaultCharset
+				p.charset = DefaultCharset
 				_ = p.headersManager.BeginValue()
 			default:
 				if p.headersManager.AppendValue(';', char) {
@@ -506,7 +506,7 @@ func (p *httpRequestsParser) Parse(data []byte) (state parser.RequestState, extr
 
 				_ = p.headersManager.FinalizeValue(string(p.headerBuff), p.quality, internal.B2S(p.charset))
 				p.quality = 0
-				p.charset = defaultCharset
+				p.charset = DefaultCharset
 				_ = p.headersManager.BeginValue()
 			default:
 				if p.headersManager.AppendValue(';', 'q', char) {
@@ -553,7 +553,7 @@ func (p *httpRequestsParser) Parse(data []byte) (state parser.RequestState, extr
 
 				_ = p.headersManager.FinalizeValue(string(p.headerBuff), p.quality, internal.B2S(p.charset))
 				p.quality = 0
-				p.charset = defaultCharset
+				p.charset = DefaultCharset
 				_ = p.headersManager.BeginValue()
 				p.state = eHeaderValueComma
 			default:
@@ -741,7 +741,7 @@ func (p *httpRequestsParser) Parse(data []byte) (state parser.RequestState, extr
 
 				_ = p.headersManager.FinalizeValue(string(p.headerBuff), p.quality, internal.B2S(p.charset))
 				p.quality = 0
-				p.charset = defaultCharset
+				p.charset = DefaultCharset
 				_ = p.headersManager.BeginValue()
 				p.state = eHeaderValueComma
 			default:
@@ -816,7 +816,7 @@ func (p *httpRequestsParser) Parse(data []byte) (state parser.RequestState, extr
 			key := string(p.headerBuff)
 			value := p.headersManager.FinalizeValue(key, p.quality, internal.B2S(p.charset))
 			p.quality = 0
-			p.charset = defaultCharset
+			p.charset = DefaultCharset
 
 			switch key {
 			case "content-length":
@@ -824,7 +824,6 @@ func (p *httpRequestsParser) Parse(data []byte) (state parser.RequestState, extr
 			case "connection":
 				p.closeConnection = string(value) == "close"
 			case "transfer-encoding":
-				// TODO: parse header value
 				p.chunkedTransferEncoding = string(value) == "chunked"
 			case "content-encoding":
 				p.decoder, p.decodeBody = p.codings.GetDecoder(value)

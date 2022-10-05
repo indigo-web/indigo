@@ -11,8 +11,8 @@ import (
 //         and when you are ready, just notify core that he can safely close
 //         the connection (even if it's already closed from client side)
 type Router interface {
-	OnRequest(request *types.Request, render types.Render) error
-	OnError(request *types.Request, render types.Render, err error)
+	OnRequest(request *types.Request) types.Response
+	OnError(request *types.Request, err error) types.Response
 }
 
 // OnStart called when server is initialized and started. Can be implemented

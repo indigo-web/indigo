@@ -28,6 +28,7 @@ func StartTCPServer(sock net.Listener, handleConn connHandler, sd chan struct{})
 		case <-sd:
 			wg.Wait()
 			sd <- struct{}{}
+
 			return http.ErrShutdown
 		default:
 			conn, err := sock.Accept()

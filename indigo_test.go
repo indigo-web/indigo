@@ -74,7 +74,7 @@ func readN(conn net.Conn, n int) ([]byte, error) {
 	}
 }
 
-func getRouter(t *testing.T) router.Router {
+func getStaticRouter(t *testing.T) router.Router {
 	r := inbuilt.NewRouter()
 
 	r.Get("/simple-get", func(_ context.Context, request *types.Request) types.Response {
@@ -192,33 +192,18 @@ func getRouter(t *testing.T) router.Router {
 	return r
 }
 
-func TestAllCases(t *testing.T) {
+func TestServer_Static(t *testing.T) {
 	// testing everything in one function only because we do not wanna
 	// run server multiple times (each time takes a bit time, in sum it
 	// is a lot of time)
 
-	r := getRouter(t)
+	r := getStaticRouter(t)
 	s := settings.Default()
 	s.TCPServer.IDLEConnLifetime = 2
 	app := NewApp(addr)
 
-	shutdown := make(chan bool)
-
-	go func() {
-		require.Equal(t, http.ErrShutdown, app.Serve(r, s))
-		shutdown <- true
-	}()
-
-	defer func() {
-		go app.Shutdown()
-		instantlyDisconnect()
-
-		select {
-		case <-shutdown:
-		case <-time.After(5 * time.Second):
-			require.Fail(t, "server is not shutting down for too long")
-		}
-	}()
+	runningServer := newServer(app)
+	go runningServer.Start(t, r, s)
 
 	// wait a bit to guarantee that server is running
 	time.Sleep(200 * time.Millisecond)
@@ -336,11 +321,11 @@ func TestAllCases(t *testing.T) {
 	})
 
 	t.Run("/hijack-conn-no-body-read", func(t *testing.T) {
-		sendSimpleRequest(t, "/hijack-conn-no-body-read")
+		sendSimpleRequest(t, "/hijack-conn-no-body-read", addr)
 	})
 
 	t.Run("/hijack-conn-with-body-read", func(t *testing.T) {
-		sendSimpleRequest(t, "/hijack-conn-with-body-read")
+		sendSimpleRequest(t, "/hijack-conn-with-body-read", addr)
 	})
 
 	t.Run("/with-file", func(t *testing.T) {
@@ -370,7 +355,7 @@ func TestAllCases(t *testing.T) {
 			URL: &url.URL{
 				Scheme: "http",
 				Host:   addr,
-				Path:   "/trace",
+				Path:   "/simple-get",
 			},
 			Proto:      "HTTP/1.1",
 			ProtoMajor: 1,
@@ -392,9 +377,9 @@ func TestAllCases(t *testing.T) {
 		data := string(dataBytes)
 		require.NoError(t, err)
 
-		wantRequestLine := "TRACE /trace HTTP/1.1\r\n"
-		require.True(t, len(data) > len(wantRequestLine))
-		require.True(t, data[:len(wantRequestLine)] == wantRequestLine)
+		wantRequestLine := "TRACE /simple-get HTTP/1.1\r\n"
+		require.Greater(t, len(data), len(wantRequestLine))
+		require.Equal(t, wantRequestLine, data[:len(wantRequestLine)])
 
 		headerLines := strings.Split(data[len(wantRequestLine):], "\r\n")
 		// request is terminated with \r\n\r\n, so 2 last values in headerLines
@@ -405,6 +390,7 @@ func TestAllCases(t *testing.T) {
 			"host: " + addr,
 			"user-agent: Go-http-client/1.1",
 			"accept-encoding: gzip",
+			"content-length: 0",
 		}
 
 		require.Equal(t, len(wantHeaderLines), len(headerLines))
@@ -450,11 +436,10 @@ func TestAllCases(t *testing.T) {
 	})
 
 	stdhttp.DefaultClient.CloseIdleConnections()
-
-	// at this point server is supposed to be closed, but who knows, who knows
+	runningServer.Wait(t, 3*time.Second)
 }
 
-func sendSimpleRequest(t *testing.T, path string) {
+func sendSimpleRequest(t *testing.T, path string, addr string) {
 	conn, err := net.Dial("tcp", addr)
 	require.NoError(t, err)
 
@@ -480,4 +465,32 @@ func contains(strs []string, substr string) bool {
 	}
 
 	return false
+}
+
+type serverWrap struct {
+	app      *Application
+	shutdown chan struct{}
+}
+
+func newServer(app *Application) serverWrap {
+	return serverWrap{
+		app:      app,
+		shutdown: make(chan struct{}),
+	}
+}
+
+func (s serverWrap) Start(t *testing.T, r router.Router, settings ...settings.Settings) {
+	require.Equal(t, http.ErrShutdown, s.app.Serve(r, settings...))
+	s.shutdown <- struct{}{}
+}
+
+func (s serverWrap) Wait(t *testing.T, duration time.Duration) {
+	s.app.Shutdown()
+	instantlyDisconnect()
+
+	select {
+	case <-s.shutdown:
+	case <-time.After(duration):
+		require.Fail(t, "server is not shutting down for too long")
+	}
 }

@@ -104,7 +104,7 @@ func (r *Renderer) Response(
 		return err
 	}
 
-	buff = renderContentLength(len(response.Body), buff)
+	buff = renderContentLength(int64(len(response.Body)), buff)
 	r.buff = append(buff, crlf...)
 
 	// HEAD requests MUST NOT contain message body - the main difference
@@ -144,7 +144,7 @@ func (r *Renderer) renderFileInto(
 		return err
 	}
 
-	r.buff = renderContentLength(int(stat.Size()), r.buff)
+	r.buff = renderContentLength(stat.Size(), r.buff)
 
 	if err = writer(append(r.buff, crlf...)); err != nil {
 		return errConnWrite
@@ -175,8 +175,10 @@ func (r *Renderer) renderFileInto(
 	}
 }
 
-func renderContentLength(value int, buff []byte) []byte {
-	return append(append(append(buff, contentLength...), strconv.Itoa(value)...), crlf...)
+func renderContentLength(value int64, buff []byte) []byte {
+	buff = append(buff, contentLength...)
+
+	return append(strconv.AppendInt(buff, value, 10), crlf...)
 }
 
 func renderHeader(key string, hdrs []headers.Header, into []byte) []byte {
@@ -218,14 +220,14 @@ func isKeepAlive(request *types.Request) bool {
 	return request.Proto == proto.HTTP11
 }
 
-// mergeHeaders allocates a new map with initial capacity of len(a)+len(b)
-// Values from b overrides values from a
+// mergeHeaders simply overrides a with values from b
 func mergeHeaders(a, b headers.Headers) headers.Headers {
 	into := make(headers.Headers, len(a)+len(b))
 
 	for k, v := range a {
 		into[k] = v
 	}
+
 	for k, v := range b {
 		into[k] = v
 	}
