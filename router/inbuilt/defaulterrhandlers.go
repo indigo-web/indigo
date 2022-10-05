@@ -26,7 +26,7 @@ func newErrorHandlers() errHandlers {
 func defaultMethodNotAllowedHandler(ctx context.Context, _ *types.Request) types.Response {
 	allow := ctx.Value("allow").(string)
 
-	return types.WithResponse.
+	return types.
 		WithError(http.ErrMethodNotAllowed).
 		WithHeader("Allow", allow)
 }
