@@ -222,9 +222,15 @@ func isKeepAlive(request *types.Request) bool {
 
 // mergeHeaders simply overrides a with values from b
 func mergeHeaders(a, b headers.Headers) headers.Headers {
-	for k, v := range b {
-		a[k] = v
+	into := make(headers.Headers, len(a)+len(b))
+
+	for k, v := range a {
+		into[k] = v
 	}
 
-	return a
+	for k, v := range b {
+		into[k] = v
+	}
+	
+	return into
 }
