@@ -6,6 +6,7 @@ import (
 	"testing"
 	"time"
 
+
 	"github.com/fakefloordiv/indigo/http/encodings"
 	"github.com/fakefloordiv/indigo/http/headers"
 	"github.com/fakefloordiv/indigo/http/parser/http1"
@@ -92,7 +93,6 @@ func (c connMock) SetWriteDeadline(time.Time) error {
 
 func BenchmarkIndigo(b *testing.B) {
 	router := inbuilt.NewRouter()
-
 	root := router.Resource("/")
 	root.Get(func(context.Context, *types.Request) types.Response {
 		return types.OK()
