@@ -77,7 +77,7 @@ func (r *Renderer) Response(
 
 	buff := r.buff[:0]
 	buff = append(append(buff, proto.ToBytes(request.Proto)...), space...)
-	buff = append(append(buff, strconv.Itoa(int(response.Code))...), space...)
+	buff = append(strconv.AppendInt(buff, int64(response.Code), 10), space...)
 	buff = append(append(buff, status.Text(response.Code)...), crlf...)
 
 	customRespHeaders := response.Headers()
