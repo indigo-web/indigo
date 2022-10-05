@@ -231,6 +231,6 @@ func mergeHeaders(a, b headers.Headers) headers.Headers {
 	for k, v := range b {
 		into[k] = v
 	}
-	
+
 	return into
 }

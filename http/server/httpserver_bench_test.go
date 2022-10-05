@@ -6,7 +6,6 @@ import (
 	"testing"
 	"time"
 
-
 	"github.com/fakefloordiv/indigo/http/encodings"
 	"github.com/fakefloordiv/indigo/http/headers"
 	"github.com/fakefloordiv/indigo/http/parser/http1"
