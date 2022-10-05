@@ -2,6 +2,10 @@ package server
 
 import (
 	"context"
+	"net"
+	"testing"
+	"time"
+
 	"github.com/fakefloordiv/indigo/http/encodings"
 	"github.com/fakefloordiv/indigo/http/headers"
 	"github.com/fakefloordiv/indigo/http/parser/http1"
@@ -10,9 +14,6 @@ import (
 	"github.com/fakefloordiv/indigo/router/inbuilt"
 	"github.com/fakefloordiv/indigo/settings"
 	"github.com/fakefloordiv/indigo/types"
-	"net"
-	"testing"
-	"time"
 )
 
 var (
@@ -100,7 +101,6 @@ func BenchmarkIndigo(b *testing.B) {
 		_ = request.OnBody(func([]byte) error {
 			return nil
 		}, func(error) {
-
 		})
 
 		return types.OK()
