@@ -119,5 +119,11 @@ func (m Manager) FinalizeValue(key string, q uint8, charset string) (finalValue 
 // new headers map
 func (m *Manager) Reset() {
 	m.Values = m.Values[:0]
-	m.Headers = make(Headers, m.headersSettings.Number.Default)
+
+	// this will anyway be optimized by compiler to use mapclear function.
+	// Also, clearing the old one map instead of allocating a new one makes
+	// much less garbage collector pressure
+	for k := range m.Headers {
+		delete(m.Headers, k)
+	}
 }
