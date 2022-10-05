@@ -6,7 +6,6 @@ import (
 	"testing"
 	"time"
 
-
 	"github.com/fakefloordiv/indigo/http/encodings"
 	"github.com/fakefloordiv/indigo/http/headers"
 	"github.com/fakefloordiv/indigo/http/parser/http1"
@@ -63,31 +62,31 @@ func (c connMock) Read(b []byte) (n int, err error) {
 	return len(b), nil
 }
 
-func (c connMock) Write(b []byte) (n int, err error) {
+func (connMock) Write(b []byte) (n int, err error) {
 	return len(b), nil
 }
 
-func (c connMock) Close() error {
+func (connMock) Close() error {
 	return nil
 }
 
-func (c connMock) LocalAddr() net.Addr {
+func (connMock) LocalAddr() net.Addr {
 	return nil
 }
 
-func (c connMock) RemoteAddr() net.Addr {
+func (connMock) RemoteAddr() net.Addr {
 	return nil
 }
 
-func (c connMock) SetDeadline(time.Time) error {
+func (connMock) SetDeadline(time.Time) error {
 	return nil
 }
 
-func (c connMock) SetReadDeadline(time.Time) error {
+func (connMock) SetReadDeadline(time.Time) error {
 	return nil
 }
 
-func (c connMock) SetWriteDeadline(time.Time) error {
+func (connMock) SetWriteDeadline(time.Time) error {
 	return nil
 }
 
