@@ -50,7 +50,7 @@ func requestURI(request *types.Request, buff []byte) []byte {
 func requestHeaders(request *types.Request, buff []byte) []byte {
 	for k, v := range request.Headers.AsMap() {
 		buff = append(append(buff, k...), http.COLONSP...)
-		buff = append(joinValuesInto(buff, v))
+		buff = joinValuesInto(buff, v)
 	}
 
 	return buff
