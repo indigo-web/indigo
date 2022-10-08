@@ -7,7 +7,8 @@ var (
 )
 
 var (
-	SP    = " "
-	COLON = ":"
-	COMMA = ","
+	SP      = " "
+	COLON   = ":"
+	COLONSP = COLON + SP
+	COMMA   = ","
 )

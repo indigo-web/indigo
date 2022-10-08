@@ -33,28 +33,14 @@ const (
 	// application/octet-stream, but we know that it is usually text/html,
 	// isn't it?
 	defaultContentType = "text/html"
-
-	// explicitly set a list of encodings are supported to avoid awkward
-	// situations
-	// Empty by default because this value is dynamic - depends on which
-	// encodings will user add. If it exists, it will be overridden. If
-	// it is not existing, this value will not be set
-	defaultAcceptEncodings = ""
 )
 
-var defaultHeaders = headers.Headers{
-	"Server": []headers.Header{
-		{Value: defaultServer},
-	},
-	"Connection": []headers.Header{
-		{Value: defaultConnection},
-	},
-	"Content-Type": []headers.Header{
-		{Value: defaultContentType},
-	},
-	"Accept-Encodings": []headers.Header{
-		{Value: defaultAcceptEncodings},
-	},
+var defaultHeaders = map[string][]string{
+	"Server":       {defaultServer},
+	"Connection":   {defaultConnection},
+	"Content-Type": {defaultContentType},
+	// nil here means that value will be set later, when server will be initializing
+	"Accept-Encodings": nil,
 }
 
 // Application is just a struct with addr and shutdown channel that is currently
@@ -63,7 +49,7 @@ type Application struct {
 	addr string
 
 	codings        encodings.ContentEncodings
-	defaultHeaders headers.Headers
+	defaultHeaders map[string][]string
 
 	shutdown chan struct{}
 }
@@ -85,7 +71,7 @@ func (a Application) AddContentDecoder(token string, decoder encodings.Decoder) 
 
 // SetDefaultHeaders overrides default headers to a passed ones.
 // Doing this, make sure you know what are you doing
-func (a *Application) SetDefaultHeaders(headers headers.Headers) {
+func (a *Application) SetDefaultHeaders(headers map[string][]string) {
 	a.defaultHeaders = headers
 }
 
@@ -93,8 +79,8 @@ func (a *Application) SetDefaultHeaders(headers headers.Headers) {
 // otherwise, error is returned
 // Also, if specified, Accept-Encodings default header's value will be set here
 func (a Application) Serve(r router.Router, someSettings ...settings2.Settings) error {
-	if _, found := a.defaultHeaders["Accept-Encodings"]; found {
-		a.defaultHeaders["Accept-Encodings"] = acceptableCodingsHeader(a.codings.Acceptable())
+	if accept, found := a.defaultHeaders["Accept-Encodings"]; found && accept == nil {
+		a.defaultHeaders["Accept-Encodings"] = a.codings.Acceptable()
 	}
 
 	if onStart, ok := r.(router.OnStart); ok {
@@ -112,17 +98,20 @@ func (a Application) Serve(r router.Router, someSettings ...settings2.Settings) 
 	}
 
 	return server.StartTCPServer(sock, func(wg *sync.WaitGroup, conn net.Conn) {
-		headersManager := headers.NewManager(settings.Headers)
+		allocator := headers.NewAllocator(
+			settings.Headers.ValueSpace.Default, settings.Headers.ValueSpace.Maximal,
+		)
 		query := url.NewQuery(func() map[string][]byte {
 			return make(map[string][]byte, settings.URL.Query.Number.Default)
 		})
-		request, gateway := types.NewRequest(&headersManager, query, conn.RemoteAddr())
+		hdrs := headers.NewHeaders(make(map[string][]string, settings.Headers.Number.Default))
+		request, gateway := types.NewRequest(hdrs, query, conn.RemoteAddr())
 
 		startLineBuff := make([]byte, 0, settings.URL.Length.Default)
 		headerBuff := make([]byte, 0, settings.Headers.KeyLength.Default)
 
 		httpParser := http1.NewHTTPRequestsParser(
-			request, gateway, startLineBuff, headerBuff, settings, &headersManager, a.codings,
+			request, gateway, allocator, startLineBuff, headerBuff, settings, a.codings,
 		)
 
 		renderer := render.NewRenderer(nil, a.defaultHeaders)
@@ -161,14 +150,4 @@ func getSettings(settings ...settings2.Settings) (settings2.Settings, error) {
 	default:
 		return settings2.Settings{}, errors.New("too many settings (none or single struct is expected)")
 	}
-}
-
-func acceptableCodingsHeader(acceptable []string) (values []headers.Header) {
-	for i := range acceptable {
-		values = append(values, headers.Header{
-			Value: acceptable[i],
-		})
-	}
-
-	return values
 }

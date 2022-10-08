@@ -13,8 +13,8 @@ type (
 	FileErrHandler func(err error) Response
 )
 
-// idk why 5, but why not
-const initialRespHeadersSize = 5
+// I don't know why 7
+const initialRespHeadersSize = 7
 
 // WithResponse is just a nil-filled default pre-created response. Because
 // of clear methods, it is anyway copied every time it is used as constructor
@@ -27,9 +27,11 @@ var WithResponse = Response{
 type Response struct {
 	Code   status.Code
 	Status status.Status
-	// headers due to possible side effects are decided to be private
-	// also uninitialized response must ALWAYS have this value as nil
-	headers headers.Headers
+	// headers are simply a hashmap that is a mutable object, so side effects may happen
+	// so that is why we have to hide it from user, and let the usage from methods ONLY.
+	// This guarantees that each response will have its own headers object
+	headers    headers.Headers
+	headersSet bool
 	// Body is a mutable object. But it's guaranteed that in WithResponse it will not
 	// be modified because it's nil. This means that any data will be appended will
 	// allocate a new underlying array
@@ -42,7 +44,7 @@ func NewResponse() Response {
 	return Response{
 		Code:    status.OK,
 		Status:  status.Text(status.OK),
-		headers: make(headers.Headers),
+		headers: headers.NewHeaders(make(map[string][]string, initialRespHeadersSize)),
 	}
 }
 
@@ -65,50 +67,14 @@ func (r Response) WithStatus(status status.Status) Response {
 
 // WithHeader sets header values to a key. In case it already exists the value will
 // be appended
-func (r Response) WithHeader(key string, values ...string) Response {
-	if r.headers == nil {
-		r.headers = make(headers.Headers, initialRespHeadersSize)
+func (r Response) WithHeader(key string, headerValues ...string) Response {
+	if !r.headersSet {
+		// TODO: add object pool here
+		r.headers = headers.NewHeaders(make(map[string][]string, initialRespHeadersSize))
+		r.headersSet = true
 	}
 
-	hdrs, found := r.headers[key]
-	if !found {
-		r.headers[key] = strHeaders2Headers(values...)
-	} else {
-		r.headers[key] = append(hdrs, strHeaders2Headers(values...)...)
-	}
-
-	return r
-}
-
-// WithHeaderQ appends or creates a new response header value with a specified
-// quality-marker
-func (r Response) WithHeaderQ(key string, value string, q uint8) Response {
-	if r.headers == nil {
-		r.headers = make(headers.Headers, initialRespHeadersSize)
-		r.headers[key] = []headers.Header{
-			{
-				Value: value,
-				Q:     q,
-			},
-		}
-
-		return r
-	}
-
-	hdrs, found := r.headers[key]
-	if !found {
-		r.headers[key] = []headers.Header{
-			{
-				Value: value,
-				Q:     q,
-			},
-		}
-	} else {
-		r.headers[key] = append(hdrs, headers.Header{
-			Value: value,
-			Q:     q,
-		})
-	}
+	r.headers.Add(key, headerValues...)
 
 	return r
 }
@@ -117,17 +83,14 @@ func (r Response) WithHeaderQ(key string, value string, q uint8) Response {
 // way to specify a quality marker of value. In case headers were not initialized
 // before, response headers will be set to a passed map, so editing this map
 // will affect response
-func (r Response) WithHeaders(headers headers.Headers) Response {
-	if r.headers == nil {
-		r.headers = headers
-		return r
-	}
+func (r Response) WithHeaders(headers map[string][]string) Response {
+	resp := r
 
 	for k, v := range headers {
-		r.headers[k] = v
+		resp = resp.WithHeader(k, v...)
 	}
 
-	return r
+	return resp
 }
 
 // WithBody sets a string as a response body. This will override already-existing
@@ -206,18 +169,6 @@ func (r Response) File() (string, FileErrHandler) {
 	return r.Filename, r.handler
 }
 
-func strHeaders2Headers(strHeaders ...string) []headers.Header {
-	hdrs := make([]headers.Header, len(strHeaders))
-
-	for i := range strHeaders {
-		hdrs[i] = headers.Header{
-			Value: strHeaders[i],
-		}
-	}
-
-	return hdrs
-}
-
 // OK returns a 200 OK response
 func OK() Response {
 	return WithResponse
@@ -243,17 +194,11 @@ func WithHeader(key string, values ...string) Response {
 	return WithResponse.WithHeader(key, values...)
 }
 
-// WithHeaderQ appends or creates a new response header value with a specified
-// quality-marker
-func WithHeaderQ(key string, value string, q uint8) Response {
-	return WithResponse.WithHeaderQ(key, value, q)
-}
-
 // WithHeaders simply merges passed headers into response. Also, it is the only
 // way to specify a quality marker of value. In case headers were not initialized
 // before, response headers will be set to a passed map, so editing this map
 // will affect response
-func WithHeaders(headers headers.Headers) Response {
+func WithHeaders(headers map[string][]string) Response {
 	return WithResponse.WithHeaders(headers)
 }
 
