@@ -205,8 +205,12 @@ func isKeepAlive(request *types.Request) bool {
 }
 
 // mergeHeaders simply overrides a with values from b
-func mergeHeaders(a, b headers.Headers) headers.Headers {
-	into := make(headers.Headers, len(a)+len(b))
+func mergeHeaders(a, b map[string][]string) map[string][]string {
+	if len(b) == 0 {
+		return a
+	}
+
+	into := make(map[string][]string, len(a)+len(b))
 
 	for k, v := range a {
 		into[k] = v
