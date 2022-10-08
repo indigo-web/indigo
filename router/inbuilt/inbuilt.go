@@ -19,8 +19,8 @@ type (
 // 2) Middlewares
 // 3) Error handlers
 // 4) Encoding/decoding incoming content
-// 5) Routing by path and method. If path not found, 404 Not Found is returned.
-//    If path is found, but no method attached, 413 Method Not Allowed is returned.
+// 5) Routing by path and method. If path not found, 404 Not Found is returned. If path
+// is found, but no method attached, 413 Method Not Allowed is returned.
 type Router struct {
 	root   *Router
 	groups []Router
@@ -36,8 +36,7 @@ type Router struct {
 	traceBuff []byte
 }
 
-// NewRouter constructs a new instance of inbuilt router. Error handlers
-// by default are applied, renderer with a nil (as initial value) buffer constructed
+// NewRouter constructs a new instance of inbuilt router
 func NewRouter() *Router {
 	r := &Router{
 		routes:      make(routertypes.RoutesMap),

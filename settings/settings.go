@@ -12,88 +12,77 @@ type Setting[T number] struct {
 }
 
 type (
-	// HeadersNumber is responsible for headers map size.
-	// Default value is an initial size of allocated headers map
-	// Maximal value is maximum number of headers allowed to be presented
-	HeadersNumber Setting[uint8]
-
-	// HeadersKeyLength is responsible for header key length.
-	// Default value is an initial size of header key buffer allocated in parser
-	// Maximal value is a maximal length of header key
-	HeadersKeyLength Setting[uint8]
-
-	// HeadersValuesSpace is responsible for a maximal space in bytes available for
-	// keeping header values in memory.
-	// Default value is initial space allocated when client connects
-	// Maximal value is a hard limit, reaching which one client triggers server
-	//         to response with 431 Header Fields Too Large
+	HeadersNumber      Setting[uint8]
+	HeadersKeyLength   Setting[uint8]
 	HeadersValuesSpace Setting[uint32]
 
-	// URLLength is responsible for URL buffer.
-	// Default value is an initial size of URL buffer
-	// Maximal value is a maximal length of URL (protocol and method are
-	//         included, so real limit will be a bit less than specified one,
-	//         depends on method and protocol)
 	URLLength Setting[uint16]
 
 	// Query is responsible for url query settings.
 	Query struct {
+		// Length is responsible for a maximal length of url query may be
+		// received.
+		// Default value is unused
 		Length QueryLength
+		// Number is responsible for an initial capacity of query entries map.
+		// Maximal value is unused because:
+		//   Maximal number of entries equals to 65535 (math.MaxUint16) divided by
+		//   3 (minimal length of query entry) that equals to 21,845.
+		//   Worst case: sizeof(int) == 64 and sizeof(unsafe.Pointer) == 64. Then
+		//   slice type takes 16 bytes
+		//   In that case, we can calculate how much memory AT MOST will be used.
+		//   24 bytes (slice type - cap, len and pointer 8 bytes each) + 1 byte
+		//   (an array of a single char in best case) + 16 bytes (string type - len
+		//   and pointer) + 1 byte (an array of single char in best case)
+		//   42 bytes in total for each pair, 917490 bytes in total, that is 896 kilobytes
+		//   that is 0.87 megabytes. IMHO that is not that much to care about. In case it
+		//   is - somebody will open an issue, or even better, implement the limit by himself
+		//   (hope he is lucky enough to find out how to handle with my hand-made DI)
 		Number QueryNumber
 	}
 
-	// QueryLength is responsible for a maximal length of url query may be
-	// received.
-	// Default value is unused
 	QueryLength Setting[uint16]
-
-	// QueryNumber is responsible for an initial capacity of query entries map.
-	// Maximal value is unused because:
-	//   Maximal number of entries equals to 65535 (math.MaxUint16) divided by
-	//   3 (minimal length of query entry) that equals to 21,845.
-	//   Worst case: sizeof(int) == 64 and sizeof(unsafe.Pointer) == 64. Then
-	//   slice type takes 16 bytes
-	//   In that case, we can calculate how much memory AT MOST will be used.
-	//   24 bytes (slice type - cap, len and pointer 8 bytes each) + 1 byte
-	//   (an array of a single char in best case) + 16 bytes (string type - len
-	//   and pointer) + 1 byte (an array of single char in best case)
-	//   42 bytes in total for each pair, 917490 bytes in total, that is 896 kilobytes
-	//   that is 0.87 megabytes. IMHO that is not that much to care about. In case it
-	//   is - somebody will open an issue, or even better, implement the limit by himself
-	//   (hope he is lucky enough to find out how to handle with my hand-made DI)
 	QueryNumber Setting[uint16]
 
-	// TCPServerRead is responsible for tcp server reading buffer settings.
-	// Default value is a size of buffer for reading from socket, also
-	//         we can call this setting as a "how many bytes are read from
-	//         socket at most"
 	TCPServerRead Setting[uint16]
 
-	// BodyLength is responsible for body length parameters.
-	// Default value is unused
-	// Maximal value is a maximal length of body
-	BodyLength Setting[uint32]
-
-	// BodyChunkSize is responsible for chunks in chunked transfer encoding mode.
-	// Default value is unused because chunked body parser calls callback with
-	//         data taken from input stream
-	// Maximal value is a maximal length of chunk
+	BodyLength    Setting[uint32]
 	BodyChunkSize Setting[uint32]
 )
 
 type (
 	Headers struct {
-		Number     HeadersNumber
-		KeyLength  HeadersKeyLength
+		// Number is responsible for headers map size.
+		// Default value is an initial size of allocated headers map.
+		// Maximal value is maximum number of headers allowed to be presented
+		Number HeadersNumber
+		// KeyLength is responsible for header key length.
+		// Default value is an initial size of header key buffer allocated in parser.
+		// Maximal value is a maximal length of header key
+		KeyLength HeadersKeyLength
+		// HeadersValuesSpace is responsible for a maximal space in bytes available for
+		// keeping header values in memory.
+		// Default value is initial space allocated when client connects.
+		// Maximal value is a hard limit, reaching which one client triggers server
+		// to response with 431 Header Fields Too Large
 		ValueSpace HeadersValuesSpace
 	}
 
 	URL struct {
+		// Length is responsible for URL buffer.
+		// Default value is an initial size of URL buffer.
+		// Maximal value is a maximal length of URL (protocol and method are
+		// included, so real limit will be a bit less than specified one,
+		// depends on method and protocol)
 		Length URLLength
 		Query  Query
 	}
 
 	TCPServer struct {
+		// Read is responsible for tcp server reading buffer settings.
+		// Default value is a size of buffer for reading from socket, also
+		// we can call this setting as a "how many bytes are read from
+		// socket at most"
 		Read TCPServerRead
 		// IDLEConnLifetime is a timer in seconds, after expiration of which one IDLE
 		// connection will be actively closed by server.
@@ -103,7 +92,14 @@ type (
 	}
 
 	Body struct {
-		Length    BodyLength
+		// Length is responsible for body length parameters.
+		// Default value is unused.
+		// Maximal value is a maximal length of body
+		Length BodyLength
+		// BodyChunkSize is responsible for chunks in chunked transfer encoding mode.
+		// Default value is unused because chunked body parser calls callback with
+		// data taken from input stream.
+		// Maximal value is a maximal length of chunk
 		ChunkSize BodyChunkSize
 	}
 )
