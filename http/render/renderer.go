@@ -10,16 +10,12 @@ import (
 	methods "github.com/fakefloordiv/indigo/http/method"
 
 	"github.com/fakefloordiv/indigo/http"
-	"github.com/fakefloordiv/indigo/http/headers"
 	"github.com/fakefloordiv/indigo/http/proto"
 	"github.com/fakefloordiv/indigo/http/status"
 	"github.com/fakefloordiv/indigo/types"
 )
 
 var (
-	space         = []byte(" ")
-	crlf          = []byte("\r\n")
-	colonSpace    = []byte(": ")
 	contentLength = []byte("Content-Length: ")
 
 	errConnWrite = errors.New("error occurred while communicating with conn")
@@ -35,10 +31,10 @@ type Renderer struct {
 	buff      []byte
 	keepAlive bool
 
-	defaultHeaders headers.Headers
+	defaultHeaders map[string][]string
 }
 
-func NewRenderer(buff []byte, defaultHeaders headers.Headers) *Renderer {
+func NewRenderer(buff []byte, defaultHeaders map[string][]string) *Renderer {
 	return &Renderer{
 		buff:           buff,
 		defaultHeaders: defaultHeaders,
@@ -69,23 +65,22 @@ func (r *Renderer) Response(
 	case true:
 		// in case request Connection header is set to close, this response must be the last
 		// one, after which one connection will be closed. It's better to close it silently
-		connection, found := request.Headers["connection"]
-		if found && connection[0].Value == "close" {
+		if request.Headers.Value("connection") == "close" {
 			err = http.ErrCloseConnection
 		}
 	}
 
 	buff := r.buff[:0]
-	buff = append(append(buff, proto.ToBytes(request.Proto)...), space...)
-	buff = append(strconv.AppendInt(buff, int64(response.Code), 10), space...)
-	buff = append(append(buff, status.Text(response.Code)...), crlf...)
+	buff = append(append(buff, proto.ToBytes(request.Proto)...), http.SP...)
+	buff = append(strconv.AppendInt(buff, int64(response.Code), 10), http.SP...)
+	buff = append(append(buff, status.Text(response.Code)...), http.CRLF...)
 
 	customRespHeaders := response.Headers()
 	// TODO: this shit decreses performance from 75-77k rps to 68-70k
-	respHeaders := mergeHeaders(r.defaultHeaders, customRespHeaders)
+	respHeaders := mergeHeaders(r.defaultHeaders, customRespHeaders.AsMap())
 
 	for key, values := range respHeaders {
-		buff = append(renderHeader(key, values, buff), crlf...)
+		buff = append(renderHeader(key, values, buff), http.CRLF...)
 	}
 
 	if len(response.Filename) > 0 {
@@ -105,7 +100,7 @@ func (r *Renderer) Response(
 	}
 
 	buff = renderContentLength(int64(len(response.Body)), buff)
-	r.buff = append(buff, crlf...)
+	r.buff = append(buff, http.CRLF...)
 
 	// HEAD requests MUST NOT contain message body - the main difference
 	// between HEAD and GET requests
@@ -146,7 +141,7 @@ func (r *Renderer) renderFileInto(
 
 	r.buff = renderContentLength(stat.Size(), r.buff)
 
-	if err = writer(append(r.buff, crlf...)); err != nil {
+	if err = writer(append(r.buff, http.CRLF...)); err != nil {
 		return errConnWrite
 	}
 
@@ -178,27 +173,17 @@ func (r *Renderer) renderFileInto(
 func renderContentLength(value int64, buff []byte) []byte {
 	buff = append(buff, contentLength...)
 
-	return append(strconv.AppendInt(buff, value, 10), crlf...)
+	return append(strconv.AppendInt(buff, value, 10), http.CRLF...)
 }
 
-func renderHeader(key string, hdrs []headers.Header, into []byte) []byte {
-	into = append(append(into, key...), colonSpace...)
+func renderHeader(key string, hdrs []string, into []byte) []byte {
+	// TODO: instead of appending, try copying into. This should be cheaper
+	into = append(append(into, key...), http.COLONSP...)
+	into = append(into, hdrs[0]...)
 
-	for i := 0; i < len(hdrs)-1; i++ {
-		into = append(into, hdrs[i].Value...)
-
-		if hdrs[i].Q > 0 {
-			into = append(append(into, ";q=0."...), hdrs[i].QualityString()...)
-		}
-
-		into = append(into, ',')
-	}
-
-	lastHeader := hdrs[len(hdrs)-1]
-	into = append(into, lastHeader.Value...)
-
-	if lastHeader.Q > 0 {
-		into = append(append(into, ";q=0."...), lastHeader.QualityString()...)
+	for i := range hdrs[1:] {
+		into = append(into, http.COMMA...)
+		into = append(into, hdrs[i]...)
 	}
 
 	return into
@@ -210,9 +195,8 @@ func isKeepAlive(request *types.Request) bool {
 		return false
 	}
 
-	keepAlive, found := request.Headers["connection"]
-	if found {
-		return keepAlive[0].Value == "keep-alive"
+	if connection := request.Headers.Value("connection"); connection != "" {
+		return connection == "keep-alive"
 	}
 
 	// because HTTP/1.0 by default is not keep-alive. And if no Connection

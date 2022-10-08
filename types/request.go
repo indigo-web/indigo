@@ -34,8 +34,7 @@ type Request struct {
 	Proto    proto.Proto
 	Remote   net.Addr
 
-	Headers        headers.Headers
-	headersManager *headers.Manager
+	Headers headers.Headers
 
 	ContentLength uint
 
@@ -54,15 +53,14 @@ type Request struct {
 // because it has only optional purposes and buff will be nil anyway
 // But maybe it's better to implement DI all the way we go? I don't know, maybe
 // someone will contribute and fix this
-func NewRequest(manager *headers.Manager, query url.Query, remote net.Addr) (*Request, *body.Gateway) {
+func NewRequest(hdrs headers.Headers, query url.Query, remote net.Addr) (*Request, *body.Gateway) {
 	requestBodyStruct, gateway := newRequestBody()
 	request := &Request{
-		Query:          query,
-		Proto:          proto.HTTP11,
-		Headers:        manager.Headers,
-		Remote:         remote,
-		headersManager: manager,
-		body:           requestBodyStruct,
+		Query:   query,
+		Proto:   proto.HTTP11,
+		Headers: hdrs,
+		Remote:  remote,
+		body:    requestBodyStruct,
 	}
 
 	return request, gateway
@@ -102,8 +100,7 @@ func (r *Request) Reader() io.Reader {
 func (r *Request) Reset() error {
 	r.Fragment = ""
 	r.Query.Set(nil)
-	r.headersManager.Reset()
-	r.Headers = r.headersManager.Headers
+	r.Headers.Clear()
 
 	return r.body.Reset()
 }
