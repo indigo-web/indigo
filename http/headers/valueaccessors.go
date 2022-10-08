@@ -2,9 +2,7 @@ package headers
 
 import "strings"
 
-var (
-	qualitySubstr = ";q=0."
-)
+var qualitySubstr = ";q=0."
 
 // ValueOf returns a value until first semicolon is met. Even if the value after semicolon
 // is not a parameter, it will anyway be counted as a parameter

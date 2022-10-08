@@ -2,6 +2,7 @@ package http1
 
 import (
 	"bytes"
+
 	"github.com/fakefloordiv/indigo/http"
 	"github.com/fakefloordiv/indigo/http/encodings"
 	"github.com/fakefloordiv/indigo/http/headers"
@@ -14,9 +15,7 @@ import (
 	"github.com/fakefloordiv/indigo/types"
 )
 
-var (
-	contentLength = []byte("content-length")
-)
+var contentLength = []byte("content-length")
 
 // httpRequestsParser is a stream-based http requests parser. It modifies
 // request object by pointer in performance purposes. Decodes url-encoded
