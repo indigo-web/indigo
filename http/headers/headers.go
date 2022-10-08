@@ -25,19 +25,16 @@ func (h Headers) Value(key string) string {
 
 // ValueOr returns a header value
 func (h Headers) ValueOr(key, or string) string {
-	values, found := h.headers[key]
-	if !found {
-		return or
+	if values := h.headers[key]; values != nil {
+		return values[0]
 	}
 
-	return values[0]
+	return or
 }
 
 // Values returns a slice of values including parameters
 func (h Headers) Values(key string) []string {
-	values, _ := h.headers[key]
-
-	return values
+	return h.headers[key]
 }
 
 func (h Headers) AsMap() map[string][]string {
@@ -45,8 +42,7 @@ func (h Headers) AsMap() map[string][]string {
 }
 
 func (h Headers) Add(key string, newValues ...string) {
-	values, _ := h.headers[key]
-	h.headers[key] = append(values, newValues...)
+	h.headers[key] = append(h.headers[key], newValues...)
 }
 
 func (h Headers) Set(key string, values []string) {
