@@ -27,7 +27,7 @@ func MyHandler(_ context.Context, request *types.Request) types.Response {
 	for {
 		n, err := conn.Read(readBuff)
 		if n == 0 || err != nil {
-			conn.Close()
+			_ = conn.Close()
 
 			return types.OK()
 		}
