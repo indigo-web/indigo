@@ -1,7 +1,7 @@
 package http1
 
 import (
-	"bytes"
+	"fmt"
 	"github.com/fakefloordiv/indigo/alloc"
 	"github.com/fakefloordiv/indigo/http"
 	"github.com/fakefloordiv/indigo/http/encodings"
@@ -12,9 +12,8 @@ import (
 	"github.com/fakefloordiv/indigo/internal/body"
 	"github.com/fakefloordiv/indigo/settings"
 	"github.com/fakefloordiv/indigo/types"
+	"strconv"
 )
-
-var contentLength = []byte("content-length")
 
 // httpRequestsParser is a stream-based http requests parser. It modifies
 // request object by pointer in performance purposes. Decodes url-encoded
@@ -39,8 +38,9 @@ type httpRequestsParser struct {
 	urlEncodedChar         uint8
 	protoMajor, protoMinor uint8
 
-	headerKeyBuff        []byte
 	headersNumber        uint8
+	headerKey            string
+	headerKeyAllocator   alloc.Allocator
 	headerValueAllocator alloc.Allocator
 
 	body       *body.Gateway
@@ -50,8 +50,8 @@ type httpRequestsParser struct {
 }
 
 func NewHTTPRequestsParser(
-	request *types.Request, body *body.Gateway, allocator alloc.Allocator,
-	startLineBuff, headerBuff []byte, settings settings.Settings,
+	request *types.Request, body *body.Gateway, keyAllocator, valAllocator alloc.Allocator,
+	startLineBuff []byte, settings settings.Settings,
 	codings encodings.ContentEncodings,
 ) parser.HTTPRequestsParser {
 	return &httpRequestsParser{
@@ -61,8 +61,8 @@ func NewHTTPRequestsParser(
 		chunkedBodyParser:    newChunkedBodyParser(body, settings),
 		settings:             settings,
 		startLineBuff:        startLineBuff,
-		headerKeyBuff:        headerBuff,
-		headerValueAllocator: allocator,
+		headerKeyAllocator:   keyAllocator,
+		headerValueAllocator: valAllocator,
 		codings:              codings,
 
 		body: body,
@@ -113,6 +113,7 @@ func (p *httpRequestsParser) Parse(data []byte) (state parser.RequestState, extr
 				p.request.Method = methods.Parse(internal.B2S(p.startLineBuff))
 
 				if p.request.Method == methods.Unknown {
+					fmt.Println("method is not implemented,", strconv.Quote(string(p.startLineBuff)))
 					return parser.Error, nil, http.ErrMethodNotImplemented
 				}
 
@@ -355,8 +356,9 @@ func (p *httpRequestsParser) Parse(data []byte) (state parser.RequestState, extr
 			default:
 				// headers are here. I have to have a buffer for header key, and after receiving it,
 				// get an appender from headers manager (and keep it in httpRequestsParser struct)
+				hBegin = i
+				data[i] = data[i] | 0x20
 				p.state = eHeaderKey
-				p.headerKeyBuff = append(p.headerKeyBuff[:0], data[i]|0x20)
 			}
 		case eProtoCRLFCR:
 			switch data[i] {
@@ -377,7 +379,13 @@ func (p *httpRequestsParser) Parse(data []byte) (state parser.RequestState, extr
 
 				p.headersNumber++
 
-				if bytes.Equal(p.headerKeyBuff, contentLength) {
+				if !p.headerKeyAllocator.Append(data[hBegin:i]) {
+					return parser.Error, nil, http.ErrHeaderFieldsTooLarge
+				}
+
+				p.headerKey = internal.B2S(p.headerKeyAllocator.Finish())
+
+				if p.headerKey == "content-length" {
 					p.state = eContentLength
 					continue
 				}
@@ -386,11 +394,7 @@ func (p *httpRequestsParser) Parse(data []byte) (state parser.RequestState, extr
 			case '\r', '\n':
 				return parser.Error, nil, http.ErrBadRequest
 			default:
-				if uint8(len(p.headerKeyBuff)) >= p.settings.Headers.KeyLength.Maximal {
-					return parser.Error, nil, http.ErrHeaderFieldsTooLarge
-				}
-
-				p.headerKeyBuff = append(p.headerKeyBuff, data[i]|0x20)
+				data[i] = data[i] | 0x20
 			}
 		case eHeaderColon:
 			switch data[i] {
@@ -442,7 +446,8 @@ func (p *httpRequestsParser) Parse(data []byte) (state parser.RequestState, extr
 
 				return parser.HeadersCompleted, data[i+1:], nil
 			default:
-				p.headerKeyBuff = append(p.headerKeyBuff[:0], data[i]|0x20)
+				hBegin = i
+				data[i] = data[i] | 0x20
 				p.state = eHeaderKey
 			}
 		case eContentLengthCRLFCR:
@@ -489,9 +494,7 @@ func (p *httpRequestsParser) Parse(data []byte) (state parser.RequestState, extr
 				}
 
 				value := p.headerValueAllocator.Finish()
-				// TODO: instead of allocating a new string every time here, try another way for
-				//       caching
-				p.request.Headers.Add(string(p.headerKeyBuff), internal.B2S(value))
+				p.request.Headers.Add(p.headerKey, internal.B2S(value))
 			}
 		case eHeaderValueComma:
 			switch char := data[i]; char {
@@ -551,11 +554,10 @@ func (p *httpRequestsParser) Parse(data []byte) (state parser.RequestState, extr
 		case eHeaderValueCRLF:
 			// TODO: save whole header line, without any commas, here. Only after that
 			//       analyze how long our slice is supposed to be
-			key := string(p.headerKeyBuff)
 			value := p.headerValueAllocator.Finish()
-			p.request.Headers.Add(key, internal.B2S(value))
+			p.request.Headers.Add(p.headerKey, internal.B2S(value))
 
-			switch key {
+			switch p.headerKey {
 			case "connection":
 				p.closeConnection = string(value) == "close"
 			case "transfer-encoding":
@@ -568,8 +570,6 @@ func (p *httpRequestsParser) Parse(data []byte) (state parser.RequestState, extr
 			case "trailer":
 				p.trailer = true
 			}
-
-			p.headerKeyBuff = p.headerKeyBuff[:0]
 
 			switch data[i] {
 			case '\n':
@@ -585,7 +585,8 @@ func (p *httpRequestsParser) Parse(data []byte) (state parser.RequestState, extr
 			case '\r':
 				p.state = eHeaderValueCRLFCR
 			default:
-				p.headerKeyBuff = append(p.headerKeyBuff[:0], data[i]|0x20)
+				hBegin = i
+				data[i] = data[i] | 0x20
 				p.state = eHeaderKey
 			}
 		case eHeaderValueCRLFCR:
@@ -606,8 +607,13 @@ func (p *httpRequestsParser) Parse(data []byte) (state parser.RequestState, extr
 		}
 	}
 
-	if p.state == eHeaderValue {
+	switch p.state {
+	case eHeaderValue:
 		if !p.headerValueAllocator.Append(data[hBegin:]) {
+			return parser.Error, nil, http.ErrHeaderFieldsTooLarge
+		}
+	case eHeaderKey:
+		if !p.headerKeyAllocator.Append(data[hBegin:]) {
 			return parser.Error, nil, http.ErrHeaderFieldsTooLarge
 		}
 	}
@@ -672,6 +678,7 @@ func (p *httpRequestsParser) reset() {
 	p.headersNumber = 0
 	p.chunkedTransferEncoding = false
 	p.decodeBody = false
+	p.headerKeyAllocator.Clear()
 	p.headerValueAllocator.Clear()
 	p.trailer = false
 	p.state = eMethod
