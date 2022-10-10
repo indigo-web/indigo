@@ -1,6 +1,7 @@
 package http1
 
 import (
+	"github.com/fakefloordiv/indigo/alloc"
 	"testing"
 
 	"github.com/fakefloordiv/indigo/http/encodings"
@@ -48,7 +49,7 @@ var (
 
 func getParser() (httpparser.HTTPRequestsParser, *types.Request) {
 	s := settings2.Default()
-	allocator := headers.NewAllocator(s.Headers.ValueSpace.Default, s.Headers.ValueSpace.Maximal)
+	allocator := alloc.NewAllocator(int(s.Headers.ValueSpace.Default), int(s.Headers.ValueSpace.Maximal))
 	request, gateway := types.NewRequest(headers.NewHeaders(nil), url.Query{}, nil)
 	codings := encodings.NewContentEncodings()
 	startLineBuff := make([]byte, 0, s.URL.Length.Default)

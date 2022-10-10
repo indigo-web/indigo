@@ -2,10 +2,9 @@ package http1
 
 import (
 	"bytes"
-
+	"github.com/fakefloordiv/indigo/alloc"
 	"github.com/fakefloordiv/indigo/http"
 	"github.com/fakefloordiv/indigo/http/encodings"
-	"github.com/fakefloordiv/indigo/http/headers"
 	methods "github.com/fakefloordiv/indigo/http/method"
 	"github.com/fakefloordiv/indigo/http/parser"
 	"github.com/fakefloordiv/indigo/http/proto"
@@ -42,7 +41,7 @@ type httpRequestsParser struct {
 
 	headerKeyBuff        []byte
 	headersNumber        uint8
-	headerValueAllocator headers.Allocator
+	headerValueAllocator alloc.Allocator
 
 	body       *body.Gateway
 	codings    encodings.ContentEncodings
@@ -51,7 +50,7 @@ type httpRequestsParser struct {
 }
 
 func NewHTTPRequestsParser(
-	request *types.Request, body *body.Gateway, allocator headers.Allocator,
+	request *types.Request, body *body.Gateway, allocator alloc.Allocator,
 	startLineBuff, headerBuff []byte, settings settings.Settings,
 	codings encodings.ContentEncodings,
 ) parser.HTTPRequestsParser {

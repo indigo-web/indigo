@@ -2,6 +2,7 @@ package indigo
 
 import (
 	"errors"
+	"github.com/fakefloordiv/indigo/alloc"
 	"net"
 	"sync"
 
@@ -98,8 +99,8 @@ func (a Application) Serve(r router.Router, someSettings ...settings2.Settings) 
 	}
 
 	return server.StartTCPServer(sock, func(wg *sync.WaitGroup, conn net.Conn) {
-		allocator := headers.NewAllocator(
-			settings.Headers.ValueSpace.Default, settings.Headers.ValueSpace.Maximal,
+		allocator := alloc.NewAllocator(
+			int(settings.Headers.ValueSpace.Default), int(settings.Headers.ValueSpace.Maximal),
 		)
 		query := url.NewQuery(func() map[string][]byte {
 			return make(map[string][]byte, settings.URL.Query.Number.Default)

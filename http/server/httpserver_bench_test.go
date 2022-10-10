@@ -2,6 +2,7 @@ package server
 
 import (
 	"context"
+	"github.com/fakefloordiv/indigo/alloc"
 	"net"
 	"testing"
 	"time"
@@ -122,7 +123,7 @@ func BenchmarkIndigo(b *testing.B) {
 		return make(map[string][]byte)
 	})
 	request, writer := types.NewRequest(headers.NewHeaders(nil), query, nil)
-	allocator := headers.NewAllocator(s.Headers.ValueSpace.Default, s.Headers.ValueSpace.Maximal)
+	allocator := alloc.NewAllocator(int(s.Headers.ValueSpace.Default), int(s.Headers.ValueSpace.Maximal))
 	startLineBuff := make([]byte, 0, s.URL.Length.Maximal)
 	headerBuff := make([]byte, 0, s.Headers.KeyLength.Maximal)
 	codings := encodings.NewContentEncodings()
