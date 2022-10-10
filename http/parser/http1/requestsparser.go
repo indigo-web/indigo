@@ -2,6 +2,8 @@ package http1
 
 import (
 	"fmt"
+	"strconv"
+
 	"github.com/fakefloordiv/indigo/alloc"
 	"github.com/fakefloordiv/indigo/http"
 	"github.com/fakefloordiv/indigo/http/encodings"
@@ -12,7 +14,6 @@ import (
 	"github.com/fakefloordiv/indigo/internal/body"
 	"github.com/fakefloordiv/indigo/settings"
 	"github.com/fakefloordiv/indigo/types"
-	"strconv"
 )
 
 // httpRequestsParser is a stream-based http requests parser. It modifies
