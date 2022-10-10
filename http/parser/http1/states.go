@@ -26,21 +26,10 @@ const (
 	eHeaderKey
 	eHeaderColon
 	eContentLength
+	eContentLengthCR
+	eContentLengthCRLF
+	eContentLengthCRLFCR
 	eHeaderValue
-	eHeaderValueSemicolon
-	eHeaderValueSemicolonQ
-	eHeaderQualityMajor
-	eHeaderQualityDot
-	eHeaderQualityMinor
-	eHeaderQualitySplitter
-	eHeaderValueSemicolonC
-	eHeaderValueSemicolonCh
-	eHeaderValueSemicolonCha
-	eHeaderValueSemicolonChar
-	eHeaderValueSemicolonChars
-	eHeaderValueSemicolonCharse
-	eHeaderValueSemicolonCharset
-	eValueCharset
 	eHeaderValueComma
 	eHeaderValueBackslash
 	eHeaderValueQuoted

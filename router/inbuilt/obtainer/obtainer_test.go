@@ -10,7 +10,6 @@ import (
 	methods "github.com/fakefloordiv/indigo/http/method"
 	"github.com/fakefloordiv/indigo/http/url"
 	routertypes "github.com/fakefloordiv/indigo/router/inbuilt/types"
-	settings2 "github.com/fakefloordiv/indigo/settings"
 	"github.com/fakefloordiv/indigo/types"
 	"github.com/stretchr/testify/require"
 )
@@ -20,9 +19,8 @@ func nopHandler(context.Context, *types.Request) types.Response {
 }
 
 func newRequest(path string, method methods.Method) *types.Request {
-	manager := headers.NewManager(settings2.Default().Headers)
 	request, _ := types.NewRequest(
-		&manager, url.Query{}, nil,
+		headers.NewHeaders(make(map[string][]string)), url.Query{}, nil,
 	)
 	request.Path = path
 	request.Method = method

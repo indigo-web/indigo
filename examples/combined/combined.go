@@ -25,7 +25,7 @@ func Index(_ context.Context, _ *types.Request) types.Response {
 }
 
 func IndexSay(_ context.Context, request *types.Request) types.Response {
-	if talking, found := request.Headers["talking"]; !found || talking[0].Value != "allowed" {
+	if talking := request.Headers.Value("talking"); talking != "allowed" {
 		return types.WithCode(status.UnavailableForLegalReasons)
 	}
 
@@ -46,7 +46,7 @@ func World(_ context.Context, _ *types.Request) types.Response {
 }
 
 func Easter(_ context.Context, request *types.Request) types.Response {
-	if _, found := request.Headers["easter"]; found {
+	if easter := request.Headers.Value("easter"); len(easter) > 0 {
 		return types.
 			WithCode(status.Teapot).
 			WithHeader("Easter", "Egg").

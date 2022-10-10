@@ -118,20 +118,19 @@ func BenchmarkIndigo(b *testing.B) {
 	router.OnStart()
 
 	s := settings.Default()
-	manager := headers.NewManager(s.Headers)
 	query := url.NewQuery(func() map[string][]byte {
 		return make(map[string][]byte)
 	})
-	request, writer := types.NewRequest(&manager, query, nil)
+	request, writer := types.NewRequest(headers.NewHeaders(nil), query, nil)
+	allocator := headers.NewAllocator(s.Headers.ValueSpace.Default, s.Headers.ValueSpace.Maximal)
 	startLineBuff := make([]byte, 0, s.URL.Length.Maximal)
 	headerBuff := make([]byte, 0, s.Headers.KeyLength.Maximal)
 	codings := encodings.NewContentEncodings()
-	parser := http1.NewHTTPRequestsParser(request, writer, startLineBuff, headerBuff, s, &manager, codings)
+	parser := http1.NewHTTPRequestsParser(request, writer, allocator, startLineBuff, headerBuff, s, codings)
 
 	// because only tcp server reads from conn. We do not benchmark tcp server here
 	conn := newConn(nil)
-	defaultHeaders := make(headers.Headers, 10)
-	render := render2.NewRenderer(make([]byte, 0, 1024), defaultHeaders)
+	render := render2.NewRenderer(make([]byte, 0, 1024), make(map[string][]string))
 
 	server := NewHTTPServer(request, router, parser, conn, render)
 	go server.Run()
@@ -154,7 +153,7 @@ func BenchmarkIndigo(b *testing.B) {
 		}
 	})
 
-	b.Run("SimpleGETWithHeader", func(b *testing.B) {
+	b.Run("WithRespHeader", func(b *testing.B) {
 		for i := 0; i < b.N; i++ {
 			_ = server.OnData(simpleGETWithHeader)
 		}

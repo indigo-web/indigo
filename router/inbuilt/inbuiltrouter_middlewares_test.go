@@ -13,7 +13,6 @@ import (
 	"github.com/fakefloordiv/indigo/http/headers"
 	methods "github.com/fakefloordiv/indigo/http/method"
 	"github.com/fakefloordiv/indigo/http/url"
-	"github.com/fakefloordiv/indigo/settings"
 	"github.com/fakefloordiv/indigo/types"
 
 	"github.com/stretchr/testify/require"
@@ -110,10 +109,9 @@ func getPointApplied2Middleware(stack *callstack) routertypes.Middleware {
 }
 
 func getRequest() (*types.Request, *body.Gateway) {
-	manager := headers.NewManager(settings.Default().Headers)
 	query := url.NewQuery(nil)
 
-	return types.NewRequest(&manager, query, nil)
+	return types.NewRequest(headers.NewHeaders(nil), query, nil)
 }
 
 func TestMiddlewares(t *testing.T) {

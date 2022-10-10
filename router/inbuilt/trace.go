@@ -2,11 +2,8 @@ package inbuilt
 
 import (
 	"github.com/fakefloordiv/indigo/http"
-	"github.com/fakefloordiv/indigo/http/headers"
 	methods "github.com/fakefloordiv/indigo/http/method"
-	"github.com/fakefloordiv/indigo/http/parser/http1"
 	"github.com/fakefloordiv/indigo/http/proto"
-	"github.com/fakefloordiv/indigo/internal"
 	"github.com/fakefloordiv/indigo/types"
 )
 
@@ -51,35 +48,18 @@ func requestURI(request *types.Request, buff []byte) []byte {
 }
 
 func requestHeaders(request *types.Request, buff []byte) []byte {
-	for k, v := range request.Headers {
-		buff = append(buff, k...)
-		buff = append(append(buff, http.COLON...), http.SP...)
-		buff = renderHeaderValues(v, buff)
-		buff = append(buff, http.CRLF...)
+	for k, v := range request.Headers.AsMap() {
+		buff = append(append(buff, k...), http.COLONSP...)
+		buff = joinValuesInto(buff, v)
 	}
 
 	return buff
 }
 
-func renderHeaderValues(values []headers.Header, buff []byte) []byte {
+func joinValuesInto(buff []byte, values []string) []byte {
 	for i := range values[:len(values)-1] {
-		buff = renderHeaderValue(values[i], buff)
-		buff = append(buff, http.COMMA...)
+		buff = append(append(buff, values[i]...), http.COMMA...)
 	}
 
-	return renderHeaderValue(values[len(values)-1], buff)
-}
-
-func renderHeaderValue(value headers.Header, buff []byte) []byte {
-	buff = append(buff, value.Value...)
-
-	if value.Q != 10 {
-		buff = append(append(buff, ";q=0."...), value.QualityString()...)
-	}
-
-	if value.Charset != internal.B2S(http1.DefaultCharset) {
-		buff = append(append(buff, ";charset="...), value.Charset...)
-	}
-
-	return buff
+	return append(append(buff, values[len(values)-1]...), http.CRLF...)
 }

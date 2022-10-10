@@ -5,7 +5,6 @@ import (
 
 	"github.com/fakefloordiv/indigo/http/headers"
 	"github.com/fakefloordiv/indigo/http/url"
-	"github.com/fakefloordiv/indigo/settings"
 	"github.com/fakefloordiv/indigo/types"
 )
 
@@ -15,55 +14,32 @@ func nopWriter(_ []byte) error {
 
 func BenchmarkRenderer_Response(b *testing.B) {
 	buff := make([]byte, 0, 1024)
-	defaultHeadersSmall := headers.Headers{
-		"Server": []headers.Header{
-			{Value: "indigo"},
-		},
+	defaultHeadersSmall := map[string][]string{
+		"Server": {"indigo"},
 	}
-	defaultHeadersMedium := headers.Headers{
-		"Server": []headers.Header{
-			{Value: "indigo"},
-		},
-		"Connection": []headers.Header{
-			{Value: "keep-alive"},
-		},
-		"Accept-Encodings": []headers.Header{
-			{Value: "identity"},
-		},
+	defaultHeadersMedium := map[string][]string{
+		"Server":           {"indigo"},
+		"Connection":       {"keep-alive"},
+		"Accept-Encodings": {"identity"},
 	}
-	defaultHeadersBig := headers.Headers{
-		"Server": []headers.Header{
-			{Value: "indigo"},
+	defaultHeadersBig := map[string][]string{
+		"Server":           {"indigo"},
+		"Connection":       {"keep-alive"},
+		"Accept-Encodings": {"identity"},
+		"Easter":           {"Egg"},
+		"Multiple": {
+			"choices",
+			"variants",
+			"ways",
+			"solutions",
 		},
-		"Connection": []headers.Header{
-			{Value: "keep-alive"},
-		},
-		"Accept-Encodings": []headers.Header{
-			{Value: "identity"},
-		},
-		"Easter": []headers.Header{
-			{Value: "Egg"},
-		},
-		"Multiple": []headers.Header{
-			{Value: "choices"},
-			{Value: "variants"},
-			{Value: "ways"},
-			{Value: "solutions"},
-		},
-		"Something": []headers.Header{
-			{Value: "is not happening"},
-		},
-		"Talking": []headers.Header{
-			{Value: "allowed"},
-		},
-		"Lorem": []headers.Header{
-			{Value: "ipsum"},
-			{Value: "doremi"},
-		},
+		"Something": {"is not happening"},
+		"Talking":   {"allowed"},
+		"Lorem":     {"ipsum", "doremi"},
 	}
 
-	manager := headers.NewManager(settings.Default().Headers)
-	defaultRequest, _ := types.NewRequest(&manager, url.NewQuery(nil), nil)
+	hdrs := headers.NewHeaders(make(map[string][]string))
+	defaultRequest, _ := types.NewRequest(hdrs, url.NewQuery(nil), nil)
 
 	b.Run("DefaultResponse_NoDefHeaders", func(b *testing.B) {
 		renderer := NewRenderer(buff, nil)
