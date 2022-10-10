@@ -57,7 +57,6 @@ type (
 		// Maximal value is maximum number of headers allowed to be presented
 		Number HeadersNumber
 		// KeyLength is responsible for header key length.
-		// Default value is an initial size of header key buffer allocated in parser.
 		// Maximal value is a maximal length of header key
 		KeyLength HeadersKeyLength
 		// HeadersValuesSpace is responsible for a maximal space in bytes available for
@@ -118,12 +117,11 @@ func Default() Settings {
 	return Settings{
 		Headers: Headers{
 			Number: HeadersNumber{
-				Default: 25,
+				Default: 10,
 				Maximal: 100,
 			},
 			KeyLength: HeadersKeyLength{
-				Default: 100,
-				Maximal: math.MaxUint8,
+				Maximal: 100,
 			},
 			ValueSpace: HeadersValuesSpace{
 				// for simple requests without many header values this will be enough, I hope
