@@ -1,4 +1,4 @@
-package headers
+package alloc
 
 // Allocator is simply a container with a big byte-slice inside. It is responsible
 // for keeping header values together instead of having a lot of smaller slices.
@@ -8,10 +8,10 @@ type Allocator struct {
 	memory     []byte
 	begin, pos int
 
-	maxSize uint32
+	maxSize int
 }
 
-func NewAllocator(initialSpace, maxSpace uint32) Allocator {
+func NewAllocator(initialSpace, maxSpace int) Allocator {
 	return Allocator{
 		memory:  make([]byte, initialSpace),
 		maxSize: maxSpace,
@@ -23,7 +23,7 @@ func NewAllocator(initialSpace, maxSpace uint32) Allocator {
 // to grow by its in-built algorithm
 func (a *Allocator) Append(chars []byte) (ok bool) {
 	if a.pos+len(chars) > len(a.memory) {
-		if uint32(len(a.memory)+len(chars)) >= a.maxSize {
+		if len(a.memory)+len(chars) >= a.maxSize {
 			return false
 		}
 

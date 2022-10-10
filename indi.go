@@ -5,6 +5,8 @@ import (
 	"net"
 	"sync"
 
+	"github.com/fakefloordiv/indigo/alloc"
+
 	"github.com/fakefloordiv/indigo/http/render"
 
 	"github.com/fakefloordiv/indigo/http/encodings"
@@ -98,8 +100,13 @@ func (a Application) Serve(r router.Router, someSettings ...settings2.Settings) 
 	}
 
 	return server.StartTCPServer(sock, func(wg *sync.WaitGroup, conn net.Conn) {
-		allocator := headers.NewAllocator(
-			settings.Headers.ValueSpace.Default, settings.Headers.ValueSpace.Maximal,
+		keyAllocator := alloc.NewAllocator(
+			int(settings.Headers.KeyLength.Maximal)*int(settings.Headers.Number.Default),
+			int(settings.Headers.KeyLength.Maximal)*int(settings.Headers.Number.Maximal),
+		)
+		valAllocator := alloc.NewAllocator(
+			int(settings.Headers.ValueSpace.Default),
+			int(settings.Headers.ValueSpace.Maximal),
 		)
 		query := url.NewQuery(func() map[string][]byte {
 			return make(map[string][]byte, settings.URL.Query.Number.Default)
@@ -108,10 +115,9 @@ func (a Application) Serve(r router.Router, someSettings ...settings2.Settings) 
 		request, gateway := types.NewRequest(hdrs, query, conn.RemoteAddr())
 
 		startLineBuff := make([]byte, 0, settings.URL.Length.Default)
-		headerBuff := make([]byte, 0, settings.Headers.KeyLength.Default)
 
 		httpParser := http1.NewHTTPRequestsParser(
-			request, gateway, allocator, startLineBuff, headerBuff, settings, a.codings,
+			request, gateway, keyAllocator, valAllocator, startLineBuff, settings, a.codings,
 		)
 
 		renderer := render.NewRenderer(nil, a.defaultHeaders)

@@ -6,6 +6,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/fakefloordiv/indigo/alloc"
+
 	"github.com/fakefloordiv/indigo/http/encodings"
 	"github.com/fakefloordiv/indigo/http/headers"
 	"github.com/fakefloordiv/indigo/http/parser/http1"
@@ -122,11 +124,16 @@ func BenchmarkIndigo(b *testing.B) {
 		return make(map[string][]byte)
 	})
 	request, writer := types.NewRequest(headers.NewHeaders(nil), query, nil)
-	allocator := headers.NewAllocator(s.Headers.ValueSpace.Default, s.Headers.ValueSpace.Maximal)
+	keyAllocator := alloc.NewAllocator(
+		int(s.Headers.KeyLength.Maximal)*int(s.Headers.Number.Default),
+		int(s.Headers.KeyLength.Maximal)*int(s.Headers.Number.Maximal),
+	)
+	valAllocator := alloc.NewAllocator(
+		int(s.Headers.ValueSpace.Default), int(s.Headers.ValueSpace.Maximal),
+	)
 	startLineBuff := make([]byte, 0, s.URL.Length.Maximal)
-	headerBuff := make([]byte, 0, s.Headers.KeyLength.Maximal)
 	codings := encodings.NewContentEncodings()
-	parser := http1.NewHTTPRequestsParser(request, writer, allocator, startLineBuff, headerBuff, s, codings)
+	parser := http1.NewHTTPRequestsParser(request, writer, keyAllocator, valAllocator, startLineBuff, s, codings)
 
 	// because only tcp server reads from conn. We do not benchmark tcp server here
 	conn := newConn(nil)
