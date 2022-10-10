@@ -49,14 +49,19 @@ var (
 
 func getParser() (httpparser.HTTPRequestsParser, *types.Request) {
 	s := settings2.Default()
-	allocator := alloc.NewAllocator(int(s.Headers.ValueSpace.Default), int(s.Headers.ValueSpace.Maximal))
+	keyAllocator := alloc.NewAllocator(
+		int(s.Headers.KeyLength.Maximal)*int(s.Headers.Number.Default),
+		int(s.Headers.KeyLength.Maximal)*int(s.Headers.Number.Maximal),
+	)
+	valAllocator := alloc.NewAllocator(
+		int(s.Headers.ValueSpace.Default), int(s.Headers.ValueSpace.Maximal),
+	)
 	request, gateway := types.NewRequest(headers.NewHeaders(nil), url.Query{}, nil)
 	codings := encodings.NewContentEncodings()
 	startLineBuff := make([]byte, 0, s.URL.Length.Default)
-	headerBuff := make([]byte, 0, s.Headers.KeyLength.Default)
 
 	return NewHTTPRequestsParser(
-		request, gateway, allocator, startLineBuff, headerBuff, s, codings,
+		request, gateway, keyAllocator, valAllocator, startLineBuff, s, codings,
 	), request
 }
 
