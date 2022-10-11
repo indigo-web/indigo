@@ -53,7 +53,7 @@ func StartTCPServer(sock net.Listener, handleConn connHandler, sd chan struct{})
 // client has disconnected, even if server is guilty
 //
 // In case timeout is -1 (disabled), ordinary tcp server will be started, removing
-// overhead from channels
+// overhead from timer
 func DefaultConnHandler(
 	wg *sync.WaitGroup, conn net.Conn, timeout int, handleData dataHandler, buff []byte,
 ) {
@@ -111,13 +111,7 @@ func timeoutConnHandler(conn net.Conn, handleData dataHandler, timeout int, buff
 
 			ch <- processed
 		case <-timer.C:
-			if err := handleData(nil); err != nil {
-				panic(
-					"BUG: http/server/tcpserver.go:timeoutConnHandler(): handleData(nil) " +
-						"returned non-nil error: " + err.Error(),
-				)
-			}
-
+			_ = handleData(nil)
 			_ = conn.Close()
 			<-ch
 			timer.Stop()
