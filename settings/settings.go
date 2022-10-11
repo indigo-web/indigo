@@ -101,13 +101,18 @@ type (
 		// Maximal value is a maximal length of chunk
 		ChunkSize BodyChunkSize
 	}
+
+	// ResponseBuff is responsible for a response buffer.
+	// Default value is a size of buffer allocated once a client connects.
+	ResponseBuff Setting[uint32]
 )
 
 type Settings struct {
-	Headers   Headers
-	URL       URL
-	TCPServer TCPServer
-	Body      Body
+	Headers      Headers
+	URL          URL
+	TCPServer    TCPServer
+	Body         Body
+	ResponseBuff ResponseBuff
 }
 
 func Default() Settings {
@@ -159,6 +164,9 @@ func Default() Settings {
 				Maximal: math.MaxUint32,
 			},
 		},
+		ResponseBuff: ResponseBuff{
+			Default: 1024,
+		},
 	}
 }
 
@@ -197,6 +205,8 @@ func Fill(original Settings) (modified Settings) {
 		original.Body.Length.Maximal, defaultSettings.Body.Length.Maximal)
 	original.Body.ChunkSize.Maximal = customOrDefault(
 		original.Body.ChunkSize.Maximal, defaultSettings.Body.ChunkSize.Maximal)
+	original.ResponseBuff.Default = customOrDefault(
+		original.ResponseBuff.Default, defaultSettings.ResponseBuff.Default)
 
 	return original
 }

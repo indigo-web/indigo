@@ -120,7 +120,8 @@ func (a Application) Serve(r router.Router, someSettings ...settings2.Settings) 
 			request, gateway, keyAllocator, valAllocator, startLineBuff, settings, a.codings,
 		)
 
-		renderer := render.NewRenderer(nil, a.defaultHeaders)
+		respBuff := make([]byte, 0, settings.ResponseBuff.Default)
+		renderer := render.NewRenderer(respBuff, a.defaultHeaders)
 
 		httpServer := server.NewHTTPServer(request, r, httpParser, conn, renderer)
 		go httpServer.Run()
