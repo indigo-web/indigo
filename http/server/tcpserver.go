@@ -90,13 +90,16 @@ func timeoutConnHandler(conn net.Conn, handleData dataHandler, timeout int, buff
 	go readFromConn(ch, conn, buff)
 
 	duration := time.Duration(timeout) * time.Second
+	timer := time.NewTimer(duration)
 
 	for {
-		timer := time.NewTimer(duration)
-
 		select {
 		case n := <-ch:
-			timer.Stop()
+			if !timer.Stop() {
+				<-timer.C
+			}
+
+			timer.Reset(duration)
 
 			if err := handleData(buff[:n]); err != nil || n == 0 {
 				if err != http.ErrHijackConn {
