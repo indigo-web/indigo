@@ -177,13 +177,12 @@ func renderContentLength(value int64, buff []byte) []byte {
 }
 
 func renderHeader(key string, hdrs []string, into []byte) []byte {
-	// TODO: instead of appending, try copying into. This should be cheaper
 	into = append(append(into, key...), http.COLONSP...)
 	into = append(into, hdrs[0]...)
 
 	for i := range hdrs[1:] {
 		into = append(into, http.COMMA...)
-		into = append(into, hdrs[i]...)
+		into = append(into, hdrs[i+1]...)
 	}
 
 	return into
