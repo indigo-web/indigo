@@ -3,11 +3,9 @@ package server
 import (
 	"net"
 
-	"github.com/fakefloordiv/indigo/http/render"
-
 	"github.com/fakefloordiv/indigo/http"
-
 	"github.com/fakefloordiv/indigo/http/parser"
+	"github.com/fakefloordiv/indigo/http/render"
 	"github.com/fakefloordiv/indigo/router"
 	"github.com/fakefloordiv/indigo/types"
 )
@@ -67,7 +65,7 @@ func (h *httpServer) Run() {
 // core must do. It parses a data provided by tcp server, and according
 // to the parser state returned, decides what to do
 func (h *httpServer) OnData(data []byte) (err error) {
-	if data == nil {
+	if len(data) == 0 {
 		h.err = http.ErrConnectionTimeout
 		h.notifier <- eError
 		<-h.notifier
@@ -148,7 +146,7 @@ func (h *httpServer) requestProcessor() {
 		case eHeadersCompleted:
 			// in case connection was hijacked, router does not know about it,
 			// so he tries to write a response as usual. But he fails, because
-			// connection is (must be) already closed. He returns an error, but
+			// connection is (supposed to be) already closed. He returns an error, but
 			// request processor... Also doesn't know about hijacking! That's why
 			// here we are checking a notifier chan whether it's nil (it may be nil
 			// ONLY here and ONLY because of hijacking)
