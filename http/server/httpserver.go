@@ -85,14 +85,6 @@ func (h *httpServer) OnData(data []byte) (err error) {
 		case parser.Pending:
 		case parser.HeadersCompleted:
 			h.notifier <- eHeadersCompleted
-		case parser.BodyCompleted:
-			switch <-h.notifier {
-			case eProcessed:
-			case eConnHijack:
-				return http.ErrHijackConn
-			default:
-				return http.ErrCloseConnection
-			}
 		case parser.RequestCompleted:
 			h.notifier <- eHeadersCompleted
 			// the reason why we have manually finalize body is that
@@ -101,7 +93,8 @@ func (h *httpServer) OnData(data []byte) (err error) {
 			// something to a blocking chan. This causes a deadlock, so
 			// we choose a bit hacky solution
 			h.parser.FinalizeBody()
-
+			fallthrough
+		case parser.BodyCompleted:
 			switch <-h.notifier {
 			case eProcessed:
 			case eConnHijack:
@@ -164,6 +157,7 @@ func (h *httpServer) requestProcessor() {
 
 				return
 			}
+
 			if err := h.request.Reset(); err != nil {
 				// we already sent a response that did not errored, so no way here
 				// to send one more response with error. Just ignore it
