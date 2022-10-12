@@ -27,6 +27,9 @@ jobs:
       - name: Run tests
         run: go test -coverprofile=cover.out ./...
 
+      - name: Run tests with -race option
+          run: go test -race ./...
+
       - name: Code coverage report
         run: |
           ./bin/deepsource report --analyzer test-coverage --key go --value-file ./cover.out
