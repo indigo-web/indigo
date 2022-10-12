@@ -9,6 +9,7 @@ on:
     branches:
       - master
       - dev
+      - workflow/ci
 
 jobs:
   setup:
@@ -26,6 +27,9 @@ jobs:
       
       - name: Run tests
         run: go test -coverprofile=cover.out ./...
+
+      - name: Run tests with -race option
+        run: go test -race ./...
 
       - name: Code coverage report
         run: |
