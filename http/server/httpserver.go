@@ -40,7 +40,7 @@ func NewHTTPServer(
 	req *types.Request, router router.Router, parser parser.HTTPRequestsParser,
 	conn net.Conn, renderer *render.Renderer,
 ) HTTPServer {
-	return &httpServer{
+	server := &httpServer{
 		request: req,
 		respWriter: func(b []byte) error {
 			_, err := conn.Write(b)
@@ -52,12 +52,15 @@ func NewHTTPServer(
 		renderer: renderer,
 		notifier: make(chan serverState),
 	}
+
+	req.Hijack = types.Hijacker(req, server.HijackConn)
+
+	return server
 }
 
 // Run first prepares request by setting up hijacker, then starts
 // requests processor in blocking mode
 func (h *httpServer) Run() {
-	h.request.Hijack = types.Hijacker(h.request, h.HijackConn)
 	h.requestProcessor()
 }
 
