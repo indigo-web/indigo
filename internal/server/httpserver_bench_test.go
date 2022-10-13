@@ -136,7 +136,7 @@ func BenchmarkIndigo(b *testing.B) {
 
 	// because only tcp server reads from conn. We do not benchmark tcp server here
 	conn := newConn(nil)
-	render := render2.NewRenderer(make([]byte, 0, 1024), make(map[string][]string))
+	render := render2.NewRenderer(make([]byte, 0, 1024), nil, make(map[string][]string))
 
 	server := NewHTTPServer(request, router, parser, conn, render)
 	go server.Run()

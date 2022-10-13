@@ -42,7 +42,7 @@ func BenchmarkRenderer_Response(b *testing.B) {
 
 	b.Run("DefaultResponse_NoDefHeaders", func(b *testing.B) {
 		buff := make([]byte, 0, 1024)
-		renderer := NewRenderer(buff, nil)
+		renderer := NewRenderer(buff, nil, nil)
 
 		b.ResetTimer()
 
@@ -53,7 +53,7 @@ func BenchmarkRenderer_Response(b *testing.B) {
 
 	b.Run("DefaultResponse_1DefaultHeader", func(b *testing.B) {
 		buff := make([]byte, 0, 1024)
-		renderer := NewRenderer(buff, defaultHeadersSmall)
+		renderer := NewRenderer(buff, nil, defaultHeadersSmall)
 
 		b.ResetTimer()
 
@@ -64,7 +64,7 @@ func BenchmarkRenderer_Response(b *testing.B) {
 
 	b.Run("DefaultResponse_3DefaultHeaders", func(b *testing.B) {
 		buff := make([]byte, 0, 1024)
-		renderer := NewRenderer(buff, defaultHeadersMedium)
+		renderer := NewRenderer(buff, nil, defaultHeadersMedium)
 
 		b.ResetTimer()
 
@@ -75,7 +75,7 @@ func BenchmarkRenderer_Response(b *testing.B) {
 
 	b.Run("DefaultResponse_8DefaultHeaders", func(b *testing.B) {
 		buff := make([]byte, 0, 1024)
-		renderer := NewRenderer(buff, defaultHeadersBig)
+		renderer := NewRenderer(buff, nil, defaultHeadersBig)
 
 		b.ResetTimer()
 
