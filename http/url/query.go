@@ -2,8 +2,7 @@ package url
 
 import (
 	"errors"
-
-	"github.com/fakefloordiv/indigo/http/url/queryparser"
+	"github.com/fakefloordiv/indigo/internal/queryparser"
 )
 
 var ErrNoSuchKey = errors.New("requested key is not presented")
