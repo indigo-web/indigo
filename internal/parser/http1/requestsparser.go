@@ -2,16 +2,16 @@ package http1
 
 import (
 	"fmt"
-	"github.com/fakefloordiv/indigo/internal/alloc"
 	"strconv"
 
 	"github.com/fakefloordiv/indigo/http"
 	"github.com/fakefloordiv/indigo/http/encodings"
 	methods "github.com/fakefloordiv/indigo/http/method"
-	"github.com/fakefloordiv/indigo/http/parser"
 	"github.com/fakefloordiv/indigo/http/proto"
 	"github.com/fakefloordiv/indigo/internal"
+	"github.com/fakefloordiv/indigo/internal/alloc"
 	"github.com/fakefloordiv/indigo/internal/body"
+	"github.com/fakefloordiv/indigo/internal/parser"
 	"github.com/fakefloordiv/indigo/settings"
 	"github.com/fakefloordiv/indigo/types"
 )

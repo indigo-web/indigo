@@ -1,17 +1,16 @@
 package http1
 
 import (
-	"github.com/fakefloordiv/indigo/internal/alloc"
 	"testing"
 
-	"github.com/fakefloordiv/indigo/http/encodings"
-
 	"github.com/fakefloordiv/indigo/http"
+	"github.com/fakefloordiv/indigo/http/encodings"
 	"github.com/fakefloordiv/indigo/http/headers"
 	methods "github.com/fakefloordiv/indigo/http/method"
-	httpparser "github.com/fakefloordiv/indigo/http/parser"
 	"github.com/fakefloordiv/indigo/http/proto"
 	"github.com/fakefloordiv/indigo/http/url"
+	"github.com/fakefloordiv/indigo/internal/alloc"
+	httpparser "github.com/fakefloordiv/indigo/internal/parser"
 	settings2 "github.com/fakefloordiv/indigo/settings"
 	"github.com/fakefloordiv/indigo/types"
 

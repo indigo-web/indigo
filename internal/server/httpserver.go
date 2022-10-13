@@ -5,7 +5,7 @@ import (
 	"net"
 
 	"github.com/fakefloordiv/indigo/http"
-	"github.com/fakefloordiv/indigo/http/parser"
+	"github.com/fakefloordiv/indigo/internal/parser"
 	"github.com/fakefloordiv/indigo/router"
 	"github.com/fakefloordiv/indigo/types"
 )
