@@ -13,7 +13,6 @@ func nopWriter(_ []byte) error {
 }
 
 func BenchmarkRenderer_Response(b *testing.B) {
-	buff := make([]byte, 0, 1024)
 	defaultHeadersSmall := map[string][]string{
 		"Server": {"indigo"},
 	}
@@ -42,7 +41,8 @@ func BenchmarkRenderer_Response(b *testing.B) {
 	defaultRequest, _ := types.NewRequest(hdrs, url.NewQuery(nil), nil)
 
 	b.Run("DefaultResponse_NoDefHeaders", func(b *testing.B) {
-		renderer := NewRenderer(buff, nil)
+		buff := make([]byte, 0, 1024)
+		renderer := NewRenderer(buff, nil, nil)
 
 		b.ResetTimer()
 
@@ -51,8 +51,9 @@ func BenchmarkRenderer_Response(b *testing.B) {
 		}
 	})
 
-	b.Run("DefaultResponse_SmallDefHeaders", func(b *testing.B) {
-		renderer := NewRenderer(buff, defaultHeadersSmall)
+	b.Run("DefaultResponse_1DefaultHeader", func(b *testing.B) {
+		buff := make([]byte, 0, 1024)
+		renderer := NewRenderer(buff, nil, defaultHeadersSmall)
 
 		b.ResetTimer()
 
@@ -61,8 +62,9 @@ func BenchmarkRenderer_Response(b *testing.B) {
 		}
 	})
 
-	b.Run("DefaultResponse_MediumDefHeaders", func(b *testing.B) {
-		renderer := NewRenderer(buff, defaultHeadersMedium)
+	b.Run("DefaultResponse_3DefaultHeaders", func(b *testing.B) {
+		buff := make([]byte, 0, 1024)
+		renderer := NewRenderer(buff, nil, defaultHeadersMedium)
 
 		b.ResetTimer()
 
@@ -71,8 +73,9 @@ func BenchmarkRenderer_Response(b *testing.B) {
 		}
 	})
 
-	b.Run("DefaultResponse_BigDefHeaders", func(b *testing.B) {
-		renderer := NewRenderer(buff, defaultHeadersBig)
+	b.Run("DefaultResponse_8DefaultHeaders", func(b *testing.B) {
+		buff := make([]byte, 0, 1024)
+		renderer := NewRenderer(buff, nil, defaultHeadersBig)
 
 		b.ResetTimer()
 

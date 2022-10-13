@@ -115,7 +115,7 @@ func (a Application) Serve(r router.Router, someSettings ...settings2.Settings) 
 		)
 
 		respBuff := make([]byte, 0, settings.ResponseBuff.Default)
-		renderer := render.NewRenderer(respBuff, a.defaultHeaders)
+		renderer := render.NewRenderer(respBuff, nil, a.defaultHeaders)
 
 		httpServer := server2.NewHTTPServer(request, r, httpParser, conn, renderer)
 		go httpServer.Run()
