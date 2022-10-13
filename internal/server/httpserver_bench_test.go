@@ -6,13 +6,12 @@ import (
 	"testing"
 	"time"
 
-	"github.com/fakefloordiv/indigo/alloc"
-
 	"github.com/fakefloordiv/indigo/http/encodings"
 	"github.com/fakefloordiv/indigo/http/headers"
-	"github.com/fakefloordiv/indigo/http/parser/http1"
-	render2 "github.com/fakefloordiv/indigo/http/render"
 	"github.com/fakefloordiv/indigo/http/url"
+	"github.com/fakefloordiv/indigo/internal/alloc"
+	"github.com/fakefloordiv/indigo/internal/parser/http1"
+	render2 "github.com/fakefloordiv/indigo/internal/render"
 	"github.com/fakefloordiv/indigo/router/inbuilt"
 	"github.com/fakefloordiv/indigo/settings"
 	"github.com/fakefloordiv/indigo/types"

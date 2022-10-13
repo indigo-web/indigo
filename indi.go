@@ -5,15 +5,14 @@ import (
 	"net"
 	"sync"
 
-	"github.com/fakefloordiv/indigo/alloc"
-
-	"github.com/fakefloordiv/indigo/http/render"
+	server2 "github.com/fakefloordiv/indigo/internal/server"
 
 	"github.com/fakefloordiv/indigo/http/encodings"
 	"github.com/fakefloordiv/indigo/http/headers"
-	"github.com/fakefloordiv/indigo/http/parser/http1"
-	"github.com/fakefloordiv/indigo/http/server"
 	"github.com/fakefloordiv/indigo/http/url"
+	"github.com/fakefloordiv/indigo/internal/alloc"
+	"github.com/fakefloordiv/indigo/internal/parser/http1"
+	"github.com/fakefloordiv/indigo/internal/render"
 	"github.com/fakefloordiv/indigo/router"
 	settings2 "github.com/fakefloordiv/indigo/settings"
 	"github.com/fakefloordiv/indigo/types"
@@ -26,10 +25,6 @@ const (
 	// specifying version at all
 	defaultServer = "indigo"
 
-	// Automatically specify connection as keep-alive. Maybe it is not
-	// a compulsory move from server, but still
-	defaultConnection = "keep-alive"
-
 	// actually, we don't know what content type of body user responds
 	// with, so due to rfc2068 7.2.1 it is supposed to be
 	// application/octet-stream, but we know that it is usually text/html,
@@ -39,7 +34,6 @@ const (
 
 var defaultHeaders = map[string][]string{
 	"Server":       {defaultServer},
-	"Connection":   {defaultConnection},
 	"Content-Type": {defaultContentType},
 	// nil here means that value will be set later, when server will be initializing
 	"Accept-Encodings": nil,
@@ -99,7 +93,7 @@ func (a Application) Serve(r router.Router, someSettings ...settings2.Settings) 
 		return err
 	}
 
-	return server.StartTCPServer(sock, func(wg *sync.WaitGroup, conn net.Conn) {
+	return server2.StartTCPServer(sock, func(wg *sync.WaitGroup, conn net.Conn) {
 		keyAllocator := alloc.NewAllocator(
 			int(settings.Headers.KeyLength.Maximal)*int(settings.Headers.Number.Default),
 			int(settings.Headers.KeyLength.Maximal)*int(settings.Headers.Number.Maximal),
@@ -123,11 +117,11 @@ func (a Application) Serve(r router.Router, someSettings ...settings2.Settings) 
 		respBuff := make([]byte, 0, settings.ResponseBuff.Default)
 		renderer := render.NewRenderer(respBuff, a.defaultHeaders)
 
-		httpServer := server.NewHTTPServer(request, r, httpParser, conn, renderer)
+		httpServer := server2.NewHTTPServer(request, r, httpParser, conn, renderer)
 		go httpServer.Run()
 
 		readBuff := make([]byte, settings.TCPServer.Read.Default)
-		server.DefaultConnHandler(
+		server2.DefaultConnHandler(
 			wg, conn, settings.TCPServer.IDLEConnLifetime, httpServer.OnData, readBuff,
 		)
 	}, a.shutdown)
