@@ -34,12 +34,14 @@ type Renderer struct {
 	keepAlive bool
 
 	defaultHeaders map[string][]string
+	fileBuff       []byte
 }
 
-func NewRenderer(buff []byte, defaultHeaders map[string][]string) *Renderer {
+func NewRenderer(buff, fileBuff []byte, defaultHeaders map[string][]string) *Renderer {
 	return &Renderer{
 		buff:           buff,
 		defaultHeaders: defaultHeaders,
+		fileBuff:       fileBuff,
 	}
 }
 
@@ -78,7 +80,6 @@ func (r *Renderer) Response(
 	buff = append(append(buff, status.Text(response.Code)...), httpchars.CRLF...)
 
 	customRespHeaders := response.Headers()
-	// TODO: this shit decreses performance from 75-77k rps to 68-70k
 	respHeaders := mergeHeaders(r.defaultHeaders, customRespHeaders.AsMap())
 
 	for key, values := range respHeaders {
@@ -153,11 +154,13 @@ func (r *Renderer) renderFileInto(
 		return nil
 	}
 
-	// write by blocks 64kb each
-	buff := make([]byte, math.MaxUint16)
+	if r.fileBuff == nil {
+		// write by blocks 64kb each
+		r.fileBuff = make([]byte, math.MaxUint16)
+	}
 
 	for {
-		n, err := file.Read(buff)
+		n, err := file.Read(r.fileBuff)
 		switch err {
 		case nil:
 		case io.EOF:
@@ -166,7 +169,7 @@ func (r *Renderer) renderFileInto(
 			return err
 		}
 
-		if err = writer(buff[:n]); err != nil {
+		if err = writer(r.fileBuff[:n]); err != nil {
 			return errConnWrite
 		}
 	}
@@ -205,21 +208,17 @@ func isKeepAlive(request *types.Request) bool {
 	return request.Proto == proto.HTTP11
 }
 
-// mergeHeaders simply overrides a with values from b
+// mergeHeaders merges a with b, overriding values from a
 func mergeHeaders(a, b map[string][]string) map[string][]string {
-	if len(b) == 0 {
+	if b == nil {
 		return a
 	}
 
-	into := make(map[string][]string, len(a)+len(b))
-
-	for k, v := range a {
-		into[k] = v
+	for key, val := range a {
+		if _, found := b[key]; !found {
+			b[key] = val
+		}
 	}
 
-	for k, v := range b {
-		into[k] = v
-	}
-
-	return into
+	return b
 }
