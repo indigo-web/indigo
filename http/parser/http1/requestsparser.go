@@ -76,9 +76,7 @@ func (p *httpRequestsParser) Parse(data []byte) (state parser.RequestState, extr
 
 		return parser.ConnectionClose, nil, nil
 	}
-
-	_ = *p.request
-
+	
 	if p.state == eBody {
 		var done bool
 		done, extra, err = p.parseBody(data)
