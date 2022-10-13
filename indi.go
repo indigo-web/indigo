@@ -2,12 +2,12 @@ package indigo
 
 import (
 	"errors"
+	server2 "github.com/fakefloordiv/indigo/internal/server"
 	"net"
 	"sync"
 
 	"github.com/fakefloordiv/indigo/http/encodings"
 	"github.com/fakefloordiv/indigo/http/headers"
-	"github.com/fakefloordiv/indigo/http/server"
 	"github.com/fakefloordiv/indigo/http/url"
 	"github.com/fakefloordiv/indigo/internal/alloc"
 	"github.com/fakefloordiv/indigo/internal/parser/http1"
@@ -97,7 +97,7 @@ func (a Application) Serve(r router.Router, someSettings ...settings2.Settings) 
 		return err
 	}
 
-	return server.StartTCPServer(sock, func(wg *sync.WaitGroup, conn net.Conn) {
+	return server2.StartTCPServer(sock, func(wg *sync.WaitGroup, conn net.Conn) {
 		keyAllocator := alloc.NewAllocator(
 			int(settings.Headers.KeyLength.Maximal)*int(settings.Headers.Number.Default),
 			int(settings.Headers.KeyLength.Maximal)*int(settings.Headers.Number.Maximal),
@@ -121,11 +121,11 @@ func (a Application) Serve(r router.Router, someSettings ...settings2.Settings) 
 		respBuff := make([]byte, 0, settings.ResponseBuff.Default)
 		renderer := render.NewRenderer(respBuff, a.defaultHeaders)
 
-		httpServer := server.NewHTTPServer(request, r, httpParser, conn, renderer)
+		httpServer := server2.NewHTTPServer(request, r, httpParser, conn, renderer)
 		go httpServer.Run()
 
 		readBuff := make([]byte, settings.TCPServer.Read.Default)
-		server.DefaultConnHandler(
+		server2.DefaultConnHandler(
 			wg, conn, settings.TCPServer.IDLEConnLifetime, httpServer.OnData, readBuff,
 		)
 	}, a.shutdown)
