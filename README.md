@@ -39,5 +39,7 @@ func main() {
 }
 ```
 
-More examples in `examples/` folder.
+More examples in [examples/](https://github.com/fakefloordiv/indigo/tree/master/examples) folder.
 
+
+Project workspace (TODO list included): trello.com/w/indigowebserver
