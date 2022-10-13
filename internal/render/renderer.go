@@ -2,6 +2,7 @@ package render
 
 import (
 	"errors"
+	"github.com/fakefloordiv/indigo/internal/httpchars"
 	"io"
 	"math"
 	"os"
@@ -71,16 +72,16 @@ func (r *Renderer) Response(
 	}
 
 	buff := r.buff[:0]
-	buff = append(append(buff, proto.ToBytes(request.Proto)...), http.SP...)
-	buff = append(strconv.AppendInt(buff, int64(response.Code), 10), http.SP...)
-	buff = append(append(buff, status.Text(response.Code)...), http.CRLF...)
+	buff = append(append(buff, proto.ToBytes(request.Proto)...), httpchars.SP...)
+	buff = append(strconv.AppendInt(buff, int64(response.Code), 10), httpchars.SP...)
+	buff = append(append(buff, status.Text(response.Code)...), httpchars.CRLF...)
 
 	customRespHeaders := response.Headers()
 	// TODO: this shit decreses performance from 75-77k rps to 68-70k
 	respHeaders := mergeHeaders(r.defaultHeaders, customRespHeaders.AsMap())
 
 	for key, values := range respHeaders {
-		buff = append(renderHeader(key, values, buff), http.CRLF...)
+		buff = append(renderHeader(key, values, buff), httpchars.CRLF...)
 	}
 
 	if len(response.Filename) > 0 {
@@ -100,7 +101,7 @@ func (r *Renderer) Response(
 	}
 
 	buff = renderContentLength(int64(len(response.Body)), buff)
-	r.buff = append(buff, http.CRLF...)
+	r.buff = append(buff, httpchars.CRLF...)
 
 	// HEAD requests MUST NOT contain message body - the main difference
 	// between HEAD and GET requests
@@ -141,7 +142,7 @@ func (r *Renderer) renderFileInto(
 
 	r.buff = renderContentLength(stat.Size(), r.buff)
 
-	if err = writer(append(r.buff, http.CRLF...)); err != nil {
+	if err = writer(append(r.buff, httpchars.CRLF...)); err != nil {
 		return errConnWrite
 	}
 
@@ -173,15 +174,15 @@ func (r *Renderer) renderFileInto(
 func renderContentLength(value int64, buff []byte) []byte {
 	buff = append(buff, contentLength...)
 
-	return append(strconv.AppendInt(buff, value, 10), http.CRLF...)
+	return append(strconv.AppendInt(buff, value, 10), httpchars.CRLF...)
 }
 
 func renderHeader(key string, hdrs []string, into []byte) []byte {
-	into = append(append(into, key...), http.COLONSP...)
+	into = append(append(into, key...), httpchars.COLONSP...)
 	into = append(into, hdrs[0]...)
 
 	for i := range hdrs[1:] {
-		into = append(into, http.COMMA...)
+		into = append(into, httpchars.COMMA...)
 		into = append(into, hdrs[i+1]...)
 	}
 

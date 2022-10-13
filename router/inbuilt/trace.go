@@ -1,9 +1,9 @@
 package inbuilt
 
 import (
-	"github.com/fakefloordiv/indigo/http"
 	methods "github.com/fakefloordiv/indigo/http/method"
 	"github.com/fakefloordiv/indigo/http/proto"
+	"github.com/fakefloordiv/indigo/internal/httpchars"
 	"github.com/fakefloordiv/indigo/types"
 )
 
@@ -20,15 +20,15 @@ func traceResponse(messageBody []byte) types.Response {
 
 func renderHTTPRequest(request *types.Request, buff []byte) []byte {
 	buff = append(buff, methods.ToString(request.Method)...)
-	buff = append(buff, http.SP...)
+	buff = append(buff, httpchars.SP...)
 	buff = requestURI(request, buff)
-	buff = append(buff, http.SP...)
+	buff = append(buff, httpchars.SP...)
 	buff = append(buff, proto.ToBytes(request.Proto)...)
-	buff = append(buff, http.CRLF...)
+	buff = append(buff, httpchars.CRLF...)
 	buff = requestHeaders(request, buff)
 	buff = append(buff, "content-length: 0\r\n"...)
 
-	return append(buff, http.CRLF...)
+	return append(buff, httpchars.CRLF...)
 }
 
 func requestURI(request *types.Request, buff []byte) []byte {
@@ -49,7 +49,7 @@ func requestURI(request *types.Request, buff []byte) []byte {
 
 func requestHeaders(request *types.Request, buff []byte) []byte {
 	for k, v := range request.Headers.AsMap() {
-		buff = append(append(buff, k...), http.COLONSP...)
+		buff = append(append(buff, k...), httpchars.COLONSP...)
 		buff = joinValuesInto(buff, v)
 	}
 
@@ -58,8 +58,8 @@ func requestHeaders(request *types.Request, buff []byte) []byte {
 
 func joinValuesInto(buff []byte, values []string) []byte {
 	for i := range values[:len(values)-1] {
-		buff = append(append(buff, values[i]...), http.COMMA...)
+		buff = append(append(buff, values[i]...), httpchars.COMMA...)
 	}
 
-	return append(append(buff, values[len(values)-1]...), http.CRLF...)
+	return append(append(buff, values[len(values)-1]...), httpchars.CRLF...)
 }

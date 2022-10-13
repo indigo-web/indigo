@@ -1,11 +1,11 @@
 package server
 
 import (
+	"github.com/fakefloordiv/indigo/internal/render"
 	"net"
 
 	"github.com/fakefloordiv/indigo/http"
 	"github.com/fakefloordiv/indigo/http/parser"
-	"github.com/fakefloordiv/indigo/http/render"
 	"github.com/fakefloordiv/indigo/router"
 	"github.com/fakefloordiv/indigo/types"
 )
