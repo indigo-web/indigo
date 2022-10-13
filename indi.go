@@ -24,10 +24,6 @@ const (
 	// specifying version at all
 	defaultServer = "indigo"
 
-	// Automatically specify connection as keep-alive. Maybe it is not
-	// a compulsory move from server, but still
-	defaultConnection = "keep-alive"
-
 	// actually, we don't know what content type of body user responds
 	// with, so due to rfc2068 7.2.1 it is supposed to be
 	// application/octet-stream, but we know that it is usually text/html,
@@ -37,7 +33,6 @@ const (
 
 var defaultHeaders = map[string][]string{
 	"Server":       {defaultServer},
-	"Connection":   {defaultConnection},
 	"Content-Type": {defaultContentType},
 	// nil here means that value will be set later, when server will be initializing
 	"Accept-Encodings": nil,
