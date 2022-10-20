@@ -130,7 +130,7 @@ func BenchmarkIndigo(b *testing.B) {
 	valAllocator := alloc.NewAllocator(
 		int(s.Headers.ValueSpace.Default), int(s.Headers.ValueSpace.Maximal),
 	)
-	startLineBuff := make([]byte, 0, s.URL.Length.Maximal)
+	startLineBuff := make([]byte, s.URL.Length.Maximal)
 	codings := encodings.NewContentEncodings()
 	parser := http1.NewHTTPRequestsParser(request, writer, keyAllocator, valAllocator, startLineBuff, s, codings)
 
