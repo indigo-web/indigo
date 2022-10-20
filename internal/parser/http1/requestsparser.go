@@ -1,9 +1,6 @@
 package http1
 
 import (
-	"fmt"
-	"strconv"
-
 	"github.com/fakefloordiv/indigo/http"
 	"github.com/fakefloordiv/indigo/http/encodings"
 	methods "github.com/fakefloordiv/indigo/http/method"
@@ -71,12 +68,6 @@ func NewHTTPRequestsParser(
 }
 
 func (p *httpRequestsParser) Parse(data []byte) (state parser.RequestState, extra []byte, err error) {
-	if len(data) == 0 {
-		p.body.WriteErr(http.ErrCloseConnection)
-
-		return parser.ConnectionClose, nil, nil
-	}
-
 	if p.state == eBody {
 		var done bool
 		done, extra, err = p.parseBody(data)
@@ -112,7 +103,6 @@ func (p *httpRequestsParser) Parse(data []byte) (state parser.RequestState, extr
 				p.request.Method = methods.Parse(internal.B2S(p.startLineBuff))
 
 				if p.request.Method == methods.Unknown {
-					fmt.Println("method is not implemented,", strconv.Quote(string(p.startLineBuff)))
 					return parser.Error, nil, http.ErrMethodNotImplemented
 				}
 
@@ -296,40 +286,34 @@ func (p *httpRequestsParser) Parse(data []byte) (state parser.RequestState, extr
 				return parser.Error, nil, http.ErrUnsupportedProtocol
 			}
 		case eProtoMajor:
-			if data[i] == '.' {
-				p.state = eProtoMinor
-				continue
-			}
-
 			if data[i]-'0' > 9 {
 				return parser.Error, nil, http.ErrUnsupportedProtocol
 			}
 
-			was := p.protoMajor
-			p.protoMajor = p.protoMajor*10 + data[i] - '0'
-
-			if p.protoMajor < was {
-				// overflow
+			p.protoMajor = data[i] - '0'
+			p.state = eProtoDot
+		case eProtoDot:
+			switch data[i] {
+			case '.':
+				p.state = eProtoMinor
+			default:
 				return parser.Error, nil, http.ErrUnsupportedProtocol
 			}
 		case eProtoMinor:
+			if data[i]-'0' > 9 {
+				return parser.Error, nil, http.ErrUnsupportedProtocol
+			}
+
+			p.protoMinor = data[i] - '0'
+			p.state = eProtoEnd
+		case eProtoEnd:
 			switch data[i] {
 			case '\r':
 				p.state = eProtoCR
 			case '\n':
 				p.state = eProtoCRLF
 			default:
-				if data[i]-'0' > 9 {
-					return parser.Error, nil, http.ErrUnsupportedProtocol
-				}
-
-				was := p.protoMinor
-				p.protoMinor = p.protoMinor*10 + data[i] - '0'
-
-				if p.protoMinor < was {
-					// overflow
-					return parser.Error, nil, http.ErrUnsupportedProtocol
-				}
+				return parser.Error, nil, http.ErrUnsupportedProtocol
 			}
 		case eProtoCR:
 			if data[i] != '\n' {
@@ -342,8 +326,6 @@ func (p *httpRequestsParser) Parse(data []byte) (state parser.RequestState, extr
 			if p.request.Proto == proto.Unknown {
 				return parser.Error, nil, http.ErrUnsupportedProtocol
 			}
-
-			p.protoMajor, p.protoMinor = 0, 0
 
 			switch data[i] {
 			case '\r':
