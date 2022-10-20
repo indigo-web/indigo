@@ -13,6 +13,8 @@ import (
 	"github.com/fakefloordiv/indigo/types"
 )
 
+const maxMethodLength = len("CONNECT")
+
 // httpRequestsParser is a stream-based http requests parser. It modifies
 // request object by pointer in performance purposes. Decodes url-encoded
 // values by its own, you can see that by presented states ePathDecode1Char,
@@ -32,7 +34,7 @@ type httpRequestsParser struct {
 	chunkedBodyParser       chunkedBodyParser
 
 	startLineBuff          []byte
-	offset                 int
+	begin, pointer         int
 	urlEncodedChar         uint8
 	protoMajor, protoMinor uint8
 
@@ -92,66 +94,67 @@ func (p *httpRequestsParser) Parse(data []byte) (state parser.RequestState, extr
 		case eMethod:
 			switch data[i] {
 			case '\r', '\n': // rfc2068, 4.1
-				if len(p.startLineBuff) > 0 {
+				if p.pointer > 0 {
 					return parser.Error, nil, http.ErrMethodNotImplemented
 				}
 			case ' ':
-				if len(p.startLineBuff) == 0 {
+				if p.pointer == 0 {
 					return parser.Error, nil, http.ErrBadRequest
 				}
 
-				p.request.Method = methods.Parse(internal.B2S(p.startLineBuff))
+				p.request.Method = methods.Parse(internal.B2S(p.startLineBuff[:p.pointer]))
 
 				if p.request.Method == methods.Unknown {
 					return parser.Error, nil, http.ErrMethodNotImplemented
 				}
 
-				p.offset = len(p.startLineBuff)
+				p.begin = p.pointer
 				p.state = ePath
 			default:
-				if len(p.startLineBuff) > len("CONNECT") { // the longest method, trust me
+				if p.pointer > maxMethodLength { // the longest method, trust me
 					return parser.Error, nil, http.ErrBadRequest
 				}
 
-				p.startLineBuff = append(p.startLineBuff, data[i])
+				p.startLineBuff[p.pointer] = data[i]
+				p.pointer++
 			}
 		case ePath:
 			switch data[i] {
 			case ' ':
-				if len(p.startLineBuff) == p.offset {
+				if p.begin == p.pointer {
 					return parser.Error, nil, http.ErrBadRequest
 				}
 
-				p.request.Path = internal.B2S(p.startLineBuff[p.offset:])
-				p.offset = len(p.startLineBuff)
+				p.request.Path = internal.B2S(p.startLineBuff[p.begin:p.pointer])
 				p.state = eProto
 			case '%':
 				p.state = ePathDecode1Char
 			case '?':
-				p.request.Path = internal.B2S(p.startLineBuff[p.offset:])
+				p.request.Path = internal.B2S(p.startLineBuff[p.begin:p.pointer])
 				if len(p.request.Path) == 0 {
 					p.request.Path = "/"
 				}
 
-				p.offset = len(p.startLineBuff)
+				p.begin = p.pointer
 				p.state = eQuery
 			case '#':
-				p.request.Path = internal.B2S(p.startLineBuff[p.offset:])
+				p.request.Path = internal.B2S(p.startLineBuff[p.begin:p.pointer])
 				if len(p.request.Path) == 0 {
 					p.request.Path = "/"
 				}
 
-				p.offset = len(p.startLineBuff)
+				p.begin = p.pointer
 				p.state = eFragment
 			case '\x00', '\n', '\r', '\t', '\b', '\a', '\v', '\f':
 				// request path MUST NOT include any non-printable characters
 				return parser.Error, nil, http.ErrBadRequest
 			default:
-				if uint16(len(p.startLineBuff)) >= p.settings.URL.Length.Maximal {
+				if p.pointer >= len(p.startLineBuff) {
 					return parser.Error, nil, http.ErrURITooLong
 				}
 
-				p.startLineBuff = append(p.startLineBuff, data[i])
+				p.startLineBuff[p.pointer] = data[i]
+				p.pointer++
 			}
 		case ePathDecode1Char:
 			if !isHex(data[i]) {
@@ -164,38 +167,39 @@ func (p *httpRequestsParser) Parse(data []byte) (state parser.RequestState, extr
 			if !isHex(data[i]) {
 				return parser.Error, nil, http.ErrURIDecoding
 			}
-			if uint16(len(p.startLineBuff)) >= p.settings.URL.Length.Maximal {
+			if p.pointer >= len(p.startLineBuff) {
 				return parser.Error, nil, http.ErrURITooLong
 			}
 
-			p.startLineBuff = append(p.startLineBuff, p.urlEncodedChar|unHex(data[i]))
-			p.urlEncodedChar = 0
+			p.startLineBuff[p.pointer] = p.urlEncodedChar | unHex(data[i])
+			p.pointer++
 			p.state = ePath
 		case eQuery:
 			switch data[i] {
 			case ' ':
-				p.request.Query.Set(p.startLineBuff[p.offset:])
-				p.offset = len(p.startLineBuff)
+				p.request.Query.Set(p.startLineBuff[p.begin:p.pointer])
 				p.state = eProto
 			case '#':
-				p.offset = len(p.startLineBuff)
+				p.begin = p.pointer
 				p.state = eFragment
 			case '%':
 				p.state = eQueryDecode1Char
 			case '+':
-				if uint16(len(p.startLineBuff)) >= p.settings.URL.Length.Maximal {
+				if p.pointer >= len(p.startLineBuff) {
 					return parser.Error, nil, http.ErrURITooLong
 				}
 
-				p.startLineBuff = append(p.startLineBuff, ' ')
+				p.startLineBuff[p.pointer] = ' '
+				p.pointer++
 			case '\x00', '\n', '\r', '\t', '\b', '\a', '\v', '\f':
 				return parser.Error, nil, http.ErrBadRequest
 			default:
-				if uint16(len(p.startLineBuff)) >= p.settings.URL.Length.Maximal {
+				if p.pointer >= len(p.startLineBuff) {
 					return parser.Error, nil, http.ErrURITooLong
 				}
 
-				p.startLineBuff = append(p.startLineBuff, data[i])
+				p.startLineBuff[p.pointer] = data[i]
+				p.pointer++
 			}
 		case eQueryDecode1Char:
 			if !isHex(data[i]) {
@@ -208,29 +212,29 @@ func (p *httpRequestsParser) Parse(data []byte) (state parser.RequestState, extr
 			if !isHex(data[i]) {
 				return parser.Error, nil, http.ErrURIDecoding
 			}
-			if uint16(len(p.startLineBuff)) >= p.settings.URL.Length.Maximal {
+			if p.pointer >= len(p.startLineBuff) {
 				return parser.Error, nil, http.ErrURITooLong
 			}
 
-			p.startLineBuff = append(p.startLineBuff, p.urlEncodedChar|unHex(data[i]))
-			p.urlEncodedChar = 0
+			p.startLineBuff[p.pointer] = p.urlEncodedChar | unHex(data[i])
+			p.pointer++
 			p.state = eQuery
 		case eFragment:
 			switch data[i] {
 			case ' ':
-				p.request.Fragment = internal.B2S(p.startLineBuff[p.offset:])
-				p.offset = len(p.startLineBuff)
+				p.request.Fragment = internal.B2S(p.startLineBuff[p.begin:p.pointer])
 				p.state = eProto
 			case '%':
 				p.state = eFragmentDecode1Char
 			case '\x00', '\n', '\r', '\t', '\b', '\a', '\v', '\f':
 				return parser.Error, nil, http.ErrBadRequest
 			default:
-				if uint16(len(p.startLineBuff)) >= p.settings.URL.Length.Maximal {
+				if p.pointer >= len(p.startLineBuff) {
 					return parser.Error, nil, http.ErrURITooLong
 				}
 
-				p.startLineBuff = append(p.startLineBuff, data[i])
+				p.startLineBuff[p.pointer] = data[i]
+				p.pointer++
 			}
 		case eFragmentDecode1Char:
 			if !isHex(data[i]) {
@@ -243,14 +247,17 @@ func (p *httpRequestsParser) Parse(data []byte) (state parser.RequestState, extr
 			if !isHex(data[i]) {
 				return parser.Error, nil, http.ErrURIDecoding
 			}
-			if uint16(len(p.startLineBuff)) >= p.settings.URL.Length.Maximal {
+			if p.pointer >= len(p.startLineBuff) {
 				return parser.Error, nil, http.ErrURITooLong
 			}
 
-			p.startLineBuff = append(p.startLineBuff, p.urlEncodedChar|unHex(data[i]))
-			p.urlEncodedChar = 0
+			p.startLineBuff[p.pointer] = p.urlEncodedChar | unHex(data[i])
+			p.pointer++
 			p.state = eFragment
 		case eProto:
+			p.begin = 0
+			p.pointer = 0
+
 			switch data[i] {
 			case '\r', '\n':
 				return parser.Error, nil, http.ErrBadRequest
@@ -652,10 +659,8 @@ func (p *httpRequestsParser) FinalizeBody() {
 }
 
 func (p *httpRequestsParser) reset() {
-	p.startLineBuff = p.startLineBuff[:0]
 	p.protoMajor = 0
 	p.protoMinor = 0
-	p.offset = 0
 	p.headersNumber = 0
 	p.chunkedTransferEncoding = false
 	p.decodeBody = false
