@@ -68,11 +68,9 @@ type (
 	}
 
 	URL struct {
-		// Length is responsible for URL buffer.
-		// Default value is an initial size of URL buffer.
-		// Maximal value is a maximal length of URL (protocol and method are
-		// included, so real limit will be a bit less than specified one,
-		// depends on method and protocol)
+		// Length is responsible for info line buffer.
+		// Maximal is a size for buffer that'll be allocated once and will be kept
+		// until client disconnect
 		Length URLLength
 		Query  Query
 	}
@@ -137,7 +135,6 @@ func Default() Settings {
 		},
 		URL: URL{
 			Length: URLLength{
-				Default: 8192,
 				Maximal: math.MaxUint16,
 			},
 			Query: Query{
@@ -187,8 +184,6 @@ func Fill(original Settings) (modified Settings) {
 		original.Headers.ValueSpace.Default, defaultSettings.Headers.ValueSpace.Default)
 	original.Headers.ValueSpace.Maximal = customOrDefault(
 		original.Headers.ValueSpace.Maximal, defaultSettings.Headers.ValueSpace.Maximal)
-	original.URL.Length.Default = customOrDefault(
-		original.URL.Length.Default, defaultSettings.URL.Length.Default)
 	original.URL.Length.Maximal = customOrDefault(
 		original.URL.Length.Maximal, defaultSettings.URL.Length.Maximal)
 	original.URL.Query.Length.Maximal = customOrDefault(

@@ -108,7 +108,7 @@ func (a Application) Serve(r router.Router, someSettings ...settings2.Settings) 
 		hdrs := headers.NewHeaders(make(map[string][]string, settings.Headers.Number.Default))
 		request, gateway := types.NewRequest(hdrs, query, conn.RemoteAddr())
 
-		startLineBuff := make([]byte, 0, settings.URL.Length.Default)
+		startLineBuff := make([]byte, settings.URL.Length.Maximal)
 
 		httpParser := http1.NewHTTPRequestsParser(
 			request, gateway, keyAllocator, valAllocator, startLineBuff, settings, a.codings,
