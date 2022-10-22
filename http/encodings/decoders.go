@@ -23,8 +23,8 @@ type Decoders struct {
 	decoders map[string]Decoder
 }
 
-// NewContentEncodings returns new instance of Decoders
-func NewContentEncodings() Decoders {
+// NewContentDecoders returns new instance of Decoders
+func NewContentDecoders() Decoders {
 	return Decoders{
 		decoders: make(map[string]Decoder),
 	}

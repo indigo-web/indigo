@@ -56,7 +56,7 @@ func getParser() (httpparser.HTTPRequestsParser, *types.Request) {
 		int(s.Headers.ValueSpace.Default), int(s.Headers.ValueSpace.Maximal),
 	)
 	request, gateway := types.NewRequest(headers.NewHeaders(nil), url.Query{}, nil)
-	codings := encodings.NewContentEncodings()
+	codings := encodings.NewContentDecoders()
 	startLineBuff := make([]byte, s.URL.Length.Maximal)
 
 	return NewHTTPRequestsParser(
