@@ -542,19 +542,22 @@ func (p *httpRequestsParser) Parse(data []byte) (state parser.RequestState, extr
 		case eHeaderValueCRLF:
 			// TODO: save whole header line, without any commas, here. Only after that
 			//       analyze how long our slice is supposed to be
-			value := p.headerValueAllocator.Finish()
-			p.request.Headers.Add(p.headerKey, internal.B2S(value))
+			value := internal.B2S(p.headerValueAllocator.Finish())
+			p.request.Headers.Add(p.headerKey, value)
 
 			switch p.headerKey {
 			case "connection":
-				p.closeConnection = string(value) == "close"
+				p.closeConnection = value == "close"
 			case "transfer-encoding":
-				p.chunkedTransferEncoding = string(value) == "chunked"
+				p.chunkedTransferEncoding = headers.ValueOf(value) == "chunked"
 			case "content-encoding":
-				p.decoder, p.decodeBody = p.codings.GetDecoder(internal.B2S(value))
-				if !p.decodeBody {
+				decoder, found := p.decoders.Get(value)
+				if !found {
 					return parser.Error, nil, http.ErrUnsupportedEncoding
 				}
+
+				p.decodeBody = true
+				p.decoder = decoder.New()
 			case "trailer":
 				p.trailer = true
 			}
