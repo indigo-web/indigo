@@ -3,6 +3,7 @@ package http1
 import (
 	"github.com/fakefloordiv/indigo/http"
 	"github.com/fakefloordiv/indigo/http/encodings"
+	"github.com/fakefloordiv/indigo/http/headers"
 	methods "github.com/fakefloordiv/indigo/http/method"
 	"github.com/fakefloordiv/indigo/http/proto"
 	"github.com/fakefloordiv/indigo/internal"
@@ -44,15 +45,14 @@ type httpRequestsParser struct {
 	headerValueAllocator alloc.Allocator
 
 	body       *body.Gateway
-	codings    encodings.ContentEncodings
+	decoders   encodings.Decoders
+	decoder    encodings.DecoderFunc
 	decodeBody bool
-	decoder    encodings.Decoder
 }
 
 func NewHTTPRequestsParser(
 	request *types.Request, body *body.Gateway, keyAllocator, valAllocator alloc.Allocator,
-	startLineBuff []byte, settings settings.Settings,
-	codings encodings.ContentEncodings,
+	startLineBuff []byte, settings settings.Settings, decoders encodings.Decoders,
 ) parser.HTTPRequestsParser {
 	return &httpRequestsParser{
 		state:   eMethod,
@@ -63,7 +63,7 @@ func NewHTTPRequestsParser(
 		startLineBuff:        startLineBuff,
 		headerKeyAllocator:   keyAllocator,
 		headerValueAllocator: valAllocator,
-		codings:              codings,
+		decoders:             decoders,
 
 		body: body,
 	}
@@ -111,7 +111,7 @@ func (p *httpRequestsParser) Parse(data []byte) (state parser.RequestState, extr
 				p.begin = p.pointer
 				p.state = ePath
 			default:
-				if p.pointer > maxMethodLength { // the longest method, trust me
+				if p.pointer > maxMethodLength {
 					return parser.Error, nil, http.ErrBadRequest
 				}
 
