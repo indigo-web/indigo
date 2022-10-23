@@ -31,7 +31,7 @@ func newChunkedBodyParser(gateway *body.Gateway, settings settings.Settings) chu
 // extra that are extra-bytes related to a next one request, and err if
 // occurred
 func (c *chunkedBodyParser) Parse(
-	data []byte, decoder encodings.Decoder, trailer bool,
+	data []byte, decoder encodings.DecoderFunc, trailer bool,
 ) (done bool, extra []byte, err error) {
 	if decoder == nil {
 		decoder = func(b []byte) ([]byte, error) {

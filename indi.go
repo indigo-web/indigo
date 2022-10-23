@@ -44,7 +44,7 @@ var defaultHeaders = map[string][]string{
 type Application struct {
 	addr string
 
-	codings        encodings.ContentEncodings
+	codings        encodings.Decoders
 	defaultHeaders map[string][]string
 
 	shutdown chan struct{}
@@ -54,7 +54,7 @@ type Application struct {
 func NewApp(addr string) *Application {
 	return &Application{
 		addr:           addr,
-		codings:        encodings.NewContentEncodings(),
+		codings:        encodings.NewContentDecoders(),
 		defaultHeaders: defaultHeaders,
 		shutdown:       make(chan struct{}, 1),
 	}
@@ -62,7 +62,7 @@ func NewApp(addr string) *Application {
 
 // AddContentDecoder simply adds a new content decoder
 func (a Application) AddContentDecoder(token string, decoder encodings.Decoder) {
-	a.codings.AddDecoder(token, decoder)
+	a.codings.Add(token, decoder)
 }
 
 // SetDefaultHeaders overrides default headers to a passed ones.

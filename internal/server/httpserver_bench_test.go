@@ -131,7 +131,7 @@ func BenchmarkIndigo(b *testing.B) {
 		int(s.Headers.ValueSpace.Default), int(s.Headers.ValueSpace.Maximal),
 	)
 	startLineBuff := make([]byte, s.URL.Length.Maximal)
-	codings := encodings.NewContentEncodings()
+	codings := encodings.NewContentDecoders()
 	parser := http1.NewHTTPRequestsParser(request, writer, keyAllocator, valAllocator, startLineBuff, s, codings)
 
 	// because only tcp server reads from conn. We do not benchmark tcp server here

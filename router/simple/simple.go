@@ -31,6 +31,6 @@ func (r router) OnError(request *types.Request, err error) types.Response {
 	return r.errHandler(request, err)
 }
 
-func (router) GetContentEncodings() encodings.ContentEncodings {
-	return encodings.NewContentEncodings()
+func (router) GetContentEncodings() encodings.Decoders {
+	return encodings.NewContentDecoders()
 }
