@@ -71,20 +71,67 @@ func NewHTTPRequestsParser(
 
 func (p *httpRequestsParser) Parse(data []byte) (state parser.RequestState, extra []byte, err error) {
 	if p.state == eBody {
-		var done bool
-		done, extra, err = p.parseBody(data)
-		if err != nil {
-			p.body.WriteErr(err)
+		if p.chunkedTransferEncoding {
+			done, extra, err := p.chunkedBodyParser.Parse(data, p.decoder, p.trailer)
+			if err != nil {
+				p.body.WriteErr(err)
 
-			return parser.Error, nil, err
-		} else if done {
-			p.body.Data <- nil
-			p.reset()
+				return parser.Error, nil, err
+			} else if done {
+				p.body.Data <- nil
+				p.reset()
 
-			return parser.BodyCompleted, extra, err
+				return parser.BodyCompleted, extra, nil
+			}
+
+			return parser.Pending, extra, nil
 		}
 
-		return parser.Pending, extra, nil
+		if p.lengthCountdown <= uint(len(data)) {
+			piece := data[:p.lengthCountdown]
+			if p.decodeBody {
+				piece, err = p.decoder(piece)
+				if err != nil {
+					p.body.WriteErr(err)
+
+					return parser.Error, nil, err
+				}
+			}
+
+			p.body.Data <- piece
+			<-p.body.Data
+			p.body.Data <- nil
+			extra = data[p.lengthCountdown:]
+			p.lengthCountdown = 0
+
+			if p.body.Err != nil {
+				return parser.Error, extra, p.body.Err
+			}
+
+			p.reset()
+
+			return parser.BodyCompleted, extra, nil
+		}
+
+		piece := data
+		if p.decodeBody {
+			piece, err = p.decoder(data)
+			if err != nil {
+				p.body.WriteErr(err)
+
+				return parser.Error, nil, err
+			}
+		}
+
+		p.body.Data <- piece
+		<-p.body.Data
+		p.lengthCountdown -= uint(len(data))
+
+		if p.body.Err != nil {
+			return parser.Error, nil, p.body.Err
+		}
+
+		return parser.Pending, nil, nil
 	}
 
 	var hBegin int
@@ -610,46 +657,6 @@ func (p *httpRequestsParser) Parse(data []byte) (state parser.RequestState, extr
 	}
 
 	return parser.Pending, nil, nil
-}
-
-// parseBody parses body. In case chunked transfer encoding is active,
-// only data chunks will be sent, excluding all the CRLFs and chunk
-// lengths
-func (p *httpRequestsParser) parseBody(b []byte) (done bool, extra []byte, err error) {
-	if p.chunkedTransferEncoding {
-		return p.chunkedBodyParser.Parse(b, p.decoder, p.trailer)
-	}
-
-	if p.lengthCountdown <= uint(len(b)) {
-		piece := b[:p.lengthCountdown]
-		if p.decodeBody {
-			piece, err = p.decoder(piece)
-			if err != nil {
-				return true, nil, err
-			}
-		}
-
-		p.body.Data <- piece
-		<-p.body.Data
-		extra = b[p.lengthCountdown:]
-		p.lengthCountdown = 0
-
-		return true, extra, p.body.Err
-	}
-
-	piece := b
-	if p.decodeBody {
-		piece, err = p.decoder(b)
-		if err != nil {
-			return true, nil, err
-		}
-	}
-
-	p.body.Data <- piece
-	<-p.body.Data
-	p.lengthCountdown -= uint(len(b))
-
-	return false, nil, p.body.Err
 }
 
 // FinalizeBody method just signalizes reader that we're done. This method
