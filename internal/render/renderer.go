@@ -2,6 +2,7 @@ package render
 
 import (
 	"errors"
+	"github.com/fakefloordiv/indigo/http/status"
 	"io"
 	"math"
 	"os"
@@ -13,7 +14,6 @@ import (
 
 	"github.com/fakefloordiv/indigo/http"
 	"github.com/fakefloordiv/indigo/http/proto"
-	"github.com/fakefloordiv/indigo/http/status"
 	"github.com/fakefloordiv/indigo/types"
 )
 
@@ -30,8 +30,9 @@ var (
 // Also in case of file is being sent, it collects some meta about it,
 // and compresses using available on both server and client encoders
 type Renderer struct {
-	buff      []byte
-	keepAlive bool
+	buff       []byte
+	buffOffset int
+	keepAlive  bool
 
 	defaultHeaders map[string][]string
 	fileBuff       []byte
@@ -66,6 +67,9 @@ func (r *Renderer) Response(
 		if !r.keepAlive {
 			err = http.ErrCloseConnection
 		}
+
+		r.buff = append(append(r.buff, proto.ToBytes(request.Proto)...), httpchars.SP...)
+		r.buffOffset = len(r.buff)
 	case true:
 		// in case request Connection header is set to close, this response must be the last
 		// one, after which one connection will be closed. It's better to close it silently
@@ -74,10 +78,16 @@ func (r *Renderer) Response(
 		}
 	}
 
-	buff := r.buff[:0]
-	buff = append(append(buff, proto.ToBytes(request.Proto)...), httpchars.SP...)
-	buff = append(strconv.AppendInt(buff, int64(response.Code), 10), httpchars.SP...)
-	buff = append(append(buff, status.Text(response.Code)...), httpchars.CRLF...)
+	buff := r.buff[:r.buffOffset]
+	codeStatus := status.CodeStatus(response.Code)
+
+	if response.Status == "" && codeStatus != "" {
+		buff = append(buff, codeStatus...)
+	} else {
+		// in case we have a custom response status text or code, fallback to an old way
+		buff = append(strconv.AppendInt(buff, int64(response.Code), 10), httpchars.SP...)
+		buff = append(append(buff, status.Text(response.Code)...), httpchars.CRLF...)
+	}
 
 	customRespHeaders := response.Headers()
 	respHeaders := mergeHeaders(r.defaultHeaders, customRespHeaders.AsMap())

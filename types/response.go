@@ -20,12 +20,12 @@ const initialRespHeadersSize = 7
 // of clear methods, it is anyway copied every time it is used as constructor
 // so please, DO NOT modify fields of this variable
 var WithResponse = Response{
-	Code:   status.OK,
-	Status: status.Text(status.OK),
+	Code: status.OK,
 }
 
 type Response struct {
-	Code   status.Code
+	Code status.Code
+	// Status is empty by default, in this case renderer must put a default one
 	Status status.Status
 	// headers are simply a hashmap that is a mutable object, so side effects may happen
 	// so that is why we have to hide it from user, and let the usage from methods ONLY.
@@ -43,7 +43,6 @@ type Response struct {
 func NewResponse() Response {
 	return Response{
 		Code:    status.OK,
-		Status:  status.Text(status.OK),
 		headers: headers.NewHeaders(make(map[string][]string, initialRespHeadersSize)),
 	}
 }
@@ -53,13 +52,12 @@ func NewResponse() Response {
 // code. In this case you should call WithStatus explicitly
 func (r Response) WithCode(code status.Code) Response {
 	r.Code = code
-	r.Status = status.Text(code)
 	return r
 }
 
-// WithStatus sets a status text. Not compulsory, because http does not force
-// us strictly checking a response code, and Unknown Status Code is still a
-// valid response code, but you are better to do this. Be a bro
+// WithStatus sets a custom status text. This text does not matter at all, and usually
+// totally ignored by client, so there is actually no reasons to use this except some
+// rare cases when you need to represent a response status text somewhere
 func (r Response) WithStatus(status status.Status) Response {
 	r.Status = status
 	return r
