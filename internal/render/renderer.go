@@ -2,6 +2,7 @@ package render
 
 import (
 	"errors"
+	"github.com/fakefloordiv/indigo/http/status"
 	"io"
 	"math"
 	"os"
@@ -13,7 +14,6 @@ import (
 
 	"github.com/fakefloordiv/indigo/http"
 	"github.com/fakefloordiv/indigo/http/proto"
-	"github.com/fakefloordiv/indigo/http/status"
 	"github.com/fakefloordiv/indigo/types"
 )
 
@@ -76,9 +76,16 @@ func (r *Renderer) Response(
 
 	buff := r.buff[:0]
 	buff = append(append(buff, proto.ToBytes(request.Proto)...), httpchars.SP...)
-	buff = append(strconv.AppendInt(buff, int64(response.Code), 10), httpchars.SP...)
-	buff = append(append(buff, status.Text(response.Code)...), httpchars.CRLF...)
 
+	codeStatus := status.CodeStatus(response.Code)
+
+	if response.Status == "" && codeStatus != "" {
+		buff = append(buff, codeStatus...)
+	} else {
+		buff = append(strconv.AppendInt(buff, int64(response.Code), 10), httpchars.SP...)
+		buff = append(append(buff, status.Text(response.Code)...), httpchars.CRLF...)
+	}
+	
 	customRespHeaders := response.Headers()
 	respHeaders := mergeHeaders(r.defaultHeaders, customRespHeaders.AsMap())
 
