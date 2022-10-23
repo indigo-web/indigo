@@ -85,7 +85,7 @@ func (r *Renderer) Response(
 	if response.Status == "" && codeStatus != "" {
 		buff = append(buff, codeStatus...)
 	} else {
-		// in case we have a custom response status text or code, fallback to an old way
+		// in case we have a custom response status text or unknown code, fallback to an old way
 		buff = append(strconv.AppendInt(buff, int64(response.Code), 10), httpchars.SP...)
 		buff = append(append(buff, status.Text(response.Code)...), httpchars.CRLF...)
 	}
