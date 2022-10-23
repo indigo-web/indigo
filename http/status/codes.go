@@ -215,3 +215,137 @@ func Text(code Code) Status {
 		return "Unknown Status Code"
 	}
 }
+
+// CodeStatus returns a pre-defined line with code and status text (including
+// terminating CRLF sequence) in case code is known to server, otherwise empty
+// line is returned
+func CodeStatus(code Code) string {
+	switch code {
+	case Continue:
+		return "100 Continue\r\n"
+	case SwitchingProtocols:
+		return "101 Switching Protocol\r\n"
+	case Processing:
+		return "102 Processing\r\n"
+	case EarlyHints:
+		return "103 Early Hints\r\n"
+	case OK:
+		return "200 OK\r\n"
+	case Created:
+		return "201 Created\r\n"
+	case Accepted:
+		return "202 Accepted\r\n"
+	case NonAuthoritativeInfo:
+		return "203 Non-Authoritative Information\r\n"
+	case NoContent:
+		return "204 No Content\r\n"
+	case ResetContent:
+		return "205 Reset Content\r\n"
+	case PartialContent:
+		return "206 Partial Content\r\n"
+	case MultiStatus:
+		return "207 Multi-Status\r\n"
+	case AlreadyReported:
+		return "208 Already Reported\r\n"
+	case IMUsed:
+		return "226 IM Used\r\n"
+	case MultipleChoices:
+		return "300 Multiple Choices\r\n"
+	case MovedPermanently:
+		return "301 Moved Permanently\r\n"
+	case Found:
+		return "302 Found\r\n"
+	case SeeOther:
+		return "303 See Other\r\n"
+	case NotModified:
+		return "304 Not Modified\r\n"
+	case UseProxy:
+		return "305 Use Proxy\r\n"
+	case TemporaryRedirect:
+		return "307 Temporary Redirect\r\n"
+	case PermanentRedirect:
+		return "308 Permanent Redirect\r\n"
+	case BadRequest:
+		return "400 Bad Request\r\n"
+	case Unauthorized:
+		return "401 Unauthorized\r\n"
+	case PaymentRequired:
+		return "402 Payment Required\r\n"
+	case Forbidden:
+		return "403 Forbidden\r\n"
+	case NotFound:
+		return "404 Not Found\r\n"
+	case MethodNotAllowed:
+		return "405 Method Not Allowed\r\n"
+	case NotAcceptable:
+		return "406 Not Acceptable\r\n"
+	case ProxyAuthRequired:
+		return "407 Proxy Authentication Required\r\n"
+	case RequestTimeout:
+		return "408 Request Timeout\r\n"
+	case Conflict:
+		return "409 Conflict\r\n"
+	case Gone:
+		return "410 Gone\r\n"
+	case LengthRequired:
+		return "411 Length Required\r\n"
+	case PreconditionFailed:
+		return "412 Precondition Failed\r\n"
+	case RequestEntityTooLarge:
+		return "413 Request Entity Too Large\r\n"
+	case RequestURITooLong:
+		return "414 Request URI Too Long\r\n"
+	case UnsupportedMediaType:
+		return "415 Unsupported Media Type\r\n"
+	case RequestedRangeNotSatisfiable:
+		return "416 Requested Range Not Satisfiable\r\n"
+	case ExpectationFailed:
+		return "417 Expectation Failed\r\n"
+	case Teapot:
+		return "418 I'm a teapot\r\n"
+	case MisdirectedRequest:
+		return "421 Misdirected Request\r\n"
+	case UnprocessableEntity:
+		return "422 Unprocessable Entity\r\n"
+	case Locked:
+		return "423 Locked\r\n"
+	case FailedDependency:
+		return "424 Failed Dependency\r\n"
+	case TooEarly:
+		return "425 Too Early\r\n"
+	case UpgradeRequired:
+		return "426 Upgrade Required\r\n"
+	case PreconditionRequired:
+		return "428 Precondition Required\r\n"
+	case TooManyRequests:
+		return "429 Too Many Requests\r\n"
+	case RequestHeaderFieldsTooLarge:
+		return "431 Request Header Fields Too Large\r\n"
+	case UnavailableForLegalReasons:
+		return "451 Unavailable For Legal Reasons\r\n"
+	case InternalServerError:
+		return "500 Internal Server Error\r\n"
+	case NotImplemented:
+		return "501 Not Implemented\r\n"
+	case BadGateway:
+		return "502 Bad Gateway\r\n"
+	case ServiceUnavailable:
+		return "503 Service Unavailable\r\n"
+	case GatewayTimeout:
+		return "504 Gateway Timeout\r\n"
+	case HTTPVersionNotSupported:
+		return "505 HTTP Version Not Supported\r\n"
+	case VariantAlsoNegotiates:
+		return "506 Variant Also Negotiates\r\n"
+	case InsufficientStorage:
+		return "507 Insufficient Storage\r\n"
+	case LoopDetected:
+		return "508 Loop Detected\r\n"
+	case NotExtended:
+		return "510 Not Extended\r\n"
+	case NetworkAuthenticationRequired:
+		return "511 Network Authentication Required\r\n"
+	default:
+		return ""
+	}
+}

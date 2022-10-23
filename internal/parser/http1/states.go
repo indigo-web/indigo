@@ -19,7 +19,9 @@ const (
 	eHTT
 	eHTTP
 	eProtoMajor
+	eProtoDot
 	eProtoMinor
+	eProtoEnd
 	eProtoCR
 	eProtoCRLF
 	eProtoCRLFCR

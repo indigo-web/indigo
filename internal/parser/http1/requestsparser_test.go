@@ -56,8 +56,8 @@ func getParser() (httpparser.HTTPRequestsParser, *types.Request) {
 		int(s.Headers.ValueSpace.Default), int(s.Headers.ValueSpace.Maximal),
 	)
 	request, gateway := types.NewRequest(headers.NewHeaders(nil), url.Query{}, nil)
-	codings := encodings.NewContentEncodings()
-	startLineBuff := make([]byte, 0, s.URL.Length.Default)
+	codings := encodings.NewContentDecoders()
+	startLineBuff := make([]byte, s.URL.Length.Maximal)
 
 	return NewHTTPRequestsParser(
 		request, gateway, keyAllocator, valAllocator, startLineBuff, s, codings,
@@ -261,7 +261,7 @@ func TestHttpRequestsParser_Parse_GET(t *testing.T) {
 		require.NoError(t, request.Reset())
 	})
 
-	t.Run("BiggerGETURLEncoded", func(t *testing.T) {
+	t.Run("BiggerGET_URLEncoded", func(t *testing.T) {
 		ch := make(chan []byte)
 		go readBody(request, ch)
 		state, extra, err := parser.Parse(biggerGETURLEncoded)
