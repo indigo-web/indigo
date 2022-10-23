@@ -261,7 +261,7 @@ func TestHttpRequestsParser_Parse_GET(t *testing.T) {
 		require.NoError(t, request.Reset())
 	})
 
-	t.Run("BiggerGETURLEncoded", func(t *testing.T) {
+	t.Run("BiggerGET_URLEncoded", func(t *testing.T) {
 		ch := make(chan []byte)
 		go readBody(request, ch)
 		state, extra, err := parser.Parse(biggerGETURLEncoded)
