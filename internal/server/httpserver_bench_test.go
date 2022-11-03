@@ -2,6 +2,7 @@ package server
 
 import (
 	"context"
+	"github.com/fakefloordiv/indigo/internal/pool"
 	"net"
 	"testing"
 	"time"
@@ -130,9 +131,12 @@ func BenchmarkIndigo(b *testing.B) {
 	valAllocator := alloc.NewAllocator(
 		int(s.Headers.ValueSpace.Default), int(s.Headers.ValueSpace.Maximal),
 	)
+	objPool := pool.NewObjectPool[[]string](20)
 	startLineBuff := make([]byte, s.URL.Length.Maximal)
 	codings := encodings.NewContentDecoders()
-	parser := http1.NewHTTPRequestsParser(request, writer, keyAllocator, valAllocator, startLineBuff, s, codings)
+	parser := http1.NewHTTPRequestsParser(
+		request, writer, keyAllocator, valAllocator, objPool, startLineBuff, s, codings,
+	)
 
 	// because only tcp server reads from conn. We do not benchmark tcp server here
 	conn := newConn(nil)
