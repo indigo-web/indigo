@@ -8,5 +8,6 @@ package parser
 // method for more details)
 type HTTPRequestsParser interface {
 	Parse(b []byte) (state RequestState, extra []byte, err error)
+	Release()
 	FinalizeBody()
 }
