@@ -10,6 +10,7 @@ import (
 	"github.com/fakefloordiv/indigo/internal/alloc"
 	"github.com/fakefloordiv/indigo/internal/body"
 	"github.com/fakefloordiv/indigo/internal/parser"
+	"github.com/fakefloordiv/indigo/internal/pool"
 	"github.com/fakefloordiv/indigo/settings"
 	"github.com/fakefloordiv/indigo/types"
 )
@@ -43,6 +44,7 @@ type httpRequestsParser struct {
 	headerKey            string
 	headerKeyAllocator   alloc.Allocator
 	headerValueAllocator alloc.Allocator
+	headersValuesPool    pool.ObjectPool[[]string]
 
 	body       *body.Gateway
 	decoders   encodings.Decoders
@@ -52,20 +54,23 @@ type httpRequestsParser struct {
 
 func NewHTTPRequestsParser(
 	request *types.Request, body *body.Gateway, keyAllocator, valAllocator alloc.Allocator,
-	startLineBuff []byte, settings settings.Settings, decoders encodings.Decoders,
+	valuesPool pool.ObjectPool[[]string], startLineBuff []byte, settings settings.Settings,
+	decoders encodings.Decoders,
 ) parser.HTTPRequestsParser {
 	return &httpRequestsParser{
-		state:   eMethod,
-		request: request,
+		state:    eMethod,
+		request:  request,
+		settings: settings,
 
-		chunkedBodyParser:    newChunkedBodyParser(body, settings),
-		settings:             settings,
-		startLineBuff:        startLineBuff,
+		chunkedBodyParser: newChunkedBodyParser(body, settings),
+		startLineBuff:     startLineBuff,
+
 		headerKeyAllocator:   keyAllocator,
 		headerValueAllocator: valAllocator,
-		decoders:             decoders,
+		headersValuesPool:    valuesPool,
 
-		body: body,
+		body:     body,
+		decoders: decoders,
 	}
 }
 
@@ -79,7 +84,6 @@ func (p *httpRequestsParser) Parse(data []byte) (state parser.RequestState, extr
 				return parser.Error, nil, err
 			} else if done {
 				p.body.Data <- nil
-				p.reset()
 
 				return parser.BodyCompleted, extra, nil
 			}
@@ -107,8 +111,6 @@ func (p *httpRequestsParser) Parse(data []byte) (state parser.RequestState, extr
 			if p.body.Err != nil {
 				return parser.Error, extra, p.body.Err
 			}
-
-			p.reset()
 
 			return parser.BodyCompleted, extra, nil
 		}
@@ -385,8 +387,6 @@ func (p *httpRequestsParser) Parse(data []byte) (state parser.RequestState, extr
 			case '\r':
 				p.state = eProtoCRLFCR
 			case '\n':
-				p.reset()
-
 				return parser.RequestCompleted, data[i+1:], nil
 			default:
 				// headers are here. I have to have a buffer for header key, and after receiving it,
@@ -399,8 +399,6 @@ func (p *httpRequestsParser) Parse(data []byte) (state parser.RequestState, extr
 			switch data[i] {
 			case '\n':
 				// no request body because even no headers
-				p.reset()
-
 				return parser.RequestCompleted, data[i+1:], nil
 			default:
 				return parser.Error, nil, http.ErrBadRequest
@@ -436,9 +434,6 @@ func (p *httpRequestsParser) Parse(data []byte) (state parser.RequestState, extr
 			case '\r', '\n':
 				return parser.Error, nil, http.ErrBadRequest
 			case ' ':
-			case '\\':
-				hBegin = i
-				p.state = eHeaderValueBackslash
 			default:
 				hBegin = i
 				p.state = eHeaderValue
@@ -472,8 +467,6 @@ func (p *httpRequestsParser) Parse(data []byte) (state parser.RequestState, extr
 				p.state = eContentLengthCRLFCR
 			case '\n':
 				if p.lengthCountdown == 0 && !p.chunkedTransferEncoding {
-					p.reset()
-
 					return parser.RequestCompleted, data[i+1:], nil
 				}
 
@@ -489,8 +482,6 @@ func (p *httpRequestsParser) Parse(data []byte) (state parser.RequestState, extr
 			switch data[i] {
 			case '\n':
 				if p.lengthCountdown == 0 && !p.chunkedTransferEncoding {
-					p.reset()
-
 					return parser.RequestCompleted, data[i+1:], nil
 				}
 
@@ -514,71 +505,7 @@ func (p *httpRequestsParser) Parse(data []byte) (state parser.RequestState, extr
 				}
 
 				p.state = eHeaderValueCRLF
-			case '\\':
-				p.state = eHeaderValueBackslash
-			case '"':
-				p.state = eHeaderValueQuoted
-			case ',':
-				// When comma is met, current header is finalized, and a new one started with the same key
-				// In case it is a system header like Content-Length, Connection, etc., we just ignore it
-				// because they anyway must not include commas in their values
-				p.state = eHeaderValueComma
-
-				if !p.headerValueAllocator.Append(data[hBegin:i]) {
-					return parser.Error, nil, http.ErrHeaderFieldsTooLarge
-				}
-
-				value := p.headerValueAllocator.Finish()
-				p.request.Headers.Add(p.headerKey, internal.B2S(value))
 			}
-		case eHeaderValueComma:
-			switch char := data[i]; char {
-			case ' ':
-			case '\r':
-				if !p.headerValueAllocator.Append(data[hBegin:i]) {
-					return parser.Error, nil, http.ErrHeaderFieldsTooLarge
-				}
-
-				p.state = eHeaderValueCR
-			case '\n':
-				if !p.headerValueAllocator.Append(data[hBegin:i]) {
-					return parser.Error, nil, http.ErrHeaderFieldsTooLarge
-				}
-
-				p.state = eHeaderValueCRLF
-			case '\\':
-				hBegin = i
-				p.state = eHeaderValueBackslash
-			case '"':
-				hBegin = i
-				p.state = eHeaderValueQuoted
-			default:
-				hBegin = i
-				p.state = eHeaderValue
-			}
-		case eHeaderValueQuoted:
-			switch char := data[i]; char {
-			case '\r':
-				if !p.headerValueAllocator.Append(data[hBegin:i]) {
-					return parser.Error, nil, http.ErrHeaderFieldsTooLarge
-				}
-
-				p.state = eHeaderValueCR
-			case '\n':
-				if !p.headerValueAllocator.Append(data[hBegin:i]) {
-					return parser.Error, nil, http.ErrHeaderFieldsTooLarge
-				}
-
-				p.state = eHeaderValueCRLF
-			case '\\':
-				p.state = eHeaderValueQuotedBackslash
-			case '"':
-				p.state = eHeaderValue
-			}
-		case eHeaderValueBackslash:
-			p.state = eHeaderValue
-		case eHeaderValueQuotedBackslash:
-			p.state = eHeaderValueQuoted
 		case eHeaderValueCR:
 			switch data[i] {
 			case '\n':
@@ -587,10 +514,15 @@ func (p *httpRequestsParser) Parse(data []byte) (state parser.RequestState, extr
 				return parser.Error, nil, http.ErrBadRequest
 			}
 		case eHeaderValueCRLF:
-			// TODO: save whole header line, without any commas, here. Only after that
-			//       analyze how long our slice is supposed to be
 			value := internal.B2S(p.headerValueAllocator.Finish())
-			p.request.Headers.Add(p.headerKey, value)
+
+			if buff := p.request.Headers.Values(p.headerKey); buff != nil {
+				p.request.Headers.Add(p.headerKey, value)
+			} else {
+				buff = p.headersValuesPool.Acquire()[:0]
+				buff = append(buff, value)
+				p.request.Headers.Set(p.headerKey, buff)
+			}
 
 			switch p.headerKey {
 			case "connection":
@@ -612,8 +544,6 @@ func (p *httpRequestsParser) Parse(data []byte) (state parser.RequestState, extr
 			switch data[i] {
 			case '\n':
 				if p.lengthCountdown == 0 && !p.chunkedTransferEncoding {
-					p.reset()
-
 					return parser.RequestCompleted, data[i+1:], nil
 				}
 
@@ -631,8 +561,6 @@ func (p *httpRequestsParser) Parse(data []byte) (state parser.RequestState, extr
 			switch data[i] {
 			case '\n':
 				if p.lengthCountdown == 0 && !p.chunkedTransferEncoding {
-					p.reset()
-
 					return parser.RequestCompleted, data[i+1:], nil
 				}
 
@@ -666,6 +594,17 @@ func (p *httpRequestsParser) Parse(data []byte) (state parser.RequestState, extr
 // completion flag into the body chan
 func (p *httpRequestsParser) FinalizeBody() {
 	p.body.Data <- nil
+}
+
+func (p *httpRequestsParser) Release() {
+	requestHeaders := p.request.Headers.AsMap()
+
+	for key, values := range requestHeaders {
+		p.headersValuesPool.Release(values)
+		delete(requestHeaders, key)
+	}
+
+	p.reset()
 }
 
 func (p *httpRequestsParser) reset() {
