@@ -32,10 +32,6 @@ const (
 	eContentLengthCRLF
 	eContentLengthCRLFCR
 	eHeaderValue
-	eHeaderValueComma
-	eHeaderValueBackslash
-	eHeaderValueQuoted
-	eHeaderValueQuotedBackslash
 	eHeaderValueCR
 	eHeaderValueCRLF
 	eHeaderValueCRLFCR
