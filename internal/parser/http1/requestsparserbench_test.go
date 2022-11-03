@@ -17,6 +17,8 @@ func BenchmarkHttpRequestsParser_Parse_GET(b *testing.B) {
 			for part := range parts {
 				_, _, _ = parser.Parse(parts[part])
 			}
+
+			parser.Release()
 		}
 	}
 
@@ -31,6 +33,7 @@ func BenchmarkHttpRequestsParser_Parse_GET(b *testing.B) {
 	b.Run("SimpleGET_Full", func(b *testing.B) {
 		for i := 0; i < b.N; i++ {
 			_, _, _ = parser.Parse(simpleGET)
+			parser.Release()
 		}
 	})
 
@@ -48,6 +51,7 @@ func BenchmarkHttpRequestsParser_Parse_GET(b *testing.B) {
 	b.Run("BiggerGET_Full", func(b *testing.B) {
 		for i := 0; i < b.N; i++ {
 			_, _, _ = parser.Parse(biggerGET)
+			parser.Release()
 		}
 	})
 
@@ -73,6 +77,7 @@ func BenchmarkHttpRequestsParser_Parse_GET(b *testing.B) {
 	b.Run("ManyHeaders_Full", func(b *testing.B) {
 		for i := 0; i < b.N; i++ {
 			_, _, _ = parser.Parse(manyHeaders)
+			parser.Release()
 		}
 	})
 }
