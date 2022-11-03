@@ -98,6 +98,7 @@ func (h *httpServer) OnData(data []byte) (err error) {
 		case parser.BodyCompleted:
 			switch <-h.notifier {
 			case eProcessed:
+				h.parser.Release()
 			case eConnHijack:
 				return http.ErrHijackConn
 			default:
@@ -134,8 +135,12 @@ func (h *httpServer) OnData(data []byte) (err error) {
 // space), it receives a signal from notifier chan and decides what to do starting
 // from the actual signal. Also, when called, calls router OnStart() method
 func (h *httpServer) requestProcessor() {
+	// implicitly dereference a method to avoid dereferences on every response,
+	// that is actually not that cheap
+	respRenderer := h.renderer.Response
+
 	renderer := func(response types.Response) error {
-		return h.renderer.Response(h.request, response, h.respWriter)
+		return respRenderer(h.request, response, h.respWriter)
 	}
 
 	for {
