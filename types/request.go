@@ -100,7 +100,6 @@ func (r *Request) Reader() io.Reader {
 func (r *Request) Reset() error {
 	r.Fragment = ""
 	r.Query.Set(nil)
-	r.Headers.Clear()
 
 	return r.body.Reset()
 }

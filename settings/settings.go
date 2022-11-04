@@ -12,9 +12,10 @@ type Setting[T number] struct {
 }
 
 type (
-	HeadersNumber      Setting[uint8]
-	HeadersKeyLength   Setting[uint8]
-	HeadersValuesSpace Setting[uint32]
+	HeadersNumber               Setting[uint8]
+	HeadersKeyLength            Setting[uint8]
+	HeadersValuesSpace          Setting[uint32]
+	HeadersValuesObjectPoolSize Setting[uint16]
 
 	URLLength Setting[uint16]
 
@@ -65,6 +66,10 @@ type (
 		// Maximal value is a hard limit, reaching which one client triggers server
 		// to response with 431 Header Fields Too Large
 		ValueSpace HeadersValuesSpace
+		// ValuesObjectPoolSize is responsible for a queue size in object pool of string
+		// slices.
+		// Maximal value is a queue size of the object pool queue size.
+		ValuesObjectPoolSize HeadersValuesObjectPoolSize
 	}
 
 	URL struct {
@@ -184,6 +189,8 @@ func Fill(original Settings) (modified Settings) {
 		original.Headers.ValueSpace.Default, defaultSettings.Headers.ValueSpace.Default)
 	original.Headers.ValueSpace.Maximal = customOrDefault(
 		original.Headers.ValueSpace.Maximal, defaultSettings.Headers.ValueSpace.Maximal)
+	original.Headers.ValuesObjectPoolSize.Maximal = customOrDefault(
+		original.Headers.ValuesObjectPoolSize.Maximal, defaultSettings.Headers.ValuesObjectPoolSize.Maximal)
 	original.URL.Length.Maximal = customOrDefault(
 		original.URL.Length.Maximal, defaultSettings.URL.Length.Maximal)
 	original.URL.Query.Length.Maximal = customOrDefault(

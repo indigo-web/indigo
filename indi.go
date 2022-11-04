@@ -2,6 +2,7 @@ package indigo
 
 import (
 	"errors"
+	"github.com/fakefloordiv/indigo/internal/pool"
 	"net"
 	"sync"
 
@@ -74,7 +75,7 @@ func (a *Application) SetDefaultHeaders(headers map[string][]string) {
 // Serve takes a router and someSettings, that must be only 0 or 1 elements
 // otherwise, error is returned
 // Also, if specified, Accept-Encodings default header's value will be set here
-func (a Application) Serve(r router.Router, someSettings ...settings2.Settings) error {
+func (a Application) Serve(r router.Router, settings ...settings2.Settings) error {
 	if accept, found := a.defaultHeaders["Accept-Encodings"]; found && accept == nil {
 		a.defaultHeaders["Accept-Encodings"] = a.codings.Acceptable()
 	}
@@ -83,7 +84,7 @@ func (a Application) Serve(r router.Router, someSettings ...settings2.Settings) 
 		onStart.OnStart()
 	}
 
-	settings, err := getSettings(someSettings...)
+	s, err := getSettings(settings...)
 	if err != nil {
 		return err
 	}
@@ -95,34 +96,35 @@ func (a Application) Serve(r router.Router, someSettings ...settings2.Settings) 
 
 	return server2.StartTCPServer(sock, func(wg *sync.WaitGroup, conn net.Conn) {
 		keyAllocator := alloc.NewAllocator(
-			int(settings.Headers.KeyLength.Maximal)*int(settings.Headers.Number.Default),
-			int(settings.Headers.KeyLength.Maximal)*int(settings.Headers.Number.Maximal),
+			int(s.Headers.KeyLength.Maximal)*int(s.Headers.Number.Default),
+			int(s.Headers.KeyLength.Maximal)*int(s.Headers.Number.Maximal),
 		)
 		valAllocator := alloc.NewAllocator(
-			int(settings.Headers.ValueSpace.Default),
-			int(settings.Headers.ValueSpace.Maximal),
+			int(s.Headers.ValueSpace.Default),
+			int(s.Headers.ValueSpace.Maximal),
 		)
+		objPool := pool.NewObjectPool[[]string](int(s.Headers.ValuesObjectPoolSize.Maximal))
 		query := url.NewQuery(func() map[string][]byte {
-			return make(map[string][]byte, settings.URL.Query.Number.Default)
+			return make(map[string][]byte, s.URL.Query.Number.Default)
 		})
-		hdrs := headers.NewHeaders(make(map[string][]string, settings.Headers.Number.Default))
+		hdrs := headers.NewHeaders(make(map[string][]string, s.Headers.Number.Default))
 		request, gateway := types.NewRequest(hdrs, query, conn.RemoteAddr())
 
-		startLineBuff := make([]byte, settings.URL.Length.Maximal)
+		startLineBuff := make([]byte, s.URL.Length.Maximal)
 
 		httpParser := http1.NewHTTPRequestsParser(
-			request, gateway, keyAllocator, valAllocator, startLineBuff, settings, a.codings,
+			request, gateway, keyAllocator, valAllocator, objPool, startLineBuff, s, a.codings,
 		)
 
-		respBuff := make([]byte, 0, settings.ResponseBuff.Default)
+		respBuff := make([]byte, 0, s.ResponseBuff.Default)
 		renderer := render.NewRenderer(respBuff, nil, a.defaultHeaders)
 
 		httpServer := server2.NewHTTPServer(request, r, httpParser, conn, renderer)
 		go httpServer.Run()
 
-		readBuff := make([]byte, settings.TCPServer.Read.Default)
+		readBuff := make([]byte, s.TCPServer.Read.Default)
 		server2.DefaultConnHandler(
-			wg, conn, settings.TCPServer.IDLEConnLifetime, httpServer.OnData, readBuff,
+			wg, conn, s.TCPServer.IDLEConnLifetime, httpServer.OnData, readBuff,
 		)
 	}, a.shutdown)
 }
