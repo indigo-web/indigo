@@ -2,10 +2,11 @@ package server
 
 import (
 	"context"
-	"github.com/fakefloordiv/indigo/internal/pool"
 	"net"
 	"testing"
 	"time"
+
+	"github.com/fakefloordiv/indigo/internal/pool"
 
 	"github.com/fakefloordiv/indigo/http/encodings"
 	"github.com/fakefloordiv/indigo/http/headers"
