@@ -2,9 +2,10 @@ package indigo
 
 import (
 	"errors"
-	"github.com/fakefloordiv/indigo/internal/pool"
 	"net"
 	"sync"
+
+	"github.com/fakefloordiv/indigo/internal/pool"
 
 	server2 "github.com/fakefloordiv/indigo/internal/server"
 
