@@ -76,6 +76,7 @@ func NewHTTPRequestsParser(
 
 func (p *httpRequestsParser) Parse(data []byte) (state parser.RequestState, extra []byte, err error) {
 	var value string
+	requestHeaders := p.request.Headers
 
 	switch p.state {
 	case eMethod:
@@ -814,12 +815,12 @@ headerValueCRLF:
 
 	value = internal.B2S(p.headerValueAllocator.Finish())
 
-	if buff := p.request.Headers.Values(p.headerKey); buff != nil {
-		p.request.Headers.Add(p.headerKey, value)
+	if buff := requestHeaders.Values(p.headerKey); buff != nil {
+		requestHeaders.Add(p.headerKey, value)
 	} else {
 		buff = p.headersValuesPool.Acquire()[:0]
 		buff = append(buff, value)
-		p.request.Headers.Set(p.headerKey, buff)
+		requestHeaders.Set(p.headerKey, buff)
 	}
 
 	switch p.headerKey {
@@ -827,6 +828,7 @@ headerValueCRLF:
 		p.closeConnection = value == "close"
 	case "transfer-encoding":
 		p.chunkedTransferEncoding = headers.ValueOf(value) == "chunked"
+		p.request.ChunkedTE = p.chunkedTransferEncoding
 	case "content-encoding":
 		decoder, found := p.decoders.Get(value)
 		if !found {
@@ -875,15 +877,6 @@ headerValueCRLFCR:
 	default:
 		return parser.Error, nil, http.ErrBadRequest
 	}
-}
-
-// FinalizeBody method just signalizes reader that we're done. This method
-// must be called only in 1 case - parser returned parser.RequestCompleted
-// state that means headers are parsed, but no body is presented for
-// the request, so first starting request processing, then sending a
-// completion flag into the body chan
-func (p *httpRequestsParser) FinalizeBody() {
-	p.body.Data <- nil
 }
 
 func (p *httpRequestsParser) Release() {

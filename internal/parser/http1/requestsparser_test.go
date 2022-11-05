@@ -101,16 +101,36 @@ func splitIntoParts(req []byte, n int) (parts [][]byte) {
 	return parts
 }
 
-func testPartedRequest(t *testing.T, parser httpparser.HTTPRequestsParser,
-	rawRequest []byte, n int,
-) {
+func testPartedRequest(
+	t *testing.T, parser httpparser.HTTPRequestsParser, req *types.Request, rawRequest []byte, n int,
+) (body []byte) {
 	var finalState httpparser.RequestState
+	parts := splitIntoParts(rawRequest, n)
+	bodyChan := make(chan []byte)
 
-	for _, chunk := range splitIntoParts(rawRequest, n) {
+	for i, chunk := range parts {
 		state, extra, err := parser.Parse(chunk)
+
+		switch state {
+		case httpparser.RequestCompleted:
+			require.Equal(t, len(parts), i+1, "finished before whole request was fed")
+
+			return nil
+		case httpparser.HeadersCompleted:
+			go readBody(req, bodyChan)
+		default:
+			require.NotEqual(t, httpparser.Error, state)
+		}
 
 		for len(extra) > 0 {
 			state, extra, err = parser.Parse(extra)
+			if state == httpparser.BodyCompleted {
+				require.Equal(t, len(parts), i+1, "finished before whole request was fed")
+
+				return <-bodyChan
+			}
+
+			require.NotEqual(t, httpparser.Error, state)
 		}
 
 		finalState = state
@@ -118,27 +138,25 @@ func testPartedRequest(t *testing.T, parser httpparser.HTTPRequestsParser,
 		require.Empty(t, extra)
 	}
 
-	if finalState == httpparser.RequestCompleted {
-		parser.FinalizeBody()
-	} else {
-		require.Equalf(t, httpparser.BodyCompleted, finalState,
-			"Body part size: %d", n)
+	if finalState != httpparser.RequestCompleted {
+		require.Equalf(t, httpparser.BodyCompleted, finalState, "Body part size: %d", n)
 	}
+
+	return <-bodyChan
 }
 
 func TestHttpRequestsParser_Parse_GET(t *testing.T) {
 	parser, request := getParser()
 
 	t.Run("SimpleGET", func(t *testing.T) {
-		ch := make(chan []byte)
-		go readBody(request, ch)
 		state, extra, err := parser.Parse(simpleGET)
-		parser.FinalizeBody()
 
 		require.NoError(t, err)
 		require.Equal(t, httpparser.RequestCompleted, state)
 		require.Empty(t, extra)
-		require.Empty(t, <-ch)
+		body, err := request.Body()
+		require.NoError(t, err)
+		require.Empty(t, body)
 
 		wanted := wantedRequest{
 			Method:   methods.GET,
@@ -156,7 +174,6 @@ func TestHttpRequestsParser_Parse_GET(t *testing.T) {
 		ch := make(chan []byte)
 		go readBody(request, ch)
 		state, extra, err := parser.Parse(simpleGETLeadingCRLF)
-		parser.FinalizeBody()
 
 		require.NoError(t, err)
 		require.Equal(t, httpparser.RequestCompleted, state)
@@ -179,7 +196,6 @@ func TestHttpRequestsParser_Parse_GET(t *testing.T) {
 		ch := make(chan []byte)
 		go readBody(request, ch)
 		state, extra, err := parser.Parse(biggerGET)
-		parser.FinalizeBody()
 
 		require.NoError(t, err)
 		require.Equal(t, httpparser.RequestCompleted, state)
@@ -204,7 +220,6 @@ func TestHttpRequestsParser_Parse_GET(t *testing.T) {
 		ch := make(chan []byte)
 		go readBody(request, ch)
 		state, extra, err := parser.Parse(multipleHeaders)
-		parser.FinalizeBody()
 
 		require.NoError(t, err)
 		require.Equal(t, httpparser.RequestCompleted, state)
@@ -229,7 +244,6 @@ func TestHttpRequestsParser_Parse_GET(t *testing.T) {
 		ch := make(chan []byte)
 		go readBody(request, ch)
 		state, extra, err := parser.Parse(biggerGETOnlyLF)
-		parser.FinalizeBody()
 
 		require.NoError(t, err)
 		require.Equal(t, httpparser.RequestCompleted, state)
@@ -254,7 +268,6 @@ func TestHttpRequestsParser_Parse_GET(t *testing.T) {
 		ch := make(chan []byte)
 		go readBody(request, ch)
 		state, extra, err := parser.Parse(biggerGETURLEncoded)
-		parser.FinalizeBody()
 
 		require.NoError(t, err)
 		require.Equal(t, httpparser.RequestCompleted, state)
@@ -275,10 +288,8 @@ func TestHttpRequestsParser_Parse_GET(t *testing.T) {
 
 	t.Run("BiggerGET_ByDifferentPartSizes", func(t *testing.T) {
 		for i := 1; i < len(biggerGET); i++ {
-			ch := make(chan []byte)
-			go readBody(request, ch)
-			testPartedRequest(t, parser, biggerGET, i)
-			require.Empty(t, <-ch)
+			body := testPartedRequest(t, parser, request, biggerGET, i)
+			require.Empty(t, body)
 
 			wanted := wantedRequest{
 				Method:   methods.GET,
@@ -299,7 +310,6 @@ func TestHttpRequestsParser_Parse_GET(t *testing.T) {
 		ch := make(chan []byte)
 		go readBody(request, ch)
 		state, extra, err := parser.Parse(simpleGETAbsPath)
-		parser.FinalizeBody()
 
 		require.NoError(t, err)
 		require.Equal(t, httpparser.RequestCompleted, state)
@@ -324,10 +334,8 @@ func TestHttpRequestsParser_ParsePOST(t *testing.T) {
 
 	t.Run("SomePOST_ByDifferentPartSizes", func(t *testing.T) {
 		for i := 1; i < len(somePOST); i++ {
-			ch := make(chan []byte)
-			go readBody(request, ch)
-			testPartedRequest(t, parser, somePOST, i)
-			require.Equal(t, []byte("Hello, World!"), <-ch)
+			body := testPartedRequest(t, parser, request, somePOST, i)
+			require.Equal(t, "Hello, World!", string(body))
 
 			wanted := wantedRequest{
 				Method:   methods.POST,
@@ -348,7 +356,6 @@ func TestHttpRequestsParser_ParsePOST(t *testing.T) {
 		ch := make(chan []byte)
 		go readBody(request, ch)
 		state, extra, err := parser.Parse(simpleGETQuery)
-		parser.FinalizeBody()
 
 		require.NoError(t, err)
 		require.Equal(t, httpparser.RequestCompleted, state)
@@ -565,11 +572,12 @@ func TestHttpRequestsParser_Chunked(t *testing.T) {
 	t.Run("OrdinaryChunkedRequest", func(t *testing.T) {
 		parser, request := getParser()
 
-		ch := make(chan []byte)
-		go readBody(request, ch)
 		state, extra, err := parser.Parse(ordinaryChunked)
 		require.NoError(t, err)
 		require.Equal(t, httpparser.HeadersCompleted, state)
+
+		ch := make(chan []byte)
+		go readBody(request, ch)
 
 		state, extra, err = parser.Parse(extra)
 		require.NoError(t, err)
@@ -581,11 +589,12 @@ func TestHttpRequestsParser_Chunked(t *testing.T) {
 	t.Run("ChunkedWithTrailers", func(t *testing.T) {
 		parser, request := getParser()
 
-		ch := make(chan []byte)
-		go readBody(request, ch)
 		state, extra, err := parser.Parse(chunkedWithTrailers)
 		require.NoError(t, err)
 		require.Equal(t, httpparser.HeadersCompleted, state)
+
+		ch := make(chan []byte)
+		go readBody(request, ch)
 
 		state, extra, err = parser.Parse(extra)
 		require.NoError(t, err)

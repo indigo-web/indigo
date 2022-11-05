@@ -88,12 +88,6 @@ func (h *httpServer) OnData(data []byte) (err error) {
 			h.notifier <- eHeadersCompleted
 		case parser.RequestCompleted:
 			h.notifier <- eHeadersCompleted
-			// the reason why we have manually finalize body is that
-			// parser has not notified about request completion yet, so
-			// handler is not called, but parser already has to write
-			// something to a blocking chan. This causes a deadlock, so
-			// we choose a bit hacky solution
-			h.parser.FinalizeBody()
 			fallthrough
 		case parser.BodyCompleted:
 			switch <-h.notifier {
