@@ -311,7 +311,7 @@ pathDecode2Char:
 	if !isHex(data[0]) {
 		return parser.Error, nil, http.ErrURIDecoding
 	}
-  
+
 	if p.pointer >= len(p.startLineBuff) {
 		return parser.Error, nil, http.ErrURITooLong
 	}
