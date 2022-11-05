@@ -69,7 +69,7 @@ func (r *requestBody) Read(onBody onBodyCallback, onComplete onCompleteCallback)
 // If it is already read, doing nothing and returning nil-error
 func (r *requestBody) Reset() error {
 	if r.read {
-		r.read = false
+		r.Unread()
 
 		return nil
 	}
@@ -79,6 +79,11 @@ func (r *requestBody) Reset() error {
 			return r.body.Err
 		}
 	}
+}
+
+// Unread resets bool read marker to be able to read a body again without ErrRead error
+func (r *requestBody) Unread() {
+	r.read = false
 }
 
 type bodyReader struct {
