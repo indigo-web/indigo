@@ -890,17 +890,6 @@ func (p *httpRequestsParser) Release() {
 	p.reset()
 }
 
-func (p *httpRequestsParser) Release() {
-	requestHeaders := p.request.Headers.AsMap()
-
-	for key, values := range requestHeaders {
-		p.headersValuesPool.Release(values)
-		delete(requestHeaders, key)
-	}
-
-	p.reset()
-}
-
 func (p *httpRequestsParser) reset() {
 	p.protoMajor = 0
 	p.protoMinor = 0
