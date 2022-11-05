@@ -589,11 +589,12 @@ func TestHttpRequestsParser_Chunked(t *testing.T) {
 	t.Run("ChunkedWithTrailers", func(t *testing.T) {
 		parser, request := getParser()
 
-		ch := make(chan []byte)
-		go readBody(request, ch)
 		state, extra, err := parser.Parse(chunkedWithTrailers)
 		require.NoError(t, err)
 		require.Equal(t, httpparser.HeadersCompleted, state)
+
+		ch := make(chan []byte)
+		go readBody(request, ch)
 
 		state, extra, err = parser.Parse(extra)
 		require.NoError(t, err)
