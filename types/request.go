@@ -37,6 +37,7 @@ type Request struct {
 	Headers headers.Headers
 
 	ContentLength uint
+	ChunkedTE     bool
 
 	body     *requestBody
 	bodyBuff []byte
@@ -78,7 +79,16 @@ func (r *Request) OnBody(onBody onBodyCallback, onComplete onCompleteCallback) e
 // pieces of body into the buffer that is a nil by default, but may grow and will stay
 // as big as it grew until the disconnect
 func (r *Request) Body() ([]byte, error) {
+	if r.ContentLength == 0 && !r.ChunkedTE {
+		return r.bodyBuff[:0], nil
+	}
+
+	if r.bodyBuff == nil {
+		r.bodyBuff = make([]byte, r.ContentLength)
+	}
+
 	r.bodyBuff = r.bodyBuff[:0]
+
 	err := r.body.Read(func(b []byte) error {
 		r.bodyBuff = append(r.bodyBuff, b...)
 		return nil
@@ -97,9 +107,29 @@ func (r *Request) Reader() io.Reader {
 
 // Reset resets request headers and reads body into nowhere until completed.
 // It is implemented to clear the request object between requests
-func (r *Request) Reset() error {
+func (r *Request) Reset() (err error) {
 	r.Fragment = ""
 	r.Query.Set(nil)
+
+	if err = r.resetBody(); err != nil {
+		return err
+	}
+
+	r.ContentLength = 0
+	r.ChunkedTE = false
+
+	return nil
+}
+
+func (r *Request) resetBody() error {
+	if r.ContentLength == 0 && !r.ChunkedTE {
+		// in case request does not contain a body, it makes no sense to wait
+		// for the only nil from channel. This avoids some useless goroutines
+		// switches
+		r.body.Unread()
+
+		return nil
+	}
 
 	return r.body.Reset()
 }
@@ -109,7 +139,7 @@ func Hijacker(request *Request, hijacker hijackConn) func() (net.Conn, error) {
 		// we anyway don't need to have a body anymore. Also, without reading
 		// the body until complete server will not transfer into the state
 		// we need so this step is anyway compulsory
-		switch err := request.body.Reset(); err {
+		switch err := request.resetBody(); err {
 		case nil, ErrRead:
 		default:
 			return nil, err
