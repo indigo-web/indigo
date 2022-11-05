@@ -311,7 +311,7 @@ pathDecode2Char:
 	if !isHex(data[0]) {
 		return parser.Error, nil, http.ErrURIDecoding
 	}
-
+  
 	if p.pointer >= len(p.startLineBuff) {
 		return parser.Error, nil, http.ErrURITooLong
 	}
@@ -877,6 +877,17 @@ headerValueCRLFCR:
 	default:
 		return parser.Error, nil, http.ErrBadRequest
 	}
+}
+
+func (p *httpRequestsParser) Release() {
+	requestHeaders := p.request.Headers.AsMap()
+
+	for key, values := range requestHeaders {
+		p.headersValuesPool.Release(values)
+		delete(requestHeaders, key)
+	}
+
+	p.reset()
 }
 
 func (p *httpRequestsParser) Release() {
