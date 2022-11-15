@@ -14,7 +14,7 @@ import (
 // instead of any and reflection. This increases performance a
 // lot
 
-// A valueCtx carries a key-value pair. It implements Value for that key and
+// valueCtx carries a key-value pair. It implements Value for that key and
 // delegates all other calls to the embedded Context.
 type valueCtx[K comparable, V any] struct {
 	context.Context
