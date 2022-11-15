@@ -1,6 +1,7 @@
 package server
 
 import (
+	"github.com/fakefloordiv/indigo/http/status"
 	"net"
 
 	"github.com/fakefloordiv/indigo/internal/render"
@@ -8,7 +9,6 @@ import (
 	"github.com/fakefloordiv/indigo/http"
 	"github.com/fakefloordiv/indigo/internal/parser"
 	"github.com/fakefloordiv/indigo/router"
-	"github.com/fakefloordiv/indigo/types"
 )
 
 // HTTPServer provides 3 methods:
@@ -26,8 +26,8 @@ type HTTPServer interface {
 }
 
 type httpServer struct {
-	request    *types.Request
-	respWriter types.ResponseWriter
+	request    *http.Request
+	respWriter http.ResponseWriter
 	router     router.Router
 	parser     parser.HTTPRequestsParser
 	conn       net.Conn
@@ -38,7 +38,7 @@ type httpServer struct {
 }
 
 func NewHTTPServer(
-	req *types.Request, router router.Router, parser parser.HTTPRequestsParser,
+	req *http.Request, router router.Router, parser parser.HTTPRequestsParser,
 	conn net.Conn, renderer *render.Renderer,
 ) HTTPServer {
 	server := &httpServer{
@@ -54,7 +54,7 @@ func NewHTTPServer(
 		notifier: make(chan serverState),
 	}
 
-	req.Hijack = types.Hijacker(req, server.HijackConn)
+	req.Hijack = http.Hijacker(req, server.HijackConn)
 
 	return server
 }
@@ -70,7 +70,7 @@ func (h *httpServer) Run() {
 // to the parser state returned, decides what to do
 func (h *httpServer) OnData(data []byte) (err error) {
 	if len(data) == 0 {
-		h.err = http.ErrConnectionTimeout
+		h.err = status.ErrConnectionTimeout
 		h.notifier <- eError
 		<-h.notifier
 
@@ -94,19 +94,19 @@ func (h *httpServer) OnData(data []byte) (err error) {
 			case eProcessed:
 				h.parser.Release()
 			case eConnHijack:
-				return http.ErrHijackConn
+				return status.ErrHijackConn
 			default:
-				return http.ErrCloseConnection
+				return status.ErrCloseConnection
 			}
 		case parser.ConnectionClose:
-			h.err = http.ErrCloseConnection
+			h.err = status.ErrCloseConnection
 			h.notifier <- eError
 			<-h.notifier
 
 			return nil
 		case parser.Error:
-			if err == http.ErrURIDecoding {
-				err = http.ErrBadRequest
+			if err == status.ErrURIDecoding {
+				err = status.ErrBadRequest
 			}
 
 			h.err = err
@@ -133,7 +133,7 @@ func (h *httpServer) requestProcessor() {
 	// that is actually not that cheap
 	respRenderer := h.renderer.Response
 
-	renderer := func(response types.Response) error {
+	renderer := func(response http.Response) error {
 		return respRenderer(h.request, response, h.respWriter)
 	}
 

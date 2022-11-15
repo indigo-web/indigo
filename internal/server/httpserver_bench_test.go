@@ -1,7 +1,7 @@
 package server
 
 import (
-	"context"
+	"github.com/fakefloordiv/indigo/http"
 	"net"
 	"testing"
 	"time"
@@ -16,7 +16,6 @@ import (
 	render2 "github.com/fakefloordiv/indigo/internal/render"
 	"github.com/fakefloordiv/indigo/router/inbuilt"
 	"github.com/fakefloordiv/indigo/settings"
-	"github.com/fakefloordiv/indigo/types"
 )
 
 var (
@@ -96,26 +95,26 @@ func (connMock) SetWriteDeadline(time.Time) error {
 func BenchmarkIndigo(b *testing.B) {
 	router := inbuilt.NewRouter()
 	root := router.Resource("/")
-	root.Get(func(context.Context, *types.Request) types.Response {
-		return types.OK()
+	root.Get(func(request *http.Request) http.Response {
+		return request.Respond
 	})
-	root.Post(func(_ context.Context, request *types.Request) types.Response {
+	root.Post(func(request *http.Request) http.Response {
 		_ = request.OnBody(func([]byte) error {
 			return nil
 		}, func(error) {
 		})
 
-		return types.OK()
+		return request.Respond
 	})
 
-	router.Get("/with-header", func(context.Context, *types.Request) types.Response {
-		return types.WithHeader("Hello", "world")
+	router.Get("/with-header", func(request *http.Request) http.Response {
+		return request.Respond.WithHeader("Hello", "World")
 	})
 
-	router.Get("/with-two-headers", func(context.Context, *types.Request) types.Response {
-		return types.
-			WithHeader("Hello", "world").
-			WithHeader("Lorem", "ipsum")
+	router.Get("/with-two-headers", func(request *http.Request) http.Response {
+		return request.Respond.
+			WithHeader("Hello", "World").
+			WithHeader("Lorem", "Ipsum")
 	})
 
 	router.OnStart()
@@ -124,7 +123,9 @@ func BenchmarkIndigo(b *testing.B) {
 	query := url.NewQuery(func() map[string][]byte {
 		return make(map[string][]byte)
 	})
-	request, writer := types.NewRequest(headers.NewHeaders(nil), query, nil)
+	request, writer := http.NewRequest(
+		headers.NewHeaders(nil), query, nil, nil, http.NewResponse(),
+	)
 	keyAllocator := alloc.NewAllocator(
 		int(s.Headers.KeyLength.Maximal)*int(s.Headers.Number.Default),
 		int(s.Headers.KeyLength.Maximal)*int(s.Headers.Number.Maximal),
