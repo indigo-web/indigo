@@ -1,10 +1,10 @@
 package inbuilt
 
 import (
+	"github.com/fakefloordiv/indigo/http"
 	methods "github.com/fakefloordiv/indigo/http/method"
 	"github.com/fakefloordiv/indigo/http/proto"
 	"github.com/fakefloordiv/indigo/internal/httpchars"
-	"github.com/fakefloordiv/indigo/types"
 )
 
 /*
@@ -12,13 +12,13 @@ This file is responsible for rendering http requests. Prime use case is renderin
 http requests back as a response to a trace request
 */
 
-func traceResponse(messageBody []byte) types.Response {
-	return types.
+func traceResponse(respond http.Response, messageBody []byte) http.Response {
+	return respond.
 		WithHeader("Content-Type", "message/http").
 		WithBodyByte(messageBody)
 }
 
-func renderHTTPRequest(request *types.Request, buff []byte) []byte {
+func renderHTTPRequest(request *http.Request, buff []byte) []byte {
 	buff = append(buff, methods.ToString(request.Method)...)
 	buff = append(buff, httpchars.SP...)
 	buff = requestURI(request, buff)
@@ -31,7 +31,7 @@ func renderHTTPRequest(request *types.Request, buff []byte) []byte {
 	return append(buff, httpchars.CRLF...)
 }
 
-func requestURI(request *types.Request, buff []byte) []byte {
+func requestURI(request *http.Request, buff []byte) []byte {
 	buff = append(buff, request.Path...)
 
 	if query := request.Query.Raw(); len(query) > 0 {
@@ -47,7 +47,7 @@ func requestURI(request *types.Request, buff []byte) []byte {
 	return buff
 }
 
-func requestHeaders(request *types.Request, buff []byte) []byte {
+func requestHeaders(request *http.Request, buff []byte) []byte {
 	for k, v := range request.Headers.AsMap() {
 		buff = append(append(buff, k...), httpchars.COLONSP...)
 		buff = joinValuesInto(buff, v)
