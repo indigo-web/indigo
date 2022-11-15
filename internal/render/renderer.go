@@ -6,22 +6,28 @@ import (
 	"math"
 	"os"
 	"strconv"
-
-	"github.com/fakefloordiv/indigo/http/status"
-
-	"github.com/fakefloordiv/indigo/internal/httpchars"
-
-	methods "github.com/fakefloordiv/indigo/http/method"
+	"strings"
 
 	"github.com/fakefloordiv/indigo/http"
+	methods "github.com/fakefloordiv/indigo/http/method"
 	"github.com/fakefloordiv/indigo/http/proto"
-	"github.com/fakefloordiv/indigo/types"
+	"github.com/fakefloordiv/indigo/http/status"
+	"github.com/fakefloordiv/indigo/internal/httpchars"
 )
 
 var (
 	contentLength = []byte("Content-Length: ")
 
 	errConnWrite = errors.New("error occurred while communicating with conn")
+)
+
+type (
+	defaultHeader struct {
+		value string
+		seen  bool
+	}
+
+	headersMap = map[string]*defaultHeader
 )
 
 // Renderer is a session responses renderer. Its purpose is only to know
@@ -35,29 +41,20 @@ type Renderer struct {
 	buffOffset int
 	keepAlive  bool
 
-	defaultHeaders map[string][]string
+	defaultHeaders headersMap
 	fileBuff       []byte
 }
 
 func NewRenderer(buff, fileBuff []byte, defaultHeaders map[string][]string) *Renderer {
 	return &Renderer{
 		buff:           buff,
-		defaultHeaders: defaultHeaders,
+		defaultHeaders: parseDefaultHeaders(defaultHeaders),
 		fileBuff:       fileBuff,
 	}
 }
 
-// Response method is rendering types.Response object into some buffer and then writes
-// it into the writer. Response method must provide next functionality:
-// 1) Render types.Response object according to the provided protocol version
-// 2) Be sure that used features of response are supported by client (provided protocol)
-// 3) Support default headers
-// 4) Add system-important headers, e.g. Content-Length
-// 5) Content encodings must be applied here
-// 6) Stream-based files uploading must be supported
-// 7) Handle closing connection in case protocol requires or has not specified the opposite
 func (r *Renderer) Response(
-	request *types.Request, response types.Response, writer types.ResponseWriter,
+	request *http.Request, response http.Response, writer http.ResponseWriter,
 ) (err error) {
 	switch r.keepAlive {
 	case false:
@@ -66,7 +63,7 @@ func (r *Renderer) Response(
 		// be closed after this call anyway
 		r.keepAlive = isKeepAlive(request)
 		if !r.keepAlive {
-			err = http.ErrCloseConnection
+			err = status.ErrCloseConnection
 		}
 
 		r.buff = append(append(r.buff, proto.ToBytes(request.Proto)...), httpchars.SP...)
@@ -75,7 +72,7 @@ func (r *Renderer) Response(
 		// in case request Connection header is set to close, this response must be the last
 		// one, after which one connection will be closed. It's better to close it silently
 		if request.Headers.Value("connection") == "close" {
-			err = http.ErrCloseConnection
+			err = status.ErrCloseConnection
 		}
 	}
 
@@ -90,11 +87,21 @@ func (r *Renderer) Response(
 		buff = append(append(buff, status.Text(response.Code)...), httpchars.CRLF...)
 	}
 
-	customRespHeaders := response.Headers()
-	respHeaders := mergeHeaders(r.defaultHeaders, customRespHeaders.AsMap())
+	responseHeaders := response.Headers()
 
-	for key, values := range respHeaders {
-		buff = append(renderHeader(key, values, buff), httpchars.CRLF...)
+	for i := 0; i < len(responseHeaders)/2; i += 2 {
+		buff = renderHeaderInto(buff, responseHeaders[i], responseHeaders[i+1])
+
+		if defaultHdr, found := r.defaultHeaders[responseHeaders[i]]; found {
+			defaultHdr.seen = true
+		}
+	}
+
+	for key, value := range r.defaultHeaders {
+		if !value.seen {
+			buff = renderHeaderInto(buff, key, value.value)
+			value.seen = false
+		}
 	}
 
 	if len(response.Filename) > 0 {
@@ -141,7 +148,7 @@ func (r *Renderer) Response(
 // For small and medium projects, this may be enough, for anything serious - most of all
 // nginx will be used (the same is about https)
 func (r *Renderer) renderFileInto(
-	method methods.Method, writer types.ResponseWriter, response types.Response,
+	method methods.Method, writer http.ResponseWriter, response http.Response,
 ) error {
 	file, err := os.OpenFile(response.Filename, os.O_RDONLY, 0)
 	if err != nil {
@@ -192,20 +199,16 @@ func renderContentLength(value int64, buff []byte) []byte {
 	return append(strconv.AppendInt(buff, value, 10), httpchars.CRLF...)
 }
 
-func renderHeader(key string, hdrs []string, into []byte) []byte {
-	into = append(append(into, key...), httpchars.COLONSP...)
-	into = append(into, hdrs[0]...)
+func renderHeaderInto(buff []byte, key, value string) []byte {
+	buff = append(buff, key...)
+	buff = append(buff, httpchars.COLONSP...)
+	buff = append(buff, value...)
 
-	for i := range hdrs[1:] {
-		into = append(into, httpchars.COMMA...)
-		into = append(into, hdrs[i+1]...)
-	}
-
-	return into
+	return append(buff, httpchars.CRLF...)
 }
 
 // isKeepAlive decides whether connection is keep-alive or not
-func isKeepAlive(request *types.Request) bool {
+func isKeepAlive(request *http.Request) bool {
 	if request.Proto == proto.HTTP09 {
 		return false
 	}
@@ -219,17 +222,14 @@ func isKeepAlive(request *types.Request) bool {
 	return request.Proto == proto.HTTP11
 }
 
-// mergeHeaders merges a with b, overriding values from a
-func mergeHeaders(a, b map[string][]string) map[string][]string {
-	if b == nil {
-		return a
-	}
+func parseDefaultHeaders(hdrs map[string][]string) headersMap {
+	m := make(headersMap, len(hdrs))
 
-	for key, val := range a {
-		if _, found := b[key]; !found {
-			b[key] = val
+	for key, values := range hdrs {
+		m[key] = &defaultHeader{
+			value: strings.Join(values, ","),
 		}
 	}
 
-	return b
+	return m
 }
