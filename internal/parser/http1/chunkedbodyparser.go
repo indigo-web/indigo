@@ -1,8 +1,8 @@
 package http1
 
 import (
-	"github.com/fakefloordiv/indigo/http"
 	"github.com/fakefloordiv/indigo/http/encodings"
+	"github.com/fakefloordiv/indigo/http/status"
 	"github.com/fakefloordiv/indigo/internal/body"
 	"github.com/fakefloordiv/indigo/settings"
 )
@@ -43,7 +43,7 @@ func (c *chunkedBodyParser) Parse(
 		switch c.state {
 		case eChunkLength1Char:
 			if !isHex(data[i]) {
-				return true, nil, http.ErrBadRequest
+				return true, nil, status.ErrBadRequest
 			}
 
 			c.chunkLength = uint32(unHex(data[i]))
@@ -56,12 +56,12 @@ func (c *chunkedBodyParser) Parse(
 				c.state = eChunkLengthCRLF
 			default:
 				if !isHex(data[i]) {
-					return true, nil, http.ErrBadRequest
+					return true, nil, status.ErrBadRequest
 				}
 
 				c.chunkLength = (c.chunkLength << 4) | uint32(unHex(data[i]))
 				if c.chunkLength > c.settings.Body.ChunkSize.Maximal {
-					return true, nil, http.ErrTooLarge
+					return true, nil, status.ErrTooLarge
 				}
 			}
 		case eChunkLengthCR:
@@ -69,7 +69,7 @@ func (c *chunkedBodyParser) Parse(
 			case '\n':
 				c.state = eChunkLengthCRLF
 			default:
-				return true, nil, http.ErrBadRequest
+				return true, nil, status.ErrBadRequest
 			}
 		case eChunkLengthCRLF:
 			if c.chunkLength == 0 {
@@ -82,7 +82,7 @@ func (c *chunkedBodyParser) Parse(
 					return true, data[i+1:], nil
 				default:
 					if !trailer {
-						return true, nil, http.ErrBadRequest
+						return true, nil, status.ErrBadRequest
 					}
 
 					c.state = eFooter
@@ -114,7 +114,7 @@ func (c *chunkedBodyParser) Parse(
 				case '\n':
 					c.state = eChunkBodyCRLF
 				default:
-					return true, nil, http.ErrBadRequest
+					return true, nil, status.ErrBadRequest
 				}
 			}
 		case eChunkBodyCR:
@@ -122,7 +122,7 @@ func (c *chunkedBodyParser) Parse(
 			case '\n':
 				c.state = eChunkBodyCRLF
 			default:
-				return true, nil, http.ErrBadRequest
+				return true, nil, status.ErrBadRequest
 			}
 		case eChunkBodyCRLF:
 			switch data[i] {
@@ -139,7 +139,7 @@ func (c *chunkedBodyParser) Parse(
 			default:
 				c.chunkLength = uint32(unHex(data[i]))
 				if c.chunkLength > c.settings.Body.ChunkSize.Maximal {
-					return true, nil, http.ErrTooLarge
+					return true, nil, status.ErrTooLarge
 				}
 
 				c.state = eChunkLength
@@ -155,7 +155,7 @@ func (c *chunkedBodyParser) Parse(
 
 				c.state = eFooter
 			default:
-				return true, nil, http.ErrBadRequest
+				return true, nil, status.ErrBadRequest
 			}
 		case eFooter:
 			switch data[i] {
@@ -169,7 +169,7 @@ func (c *chunkedBodyParser) Parse(
 			case '\n':
 				c.state = eFooterCRLF
 			default:
-				return true, nil, http.ErrBadRequest
+				return true, nil, status.ErrBadRequest
 			}
 		case eFooterCRLF:
 			switch data[i] {
@@ -189,7 +189,7 @@ func (c *chunkedBodyParser) Parse(
 
 				return true, data[i+1:], nil
 			default:
-				return done, nil, http.ErrBadRequest
+				return done, nil, status.ErrBadRequest
 			}
 		}
 	}

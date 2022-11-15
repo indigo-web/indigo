@@ -1,11 +1,11 @@
 package http1
 
 import (
+	"github.com/fakefloordiv/indigo/http/status"
 	"testing"
 
 	"github.com/fakefloordiv/indigo/internal/body"
 
-	"github.com/fakefloordiv/indigo/http"
 	"github.com/fakefloordiv/indigo/settings"
 
 	"github.com/stretchr/testify/require"
@@ -89,6 +89,6 @@ func TestChunkedBodyParser_Parse_Negative(t *testing.T) {
 		done, extra, err := parser.Parse(chunked, nopDecoder, false)
 		require.True(t, done)
 		require.Empty(t, extra)
-		require.EqualError(t, err, http.ErrBadRequest.Error())
+		require.EqualError(t, err, status.ErrBadRequest.Error())
 	})
 }

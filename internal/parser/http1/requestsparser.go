@@ -6,13 +6,13 @@ import (
 	"github.com/fakefloordiv/indigo/http/headers"
 	methods "github.com/fakefloordiv/indigo/http/method"
 	"github.com/fakefloordiv/indigo/http/proto"
+	"github.com/fakefloordiv/indigo/http/status"
 	"github.com/fakefloordiv/indigo/internal"
 	"github.com/fakefloordiv/indigo/internal/alloc"
 	"github.com/fakefloordiv/indigo/internal/body"
 	"github.com/fakefloordiv/indigo/internal/parser"
 	"github.com/fakefloordiv/indigo/internal/pool"
 	"github.com/fakefloordiv/indigo/settings"
-	"github.com/fakefloordiv/indigo/types"
 )
 
 const maxMethodLength = len("CONNECT")
@@ -25,7 +25,7 @@ const maxMethodLength = len("CONNECT")
 // the pending data as an extra. Body must be processed separately
 type httpRequestsParser struct {
 	state   parserState
-	request *types.Request
+	request *http.Request
 
 	settings settings.Settings
 
@@ -53,7 +53,7 @@ type httpRequestsParser struct {
 }
 
 func NewHTTPRequestsParser(
-	request *types.Request, body *body.Gateway, keyAllocator, valAllocator alloc.Allocator,
+	request *http.Request, body *body.Gateway, keyAllocator, valAllocator alloc.Allocator,
 	valuesPool pool.ObjectPool[[]string], startLineBuff []byte, settings settings.Settings,
 	decoders encodings.Decoders,
 ) parser.HTTPRequestsParser {
@@ -209,17 +209,17 @@ method:
 		switch data[i] {
 		case '\r', '\n': // rfc2068, 4.1
 			if p.pointer > 0 {
-				return parser.Error, nil, http.ErrMethodNotImplemented
+				return parser.Error, nil, status.ErrMethodNotImplemented
 			}
 		case ' ':
 			if p.pointer == 0 {
-				return parser.Error, nil, http.ErrBadRequest
+				return parser.Error, nil, status.ErrBadRequest
 			}
 
 			p.request.Method = methods.Parse(internal.B2S(p.startLineBuff[:p.pointer]))
 
 			if p.request.Method == methods.Unknown {
-				return parser.Error, nil, http.ErrMethodNotImplemented
+				return parser.Error, nil, status.ErrMethodNotImplemented
 			}
 
 			p.begin = p.pointer
@@ -228,7 +228,7 @@ method:
 			goto path
 		default:
 			if p.pointer > maxMethodLength {
-				return parser.Error, nil, http.ErrBadRequest
+				return parser.Error, nil, status.ErrBadRequest
 			}
 
 			p.startLineBuff[p.pointer] = data[i]
@@ -243,7 +243,7 @@ path:
 		switch data[i] {
 		case ' ':
 			if p.begin == p.pointer {
-				return parser.Error, nil, http.ErrBadRequest
+				return parser.Error, nil, status.ErrBadRequest
 			}
 
 			p.request.Path = internal.B2S(p.startLineBuff[p.begin:p.pointer])
@@ -276,10 +276,10 @@ path:
 			goto fragment
 		case '\x00', '\n', '\r', '\t', '\b', '\a', '\v', '\f':
 			// request path MUST NOT include any non-printable characters
-			return parser.Error, nil, http.ErrBadRequest
+			return parser.Error, nil, status.ErrBadRequest
 		default:
 			if p.pointer >= len(p.startLineBuff) {
-				return parser.Error, nil, http.ErrURITooLong
+				return parser.Error, nil, status.ErrURITooLong
 			}
 
 			p.startLineBuff[p.pointer] = data[i]
@@ -295,7 +295,7 @@ pathDecode1Char:
 	}
 
 	if !isHex(data[0]) {
-		return parser.Error, nil, http.ErrURIDecoding
+		return parser.Error, nil, status.ErrURIDecoding
 	}
 
 	p.urlEncodedChar = unHex(data[0]) << 4
@@ -309,11 +309,11 @@ pathDecode2Char:
 	}
 
 	if !isHex(data[0]) {
-		return parser.Error, nil, http.ErrURIDecoding
+		return parser.Error, nil, status.ErrURIDecoding
 	}
 
 	if p.pointer >= len(p.startLineBuff) {
-		return parser.Error, nil, http.ErrURITooLong
+		return parser.Error, nil, status.ErrURITooLong
 	}
 
 	p.startLineBuff[p.pointer] = p.urlEncodedChar | unHex(data[0])
@@ -341,16 +341,16 @@ query:
 			goto queryDecode1Char
 		case '+':
 			if p.pointer >= len(p.startLineBuff) {
-				return parser.Error, nil, http.ErrURITooLong
+				return parser.Error, nil, status.ErrURITooLong
 			}
 
 			p.startLineBuff[p.pointer] = ' '
 			p.pointer++
 		case '\x00', '\n', '\r', '\t', '\b', '\a', '\v', '\f':
-			return parser.Error, nil, http.ErrBadRequest
+			return parser.Error, nil, status.ErrBadRequest
 		default:
 			if p.pointer >= len(p.startLineBuff) {
-				return parser.Error, nil, http.ErrURITooLong
+				return parser.Error, nil, status.ErrURITooLong
 			}
 
 			p.startLineBuff[p.pointer] = data[i]
@@ -366,7 +366,7 @@ queryDecode1Char:
 	}
 
 	if !isHex(data[0]) {
-		return parser.Error, nil, http.ErrURIDecoding
+		return parser.Error, nil, status.ErrURIDecoding
 	}
 
 	p.urlEncodedChar = unHex(data[0]) << 4
@@ -380,10 +380,10 @@ queryDecode2Char:
 	}
 
 	if !isHex(data[0]) {
-		return parser.Error, nil, http.ErrURIDecoding
+		return parser.Error, nil, status.ErrURIDecoding
 	}
 	if p.pointer >= len(p.startLineBuff) {
-		return parser.Error, nil, http.ErrURITooLong
+		return parser.Error, nil, status.ErrURITooLong
 	}
 
 	p.startLineBuff[p.pointer] = p.urlEncodedChar | unHex(data[0])
@@ -405,10 +405,10 @@ fragment:
 			p.state = eFragmentDecode1Char
 			goto fragmentDecode1Char
 		case '\x00', '\n', '\r', '\t', '\b', '\a', '\v', '\f':
-			return parser.Error, nil, http.ErrBadRequest
+			return parser.Error, nil, status.ErrBadRequest
 		default:
 			if p.pointer >= len(p.startLineBuff) {
-				return parser.Error, nil, http.ErrURITooLong
+				return parser.Error, nil, status.ErrURITooLong
 			}
 
 			p.startLineBuff[p.pointer] = data[i]
@@ -424,7 +424,7 @@ fragmentDecode1Char:
 	}
 
 	if !isHex(data[0]) {
-		return parser.Error, nil, http.ErrURIDecoding
+		return parser.Error, nil, status.ErrURIDecoding
 	}
 
 	p.urlEncodedChar = unHex(data[0]) << 4
@@ -438,10 +438,10 @@ fragmentDecode2Char:
 	}
 
 	if !isHex(data[0]) {
-		return parser.Error, nil, http.ErrURIDecoding
+		return parser.Error, nil, status.ErrURIDecoding
 	}
 	if p.pointer >= len(p.startLineBuff) {
-		return parser.Error, nil, http.ErrURITooLong
+		return parser.Error, nil, status.ErrURITooLong
 	}
 
 	p.startLineBuff[p.pointer] = p.urlEncodedChar | unHex(data[0])
@@ -463,7 +463,7 @@ proto:
 		p.state = eH
 		goto protoH
 	case '\r', '\n':
-		return parser.Error, nil, http.ErrBadRequest
+		return parser.Error, nil, status.ErrBadRequest
 	}
 
 protoH:
@@ -477,7 +477,7 @@ protoH:
 		p.state = eHT
 		goto protoHT
 	default:
-		return parser.Error, nil, http.ErrUnsupportedProtocol
+		return parser.Error, nil, status.ErrUnsupportedProtocol
 	}
 
 protoHT:
@@ -491,7 +491,7 @@ protoHT:
 		p.state = eHTT
 		goto protoHTT
 	default:
-		return parser.Error, nil, http.ErrUnsupportedProtocol
+		return parser.Error, nil, status.ErrUnsupportedProtocol
 	}
 
 protoHTT:
@@ -505,7 +505,7 @@ protoHTT:
 		p.state = eHTTP
 		goto protoHTTP
 	default:
-		return parser.Error, nil, http.ErrUnsupportedProtocol
+		return parser.Error, nil, status.ErrUnsupportedProtocol
 	}
 
 protoHTTP:
@@ -519,7 +519,7 @@ protoHTTP:
 		p.state = eProtoMajor
 		goto protoMajor
 	default:
-		return parser.Error, nil, http.ErrUnsupportedProtocol
+		return parser.Error, nil, status.ErrUnsupportedProtocol
 	}
 
 protoMajor:
@@ -528,7 +528,7 @@ protoMajor:
 	}
 
 	if data[0]-'0' > 9 {
-		return parser.Error, nil, http.ErrUnsupportedProtocol
+		return parser.Error, nil, status.ErrUnsupportedProtocol
 	}
 
 	p.protoMajor = data[0] - '0'
@@ -547,7 +547,7 @@ protoDot:
 		p.state = eProtoMinor
 		goto protoMinor
 	default:
-		return parser.Error, nil, http.ErrUnsupportedProtocol
+		return parser.Error, nil, status.ErrUnsupportedProtocol
 	}
 
 protoMinor:
@@ -556,7 +556,7 @@ protoMinor:
 	}
 
 	if data[0]-'0' > 9 {
-		return parser.Error, nil, http.ErrUnsupportedProtocol
+		return parser.Error, nil, status.ErrUnsupportedProtocol
 	}
 
 	p.protoMinor = data[0] - '0'
@@ -579,7 +579,7 @@ protoEnd:
 		p.state = eProtoCRLF
 		goto protoCRLF
 	default:
-		return parser.Error, nil, http.ErrUnsupportedProtocol
+		return parser.Error, nil, status.ErrUnsupportedProtocol
 	}
 
 protoCR:
@@ -588,7 +588,7 @@ protoCR:
 	}
 
 	if data[0] != '\n' {
-		return parser.Error, nil, http.ErrBadRequest
+		return parser.Error, nil, status.ErrBadRequest
 	}
 
 	data = data[1:]
@@ -602,7 +602,7 @@ protoCRLF:
 
 	p.request.Proto = proto.Parse(p.protoMajor, p.protoMinor)
 	if p.request.Proto == proto.Unknown {
-		return parser.Error, nil, http.ErrUnsupportedProtocol
+		return parser.Error, nil, status.ErrUnsupportedProtocol
 	}
 
 	switch data[0] {
@@ -630,7 +630,7 @@ protoCRLFCR:
 		// no request body because even no headers
 		return parser.RequestCompleted, data[1:], nil
 	default:
-		return parser.Error, nil, http.ErrBadRequest
+		return parser.Error, nil, status.ErrBadRequest
 	}
 
 headerKey:
@@ -638,13 +638,13 @@ headerKey:
 		switch data[i] {
 		case ':':
 			if p.headersNumber > p.settings.Headers.Number.Maximal {
-				return parser.Error, nil, http.ErrTooManyHeaders
+				return parser.Error, nil, status.ErrTooManyHeaders
 			}
 
 			p.headersNumber++
 
 			if !p.headerKeyAllocator.Append(data[:i]) {
-				return parser.Error, nil, http.ErrHeaderFieldsTooLarge
+				return parser.Error, nil, status.ErrHeaderFieldsTooLarge
 			}
 
 			p.headerKey = internal.B2S(p.headerKeyAllocator.Finish())
@@ -658,14 +658,14 @@ headerKey:
 			p.state = eHeaderColon
 			goto headerColon
 		case '\r', '\n':
-			return parser.Error, nil, http.ErrBadRequest
+			return parser.Error, nil, status.ErrBadRequest
 		default:
 			data[i] = data[i] | 0x20
 		}
 	}
 
 	if !p.headerKeyAllocator.Append(data) {
-		return parser.Error, nil, http.ErrHeaderFieldsTooLarge
+		return parser.Error, nil, status.ErrHeaderFieldsTooLarge
 	}
 
 	return parser.Pending, nil, nil
@@ -674,7 +674,7 @@ headerColon:
 	for i := range data {
 		switch data[i] {
 		case '\r', '\n':
-			return parser.Error, nil, http.ErrBadRequest
+			return parser.Error, nil, status.ErrBadRequest
 		case ' ':
 		default:
 			data = data[i:]
@@ -699,7 +699,7 @@ contentLength:
 			goto contentLengthCRLF
 		default:
 			if char < '0' || char > '9' {
-				return parser.Error, nil, http.ErrBadRequest
+				return parser.Error, nil, status.ErrBadRequest
 			}
 
 			p.lengthCountdown = p.lengthCountdown*10 + uint(char-'0')
@@ -719,7 +719,7 @@ contentLengthCR:
 		p.state = eContentLengthCRLF
 		goto contentLengthCRLF
 	default:
-		return parser.Error, nil, http.ErrBadRequest
+		return parser.Error, nil, status.ErrBadRequest
 	}
 
 contentLengthCRLF:
@@ -763,7 +763,7 @@ contentLengthCRLFCR:
 
 		return parser.HeadersCompleted, data[1:], nil
 	default:
-		return parser.Error, nil, http.ErrBadRequest
+		return parser.Error, nil, status.ErrBadRequest
 	}
 
 headerValue:
@@ -771,7 +771,7 @@ headerValue:
 		switch char := data[i]; char {
 		case '\r':
 			if !p.headerValueAllocator.Append(data[:i]) {
-				return parser.Error, nil, http.ErrHeaderFieldsTooLarge
+				return parser.Error, nil, status.ErrHeaderFieldsTooLarge
 			}
 
 			data = data[i+1:]
@@ -779,7 +779,7 @@ headerValue:
 			goto headerValueCR
 		case '\n':
 			if !p.headerValueAllocator.Append(data[:i]) {
-				return parser.Error, nil, http.ErrHeaderFieldsTooLarge
+				return parser.Error, nil, status.ErrHeaderFieldsTooLarge
 			}
 
 			data = data[i+1:]
@@ -789,7 +789,7 @@ headerValue:
 	}
 
 	if !p.headerValueAllocator.Append(data) {
-		return parser.Error, nil, http.ErrHeaderFieldsTooLarge
+		return parser.Error, nil, status.ErrHeaderFieldsTooLarge
 	}
 
 	return parser.Pending, nil, nil
@@ -805,7 +805,7 @@ headerValueCR:
 		p.state = eHeaderValueCRLF
 		goto headerValueCRLF
 	default:
-		return parser.Error, nil, http.ErrBadRequest
+		return parser.Error, nil, status.ErrBadRequest
 	}
 
 headerValueCRLF:
@@ -832,7 +832,7 @@ headerValueCRLF:
 	case "content-encoding":
 		decoder, found := p.decoders.Get(value)
 		if !found {
-			return parser.Error, nil, http.ErrUnsupportedEncoding
+			return parser.Error, nil, status.ErrUnsupportedEncoding
 		}
 
 		p.decodeBody = true
@@ -875,7 +875,7 @@ headerValueCRLFCR:
 
 		return parser.HeadersCompleted, data[1:], nil
 	default:
-		return parser.Error, nil, http.ErrBadRequest
+		return parser.Error, nil, status.ErrBadRequest
 	}
 }
 

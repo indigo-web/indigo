@@ -1,6 +1,7 @@
 package http1
 
 import (
+	"github.com/fakefloordiv/indigo/http/status"
 	"testing"
 
 	"github.com/fakefloordiv/indigo/internal/pool"
@@ -14,8 +15,6 @@ import (
 	"github.com/fakefloordiv/indigo/internal/alloc"
 	httpparser "github.com/fakefloordiv/indigo/internal/parser"
 	settings2 "github.com/fakefloordiv/indigo/settings"
-	"github.com/fakefloordiv/indigo/types"
-
 	"github.com/stretchr/testify/require"
 )
 
@@ -45,7 +44,7 @@ var (
 	)
 )
 
-func getParser() (httpparser.HTTPRequestsParser, *types.Request) {
+func getParser() (httpparser.HTTPRequestsParser, *http.Request) {
 	s := settings2.Default()
 	keyAllocator := alloc.NewAllocator(
 		int(s.Headers.KeyLength.Maximal)*int(s.Headers.Number.Default),
@@ -55,7 +54,9 @@ func getParser() (httpparser.HTTPRequestsParser, *types.Request) {
 		int(s.Headers.ValueSpace.Default), int(s.Headers.ValueSpace.Maximal),
 	)
 	objPool := pool.NewObjectPool[[]string](20)
-	request, gateway := types.NewRequest(headers.NewHeaders(nil), url.Query{}, nil)
+	request, gateway := http.NewRequest(
+		headers.NewHeaders(nil), url.Query{}, nil, nil, http.NewResponse(),
+	)
 	codings := encodings.NewContentDecoders()
 	startLineBuff := make([]byte, s.URL.Length.Maximal)
 
@@ -64,7 +65,7 @@ func getParser() (httpparser.HTTPRequestsParser, *types.Request) {
 	), request
 }
 
-func readBody(request *types.Request, ch chan []byte) {
+func readBody(request *http.Request, ch chan []byte) {
 	body, _ := request.Body()
 	ch <- body
 }
@@ -76,7 +77,7 @@ type wantedRequest struct {
 	Headers  headers.Headers
 }
 
-func compareRequests(t *testing.T, wanted wantedRequest, actual *types.Request) {
+func compareRequests(t *testing.T, wanted wantedRequest, actual *http.Request) {
 	require.Equal(t, wanted.Method, actual.Method)
 	require.Equal(t, wanted.Path, actual.Path)
 	require.Equal(t, wanted.Protocol, actual.Proto)
@@ -102,7 +103,7 @@ func splitIntoParts(req []byte, n int) (parts [][]byte) {
 }
 
 func testPartedRequest(
-	t *testing.T, parser httpparser.HTTPRequestsParser, req *types.Request, rawRequest []byte, n int,
+	t *testing.T, parser httpparser.HTTPRequestsParser, req *http.Request, rawRequest []byte, n int,
 ) (body []byte) {
 	var finalState httpparser.RequestState
 	parts := splitIntoParts(rawRequest, n)
@@ -385,7 +386,7 @@ func TestHttpRequestsParser_Parse_Negative(t *testing.T) {
 		go readBody(request, ch)
 		state, _, err := parser.Parse(raw)
 
-		require.EqualError(t, err, http.ErrBadRequest.Error())
+		require.EqualError(t, err, status.ErrBadRequest.Error())
 		require.Equal(t, httpparser.Error, state)
 	})
 
@@ -397,7 +398,7 @@ func TestHttpRequestsParser_Parse_Negative(t *testing.T) {
 		go readBody(request, ch)
 		state, _, err := parser.Parse(raw)
 
-		require.EqualError(t, err, http.ErrBadRequest.Error())
+		require.EqualError(t, err, status.ErrBadRequest.Error())
 		require.Equal(t, httpparser.Error, state)
 	})
 
@@ -409,7 +410,7 @@ func TestHttpRequestsParser_Parse_Negative(t *testing.T) {
 		go readBody(request, ch)
 		state, _, err := parser.Parse(raw)
 
-		require.EqualError(t, err, http.ErrBadRequest.Error())
+		require.EqualError(t, err, status.ErrBadRequest.Error())
 		require.Equal(t, httpparser.Error, state)
 	})
 
@@ -421,7 +422,7 @@ func TestHttpRequestsParser_Parse_Negative(t *testing.T) {
 		go readBody(request, ch)
 		state, _, err := parser.Parse(raw)
 
-		require.EqualError(t, err, http.ErrMethodNotImplemented.Error())
+		require.EqualError(t, err, status.ErrMethodNotImplemented.Error())
 		require.Equal(t, httpparser.Error, state)
 	})
 
@@ -433,7 +434,7 @@ func TestHttpRequestsParser_Parse_Negative(t *testing.T) {
 		go readBody(request, ch)
 		state, _, err := parser.Parse(raw)
 
-		require.EqualError(t, err, http.ErrBadRequest.Error())
+		require.EqualError(t, err, status.ErrBadRequest.Error())
 		require.Equal(t, httpparser.Error, state)
 	})
 
@@ -445,7 +446,7 @@ func TestHttpRequestsParser_Parse_Negative(t *testing.T) {
 		go readBody(request, ch)
 		state, _, err := parser.Parse(raw)
 
-		require.EqualError(t, err, http.ErrUnsupportedProtocol.Error())
+		require.EqualError(t, err, status.ErrUnsupportedProtocol.Error())
 		require.Equal(t, httpparser.Error, state)
 	})
 
@@ -457,7 +458,7 @@ func TestHttpRequestsParser_Parse_Negative(t *testing.T) {
 		go readBody(request, ch)
 		state, _, err := parser.Parse(raw)
 
-		require.EqualError(t, err, http.ErrUnsupportedProtocol.Error())
+		require.EqualError(t, err, status.ErrUnsupportedProtocol.Error())
 		require.Equal(t, httpparser.Error, state)
 	})
 
@@ -469,7 +470,7 @@ func TestHttpRequestsParser_Parse_Negative(t *testing.T) {
 		go readBody(request, ch)
 		state, _, err := parser.Parse(raw)
 
-		require.EqualError(t, err, http.ErrUnsupportedProtocol.Error())
+		require.EqualError(t, err, status.ErrUnsupportedProtocol.Error())
 		require.Equal(t, httpparser.Error, state)
 	})
 
@@ -481,7 +482,7 @@ func TestHttpRequestsParser_Parse_Negative(t *testing.T) {
 		go readBody(request, ch)
 		state, _, err := parser.Parse(raw)
 
-		require.EqualError(t, err, http.ErrBadRequest.Error())
+		require.EqualError(t, err, status.ErrBadRequest.Error())
 		require.Equal(t, httpparser.Error, state)
 	})
 
@@ -510,7 +511,7 @@ func TestHttpRequestsParser_Parse_Negative(t *testing.T) {
 		go readBody(request, ch)
 		state, _, err := parser.Parse(raw)
 
-		require.EqualError(t, err, http.ErrBadRequest.Error())
+		require.EqualError(t, err, status.ErrBadRequest.Error())
 		require.Equal(t, httpparser.Error, state)
 	})
 
@@ -522,7 +523,7 @@ func TestHttpRequestsParser_Parse_Negative(t *testing.T) {
 		go readBody(request, ch)
 		state, _, err := parser.Parse(raw)
 
-		require.EqualError(t, err, http.ErrBadRequest.Error())
+		require.EqualError(t, err, status.ErrBadRequest.Error())
 		require.Equal(t, httpparser.Error, state)
 	})
 
@@ -534,7 +535,7 @@ func TestHttpRequestsParser_Parse_Negative(t *testing.T) {
 		go readBody(request, ch)
 		state, _, err := parser.Parse(raw)
 
-		require.EqualError(t, err, http.ErrUnsupportedProtocol.Error())
+		require.EqualError(t, err, status.ErrUnsupportedProtocol.Error())
 		require.Equal(t, httpparser.Error, state)
 	})
 
@@ -546,7 +547,7 @@ func TestHttpRequestsParser_Parse_Negative(t *testing.T) {
 		go readBody(request, ch)
 		state, _, err := parser.Parse(raw)
 
-		require.EqualError(t, err, http.ErrUnsupportedProtocol.Error())
+		require.EqualError(t, err, status.ErrUnsupportedProtocol.Error())
 		require.Equal(t, httpparser.Error, state)
 	})
 
@@ -554,7 +555,7 @@ func TestHttpRequestsParser_Parse_Negative(t *testing.T) {
 		parser, _ := getParser()
 		req := "GET / HTTP/1.1\r\nContent-Length: 1f5\r\n\r\n"
 		_, _, err := parser.Parse([]byte(req))
-		require.EqualError(t, err, http.ErrBadRequest.Error())
+		require.EqualError(t, err, status.ErrBadRequest.Error())
 	})
 
 	t.Run("SimpleRequest", func(t *testing.T) {
@@ -564,7 +565,7 @@ func TestHttpRequestsParser_Parse_Negative(t *testing.T) {
 		parser, _ := getParser()
 		req := "GET / \r\n"
 		_, _, err := parser.Parse([]byte(req))
-		require.EqualError(t, err, http.ErrBadRequest.Error())
+		require.EqualError(t, err, status.ErrBadRequest.Error())
 	})
 }
 
