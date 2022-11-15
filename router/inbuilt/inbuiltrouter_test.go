@@ -1,7 +1,7 @@
 package inbuilt
 
 import (
-	"context"
+	"github.com/fakefloordiv/indigo/http"
 	"testing"
 
 	routertypes "github.com/fakefloordiv/indigo/router/inbuilt/types"
@@ -9,17 +9,13 @@ import (
 	"github.com/fakefloordiv/indigo/http/status"
 
 	methods "github.com/fakefloordiv/indigo/http/method"
-	"github.com/fakefloordiv/indigo/types"
-
 	"github.com/stretchr/testify/require"
 )
 
-const respBody = "some body" // once told me
-
 // handler that does nothing, used in cases when we need nothing
 // but handler also must not be nil
-func nopHandler(_ context.Context, _ *types.Request) types.Response {
-	return types.WithResponse.WithBody(respBody)
+func nopHandler(request *http.Request) http.Response {
+	return request.Respond
 }
 
 func TestRoute(t *testing.T) {
@@ -65,7 +61,7 @@ func TestRoute(t *testing.T) {
 		// we have not registered any HEAD-method handler yet, so GET method
 		// is expected to be called (but without body)
 		require.Equal(t, status.OK, resp.Code)
-		require.Equal(t, respBody, string(resp.Body))
+		require.Empty(t, string(resp.Body))
 	})
 }
 
