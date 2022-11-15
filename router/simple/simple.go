@@ -1,14 +1,14 @@
 package simple
 
 import (
+	"github.com/fakefloordiv/indigo/http"
 	"github.com/fakefloordiv/indigo/http/encodings"
 	router2 "github.com/fakefloordiv/indigo/router"
-	"github.com/fakefloordiv/indigo/types"
 )
 
 type (
-	Handler      func(*types.Request) types.Response
-	ErrorHandler func(*types.Request, error) types.Response
+	Handler      func(*http.Request) http.Response
+	ErrorHandler func(*http.Request, error) http.Response
 )
 
 type router struct {
@@ -23,11 +23,11 @@ func NewRouter(handler Handler, errHandler ErrorHandler) router2.Router {
 	}
 }
 
-func (r router) OnRequest(request *types.Request) types.Response {
+func (r router) OnRequest(request *http.Request) http.Response {
 	return r.handler(request)
 }
 
-func (r router) OnError(request *types.Request, err error) types.Response {
+func (r router) OnError(request *http.Request, err error) http.Response {
 	return r.errHandler(request, err)
 }
 
