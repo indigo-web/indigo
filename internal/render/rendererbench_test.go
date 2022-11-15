@@ -1,11 +1,11 @@
 package render
 
 import (
+	"github.com/fakefloordiv/indigo/http"
 	"testing"
 
 	"github.com/fakefloordiv/indigo/http/headers"
 	"github.com/fakefloordiv/indigo/http/url"
-	"github.com/fakefloordiv/indigo/types"
 )
 
 func nopWriter(_ []byte) error {
@@ -38,7 +38,10 @@ func BenchmarkRenderer_Response(b *testing.B) {
 	}
 
 	hdrs := headers.NewHeaders(make(map[string][]string))
-	defaultRequest, _ := types.NewRequest(hdrs, url.NewQuery(nil), nil)
+	defaultResponse := http.NewResponse()
+	defaultRequest, _ := http.NewRequest(
+		hdrs, url.NewQuery(nil), nil, nil, defaultResponse,
+	)
 
 	b.Run("DefaultResponse_NoDefHeaders", func(b *testing.B) {
 		buff := make([]byte, 0, 1024)
@@ -47,7 +50,7 @@ func BenchmarkRenderer_Response(b *testing.B) {
 		b.ResetTimer()
 
 		for i := 0; i < b.N; i++ {
-			renderer.Response(defaultRequest, types.WithResponse, nopWriter)
+			_ = renderer.Response(defaultRequest, defaultResponse, nopWriter)
 		}
 	})
 
@@ -58,7 +61,7 @@ func BenchmarkRenderer_Response(b *testing.B) {
 		b.ResetTimer()
 
 		for i := 0; i < b.N; i++ {
-			renderer.Response(defaultRequest, types.WithResponse, nopWriter)
+			_ = renderer.Response(defaultRequest, defaultResponse, nopWriter)
 		}
 	})
 
@@ -69,7 +72,7 @@ func BenchmarkRenderer_Response(b *testing.B) {
 		b.ResetTimer()
 
 		for i := 0; i < b.N; i++ {
-			renderer.Response(defaultRequest, types.WithResponse, nopWriter)
+			_ = renderer.Response(defaultRequest, defaultResponse, nopWriter)
 		}
 	})
 
@@ -80,7 +83,7 @@ func BenchmarkRenderer_Response(b *testing.B) {
 		b.ResetTimer()
 
 		for i := 0; i < b.N; i++ {
-			renderer.Response(defaultRequest, types.WithResponse, nopWriter)
+			_ = renderer.Response(defaultRequest, defaultResponse, nopWriter)
 		}
 	})
 }
