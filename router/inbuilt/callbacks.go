@@ -1,12 +1,11 @@
 package inbuilt
 
 import (
-	"context"
+	"github.com/fakefloordiv/indigo/http/status"
 
 	"github.com/fakefloordiv/indigo/http"
 	methods "github.com/fakefloordiv/indigo/http/method"
 	"github.com/fakefloordiv/indigo/router/inbuilt/obtainer"
-	"github.com/fakefloordiv/indigo/types"
 	"github.com/fakefloordiv/indigo/valuectx"
 )
 
@@ -25,39 +24,39 @@ func (r *Router) OnStart() {
 }
 
 // OnRequest routes the request
-func (r *Router) OnRequest(request *types.Request) types.Response {
+func (r *Router) OnRequest(request *http.Request) http.Response {
 	return r.processRequest(request)
 }
 
-func (r *Router) processRequest(request *types.Request) types.Response {
-	ctx, handler, err := r.obtainer(context.Background(), request)
+func (r *Router) processRequest(request *http.Request) http.Response {
+	handler, err := r.obtainer(request)
 	if err != nil {
-		return r.processError(ctx, request, err)
+		return r.processError(request, err)
 	}
 
-	return handler(ctx, request)
+	return handler(request)
 }
 
 // OnError receives an error and calls a corresponding handler. Handler MUST BE
 // registered, otherwise panic is raised.
 // Luckily (for user), we have all the default handlers registered
-func (r *Router) OnError(request *types.Request, err error) types.Response {
-	return r.processError(context.Background(), request, err)
+func (r *Router) OnError(request *http.Request, err error) http.Response {
+	return r.processError(request, err)
 }
 
-func (r *Router) processError(ctx context.Context, request *types.Request, err error) types.Response {
-	if request.Method == methods.TRACE && err == http.ErrMethodNotAllowed {
+func (r *Router) processError(request *http.Request, err error) http.Response {
+	if request.Method == methods.TRACE && err == status.ErrMethodNotAllowed {
 		r.traceBuff = renderHTTPRequest(request, r.traceBuff)
 
-		return traceResponse(r.traceBuff)
+		return traceResponse(request.Respond, r.traceBuff)
 	}
 
 	handler, found := r.errHandlers[err]
 	if !found {
-		return types.WithError(err)
+		return request.Respond.WithError(err)
 	}
 
-	ctx = valuectx.WithValue(ctx, "error", err)
+	request.Ctx = valuectx.WithValue(request.Ctx, "error", err)
 
-	return handler(ctx, request)
+	return handler(request)
 }
