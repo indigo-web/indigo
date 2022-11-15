@@ -1,7 +1,9 @@
 package indigo
 
 import (
+	"context"
 	"errors"
+	"github.com/fakefloordiv/indigo/http"
 	"net"
 	"sync"
 
@@ -17,7 +19,6 @@ import (
 	"github.com/fakefloordiv/indigo/internal/render"
 	"github.com/fakefloordiv/indigo/router"
 	settings2 "github.com/fakefloordiv/indigo/settings"
-	"github.com/fakefloordiv/indigo/types"
 )
 
 const (
@@ -109,7 +110,8 @@ func (a Application) Serve(r router.Router, settings ...settings2.Settings) erro
 			return make(map[string][]byte, s.URL.Query.Number.Default)
 		})
 		hdrs := headers.NewHeaders(make(map[string][]string, s.Headers.Number.Default))
-		request, gateway := types.NewRequest(hdrs, query, conn.RemoteAddr())
+		response := http.NewResponse()
+		request, gateway := http.NewRequest(hdrs, query, conn.RemoteAddr(), context.Background(), response)
 
 		startLineBuff := make([]byte, s.URL.Length.Maximal)
 
