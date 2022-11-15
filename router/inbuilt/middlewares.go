@@ -1,10 +1,9 @@
 package inbuilt
 
 import (
-	"context"
+	"github.com/fakefloordiv/indigo/http"
 
 	routertypes "github.com/fakefloordiv/indigo/router/inbuilt/types"
-	"github.com/fakefloordiv/indigo/types"
 )
 
 /*
@@ -40,9 +39,9 @@ func compose(handler routertypes.HandlerFunc, middlewares []routertypes.Middlewa
 		return handler
 	}
 
-	return func(ctx context.Context, request *types.Request) types.Response {
-		return middlewares[len(middlewares)-1](
-			ctx, compose(handler, middlewares[:len(middlewares)-1]), request,
+	return func(request *http.Request) http.Response {
+		return middlewares[0](
+			compose(handler, middlewares[1:]), request,
 		)
 	}
 }

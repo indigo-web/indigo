@@ -1,7 +1,7 @@
 package inbuilt
 
 import (
-	"context"
+	"github.com/fakefloordiv/indigo/http"
 	"testing"
 
 	"github.com/fakefloordiv/indigo/http/status"
@@ -13,8 +13,6 @@ import (
 	"github.com/fakefloordiv/indigo/http/headers"
 	methods "github.com/fakefloordiv/indigo/http/method"
 	"github.com/fakefloordiv/indigo/http/url"
-	"github.com/fakefloordiv/indigo/types"
-
 	"github.com/stretchr/testify/require"
 )
 
@@ -53,65 +51,67 @@ func (c *callstack) Clear() {
 }
 
 func getGlobal1Middleware(stack *callstack) routertypes.Middleware {
-	return func(ctx context.Context, next routertypes.HandlerFunc, request *types.Request) types.Response {
+	return func(next routertypes.HandlerFunc, request *http.Request) http.Response {
 		stack.Push(global1)
 
-		return next(ctx, request)
+		return next(request)
 	}
 }
 
 func getGlobal2Middleware(stack *callstack) routertypes.Middleware {
-	return func(ctx context.Context, next routertypes.HandlerFunc, request *types.Request) types.Response {
+	return func(next routertypes.HandlerFunc, request *http.Request) http.Response {
 		stack.Push(global2)
 
-		return next(ctx, request)
+		return next(request)
 	}
 }
 
 func getLocal1Middleware(stack *callstack) routertypes.Middleware {
-	return func(ctx context.Context, next routertypes.HandlerFunc, request *types.Request) types.Response {
+	return func(next routertypes.HandlerFunc, request *http.Request) http.Response {
 		stack.Push(local1)
 
-		return next(ctx, request)
+		return next(request)
 	}
 }
 
 func getLocal2Middleware(stack *callstack) routertypes.Middleware {
-	return func(ctx context.Context, next routertypes.HandlerFunc, request *types.Request) types.Response {
+	return func(next routertypes.HandlerFunc, request *http.Request) http.Response {
 		stack.Push(local2)
 
-		return next(ctx, request)
+		return next(request)
 	}
 }
 
 func getLocal3Middleware(stack *callstack) routertypes.Middleware {
-	return func(ctx context.Context, next routertypes.HandlerFunc, request *types.Request) types.Response {
+	return func(next routertypes.HandlerFunc, request *http.Request) http.Response {
 		stack.Push(local3)
 
-		return next(ctx, request)
+		return next(request)
 	}
 }
 
 func getPointApplied1Middleware(stack *callstack) routertypes.Middleware {
-	return func(ctx context.Context, next routertypes.HandlerFunc, request *types.Request) types.Response {
+	return func(next routertypes.HandlerFunc, request *http.Request) http.Response {
 		stack.Push(pointApplied1)
 
-		return next(ctx, request)
+		return next(request)
 	}
 }
 
 func getPointApplied2Middleware(stack *callstack) routertypes.Middleware {
-	return func(ctx context.Context, next routertypes.HandlerFunc, request *types.Request) types.Response {
+	return func(next routertypes.HandlerFunc, request *http.Request) http.Response {
 		stack.Push(pointApplied2)
 
-		return next(ctx, request)
+		return next(request)
 	}
 }
 
-func getRequest() (*types.Request, *body.Gateway) {
+func getRequest() (*http.Request, *body.Gateway) {
 	query := url.NewQuery(nil)
 
-	return types.NewRequest(headers.NewHeaders(nil), query, nil)
+	return http.NewRequest(
+		headers.NewHeaders(nil), query, nil, nil, http.NewResponse(),
+	)
 }
 
 func TestMiddlewares(t *testing.T) {
@@ -150,7 +150,7 @@ func TestMiddlewares(t *testing.T) {
 		require.Equal(t, status.OK, response.Code)
 
 		wantChain := []middleware{
-			global1, global2,
+			global2, global1,
 		}
 
 		require.Equal(t, wantChain, stack.Chain())
@@ -166,7 +166,7 @@ func TestMiddlewares(t *testing.T) {
 		require.Equal(t, status.OK, response.Code)
 
 		wantChain := []middleware{
-			local2, local1, global1, pointApplied1,
+			pointApplied1, global1, local1, local2,
 		}
 
 		require.Equal(t, wantChain, stack.Chain())
@@ -182,7 +182,7 @@ func TestMiddlewares(t *testing.T) {
 		require.Equal(t, status.OK, response.Code)
 
 		wantChain := []middleware{
-			local3, local1, global1, pointApplied2,
+			pointApplied2, global1, local1, local3,
 		}
 
 		require.Equal(t, wantChain, stack.Chain())
