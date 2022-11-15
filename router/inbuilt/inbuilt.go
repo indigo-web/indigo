@@ -1,16 +1,8 @@
 package inbuilt
 
 import (
-	"context"
-
 	"github.com/fakefloordiv/indigo/router/inbuilt/obtainer"
 	routertypes "github.com/fakefloordiv/indigo/router/inbuilt/types"
-	"github.com/fakefloordiv/indigo/types"
-)
-
-type (
-	ErrorHandler func(context.Context, *types.Request) types.Response
-	errHandlers  map[error]ErrorHandler
 )
 
 // Router is a reference implementation of router for indigo
@@ -31,7 +23,7 @@ type Router struct {
 	obtainer obtainer.Obtainer
 
 	routes      routertypes.RoutesMap
-	errHandlers errHandlers
+	errHandlers routertypes.ErrHandlers
 
 	traceBuff []byte
 }
