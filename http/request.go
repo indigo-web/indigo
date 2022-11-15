@@ -1,10 +1,10 @@
-package types
+package http
 
 import (
+	"context"
+	"github.com/fakefloordiv/indigo/internal/body"
 	"io"
 	"net"
-
-	"github.com/fakefloordiv/indigo/internal/body"
 
 	"github.com/fakefloordiv/indigo/http/headers"
 	methods "github.com/fakefloordiv/indigo/http/method"
@@ -42,7 +42,9 @@ type Request struct {
 	body     *requestBody
 	bodyBuff []byte
 
-	Hijack ConnectionHijacker
+	Ctx     context.Context
+	Respond Response
+	Hijack  ConnectionHijacker
 }
 
 // NewRequest returns a new instance of request object and body gateway
@@ -54,7 +56,10 @@ type Request struct {
 // because it has only optional purposes and buff will be nil anyway
 // But maybe it's better to implement DI all the way we go? I don't know, maybe
 // someone will contribute and fix this
-func NewRequest(hdrs headers.Headers, query url.Query, remote net.Addr) (*Request, *body.Gateway) {
+func NewRequest(
+	hdrs headers.Headers, query url.Query, remote net.Addr, ctx context.Context,
+	response Response,
+) (*Request, *body.Gateway) {
 	requestBodyStruct, gateway := newRequestBody()
 	request := &Request{
 		Query:   query,
@@ -62,6 +67,8 @@ func NewRequest(hdrs headers.Headers, query url.Query, remote net.Addr) (*Reques
 		Headers: hdrs,
 		Remote:  remote,
 		body:    requestBodyStruct,
+		Ctx:     ctx,
+		Respond: response,
 	}
 
 	return request, gateway
@@ -110,6 +117,8 @@ func (r *Request) Reader() io.Reader {
 func (r *Request) Reset() (err error) {
 	r.Fragment = ""
 	r.Query.Set(nil)
+	r.Ctx = context.Background()
+	r.Respond.Reset()
 
 	if err = r.resetBody(); err != nil {
 		return err
