@@ -1,14 +1,14 @@
 package inbuilt
 
 import (
+	"github.com/fakefloordiv/indigo/http"
 	"strings"
 	"testing"
 
 	methods "github.com/fakefloordiv/indigo/http/method"
-	"github.com/fakefloordiv/indigo/types"
 )
 
-func nopRender(_ types.Response) error {
+func nopRender(_ http.Response) error {
 	return nil
 }
 
