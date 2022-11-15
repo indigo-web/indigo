@@ -1,11 +1,10 @@
 package server
 
 import (
+	"github.com/fakefloordiv/indigo/http/status"
 	"net"
 	"sync"
 	"time"
-
-	"github.com/fakefloordiv/indigo/http"
 )
 
 type (
@@ -29,7 +28,7 @@ func StartTCPServer(sock net.Listener, handleConn connHandler, sd chan struct{})
 			wg.Wait()
 			sd <- struct{}{}
 
-			return http.ErrShutdown
+			return status.ErrShutdown
 		default:
 			conn, err := sock.Accept()
 			if err != nil {
@@ -73,7 +72,7 @@ func noTimeoutConnHandler(conn net.Conn, handleData dataHandler, buff []byte) {
 		err2 := handleData(buff[:n])
 
 		if err2 != nil || err != nil || n == 0 {
-			if err2 != http.ErrHijackConn {
+			if err2 != status.ErrHijackConn {
 				_ = conn.Close()
 			}
 
@@ -102,7 +101,7 @@ func timeoutConnHandler(conn net.Conn, handleData dataHandler, timeout int, buff
 			timer.Reset(duration)
 
 			if err := handleData(buff[:n]); err != nil || n == 0 {
-				if err != http.ErrHijackConn {
+				if err != status.ErrHijackConn {
 					_ = conn.Close()
 				}
 
