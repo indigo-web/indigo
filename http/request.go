@@ -21,6 +21,9 @@ type (
 	// hijackConn is like an interface of httpServer method that notifies
 	// core about hijacking and returns connection object
 	hijackConn func() net.Conn
+
+	Path     = string
+	Fragment = string
 )
 
 // Request struct represents http request
@@ -28,9 +31,9 @@ type (
 // Headers attribute references at that one that lays in manager
 type Request struct {
 	Method   methods.Method
-	Path     string
+	Path     Path
 	Query    url.Query
-	Fragment string
+	Fragment Fragment
 	Proto    proto.Proto
 	Remote   net.Addr
 
