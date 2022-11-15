@@ -1,7 +1,7 @@
 package router
 
 import (
-	"github.com/fakefloordiv/indigo/types"
+	"github.com/fakefloordiv/indigo/http"
 )
 
 // Router is a general interface for any router compatible with indigo
@@ -11,8 +11,8 @@ import (
 //         and when you are ready, just notify core that he can safely close
 //         the connection (even if it's already closed from client side)
 type Router interface {
-	OnRequest(request *types.Request) types.Response
-	OnError(request *types.Request, err error) types.Response
+	OnRequest(request *http.Request) http.Response
+	OnError(request *http.Request, err error) http.Response
 }
 
 // OnStart called when server is initialized and started. Can be implemented
