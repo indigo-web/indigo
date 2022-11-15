@@ -20,7 +20,7 @@ func NewAllocator(initialSpace, maxSpace int) Allocator {
 
 // Append appends bytes to a buffer. In case space is not enough, trying to allocate a new
 // by appending a fitting part into current buffer, and appending the rest, allowing a slice
-// to grow by its in-built algorithm
+// to grow by its built-in algorithm
 func (a *Allocator) Append(chars []byte) (ok bool) {
 	if a.pos+len(chars) > len(a.memory) {
 		if len(a.memory)+len(chars) >= a.maxSize {
@@ -29,6 +29,7 @@ func (a *Allocator) Append(chars []byte) (ok bool) {
 
 		copy(a.memory[a.pos:], chars)
 		a.memory = append(a.memory, chars[len(a.memory)-a.pos:]...)
+		a.pos += len(chars)
 
 		return true
 	}
