@@ -1,22 +1,21 @@
 package main
 
 import (
-	"context"
 	"fmt"
+	"github.com/fakefloordiv/indigo/http"
 	"log"
 	"strconv"
 
 	"github.com/fakefloordiv/indigo"
 	"github.com/fakefloordiv/indigo/http/status"
 	"github.com/fakefloordiv/indigo/router/inbuilt"
-	"github.com/fakefloordiv/indigo/types"
 )
 
 var addr = "localhost:9090"
 
-func Index(_ context.Context, _ *types.Request) types.Response {
-	return types.WithFile("index.html", func(err error) types.Response {
-		return types.WithResponse.
+func Index(request *http.Request) http.Response {
+	return request.Respond.WithFile("index.html", func(err error) http.Response {
+		return request.Respond.
 			WithCode(status.NotFound).
 			WithBody(
 				"index.html: not found; try running this example directly from examples/combined folder",
@@ -24,36 +23,35 @@ func Index(_ context.Context, _ *types.Request) types.Response {
 	})
 }
 
-func IndexSay(_ context.Context, request *types.Request) types.Response {
+func IndexSay(request *http.Request) http.Response {
 	if talking := request.Headers.Value("talking"); talking != "allowed" {
-		return types.WithCode(status.UnavailableForLegalReasons)
+		return request.Respond.WithCode(status.UnavailableForLegalReasons)
 	}
 
 	body, err := request.Body()
 	if err != nil {
-		return types.WithError(err)
+		return request.Respond.WithError(err)
 	}
 
 	fmt.Println("Somebody said:", strconv.Quote(string(body)))
 
-	return types.OK()
+	return request.Respond
 }
 
-func World(_ context.Context, _ *types.Request) types.Response {
-	return types.WithBody(
+func World(request *http.Request) http.Response {
+	return request.Respond.WithBody(
 		`<h1>Hello, world!</h1>`,
 	)
 }
 
-func Easter(_ context.Context, request *types.Request) types.Response {
+func Easter(request *http.Request) http.Response {
 	if easter := request.Headers.Value("easter"); len(easter) > 0 {
-		return types.
-			WithCode(status.Teapot).
+		return request.Respond.WithCode(status.Teapot).
 			WithHeader("Easter", "Egg").
 			WithBody("Easter egg!")
 	}
 
-	return types.WithBody("Pretty ordinary page, isn't it?")
+	return request.Respond.WithBody("Pretty ordinary page, isn't it?")
 }
 
 func main() {

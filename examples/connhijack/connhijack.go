@@ -1,24 +1,22 @@
 package main
 
 import (
-	"context"
 	"fmt"
+	"github.com/fakefloordiv/indigo/http"
 	"log"
 	"strconv"
 
 	"github.com/fakefloordiv/indigo"
 	"github.com/fakefloordiv/indigo/http/status"
 	"github.com/fakefloordiv/indigo/router/inbuilt"
-	"github.com/fakefloordiv/indigo/types"
 )
 
 var addr = "localhost:9090"
 
-func MyHandler(_ context.Context, request *types.Request) types.Response {
+func MyHandler(request *http.Request) http.Response {
 	conn, err := request.Hijack()
 	if err != nil {
-		return types.
-			WithCode(status.BadRequest).
+		return request.Respond.WithCode(status.BadRequest).
 			WithBody("bad body")
 	}
 
@@ -29,7 +27,7 @@ func MyHandler(_ context.Context, request *types.Request) types.Response {
 		if n == 0 || err != nil {
 			_ = conn.Close()
 
-			return types.OK()
+			return request.Respond
 		}
 
 		fmt.Println("somebody says:", strconv.Quote(string(readBuff[:n])))

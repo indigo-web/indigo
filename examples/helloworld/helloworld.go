@@ -1,20 +1,19 @@
 package main
 
 import (
-	"context"
 	"fmt"
+	"github.com/fakefloordiv/indigo/http"
 	"log"
 
 	"github.com/fakefloordiv/indigo"
 	"github.com/fakefloordiv/indigo/http/status"
 	"github.com/fakefloordiv/indigo/router/inbuilt"
-	"github.com/fakefloordiv/indigo/types"
 )
 
 var addr = "localhost:9090"
 
-func MyHandler(_ context.Context, _ *types.Request) types.Response {
-	return types.
+func MyHandler(request *http.Request) http.Response {
+	return request.Respond.
 		WithCode(status.OK).
 		WithHeader("Hello", "world").
 		WithBody("<h1>How are you doing?</h1>")
