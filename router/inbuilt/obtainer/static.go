@@ -1,7 +1,7 @@
 package obtainer
 
 import (
-	"context"
+	"github.com/fakefloordiv/indigo/http/status"
 	"strings"
 
 	"github.com/fakefloordiv/indigo/http"
@@ -9,26 +9,25 @@ import (
 	"github.com/fakefloordiv/indigo/internal/functools"
 	"github.com/fakefloordiv/indigo/internal/mapconv"
 	routertypes "github.com/fakefloordiv/indigo/router/inbuilt/types"
-	"github.com/fakefloordiv/indigo/types"
 	"github.com/fakefloordiv/indigo/valuectx"
 )
 
 func StaticObtainer(routes routertypes.RoutesMap) Obtainer {
 	allowedMethods := getAllowedMethodsMap(routes)
 
-	return func(ctx context.Context, req *types.Request) (context.Context, routertypes.HandlerFunc, error) {
+	return func(req *http.Request) (routertypes.HandlerFunc, error) {
 		methods, found := routes[req.Path]
 		if !found {
-			return ctx, nil, http.ErrNotFound
+			return nil, status.ErrNotFound
 		}
 
 		if handler := getHandler(req.Method, methods); handler != nil {
-			return ctx, handler, nil
+			return handler, nil
 		}
 
-		ctx = valuectx.WithValue(ctx, "allow", allowedMethods[req.Path])
+		req.Ctx = valuectx.WithValue(req.Ctx, "allow", allowedMethods[req.Path])
 
-		return ctx, nil, http.ErrMethodNotAllowed
+		return nil, status.ErrMethodNotAllowed
 	}
 }
 

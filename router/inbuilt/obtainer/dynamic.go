@@ -1,7 +1,7 @@
 package obtainer
 
 import (
-	"context"
+	"github.com/fakefloordiv/indigo/http/status"
 	"strings"
 
 	"github.com/fakefloordiv/indigo/http"
@@ -10,28 +10,27 @@ import (
 	"github.com/fakefloordiv/indigo/internal/mapconv"
 	"github.com/fakefloordiv/indigo/router/inbuilt/radix"
 	routertypes "github.com/fakefloordiv/indigo/router/inbuilt/types"
-	"github.com/fakefloordiv/indigo/types"
 	"github.com/fakefloordiv/indigo/valuectx"
 )
 
 func DynamicObtainer(routes routertypes.RoutesMap) Obtainer {
 	tree := getTree(routes)
 
-	return func(ctx context.Context, req *types.Request) (context.Context, routertypes.HandlerFunc, error) {
+	return func(req *http.Request) (routertypes.HandlerFunc, error) {
 		var payload *radix.Payload
-		ctx, payload = tree.Match(ctx, req.Path)
+		req.Ctx, payload = tree.Match(req.Ctx, req.Path)
 		if payload == nil {
-			return ctx, nil, http.ErrNotFound
+			return nil, status.ErrNotFound
 		}
 
 		handler := getHandler(req.Method, payload.MethodsMap)
 		if handler == nil {
-			ctx = valuectx.WithValue(ctx, "allow", payload.Allow)
+			req.Ctx = valuectx.WithValue(req.Ctx, "allow", payload.Allow)
 
-			return ctx, nil, http.ErrMethodNotAllowed
+			return nil, status.ErrMethodNotAllowed
 		}
 
-		return ctx, handler, nil
+		return handler, nil
 	}
 }
 

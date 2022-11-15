@@ -2,6 +2,7 @@ package obtainer
 
 import (
 	"context"
+	"github.com/fakefloordiv/indigo/http/status"
 	"reflect"
 	"testing"
 
@@ -10,17 +11,17 @@ import (
 	methods "github.com/fakefloordiv/indigo/http/method"
 	"github.com/fakefloordiv/indigo/http/url"
 	routertypes "github.com/fakefloordiv/indigo/router/inbuilt/types"
-	"github.com/fakefloordiv/indigo/types"
 	"github.com/stretchr/testify/require"
 )
 
-func nopHandler(context.Context, *types.Request) types.Response {
-	return types.OK()
+func nopHandler(request *http.Request) http.Response {
+	return request.Respond
 }
 
-func newRequest(path string, method methods.Method) *types.Request {
-	request, _ := types.NewRequest(
-		headers.NewHeaders(make(map[string][]string)), url.Query{}, nil,
+func newRequest(path string, method methods.Method) *http.Request {
+	hdrs := headers.NewHeaders(make(map[string][]string))
+	request, _ := http.NewRequest(
+		hdrs, url.Query{}, nil, context.Background(), http.NewResponse(),
 	)
 	request.Path = path
 	request.Method = method
@@ -31,7 +32,7 @@ func newRequest(path string, method methods.Method) *types.Request {
 func testPositiveMatch(t *testing.T, obtainer Obtainer) {
 	path := "/"
 	request := newRequest(path, methods.GET)
-	_, methodsMap, err := obtainer(context.Background(), request)
+	methodsMap, err := obtainer(request)
 	require.NoError(t, err)
 	require.NotNil(t, methodsMap)
 }
@@ -39,19 +40,19 @@ func testPositiveMatch(t *testing.T, obtainer Obtainer) {
 func testNegativeMatchNotFound(t *testing.T, obtainer Obtainer) {
 	path := "/42"
 	request := newRequest(path, methods.GET)
-	_, handler, err := obtainer(context.Background(), request)
-	require.EqualError(t, err, http.ErrNotFound.Error())
+	handler, err := obtainer(request)
+	require.EqualError(t, err, status.ErrNotFound.Error())
 	require.Nil(t, handler)
 }
 
 func testNegativeMatchMethodNotAllowed(t *testing.T, obtainer Obtainer) {
 	path := "/"
 	request := newRequest(path, methods.POST)
-	ctx, handler, err := obtainer(context.Background(), request)
-	require.EqualError(t, err, http.ErrMethodNotAllowed.Error())
+	handler, err := obtainer(request)
+	require.EqualError(t, err, status.ErrMethodNotAllowed.Error())
 	require.Nil(t, handler)
 
-	allow := ctx.Value("allow")
+	allow := request.Ctx.Value("allow")
 	require.NotNil(t, allow)
 	require.Equal(t, "GET", allow.(string))
 }

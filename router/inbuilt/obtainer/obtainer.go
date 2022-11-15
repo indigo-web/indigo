@@ -1,16 +1,15 @@
 package obtainer
 
 import (
-	"context"
+	"github.com/fakefloordiv/indigo/http"
 
 	"github.com/fakefloordiv/indigo/internal/mapconv"
 	"github.com/fakefloordiv/indigo/router/inbuilt/radix"
 	routertypes "github.com/fakefloordiv/indigo/router/inbuilt/types"
-	"github.com/fakefloordiv/indigo/types"
 )
 
 type (
-	Obtainer    func(context.Context, *types.Request) (context.Context, routertypes.HandlerFunc, error)
+	Obtainer    func(*http.Request) (routertypes.HandlerFunc, error)
 	constructor func(routertypes.RoutesMap) Obtainer
 )
 
