@@ -1,11 +1,10 @@
 package inbuilt
 
 import (
-	"context"
+	"github.com/fakefloordiv/indigo/http/status"
+	routertypes "github.com/fakefloordiv/indigo/router/inbuilt/types"
 
 	"github.com/fakefloordiv/indigo/http"
-
-	"github.com/fakefloordiv/indigo/types"
 )
 
 /*
@@ -17,16 +16,18 @@ is 405 Method Not Allowed, because http requires Allow header, that is why
 we have to customize a behaviour of response with such a code
 */
 
-func newErrorHandlers() errHandlers {
-	return errHandlers{
-		http.ErrMethodNotAllowed: defaultMethodNotAllowedHandler,
+func newErrorHandlers() routertypes.ErrHandlers {
+	return routertypes.ErrHandlers{
+		status.ErrMethodNotAllowed: defaultMethodNotAllowedHandler,
 	}
 }
 
-func defaultMethodNotAllowedHandler(ctx context.Context, _ *types.Request) types.Response {
-	allow := ctx.Value("allow").(string)
+func defaultMethodNotAllowedHandler(request *http.Request) http.Response {
+	response := request.Respond.WithError(status.ErrMethodNotAllowed)
 
-	return types.
-		WithError(http.ErrMethodNotAllowed).
-		WithHeader("Allow", allow)
+	if allow, ok := request.Ctx.Value("allow").(string); ok {
+		response = response.WithHeader("Allow", allow)
+	}
+
+	return response
 }
