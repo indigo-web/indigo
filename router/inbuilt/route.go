@@ -30,20 +30,20 @@ func (r *Router) Route(
 }
 
 // RouteError adds an error handler. You can handle next errors:
-// - http.ErrBadRequest
-// - http.ErrNotFound
-// - http.ErrMethodNotAllowed
-// - http.ErrTooLarge
-// - http.ErrCloseConnection
-// - http.ErrURITooLong
-// - http.ErrHeaderFieldsTooLarge
-// - http.ErrTooManyHeaders
-// - http.ErrUnsupportedProtocol
-// - http.ErrUnsupportedEncoding
-// - http.ErrMethodNotImplemented
-// - http.ErrConnectionTimeout
+// - status.ErrBadRequest
+// - status.ErrNotFound
+// - status.ErrMethodNotAllowed
+// - status.ErrTooLarge
+// - status.ErrCloseConnection
+// - status.ErrURITooLong
+// - status.ErrHeaderFieldsTooLarge
+// - status.ErrTooManyHeaders
+// - status.ErrUnsupportedProtocol
+// - status.ErrUnsupportedEncoding
+// - status.ErrMethodNotImplemented
+// - status.ErrConnectionTimeout
 //
 // You can set your own handler and override default response
-func (r Router) RouteError(err error, handler ErrorHandler) {
+func (r Router) RouteError(err error, handler routertypes.HandlerFunc) {
 	r.root.errHandlers[err] = handler
 }
