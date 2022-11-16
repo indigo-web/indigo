@@ -34,9 +34,7 @@ func (c *chunkedBodyParser) Parse(
 	data []byte, decoder encodings.DecoderFunc, trailer bool,
 ) (done bool, extra []byte, err error) {
 	if decoder == nil {
-		decoder = func(b []byte) ([]byte, error) {
-			return b, nil
-		}
+		decoder = nopDecoder
 	}
 
 	for i := range data {
@@ -210,4 +208,8 @@ func (c *chunkedBodyParser) Parse(
 	}
 
 	return false, nil, nil
+}
+
+func nopDecoder(b []byte) ([]byte, error) {
+	return b, nil
 }
