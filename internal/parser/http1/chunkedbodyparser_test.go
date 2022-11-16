@@ -11,10 +11,6 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func nopDecoder(b []byte) ([]byte, error) {
-	return b, nil
-}
-
 func bodyReader(gateway *body.Gateway, ch chan []byte) {
 	var body []byte
 
