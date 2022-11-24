@@ -11,47 +11,51 @@ import (
 	"github.com/fakefloordiv/indigo/router/inbuilt"
 )
 
-var addr = "localhost:9090"
+var (
+	addr  = "localhost:9090"
+	index = "index.html"
+)
 
 func Index(request *http.Request) http.Response {
-	return request.Respond.WithFile("index.html", func(err error) http.Response {
-		return request.Respond.
+	return http.Respond(request).WithFile(index, func(err error) http.Response {
+		return http.Respond(request).
 			WithCode(status.NotFound).
 			WithBody(
-				"index.html: not found; try running this example directly from examples/combined folder",
+				index + ": not found; try running this example directly from examples/combined folder",
 			)
 	})
 }
 
 func IndexSay(request *http.Request) http.Response {
 	if talking := request.Headers.Value("talking"); talking != "allowed" {
-		return request.Respond.WithCode(status.UnavailableForLegalReasons)
+		return http.Respond(request).WithCode(status.UnavailableForLegalReasons)
 	}
 
 	body, err := request.Body()
 	if err != nil {
-		return request.Respond.WithError(err)
+		return http.Respond(request).WithError(err)
 	}
 
 	fmt.Println("Somebody said:", strconv.Quote(string(body)))
 
-	return request.Respond
+	return http.Respond(request)
 }
 
 func World(request *http.Request) http.Response {
-	return request.Respond.WithBody(
+	return http.Respond(request).WithBody(
 		`<h1>Hello, world!</h1>`,
 	)
 }
 
 func Easter(request *http.Request) http.Response {
 	if easter := request.Headers.Value("easter"); len(easter) > 0 {
-		return request.Respond.WithCode(status.Teapot).
+		return http.Respond(request).
+			WithCode(status.Teapot).
 			WithHeader("Easter", "Egg").
-			WithBody("Easter egg!")
+			WithBody("You have discovered an easter egg! Congratulations!")
 	}
 
-	return request.Respond.WithBody("Pretty ordinary page, isn't it?")
+	return http.Respond(request).WithBody("Pretty ordinary page, isn't it?")
 }
 
 func main() {

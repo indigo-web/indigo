@@ -15,7 +15,7 @@ import (
 // handler that does nothing, used in cases when we need nothing
 // but handler also must not be nil
 func nopHandler(request *http.Request) http.Response {
-	return request.Respond
+	return http.Respond(request)
 }
 
 func TestRoute(t *testing.T) {

@@ -15,7 +15,7 @@ import (
 )
 
 func nopHandler(request *http.Request) http.Response {
-	return request.Respond
+	return http.Respond(request)
 }
 
 func newRequest(path string, method methods.Method) *http.Request {

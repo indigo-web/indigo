@@ -96,7 +96,7 @@ func BenchmarkIndigo(b *testing.B) {
 	router := inbuilt.NewRouter()
 	root := router.Resource("/")
 	root.Get(func(request *http.Request) http.Response {
-		return request.Respond
+		return http.Respond(request)
 	})
 	root.Post(func(request *http.Request) http.Response {
 		_ = request.OnBody(func([]byte) error {
@@ -104,15 +104,15 @@ func BenchmarkIndigo(b *testing.B) {
 		}, func(error) {
 		})
 
-		return request.Respond
+		return http.Respond(request)
 	})
 
 	router.Get("/with-header", func(request *http.Request) http.Response {
-		return request.Respond.WithHeader("Hello", "World")
+		return http.Respond(request).WithHeader("Hello", "World")
 	})
 
 	router.Get("/with-two-headers", func(request *http.Request) http.Response {
-		return request.Respond.
+		return http.Respond(request).
 			WithHeader("Hello", "World").
 			WithHeader("Lorem", "Ipsum")
 	})

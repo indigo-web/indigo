@@ -82,11 +82,11 @@ func getStaticRouter(t *testing.T) router.Router {
 		require.Empty(t, request.Fragment)
 		require.Equal(t, proto.HTTP11, request.Proto)
 
-		return request.Respond
+		return http.Respond(request)
 	})
 
 	r.Get("/get-resp-body", func(request *http.Request) http.Response {
-		return request.Respond.WithBody(testRequestBody)
+		return http.Respond(request).WithBody(testRequestBody)
 	})
 
 	r.Get("/get-read-body", func(request *http.Request) http.Response {
@@ -98,7 +98,7 @@ func getStaticRouter(t *testing.T) router.Router {
 		require.NoError(t, err)
 		require.Empty(t, body)
 
-		return request.Respond
+		return http.Respond(request)
 	})
 
 	with := r.Group("/with-")
@@ -108,7 +108,7 @@ func getStaticRouter(t *testing.T) router.Router {
 		require.NoError(t, err)
 		require.Equal(t, testQueryValue, string(value))
 
-		return request.Respond
+		return http.Respond(request)
 	})
 
 	// request.OnBody() is not tested because request.Body() (wrapper for OnBody)
@@ -119,7 +119,7 @@ func getStaticRouter(t *testing.T) router.Router {
 		require.NoError(t, err)
 		require.Equal(t, testRequestBody, string(body))
 
-		return request.Respond
+		return http.Respond(request)
 	})
 
 	r.Post("/body-reader", func(request *http.Request) http.Response {
@@ -128,11 +128,11 @@ func getStaticRouter(t *testing.T) router.Router {
 		require.NoError(t, err)
 		require.Equal(t, testRequestBody, string(body))
 
-		return request.Respond
+		return http.Respond(request)
 	})
 
 	r.Post("/do-not-read-body", func(request *http.Request) http.Response {
-		return request.Respond
+		return http.Respond(request)
 	})
 
 	r.Get("/hijack-conn-no-body-read", func(request *http.Request) http.Response {
@@ -148,7 +148,7 @@ func getStaticRouter(t *testing.T) router.Router {
 
 		_ = conn.Close()
 
-		return request.Respond
+		return http.Respond(request)
 	})
 
 	r.Get("/hijack-conn-with-body-read", func(request *http.Request) http.Response {
@@ -165,20 +165,20 @@ func getStaticRouter(t *testing.T) router.Router {
 
 		_ = conn.Close()
 
-		return request.Respond
+		return http.Respond(request)
 	})
 
 	r.Get("/with-file", func(request *http.Request) http.Response {
-		return request.Respond.WithFile(testFilename, func(err error) http.Response {
+		return http.Respond(request).WithFile(testFilename, func(err error) http.Response {
 			t.Fail() // this callback must never be called
 
-			return request.Respond
+			return http.Respond(request)
 		})
 	})
 
 	r.Get("/with-file-notfound", func(request *http.Request) http.Response {
-		return request.Respond.WithFile(testFilename+"notfound", func(err error) http.Response {
-			return request.Respond.WithBody(testFileIfNotFound)
+		return http.Respond(request).WithFile(testFilename+"notfound", func(err error) http.Response {
+			return http.Respond(request).WithBody(testFileIfNotFound)
 		})
 	})
 
