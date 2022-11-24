@@ -45,9 +45,9 @@ type Request struct {
 	body     *requestBody
 	bodyBuff []byte
 
-	Ctx     context.Context
-	Respond Response
-	Hijack  ConnectionHijacker
+	Ctx      context.Context
+	response Response
+	Hijack   ConnectionHijacker
 }
 
 // NewRequest returns a new instance of request object and body gateway
@@ -65,13 +65,13 @@ func NewRequest(
 ) (*Request, *body.Gateway) {
 	requestBodyStruct, gateway := newRequestBody()
 	request := &Request{
-		Query:   query,
-		Proto:   proto.HTTP11,
-		Headers: hdrs,
-		Remote:  remote,
-		body:    requestBodyStruct,
-		Ctx:     ctx,
-		Respond: response,
+		Query:    query,
+		Proto:    proto.HTTP11,
+		Headers:  hdrs,
+		Remote:   remote,
+		body:     requestBodyStruct,
+		Ctx:      ctx,
+		response: response,
 	}
 
 	return request, gateway
@@ -121,7 +121,7 @@ func (r *Request) Reset() (err error) {
 	r.Fragment = ""
 	r.Query.Set(nil)
 	r.Ctx = context.Background()
-	r.Respond.Reset()
+	r.response.Reset()
 
 	if err = r.resetBody(); err != nil {
 		return err
@@ -159,4 +159,8 @@ func Hijacker(request *Request, hijacker hijackConn) func() (net.Conn, error) {
 
 		return hijacker(), nil
 	}
+}
+
+func Respond(request *Request) Response {
+	return request.response
 }
