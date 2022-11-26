@@ -118,7 +118,7 @@ func (h *httpServer) OnData(data []byte) (err error) {
 
 			return err
 		default:
-			panic("BUG: http/server/httpserver.go:OnData(): received unknown state")
+			panic("BUG: http/server/http.go:OnData(): received unknown state")
 		}
 	}
 
@@ -172,7 +172,7 @@ func (h *httpServer) requestProcessor() {
 			h.notifier <- eProcessed
 			return
 		default:
-			panic("BUG: http/server/httpserver.go:requestProcessor(): received unknown state")
+			panic("BUG: http/server/http.go:requestProcessor(): received unknown state")
 		}
 	}
 }
