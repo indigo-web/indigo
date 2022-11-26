@@ -16,18 +16,17 @@ It provides such a features:
 package main
 
 import (
-  "context"
   "log"
   
   "github.com/fakefloordiv/indigo"
+  "github.com/fakefloordiv/indigo/http"
   "github.com/fakefloordiv/indigo/router/inbuilt"
-  "github.com/fakefloordiv/indigo/types"
 )
 
 var addr = "localhost:9090"
 
-func MyHandler(_ context.Context, req *types.Request) types.Response {
-  return types.WithBody("Hello, world!")
+func MyHandler(request *http.Request) http.Response {
+  return http.Respond(request).WithBody("Hello, world!")
 }
 
 func main() {
