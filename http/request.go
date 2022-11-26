@@ -146,6 +146,16 @@ func (r *Request) resetBody() error {
 	return r.body.Reset()
 }
 
+// Hijacker is a layer between request object and server that guarantees that request's body
+// will be completely read before connection is hijacked. Request body must be read to avoid
+// non-determination caused by possible receiving the request body instead of actual data
+// that is expected to be received.
+//
+// This function is exported only because another package (internal/server/http.go) requires
+// it. It cannot be inlined there because it uses non-exported method of the request object.
+// That is why user is supposed to not care about this function, moreover it receives a hijacker
+// function that is not used by user anywhere (except Request.Hijack method that IS NOT EXPECTED
+// TO BE PASSED HERE)
 func Hijacker(request *Request, hijacker hijackConn) func() (net.Conn, error) {
 	return func() (net.Conn, error) {
 		// we anyway don't need to have a body anymore. Also, without reading
