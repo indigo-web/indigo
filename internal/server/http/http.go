@@ -1,4 +1,4 @@
-package server
+package http
 
 import (
 	"github.com/fakefloordiv/indigo/http/status"
