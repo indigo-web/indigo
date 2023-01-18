@@ -1,6 +1,10 @@
 package http1
 
 import (
+	"io"
+	"strconv"
+	"testing"
+
 	"github.com/fakefloordiv/indigo/http"
 	"github.com/fakefloordiv/indigo/http/headers"
 	"github.com/fakefloordiv/indigo/http/url"
@@ -8,9 +12,6 @@ import (
 	"github.com/fakefloordiv/indigo/internal/server/tcp"
 	"github.com/fakefloordiv/indigo/settings"
 	"github.com/stretchr/testify/require"
-	"io"
-	"strconv"
-	"testing"
 )
 
 func getRequestWithReader(chunked bool, body ...[]byte) (*http.Request, http.BodyReader) {

@@ -1,9 +1,10 @@
 package tcp
 
 import (
-	"github.com/fakefloordiv/indigo/http/status"
 	"net"
 	"sync"
+
+	"github.com/fakefloordiv/indigo/http/status"
 )
 
 type onConnection func(net.Conn)

@@ -2,8 +2,9 @@ package main
 
 import (
 	"fmt"
-	"github.com/fakefloordiv/indigo/http"
 	"log"
+
+	"github.com/fakefloordiv/indigo/http"
 
 	routertypes "github.com/fakefloordiv/indigo/router/inbuilt/types"
 

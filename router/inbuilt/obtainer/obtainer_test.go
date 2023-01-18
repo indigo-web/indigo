@@ -1,12 +1,13 @@
 package obtainer
 
 import (
+	"reflect"
+	"testing"
+
 	"github.com/fakefloordiv/indigo/http/status"
 	"github.com/fakefloordiv/indigo/internal/parser/http1"
 	"github.com/fakefloordiv/indigo/internal/server/tcp"
 	"github.com/fakefloordiv/indigo/settings"
-	"reflect"
-	"testing"
 
 	"github.com/fakefloordiv/indigo/http"
 	"github.com/fakefloordiv/indigo/http/headers"

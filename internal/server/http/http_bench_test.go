@@ -1,11 +1,12 @@
 package http
 
 import (
-	"github.com/fakefloordiv/indigo/http"
-	"github.com/fakefloordiv/indigo/internal/server/tcp"
 	"net"
 	"testing"
 	"time"
+
+	"github.com/fakefloordiv/indigo/http"
+	"github.com/fakefloordiv/indigo/internal/server/tcp"
 
 	"github.com/fakefloordiv/indigo/internal/pool"
 
@@ -95,9 +96,7 @@ func (connMock) SetWriteDeadline(time.Time) error {
 func BenchmarkIndigo(b *testing.B) {
 	router := inbuilt.NewRouter()
 	root := router.Resource("/")
-	root.Get(func(request *http.Request) http.Response {
-		return http.RespondTo(request)
-	})
+	root.Get(http.RespondTo)
 	root.Post(func(request *http.Request) http.Response {
 		_ = request.OnBody(func([]byte) error {
 			return nil

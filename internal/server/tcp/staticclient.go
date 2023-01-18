@@ -41,14 +41,14 @@ func (s *staticClient) Unread(takeback []byte) {
 	s.takeback = takeback
 }
 
-func (s staticClient) Write([]byte) error {
+func (staticClient) Write([]byte) error {
 	return nil
 }
 
-func (s staticClient) Remote() net.Addr {
+func (staticClient) Remote() net.Addr {
 	return nil
 }
 
-func (s staticClient) Close() error {
+func (staticClient) Close() error {
 	return nil
 }

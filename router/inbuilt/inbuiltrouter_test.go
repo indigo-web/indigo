@@ -1,8 +1,9 @@
 package inbuilt
 
 import (
-	"github.com/fakefloordiv/indigo/http"
 	"testing"
+
+	"github.com/fakefloordiv/indigo/http"
 
 	routertypes "github.com/fakefloordiv/indigo/router/inbuilt/types"
 

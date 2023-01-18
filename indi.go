@@ -2,11 +2,12 @@ package indigo
 
 import (
 	"errors"
+	"net"
+
 	"github.com/fakefloordiv/indigo/http"
 	"github.com/fakefloordiv/indigo/internal/pool"
 	httpserver "github.com/fakefloordiv/indigo/internal/server/http"
 	"github.com/fakefloordiv/indigo/internal/server/tcp"
-	"net"
 
 	"github.com/fakefloordiv/indigo/http/encodings"
 	"github.com/fakefloordiv/indigo/http/headers"

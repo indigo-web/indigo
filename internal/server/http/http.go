@@ -3,10 +3,11 @@ package http
 import (
 	"errors"
 	"fmt"
+	"os"
+
 	"github.com/fakefloordiv/indigo/http/status"
 	"github.com/fakefloordiv/indigo/internal/render"
 	"github.com/fakefloordiv/indigo/internal/server/tcp"
-	"os"
 
 	"github.com/fakefloordiv/indigo/http"
 	"github.com/fakefloordiv/indigo/internal/parser"

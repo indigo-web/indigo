@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
-	"github.com/fakefloordiv/indigo/http/status"
 	"io"
 	"net"
 	stdhttp "net/http"
@@ -13,6 +12,8 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/fakefloordiv/indigo/http/status"
 
 	"github.com/fakefloordiv/indigo/settings"
 
@@ -132,9 +133,7 @@ func getStaticRouter(t *testing.T) router.Router {
 	//	return http.RespondTo(request)
 	//})
 
-	r.Post("/do-not-read-body", func(request *http.Request) http.Response {
-		return http.RespondTo(request)
-	})
+	r.Post("/do-not-read-body", http.RespondTo)
 
 	// TODO: implement connection hijacking and uncomment these tests
 	//r.Get("/hijack-conn-no-body-read", func(request *http.Request) http.Response {
@@ -422,7 +421,7 @@ func TestServer_Static(t *testing.T) {
 
 	// this test must ALWAYS be on the bottom as it is the longest-duration test
 	t.Run("/test-idle-disconnect", func(t *testing.T) {
-		//t.Parallel()
+		// t.Parallel()
 
 		conn, err := net.Dial("tcp4", addr)
 		require.NoError(t, err)

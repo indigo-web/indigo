@@ -2,9 +2,10 @@ package http1
 
 import (
 	"fmt"
+	"io"
+
 	"github.com/fakefloordiv/indigo/http/status"
 	"github.com/fakefloordiv/indigo/settings"
-	"io"
 )
 
 // chunkedBodyParser is a parser for chunked encoded request bodies

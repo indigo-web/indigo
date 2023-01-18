@@ -1,9 +1,10 @@
 package http1
 
 import (
-	"github.com/fakefloordiv/indigo/settings"
 	"strings"
 	"testing"
+
+	"github.com/fakefloordiv/indigo/settings"
 )
 
 func BenchmarkChunkedBodyParser(b *testing.B) {
