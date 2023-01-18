@@ -1,9 +1,10 @@
 package inbuilt
 
 import (
-	"github.com/fakefloordiv/indigo/http"
 	"strings"
 	"testing"
+
+	"github.com/fakefloordiv/indigo/http"
 
 	methods "github.com/fakefloordiv/indigo/http/method"
 )

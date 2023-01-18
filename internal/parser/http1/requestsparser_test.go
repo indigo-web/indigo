@@ -1,9 +1,10 @@
 package http1
 
 import (
+	"testing"
+
 	"github.com/fakefloordiv/indigo/http/status"
 	"github.com/fakefloordiv/indigo/internal/server/tcp"
-	"testing"
 
 	"github.com/fakefloordiv/indigo/internal/pool"
 

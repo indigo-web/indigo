@@ -2,6 +2,7 @@ package http1
 
 import (
 	"fmt"
+
 	"github.com/fakefloordiv/indigo/http"
 	"github.com/fakefloordiv/indigo/http/headers"
 	methods "github.com/fakefloordiv/indigo/http/method"

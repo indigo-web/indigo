@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
-	"github.com/fakefloordiv/indigo/http/status"
 	"io"
 	"net"
 	stdhttp "net/http"
@@ -13,6 +12,8 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/fakefloordiv/indigo/http/status"
 
 	"github.com/fakefloordiv/indigo/settings"
 
@@ -422,7 +423,7 @@ func TestServer_Static(t *testing.T) {
 
 	// this test must ALWAYS be on the bottom as it is the longest-duration test
 	t.Run("/test-idle-disconnect", func(t *testing.T) {
-		//t.Parallel()
+		// t.Parallel()
 
 		conn, err := net.Dial("tcp4", addr)
 		require.NoError(t, err)

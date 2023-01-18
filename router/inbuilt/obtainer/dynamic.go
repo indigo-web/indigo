@@ -1,8 +1,9 @@
 package obtainer
 
 import (
-	"github.com/fakefloordiv/indigo/http/status"
 	"strings"
+
+	"github.com/fakefloordiv/indigo/http/status"
 
 	"github.com/fakefloordiv/indigo/http"
 	methods "github.com/fakefloordiv/indigo/http/method"
