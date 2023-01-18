@@ -24,7 +24,7 @@ jobs:
 
       - name: Install deepsource CLI tool
         run: curl https://deepsource.io/cli | sh
-      
+
       - name: Run tests
         run: go test -coverprofile=cover.out ./...
 

@@ -10,8 +10,8 @@ enabled = true
 name = "go"
 enabled = true
 
-  [analyzers.meta]
-  import_root = "github.com/fakefloordiv/indigo"
+[analyzers.meta]
+import_root = "github.com/fakefloordiv/indigo"
 
 [[transformers]]
 name = "gofumpt"

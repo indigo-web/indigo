@@ -1,8 +1,12 @@
 package render
 
 import (
-	"github.com/fakefloordiv/indigo/http"
 	"testing"
+
+	"github.com/fakefloordiv/indigo/http"
+	"github.com/fakefloordiv/indigo/internal/parser/http1"
+	"github.com/fakefloordiv/indigo/internal/server/tcp"
+	"github.com/fakefloordiv/indigo/settings"
 
 	"github.com/fakefloordiv/indigo/http/headers"
 	"github.com/fakefloordiv/indigo/http/url"
@@ -38,9 +42,10 @@ func BenchmarkRenderer_Response(b *testing.B) {
 	}
 
 	hdrs := headers.NewHeaders(make(map[string][]string))
-	defaultResponse := http.NewResponse()
-	defaultRequest, _ := http.NewRequest(
-		hdrs, url.NewQuery(nil), nil, nil, defaultResponse,
+	response := http.NewResponse()
+	bodyReader := http1.NewBodyReader(tcp.NewNopClient(), settings.Default().Body)
+	request := http.NewRequest(
+		hdrs, url.NewQuery(nil), http.NewResponse(), nil, bodyReader,
 	)
 
 	b.Run("DefaultResponse_NoDefHeaders", func(b *testing.B) {
@@ -50,7 +55,7 @@ func BenchmarkRenderer_Response(b *testing.B) {
 		b.ResetTimer()
 
 		for i := 0; i < b.N; i++ {
-			_ = renderer.Response(defaultRequest, defaultResponse, nopWriter)
+			_ = renderer.Render(request, response, nopWriter)
 		}
 	})
 
@@ -61,7 +66,7 @@ func BenchmarkRenderer_Response(b *testing.B) {
 		b.ResetTimer()
 
 		for i := 0; i < b.N; i++ {
-			_ = renderer.Response(defaultRequest, defaultResponse, nopWriter)
+			_ = renderer.Render(request, response, nopWriter)
 		}
 	})
 
@@ -72,7 +77,7 @@ func BenchmarkRenderer_Response(b *testing.B) {
 		b.ResetTimer()
 
 		for i := 0; i < b.N; i++ {
-			_ = renderer.Response(defaultRequest, defaultResponse, nopWriter)
+			_ = renderer.Render(request, response, nopWriter)
 		}
 	})
 
@@ -83,7 +88,7 @@ func BenchmarkRenderer_Response(b *testing.B) {
 		b.ResetTimer()
 
 		for i := 0; i < b.N; i++ {
-			_ = renderer.Response(defaultRequest, defaultResponse, nopWriter)
+			_ = renderer.Render(request, response, nopWriter)
 		}
 	})
 }

@@ -48,12 +48,12 @@ func (r *Router) processError(request *http.Request, err error) http.Response {
 	if request.Method == methods.TRACE && err == status.ErrMethodNotAllowed {
 		r.traceBuff = renderHTTPRequest(request, r.traceBuff)
 
-		return traceResponse(http.Respond(request), r.traceBuff)
+		return traceResponse(http.RespondTo(request), r.traceBuff)
 	}
 
 	handler, found := r.errHandlers[err]
 	if !found {
-		return http.Respond(request).WithError(err)
+		return http.RespondTo(request).WithError(err)
 	}
 
 	request.Ctx = valuectx.WithValue(request.Ctx, "error", err)

@@ -1,14 +1,16 @@
 package inbuilt
 
 import (
-	"github.com/fakefloordiv/indigo/http"
 	"testing"
+
+	"github.com/fakefloordiv/indigo/http"
+	"github.com/fakefloordiv/indigo/internal/parser/http1"
+	"github.com/fakefloordiv/indigo/internal/server/tcp"
+	"github.com/fakefloordiv/indigo/settings"
 
 	"github.com/fakefloordiv/indigo/http/status"
 
 	routertypes "github.com/fakefloordiv/indigo/router/inbuilt/types"
-
-	"github.com/fakefloordiv/indigo/internal/body"
 
 	"github.com/fakefloordiv/indigo/http/headers"
 	methods "github.com/fakefloordiv/indigo/http/method"
@@ -106,11 +108,12 @@ func getPointApplied2Middleware(stack *callstack) routertypes.Middleware {
 	}
 }
 
-func getRequest() (*http.Request, *body.Gateway) {
+func getRequest() *http.Request {
 	query := url.NewQuery(nil)
+	bodyReader := http1.NewBodyReader(tcp.NewNopClient(), settings.Default().Body)
 
 	return http.NewRequest(
-		headers.NewHeaders(nil), query, nil, nil, http.NewResponse(),
+		headers.NewHeaders(nil), query, http.NewResponse(), nil, bodyReader,
 	)
 }
 
@@ -142,7 +145,7 @@ func TestMiddlewares(t *testing.T) {
 	r.OnStart()
 
 	t.Run("/", func(t *testing.T) {
-		request, _ := getRequest()
+		request := getRequest()
 		request.Method = methods.GET
 		request.Path = "/"
 
@@ -158,7 +161,7 @@ func TestMiddlewares(t *testing.T) {
 	})
 
 	t.Run("/api/v1/hello", func(t *testing.T) {
-		request, _ := getRequest()
+		request := getRequest()
 		request.Method = methods.GET
 		request.Path = "/api/v1/hello"
 
@@ -174,7 +177,7 @@ func TestMiddlewares(t *testing.T) {
 	})
 
 	t.Run("/api/v2/world", func(t *testing.T) {
-		request, _ := getRequest()
+		request := getRequest()
 		request.Method = methods.GET
 		request.Path = "/api/v2/world"
 

@@ -1,8 +1,9 @@
 package obtainer
 
 import (
-	"github.com/fakefloordiv/indigo/http/status"
 	"strings"
+
+	"github.com/fakefloordiv/indigo/http/status"
 
 	"github.com/fakefloordiv/indigo/http"
 	methods "github.com/fakefloordiv/indigo/http/method"
@@ -18,7 +19,7 @@ func DynamicObtainer(routes routertypes.RoutesMap) Obtainer {
 
 	return func(req *http.Request) (routertypes.HandlerFunc, error) {
 		var payload *radix.Payload
-		req.Ctx, payload = tree.Match(req.Ctx, req.Path)
+		req.Ctx, payload = tree.Match(req.Ctx, stripTrailingSlash(req.Path))
 		if payload == nil {
 			return nil, status.ErrNotFound
 		}

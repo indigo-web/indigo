@@ -23,7 +23,7 @@ func newErrorHandlers() routertypes.ErrHandlers {
 }
 
 func defaultMethodNotAllowedHandler(request *http.Request) http.Response {
-	response := http.Respond(request).WithError(status.ErrMethodNotAllowed)
+	response := http.RespondTo(request).WithError(status.ErrMethodNotAllowed)
 
 	if allow, ok := request.Ctx.Value("allow").(string); ok {
 		response = response.WithHeader("Allow", allow)

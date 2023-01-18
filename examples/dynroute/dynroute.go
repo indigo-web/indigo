@@ -2,8 +2,9 @@ package main
 
 import (
 	"fmt"
-	"github.com/fakefloordiv/indigo/http"
 	"log"
+
+	"github.com/fakefloordiv/indigo/http"
 
 	"github.com/fakefloordiv/indigo"
 	"github.com/fakefloordiv/indigo/router/inbuilt"
@@ -14,7 +15,7 @@ var addr = "localhost:9090"
 func MyDynamicHandler(request *http.Request) http.Response {
 	worldName := request.Ctx.Value("world-name").(string)
 
-	return http.Respond(request).WithBody("your world-name is " + worldName)
+	return http.RespondTo(request).WithBody("your world-name is " + worldName)
 }
 
 func main() {
