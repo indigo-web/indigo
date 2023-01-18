@@ -1,18 +1,10 @@
 package http1
 
 import (
-	"github.com/fakefloordiv/indigo/internal/body"
 	"github.com/fakefloordiv/indigo/settings"
 	"strings"
 	"testing"
 )
-
-func nopBodyReader(gateway *body.Gateway) {
-	for {
-		<-gateway.Data
-		gateway.Data <- nil
-	}
-}
 
 func BenchmarkChunkedBodyParser(b *testing.B) {
 	chunkedEnd := "0\r\n\r\n"
@@ -26,25 +18,23 @@ func BenchmarkChunkedBodyParser(b *testing.B) {
 		strings.Repeat("1a\r\nBut what's wrong with you?\r\n", 100) + chunkedEnd,
 	)
 
-	gateway := body.NewBodyGateway()
-	parser := newChunkedBodyParser(gateway, settings.Default())
-	go nopBodyReader(gateway)
+	parser := newChunkedBodyParser(settings.Default().Body)
 
 	b.Run("Small_Example", func(b *testing.B) {
 		for i := 0; i < b.N; i++ {
-			_, _, _ = parser.Parse(smallChunked, nopDecoder, false)
+			_, _, _ = parser.Parse(smallChunked, false)
 		}
 	})
 
 	b.Run("Medium_15Repeats", func(b *testing.B) {
 		for i := 0; i < b.N; i++ {
-			_, _, _ = parser.Parse(mediumChunked, nopDecoder, false)
+			_, _, _ = parser.Parse(mediumChunked, false)
 		}
 	})
 
 	b.Run("Big_100Repeats", func(b *testing.B) {
 		for i := 0; i < b.N; i++ {
-			_, _, _ = parser.Parse(bigChunked, nopDecoder, false)
+			_, _, _ = parser.Parse(bigChunked, false)
 		}
 	})
 }

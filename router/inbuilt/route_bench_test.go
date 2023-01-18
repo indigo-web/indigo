@@ -13,19 +13,19 @@ func nopRender(_ http.Response) error {
 }
 
 func BenchmarkRequestRouting(b *testing.B) {
-	longURIRequest, _ := getRequest()
+	longURIRequest := getRequest()
 	longURIRequest.Method = methods.GET
 	longURIRequest.Path = "/" + strings.Repeat("a", 255)
 
-	shortURIRequest, _ := getRequest()
+	shortURIRequest := getRequest()
 	shortURIRequest.Method = methods.GET
 	shortURIRequest.Path = "/" + strings.Repeat("a", 15)
 
-	unknownURIRequest, _ := getRequest()
+	unknownURIRequest := getRequest()
 	unknownURIRequest.Method = methods.GET
 	unknownURIRequest.Path = "/" + strings.Repeat("b", 255)
 
-	unknownMethodRequest, _ := getRequest()
+	unknownMethodRequest := getRequest()
 	unknownMethodRequest.Method = methods.POST
 	unknownMethodRequest.Path = longURIRequest.Path
 

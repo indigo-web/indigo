@@ -2,12 +2,12 @@ package http1
 
 import (
 	"github.com/fakefloordiv/indigo/http/status"
+	"github.com/fakefloordiv/indigo/internal/server/tcp"
 	"testing"
 
 	"github.com/fakefloordiv/indigo/internal/pool"
 
 	"github.com/fakefloordiv/indigo/http"
-	"github.com/fakefloordiv/indigo/http/encodings"
 	"github.com/fakefloordiv/indigo/http/headers"
 	methods "github.com/fakefloordiv/indigo/http/method"
 	"github.com/fakefloordiv/indigo/http/proto"
@@ -33,41 +33,37 @@ var (
 
 	multipleHeaders = []byte("GET / HTTP/1.1\r\nAccept: one,two\r\nAccept: three\r\n\r\n")
 
-	ordinaryChunkedBody  = "d\r\nHello, world!\r\n1a\r\nBut what's wrong with you?\r\nf\r\nFinally am here\r\n0\r\n\r\n"
-	traileredChunkedBody = "7\r\nMozilla\r\n9\r\nDeveloper\r\n7\r\nNetwork\r\n0\r\nExpires: date here\r\n\r\n"
-	ordinaryChunked      = []byte("POST / HTTP/1.1\r\nTransfer-Encoding: chunked\r\n\r\n" + ordinaryChunkedBody)
-	chunkedWithTrailers  = []byte(
-		"POST / HTTP/1.1\r\n" +
-			"Transfer-Encoding: chunked\r\n" +
-			"Trailer: Expires, Something-Else\r\n\r\n" +
-			traileredChunkedBody,
-	)
+	// TODO: write tests for BodyReader
+	//ordinaryChunkedBody  = "d\r\nHello, world!\r\n1a\r\nBut what's wrong with you?\r\nf\r\nFinally am here\r\n0\r\n\r\n"
+	//traileredChunkedBody = "7\r\nMozilla\r\n9\r\nDeveloper\r\n7\r\nNetwork\r\n0\r\nExpires: date here\r\n\r\n"
+	//ordinaryChunked      = []byte("POST / HTTP/1.1\r\nTransfer-Encoding: chunked\r\n\r\n" + ordinaryChunkedBody)
+	//chunkedWithTrailers  = []byte(
+	//	"POST / HTTP/1.1\r\n" +
+	//		"Transfer-Encoding: chunked\r\n" +
+	//		"Trailer: Expires, Something-Else\r\n\r\n" +
+	//		traileredChunkedBody,
+	//)
 )
 
 func getParser() (httpparser.HTTPRequestsParser, *http.Request) {
 	s := settings2.Default()
 	keyAllocator := alloc.NewAllocator(
-		int(s.Headers.KeyLength.Maximal)*int(s.Headers.Number.Default),
-		int(s.Headers.KeyLength.Maximal)*int(s.Headers.Number.Maximal),
+		s.Headers.MaxKeyLength*s.Headers.Number.Default,
+		s.Headers.MaxKeyLength*s.Headers.Number.Maximal,
 	)
 	valAllocator := alloc.NewAllocator(
-		int(s.Headers.ValueSpace.Default), int(s.Headers.ValueSpace.Maximal),
+		s.Headers.ValueSpace.Default, s.Headers.ValueSpace.Maximal,
 	)
 	objPool := pool.NewObjectPool[[]string](20)
-	request, gateway := http.NewRequest(
-		headers.NewHeaders(nil), url.Query{}, nil, nil, http.NewResponse(),
+	body := NewBodyReader(tcp.NewNopClient(), s.Body)
+	request := http.NewRequest(
+		headers.NewHeaders(nil), url.Query{}, http.NewResponse(), nil, body,
 	)
-	codings := encodings.NewContentDecoders()
-	startLineBuff := make([]byte, s.URL.Length.Maximal)
+	startLineBuff := make([]byte, s.URL.MaxLength)
 
 	return NewHTTPRequestsParser(
-		request, gateway, keyAllocator, valAllocator, objPool, startLineBuff, s, codings,
+		request, keyAllocator, valAllocator, objPool, startLineBuff, s.Headers,
 	), request
-}
-
-func readBody(request *http.Request, ch chan []byte) {
-	body, _ := request.Body()
-	ch <- body
 }
 
 type wantedRequest struct {
@@ -102,48 +98,28 @@ func splitIntoParts(req []byte, n int) (parts [][]byte) {
 	return parts
 }
 
-func testPartedRequest(
-	t *testing.T, parser httpparser.HTTPRequestsParser, req *http.Request, rawRequest []byte, n int,
-) (body []byte) {
-	var finalState httpparser.RequestState
+func feedPartially(
+	parser httpparser.HTTPRequestsParser, rawRequest []byte, n int,
+) (state httpparser.RequestState, extra []byte, err error) {
 	parts := splitIntoParts(rawRequest, n)
-	bodyChan := make(chan []byte)
 
-	for i, chunk := range parts {
-		state, extra, err := parser.Parse(chunk)
-
-		switch state {
-		case httpparser.RequestCompleted:
-			require.Equal(t, len(parts), i+1, "finished before whole request was fed")
-
-			return nil
-		case httpparser.HeadersCompleted:
-			go readBody(req, bodyChan)
-		default:
-			require.NotEqual(t, httpparser.Error, state)
+	for _, chunk := range parts {
+		state, extra, err = parser.Parse(chunk)
+		if err != nil {
+			return state, extra, err
+		} else if state != httpparser.Pending {
+			return state, extra, err
 		}
 
 		for len(extra) > 0 {
 			state, extra, err = parser.Parse(extra)
-			if state == httpparser.BodyCompleted {
-				require.Equal(t, len(parts), i+1, "finished before whole request was fed")
-
-				return <-bodyChan
+			if state != httpparser.Pending {
+				return state, extra, err
 			}
-
-			require.NotEqual(t, httpparser.Error, state)
 		}
-
-		finalState = state
-		require.NoError(t, err)
-		require.Empty(t, extra)
 	}
 
-	if finalState != httpparser.RequestCompleted {
-		require.Equalf(t, httpparser.BodyCompleted, finalState, "Body part size: %d", n)
-	}
-
-	return <-bodyChan
+	return state, extra, nil
 }
 
 func TestHttpRequestsParser_Parse_GET(t *testing.T) {
@@ -151,13 +127,9 @@ func TestHttpRequestsParser_Parse_GET(t *testing.T) {
 
 	t.Run("SimpleGET", func(t *testing.T) {
 		state, extra, err := parser.Parse(simpleGET)
-
 		require.NoError(t, err)
 		require.Equal(t, httpparser.RequestCompleted, state)
 		require.Empty(t, extra)
-		body, err := request.Body()
-		require.NoError(t, err)
-		require.Empty(t, body)
 
 		wanted := wantedRequest{
 			Method:   methods.GET,
@@ -172,14 +144,10 @@ func TestHttpRequestsParser_Parse_GET(t *testing.T) {
 	})
 
 	t.Run("SimpleGETLeadingCRLF", func(t *testing.T) {
-		ch := make(chan []byte)
-		go readBody(request, ch)
 		state, extra, err := parser.Parse(simpleGETLeadingCRLF)
-
 		require.NoError(t, err)
 		require.Equal(t, httpparser.RequestCompleted, state)
 		require.Empty(t, extra)
-		require.Empty(t, <-ch)
 
 		wanted := wantedRequest{
 			Method:   methods.GET,
@@ -194,14 +162,10 @@ func TestHttpRequestsParser_Parse_GET(t *testing.T) {
 	})
 
 	t.Run("BiggerGET", func(t *testing.T) {
-		ch := make(chan []byte)
-		go readBody(request, ch)
 		state, extra, err := parser.Parse(biggerGET)
-
 		require.NoError(t, err)
 		require.Equal(t, httpparser.RequestCompleted, state)
 		require.Empty(t, extra)
-		require.Empty(t, <-ch)
 
 		wanted := wantedRequest{
 			Method:   methods.GET,
@@ -218,14 +182,10 @@ func TestHttpRequestsParser_Parse_GET(t *testing.T) {
 	})
 
 	t.Run("MultipleHeaderValues", func(t *testing.T) {
-		ch := make(chan []byte)
-		go readBody(request, ch)
 		state, extra, err := parser.Parse(multipleHeaders)
-
 		require.NoError(t, err)
 		require.Equal(t, httpparser.RequestCompleted, state)
 		require.Empty(t, extra)
-		require.Empty(t, <-ch)
 
 		wanted := wantedRequest{
 			Method:   methods.GET,
@@ -242,14 +202,10 @@ func TestHttpRequestsParser_Parse_GET(t *testing.T) {
 	})
 
 	t.Run("BiggerGETOnlyLF", func(t *testing.T) {
-		ch := make(chan []byte)
-		go readBody(request, ch)
 		state, extra, err := parser.Parse(biggerGETOnlyLF)
-
 		require.NoError(t, err)
 		require.Equal(t, httpparser.RequestCompleted, state)
 		require.Empty(t, extra)
-		require.Empty(t, <-ch)
 
 		wanted := wantedRequest{
 			Method:   methods.GET,
@@ -266,14 +222,10 @@ func TestHttpRequestsParser_Parse_GET(t *testing.T) {
 	})
 
 	t.Run("BiggerGET_URLEncoded", func(t *testing.T) {
-		ch := make(chan []byte)
-		go readBody(request, ch)
 		state, extra, err := parser.Parse(biggerGETURLEncoded)
-
 		require.NoError(t, err)
 		require.Equal(t, httpparser.RequestCompleted, state)
 		require.Empty(t, extra)
-		require.Empty(t, <-ch)
 
 		wanted := wantedRequest{
 			Method:   methods.GET,
@@ -289,8 +241,10 @@ func TestHttpRequestsParser_Parse_GET(t *testing.T) {
 
 	t.Run("BiggerGET_ByDifferentPartSizes", func(t *testing.T) {
 		for i := 1; i < len(biggerGET); i++ {
-			body := testPartedRequest(t, parser, request, biggerGET, i)
-			require.Empty(t, body)
+			state, extra, err := feedPartially(parser, biggerGET, i)
+			require.NoError(t, err)
+			require.Empty(t, extra)
+			require.Equal(t, httpparser.RequestCompleted, state)
 
 			wanted := wantedRequest{
 				Method:   methods.GET,
@@ -308,14 +262,10 @@ func TestHttpRequestsParser_Parse_GET(t *testing.T) {
 	})
 
 	t.Run("SimpleGETWithAbsolutePath", func(t *testing.T) {
-		ch := make(chan []byte)
-		go readBody(request, ch)
 		state, extra, err := parser.Parse(simpleGETAbsPath)
-
 		require.NoError(t, err)
 		require.Equal(t, httpparser.RequestCompleted, state)
 		require.Empty(t, extra)
-		require.Empty(t, <-ch)
 
 		wanted := wantedRequest{
 			Method:   methods.GET,
@@ -335,8 +285,9 @@ func TestHttpRequestsParser_ParsePOST(t *testing.T) {
 
 	t.Run("SomePOST_ByDifferentPartSizes", func(t *testing.T) {
 		for i := 1; i < len(somePOST); i++ {
-			body := testPartedRequest(t, parser, request, somePOST, i)
-			require.Equal(t, "Hello, World!", string(body))
+			state, _, err := feedPartially(parser, somePOST, i)
+			require.NoError(t, err)
+			require.Equal(t, httpparser.HeadersCompleted, state)
 
 			wanted := wantedRequest{
 				Method:   methods.POST,
@@ -354,14 +305,10 @@ func TestHttpRequestsParser_ParsePOST(t *testing.T) {
 	})
 
 	t.Run("SimpleGETWithQuery", func(t *testing.T) {
-		ch := make(chan []byte)
-		go readBody(request, ch)
 		state, extra, err := parser.Parse(simpleGETQuery)
-
 		require.NoError(t, err)
 		require.Equal(t, httpparser.RequestCompleted, state)
 		require.Empty(t, extra)
-		require.Empty(t, <-ch)
 
 		wanted := wantedRequest{
 			Method:   methods.GET,
@@ -379,109 +326,73 @@ func TestHttpRequestsParser_ParsePOST(t *testing.T) {
 
 func TestHttpRequestsParser_Parse_Negative(t *testing.T) {
 	t.Run("NoMethod", func(t *testing.T) {
-		parser, request := getParser()
-
+		parser, _ := getParser()
 		raw := []byte(" / HTTP/1.1\r\n\r\n")
-		ch := make(chan []byte)
-		go readBody(request, ch)
 		state, _, err := parser.Parse(raw)
-
 		require.EqualError(t, err, status.ErrBadRequest.Error())
 		require.Equal(t, httpparser.Error, state)
 	})
 
 	t.Run("NoPath", func(t *testing.T) {
-		parser, request := getParser()
-
+		parser, _ := getParser()
 		raw := []byte("GET HTTP/1.1\r\n\r\n")
-		ch := make(chan []byte)
-		go readBody(request, ch)
 		state, _, err := parser.Parse(raw)
-
 		require.EqualError(t, err, status.ErrBadRequest.Error())
 		require.Equal(t, httpparser.Error, state)
 	})
 
 	t.Run("PathWhitespace", func(t *testing.T) {
-		parser, request := getParser()
-
+		parser, _ := getParser()
 		raw := []byte("GET  HTTP/1.1\r\n\r\n")
-		ch := make(chan []byte)
-		go readBody(request, ch)
 		state, _, err := parser.Parse(raw)
-
 		require.EqualError(t, err, status.ErrBadRequest.Error())
 		require.Equal(t, httpparser.Error, state)
 	})
 
 	t.Run("ShortInvalidMethod", func(t *testing.T) {
-		parser, request := getParser()
-
+		parser, _ := getParser()
 		raw := []byte("GE / HTTP/1.1\r\n\r\n")
-		ch := make(chan []byte)
-		go readBody(request, ch)
 		state, _, err := parser.Parse(raw)
-
 		require.EqualError(t, err, status.ErrMethodNotImplemented.Error())
 		require.Equal(t, httpparser.Error, state)
 	})
 
 	t.Run("LongInvalidMethod", func(t *testing.T) {
-		parser, request := getParser()
-
+		parser, _ := getParser()
 		raw := []byte("PATCHPOSTPUT / HTTP/1.1\r\n\r\n")
-		ch := make(chan []byte)
-		go readBody(request, ch)
 		state, _, err := parser.Parse(raw)
-
 		require.EqualError(t, err, status.ErrBadRequest.Error())
 		require.Equal(t, httpparser.Error, state)
 	})
 
 	t.Run("ShortInvalidProtocol", func(t *testing.T) {
-		parser, request := getParser()
-
+		parser, _ := getParser()
 		raw := []byte("GET / HTT\r\n\r\n")
-		ch := make(chan []byte)
-		go readBody(request, ch)
 		state, _, err := parser.Parse(raw)
-
 		require.EqualError(t, err, status.ErrUnsupportedProtocol.Error())
 		require.Equal(t, httpparser.Error, state)
 	})
 
 	t.Run("LongInvalidProtocol", func(t *testing.T) {
-		parser, request := getParser()
-
+		parser, _ := getParser()
 		raw := []byte("GET / HTTPS/1.1\r\n\r\n")
-		ch := make(chan []byte)
-		go readBody(request, ch)
 		state, _, err := parser.Parse(raw)
-
 		require.EqualError(t, err, status.ErrUnsupportedProtocol.Error())
 		require.Equal(t, httpparser.Error, state)
 	})
 
 	t.Run("UnsupportedProtocol", func(t *testing.T) {
-		parser, request := getParser()
-
+		parser, _ := getParser()
 		raw := []byte("GET / HTTP/1.2\r\n\r\n")
-		ch := make(chan []byte)
-		go readBody(request, ch)
 		state, _, err := parser.Parse(raw)
-
 		require.EqualError(t, err, status.ErrUnsupportedProtocol.Error())
 		require.Equal(t, httpparser.Error, state)
 	})
 
 	t.Run("LFCR_CRLF", func(t *testing.T) {
-		parser, request := getParser()
-
+		parser, _ := getParser()
 		raw := []byte("GET / HTTP/1.1\n\r\r\n")
-		ch := make(chan []byte)
-		go readBody(request, ch)
 		state, _, err := parser.Parse(raw)
-
 		require.EqualError(t, err, status.ErrBadRequest.Error())
 		require.Equal(t, httpparser.Error, state)
 	})
@@ -490,71 +401,50 @@ func TestHttpRequestsParser_Parse_Negative(t *testing.T) {
 		// our parser is able to parse both crlf and lf splitters
 		// so in example below he sees LF CRLF CR
 		// the last one CR will be returned as extra-bytes
-
-		parser, request := getParser()
-
+		parser, _ := getParser()
 		raw := []byte("GET / HTTP/1.1\n\r\n\r")
-		ch := make(chan []byte)
-		go readBody(request, ch)
 		state, extra, err := parser.Parse(raw)
-
 		require.Equal(t, []byte("\r"), extra)
 		require.NoError(t, err)
 		require.Equal(t, httpparser.RequestCompleted, state)
 	})
 
 	t.Run("HeaderWithoutColon", func(t *testing.T) {
-		parser, request := getParser()
-
+		parser, _ := getParser()
 		raw := []byte("GET / HTTP/1.1\r\nsome header some value\r\n\r\n")
-		ch := make(chan []byte)
-		go readBody(request, ch)
 		state, _, err := parser.Parse(raw)
-
 		require.EqualError(t, err, status.ErrBadRequest.Error())
 		require.Equal(t, httpparser.Error, state)
 	})
 
 	t.Run("HeaderWithoutColon", func(t *testing.T) {
-		parser, request := getParser()
-
+		parser, _ := getParser()
 		raw := []byte("GET / HTTP/1.1\r\nsome header some value\r\n\r\n")
-		ch := make(chan []byte)
-		go readBody(request, ch)
 		state, _, err := parser.Parse(raw)
-
 		require.EqualError(t, err, status.ErrBadRequest.Error())
 		require.Equal(t, httpparser.Error, state)
 	})
 
 	t.Run("MajorHTTPVersionOverflow", func(t *testing.T) {
-		parser, request := getParser()
-
+		parser, _ := getParser()
 		raw := []byte("GET / HTTP/335.1\r\n\r\n")
-		ch := make(chan []byte)
-		go readBody(request, ch)
 		state, _, err := parser.Parse(raw)
-
 		require.EqualError(t, err, status.ErrUnsupportedProtocol.Error())
 		require.Equal(t, httpparser.Error, state)
 	})
 
 	t.Run("MinorHTTPVersionOverflow", func(t *testing.T) {
-		parser, request := getParser()
-
+		parser, _ := getParser()
 		raw := []byte("GET / HTTP/1.335\r\n\r\n")
-		ch := make(chan []byte)
-		go readBody(request, ch)
 		state, _, err := parser.Parse(raw)
-
 		require.EqualError(t, err, status.ErrUnsupportedProtocol.Error())
 		require.Equal(t, httpparser.Error, state)
 	})
 
 	t.Run("HeadersInvalidContentLength", func(t *testing.T) {
 		parser, _ := getParser()
-		req := "GET / HTTP/1.1\r\nContent-Length: 1f5\r\n\r\n"
-		_, _, err := parser.Parse([]byte(req))
+		raw := []byte("GET / HTTP/1.1\r\nContent-Length: 1f5\r\n\r\n")
+		_, _, err := parser.Parse(raw)
 		require.EqualError(t, err, status.ErrBadRequest.Error())
 	})
 
@@ -563,44 +453,9 @@ func TestHttpRequestsParser_Parse_Negative(t *testing.T) {
 		// HTTP/1.1-oriented, and in 1.1 simple request/response is
 		// something like a deprecated mechanism
 		parser, _ := getParser()
-		req := "GET / \r\n"
-		_, _, err := parser.Parse([]byte(req))
+		raw := []byte("GET / \r\n")
+		state, _, err := parser.Parse(raw)
 		require.EqualError(t, err, status.ErrBadRequest.Error())
-	})
-}
-
-func TestHttpRequestsParser_Chunked(t *testing.T) {
-	t.Run("OrdinaryChunkedRequest", func(t *testing.T) {
-		parser, request := getParser()
-
-		state, extra, err := parser.Parse(ordinaryChunked)
-		require.NoError(t, err)
-		require.Equal(t, httpparser.HeadersCompleted, state)
-
-		ch := make(chan []byte)
-		go readBody(request, ch)
-
-		state, extra, err = parser.Parse(extra)
-		require.NoError(t, err)
-		require.Equal(t, httpparser.BodyCompleted, state)
-		require.Empty(t, extra)
-		require.Equal(t, "Hello, world!But what's wrong with you?Finally am here", string(<-ch))
-	})
-
-	t.Run("ChunkedWithTrailers", func(t *testing.T) {
-		parser, request := getParser()
-
-		state, extra, err := parser.Parse(chunkedWithTrailers)
-		require.NoError(t, err)
-		require.Equal(t, httpparser.HeadersCompleted, state)
-
-		ch := make(chan []byte)
-		go readBody(request, ch)
-
-		state, extra, err = parser.Parse(extra)
-		require.NoError(t, err)
-		require.Equal(t, httpparser.BodyCompleted, state)
-		require.Empty(t, extra)
-		require.Equal(t, "MozillaDeveloperNetwork", string(<-ch))
+		require.Equal(t, httpparser.Error, state)
 	})
 }

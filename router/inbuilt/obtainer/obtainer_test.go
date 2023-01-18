@@ -1,8 +1,10 @@
 package obtainer
 
 import (
-	"context"
 	"github.com/fakefloordiv/indigo/http/status"
+	"github.com/fakefloordiv/indigo/internal/parser/http1"
+	"github.com/fakefloordiv/indigo/internal/server/tcp"
+	"github.com/fakefloordiv/indigo/settings"
 	"reflect"
 	"testing"
 
@@ -15,13 +17,14 @@ import (
 )
 
 func nopHandler(request *http.Request) http.Response {
-	return http.Respond(request)
+	return http.RespondTo(request)
 }
 
 func newRequest(path string, method methods.Method) *http.Request {
 	hdrs := headers.NewHeaders(make(map[string][]string))
-	request, _ := http.NewRequest(
-		hdrs, url.Query{}, nil, context.Background(), http.NewResponse(),
+	bodyReader := http1.NewBodyReader(tcp.NewNopClient(), settings.Default().Body)
+	request := http.NewRequest(
+		hdrs, url.Query{}, http.NewResponse(), nil, bodyReader,
 	)
 	request.Path = path
 	request.Method = method

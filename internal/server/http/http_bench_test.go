@@ -2,13 +2,13 @@ package http
 
 import (
 	"github.com/fakefloordiv/indigo/http"
+	"github.com/fakefloordiv/indigo/internal/server/tcp"
 	"net"
 	"testing"
 	"time"
 
 	"github.com/fakefloordiv/indigo/internal/pool"
 
-	"github.com/fakefloordiv/indigo/http/encodings"
 	"github.com/fakefloordiv/indigo/http/headers"
 	"github.com/fakefloordiv/indigo/http/url"
 	"github.com/fakefloordiv/indigo/internal/alloc"
@@ -96,23 +96,24 @@ func BenchmarkIndigo(b *testing.B) {
 	router := inbuilt.NewRouter()
 	root := router.Resource("/")
 	root.Get(func(request *http.Request) http.Response {
-		return http.Respond(request)
+		return http.RespondTo(request)
 	})
 	root.Post(func(request *http.Request) http.Response {
 		_ = request.OnBody(func([]byte) error {
 			return nil
-		}, func(error) {
+		}, func() error {
+			return nil
 		})
 
-		return http.Respond(request)
+		return http.RespondTo(request)
 	})
 
 	router.Get("/with-header", func(request *http.Request) http.Response {
-		return http.Respond(request).WithHeader("Hello", "World")
+		return http.RespondTo(request).WithHeader("Hello", "World")
 	})
 
 	router.Get("/with-two-headers", func(request *http.Request) http.Response {
-		return http.Respond(request).
+		return http.RespondTo(request).
 			WithHeader("Hello", "World").
 			WithHeader("Lorem", "Ipsum")
 	})
@@ -123,57 +124,62 @@ func BenchmarkIndigo(b *testing.B) {
 	query := url.NewQuery(func() map[string][]byte {
 		return make(map[string][]byte)
 	})
-	request, writer := http.NewRequest(
-		headers.NewHeaders(nil), query, nil, nil, http.NewResponse(),
+	bodyReader := http1.NewBodyReader(tcp.NewNopClient(), settings.Default().Body)
+	request := http.NewRequest(
+		headers.NewHeaders(nil), query, http.NewResponse(), nil, bodyReader,
 	)
 	keyAllocator := alloc.NewAllocator(
-		int(s.Headers.KeyLength.Maximal)*int(s.Headers.Number.Default),
-		int(s.Headers.KeyLength.Maximal)*int(s.Headers.Number.Maximal),
+		s.Headers.MaxKeyLength*s.Headers.Number.Default,
+		s.Headers.MaxKeyLength*s.Headers.Number.Maximal,
 	)
 	valAllocator := alloc.NewAllocator(
 		int(s.Headers.ValueSpace.Default), int(s.Headers.ValueSpace.Maximal),
 	)
 	objPool := pool.NewObjectPool[[]string](20)
-	startLineBuff := make([]byte, s.URL.Length.Maximal)
-	codings := encodings.NewContentDecoders()
+	startLineBuff := make([]byte, s.URL.MaxLength)
 	parser := http1.NewHTTPRequestsParser(
-		request, writer, keyAllocator, valAllocator, objPool, startLineBuff, s, codings,
+		request, keyAllocator, valAllocator, objPool, startLineBuff, s.Headers,
 	)
 
-	// because only tcp server reads from conn. We do not benchmark tcp server here
-	conn := newConn(nil)
+	client := tcp.NewNopClient()
 	render := render2.NewRenderer(make([]byte, 0, 1024), nil, make(map[string][]string))
 
-	server := NewHTTPServer(request, router, parser, conn, render)
-	go server.Run()
+	server := NewHTTPServer(router).(*httpServer)
+	go server.Run(client, request, bodyReader, render, parser)
 
+	simpleGETClient := tcp.NewStaticClient(simpleGETRequest)
 	b.Run("SimpleGET", func(b *testing.B) {
 		for i := 0; i < b.N; i++ {
-			_ = server.OnData(simpleGETRequest)
+			server.RunOnce(simpleGETClient, request, bodyReader, render, parser)
 		}
 	})
 
+	fiveHeadersGETClient := tcp.NewStaticClient(fiveHeadersGETRequest)
 	b.Run("FiveHeadersGET", func(b *testing.B) {
 		for i := 0; i < b.N; i++ {
-			_ = server.OnData(fiveHeadersGETRequest)
+			server.RunOnce(fiveHeadersGETClient, request, bodyReader, render, parser)
 		}
 	})
 
+	tenHeadersGETClient := tcp.NewStaticClient(tenHeadersGETRequest)
 	b.Run("TenHeadersGET", func(b *testing.B) {
 		for i := 0; i < b.N; i++ {
-			_ = server.OnData(tenHeadersGETRequest)
+			server.RunOnce(tenHeadersGETClient, request, bodyReader, render, parser)
 		}
 	})
 
+	withRespHeadersGETClient := tcp.NewStaticClient(simpleGETWithHeader)
 	b.Run("WithRespHeader", func(b *testing.B) {
 		for i := 0; i < b.N; i++ {
-			_ = server.OnData(simpleGETWithHeader)
+			server.RunOnce(withRespHeadersGETClient, request, bodyReader, render, parser)
 		}
 	})
 
-	b.Run("SimplePOST", func(b *testing.B) {
-		for i := 0; i < b.N; i++ {
-			_ = server.OnData(simplePOST)
-		}
-	})
+	// TODO: add here some special request with special client that is able to
+	//       parse a body
+	//b.Run("SimplePOST", func(b *testing.B) {
+	//	for i := 0; i < b.N; i++ {
+	//		_ = server.OnData(simplePOST)
+	//	}
+	//})
 }

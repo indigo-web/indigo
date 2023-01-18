@@ -1,58 +1,54 @@
 package http1
 
 import (
-	"github.com/fakefloordiv/indigo/http/status"
+	"io"
 	"testing"
 
-	"github.com/fakefloordiv/indigo/internal/body"
-
+	"github.com/fakefloordiv/indigo/http/status"
 	"github.com/fakefloordiv/indigo/settings"
-
 	"github.com/stretchr/testify/require"
 )
 
-func bodyReader(gateway *body.Gateway, ch chan []byte) {
-	var body []byte
+func feedParserWithPart(
+	parser chunkedBodyParser, part []byte, trailer bool,
+) (p chunkedBodyParser, result []byte, err error) {
+	var bodyPart []byte
 
-	for {
-		data := <-gateway.Data
-		if data == nil {
-			break
+	for len(part) > 0 {
+		bodyPart, part, err = parser.Parse(part, trailer)
+		if err != nil {
+			return parser, result, err
 		}
 
-		body = append(body, data...)
-		gateway.Data <- nil
+		result = append(result, bodyPart...)
 	}
 
-	ch <- body
-}
-
-func finalize(gateway *body.Gateway) {
-	gateway.Data <- nil
+	return parser, result, nil
 }
 
 func testDifferentPartSizes(t *testing.T, request []byte, wantBody string, trailer bool) {
 	for i := 1; i < len(request); i += 1 {
-		gateway := body.NewBodyGateway()
-		ch := make(chan []byte)
-		go bodyReader(gateway, ch)
-
-		parser := newChunkedBodyParser(gateway, settings.Default())
-
+		parser := newChunkedBodyParser(settings.Default().Body)
 		parts := splitIntoParts(request, i)
-		for j, part := range parts {
-			done, extra, err := parser.Parse(part, nopDecoder, trailer)
-			require.Empty(t, extra)
-			require.NoErrorf(t, err, "happened with part size: %d", i)
+		var (
+			content []byte
+			piece   []byte
+			err     error
+		)
 
-			if done {
-				require.True(t, j+1 == len(parts),
-					"done before the whole request was fed")
+		for j, part := range parts {
+			parser, piece, err = feedParserWithPart(parser, part, trailer)
+			switch err {
+			case nil:
+				content = append(content, piece...)
+			case io.EOF:
+				require.Equal(t, wantBody, string(content))
+				require.Equal(t, j, len(parts)-1, "Expected all the parts to be parsed")
+				return
+			default:
+				require.NoErrorf(t, err, "Parts size: %d", i)
 			}
 		}
-
-		finalize(gateway)
-		require.Equal(t, wantBody, string(<-ch))
 	}
 }
 
@@ -77,13 +73,10 @@ func TestChunkedBodyParser_Parse_FooterHeaders(t *testing.T) {
 func TestChunkedBodyParser_Parse_Negative(t *testing.T) {
 	t.Run("BeginWithCRLF", func(t *testing.T) {
 		chunked := []byte("\r\nd\r\nHello, world!\r\n1a\r\nBut what's wrong with you?\r\nf\r\nFinally am here\r\n0\r\n\r\n")
-		gateway := body.NewBodyGateway()
-		ch := make(chan []byte)
-		go bodyReader(gateway, ch)
 
-		parser := newChunkedBodyParser(gateway, settings.Default())
-		done, extra, err := parser.Parse(chunked, nopDecoder, false)
-		require.True(t, done)
+		parser := newChunkedBodyParser(settings.Default().Body)
+		piece, extra, err := parser.Parse(chunked, false)
+		require.Empty(t, piece)
 		require.Empty(t, extra)
 		require.EqualError(t, err, status.ErrBadRequest.Error())
 	})
