@@ -18,7 +18,7 @@ func DynamicObtainer(routes routertypes.RoutesMap) Obtainer {
 
 	return func(req *http.Request) (routertypes.HandlerFunc, error) {
 		var payload *radix.Payload
-		req.Ctx, payload = tree.Match(req.Ctx, req.Path)
+		req.Ctx, payload = tree.Match(req.Ctx, stripTrailingSlash(req.Path))
 		if payload == nil {
 			return nil, status.ErrNotFound
 		}
