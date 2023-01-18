@@ -1,15 +1,14 @@
 package http1
 
 import (
+	"fmt"
 	"github.com/fakefloordiv/indigo/http"
-	"github.com/fakefloordiv/indigo/http/encodings"
 	"github.com/fakefloordiv/indigo/http/headers"
 	methods "github.com/fakefloordiv/indigo/http/method"
 	"github.com/fakefloordiv/indigo/http/proto"
 	"github.com/fakefloordiv/indigo/http/status"
 	"github.com/fakefloordiv/indigo/internal"
 	"github.com/fakefloordiv/indigo/internal/alloc"
-	"github.com/fakefloordiv/indigo/internal/body"
 	"github.com/fakefloordiv/indigo/internal/parser"
 	"github.com/fakefloordiv/indigo/internal/pool"
 	"github.com/fakefloordiv/indigo/settings"
@@ -27,50 +26,39 @@ type httpRequestsParser struct {
 	state   parserState
 	request *http.Request
 
-	settings settings.Settings
+	headersSettings settings.Headers
 
-	lengthCountdown         uint
+	contentLength           int
 	closeConnection         bool
 	chunkedTransferEncoding bool
 	trailer                 bool
-	chunkedBodyParser       chunkedBodyParser
 
 	startLineBuff          []byte
 	begin, pointer         int
 	urlEncodedChar         uint8
 	protoMajor, protoMinor uint8
 
-	headersNumber        uint8
+	headersNumber        int
 	headerKey            string
 	headerKeyAllocator   alloc.Allocator
 	headerValueAllocator alloc.Allocator
 	headersValuesPool    pool.ObjectPool[[]string]
-
-	body       *body.Gateway
-	decoders   encodings.Decoders
-	decoder    encodings.DecoderFunc
-	decodeBody bool
 }
 
 func NewHTTPRequestsParser(
-	request *http.Request, body *body.Gateway, keyAllocator, valAllocator alloc.Allocator,
-	valuesPool pool.ObjectPool[[]string], startLineBuff []byte, settings settings.Settings,
-	decoders encodings.Decoders,
+	request *http.Request, keyAllocator, valAllocator alloc.Allocator,
+	valuesPool pool.ObjectPool[[]string], startLineBuff []byte, headersSettings settings.Headers,
 ) parser.HTTPRequestsParser {
 	return &httpRequestsParser{
-		state:    eMethod,
-		request:  request,
-		settings: settings,
+		state:           eMethod,
+		request:         request,
+		headersSettings: headersSettings,
 
-		chunkedBodyParser: newChunkedBodyParser(body, settings),
-		startLineBuff:     startLineBuff,
+		startLineBuff: startLineBuff,
 
 		headerKeyAllocator:   keyAllocator,
 		headerValueAllocator: valAllocator,
 		headersValuesPool:    valuesPool,
-
-		body:     body,
-		decoders: decoders,
 	}
 }
 
@@ -143,65 +131,8 @@ func (p *httpRequestsParser) Parse(data []byte) (state parser.RequestState, extr
 		goto headerValueCRLF
 	case eHeaderValueCRLFCR:
 		goto headerValueCRLFCR
-	case eBody:
-		if p.chunkedTransferEncoding {
-			done, extra, err := p.chunkedBodyParser.Parse(data, p.decoder, p.trailer)
-			if err != nil {
-				p.body.WriteErr(err)
-
-				return parser.Error, nil, err
-			} else if done {
-				p.body.Data <- nil
-
-				return parser.BodyCompleted, extra, nil
-			}
-
-			return parser.Pending, extra, nil
-		}
-
-		if p.lengthCountdown <= uint(len(data)) {
-			piece := data[:p.lengthCountdown]
-			if p.decodeBody {
-				piece, err = p.decoder(piece)
-				if err != nil {
-					p.body.WriteErr(err)
-
-					return parser.Error, nil, err
-				}
-			}
-
-			p.body.Data <- piece
-			<-p.body.Data
-			p.body.Data <- nil
-			extra = data[p.lengthCountdown:]
-			p.lengthCountdown = 0
-
-			if p.body.Err != nil {
-				return parser.Error, extra, p.body.Err
-			}
-
-			return parser.BodyCompleted, extra, nil
-		}
-
-		piece := data
-		if p.decodeBody {
-			piece, err = p.decoder(data)
-			if err != nil {
-				p.body.WriteErr(err)
-
-				return parser.Error, nil, err
-			}
-		}
-
-		p.body.Data <- piece
-		<-p.body.Data
-		p.lengthCountdown -= uint(len(data))
-
-		if p.body.Err != nil {
-			return parser.Error, nil, p.body.Err
-		}
-
-		return parser.Pending, nil, nil
+	default:
+		panic(fmt.Sprintf("BUG: unexpected state: %v", p.state))
 	}
 
 method:
@@ -637,7 +568,7 @@ headerKey:
 	for i := range data {
 		switch data[i] {
 		case ':':
-			if p.headersNumber > p.settings.Headers.Number.Maximal {
+			if p.headersNumber > p.headersSettings.Number.Maximal {
 				return parser.Error, nil, status.ErrTooManyHeaders
 			}
 
@@ -702,7 +633,7 @@ contentLength:
 				return parser.Error, nil, status.ErrBadRequest
 			}
 
-			p.lengthCountdown = p.lengthCountdown*10 + uint(char-'0')
+			p.contentLength = p.contentLength*10 + int(char-'0')
 		}
 	}
 
@@ -727,7 +658,7 @@ contentLengthCRLF:
 		return parser.Pending, nil, nil
 	}
 
-	p.request.ContentLength = p.lengthCountdown
+	p.request.ContentLength = p.contentLength
 
 	switch data[0] {
 	case '\r':
@@ -735,11 +666,9 @@ contentLengthCRLF:
 		p.state = eContentLengthCRLFCR
 		goto contentLengthCRLFCR
 	case '\n':
-		if p.lengthCountdown == 0 && !p.chunkedTransferEncoding {
+		if p.contentLength == 0 && !p.chunkedTransferEncoding {
 			return parser.RequestCompleted, data[1:], nil
 		}
-
-		p.state = eBody
 
 		return parser.HeadersCompleted, data[1:], nil
 	default:
@@ -755,11 +684,9 @@ contentLengthCRLFCR:
 
 	switch data[0] {
 	case '\n':
-		if p.lengthCountdown == 0 && !p.chunkedTransferEncoding {
+		if p.contentLength == 0 && !p.chunkedTransferEncoding {
 			return parser.RequestCompleted, data[1:], nil
 		}
-
-		p.state = eBody
 
 		return parser.HeadersCompleted, data[1:], nil
 	default:
@@ -829,25 +756,15 @@ headerValueCRLF:
 	case "transfer-encoding":
 		p.chunkedTransferEncoding = headers.ValueOf(value) == "chunked"
 		p.request.ChunkedTE = p.chunkedTransferEncoding
-	case "content-encoding":
-		decoder, found := p.decoders.Get(value)
-		if !found {
-			return parser.Error, nil, status.ErrUnsupportedEncoding
-		}
-
-		p.decodeBody = true
-		p.decoder = decoder.New()
 	case "trailer":
 		p.trailer = true
 	}
 
 	switch data[0] {
 	case '\n':
-		if p.lengthCountdown == 0 && !p.chunkedTransferEncoding {
+		if p.contentLength == 0 && !p.chunkedTransferEncoding {
 			return parser.RequestCompleted, data[1:], nil
 		}
-
-		p.state = eBody
 
 		return parser.HeadersCompleted, data[1:], nil
 	case '\r':
@@ -867,11 +784,9 @@ headerValueCRLFCR:
 
 	switch data[0] {
 	case '\n':
-		if p.lengthCountdown == 0 && !p.chunkedTransferEncoding {
+		if p.contentLength == 0 && !p.chunkedTransferEncoding {
 			return parser.RequestCompleted, data[1:], nil
 		}
-
-		p.state = eBody
 
 		return parser.HeadersCompleted, data[1:], nil
 	default:
@@ -882,9 +797,16 @@ headerValueCRLFCR:
 func (p *httpRequestsParser) Release() {
 	requestHeaders := p.request.Headers.AsMap()
 
-	for key, values := range requestHeaders {
+	for _, values := range requestHeaders {
 		p.headersValuesPool.Release(values)
-		delete(requestHeaders, key)
+	}
+
+	// separated delete-loop from releasing headers values pool because go's standard (Google's)
+	// compiler optimizes delete-loop ONLY in case there is a single expression that is a delete
+	// function call. So maybe such an optimization will make some difference
+	// TODO: profile this and proof that this optimization makes sense
+	for k := range requestHeaders {
+		delete(requestHeaders, k)
 	}
 
 	p.reset()
@@ -895,9 +817,9 @@ func (p *httpRequestsParser) reset() {
 	p.protoMinor = 0
 	p.headersNumber = 0
 	p.chunkedTransferEncoding = false
-	p.decodeBody = false
 	p.headerKeyAllocator.Clear()
 	p.headerValueAllocator.Clear()
 	p.trailer = false
+	p.contentLength = 0
 	p.state = eMethod
 }
