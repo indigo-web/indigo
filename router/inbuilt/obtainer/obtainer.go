@@ -29,3 +29,14 @@ func getObtainer(routes []string) constructor {
 
 	return StaticObtainer
 }
+
+// stripTrailingSlash just removes a trailing slash of request path in case it is presented.
+// Note: this removes only one trailing slash. In case 2 or more are presented they'll be treated
+// as an ordinary part of the path so won't be stripped
+func stripTrailingSlash(path string) string {
+	if path[len(path)-1] == '/' {
+		return path[:len(path)-1]
+	}
+
+	return path
+}
