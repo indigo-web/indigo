@@ -133,9 +133,7 @@ func getStaticRouter(t *testing.T) router.Router {
 	//	return http.RespondTo(request)
 	//})
 
-	r.Post("/do-not-read-body", func(request *http.Request) http.Response {
-		return http.RespondTo(request)
-	})
+	r.Post("/do-not-read-body", http.RespondTo)
 
 	// TODO: implement connection hijacking and uncomment these tests
 	//r.Get("/hijack-conn-no-body-read", func(request *http.Request) http.Response {

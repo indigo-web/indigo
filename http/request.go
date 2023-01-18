@@ -132,7 +132,7 @@ func (r *Request) Body() ([]byte, error) {
 
 // Reader returns io.Reader for request body. This method may be called multiple times,
 // but reading from multiple readers leads to Undefined Behaviour
-func (r *Request) Reader() io.Reader {
+func (*Request) Reader() io.Reader {
 	// TODO: implement io.Reader interface for request body
 	panic("not implemented")
 }
