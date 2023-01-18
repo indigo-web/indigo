@@ -138,11 +138,13 @@ func (r Response) File() (string, FileErrHandler) {
 	return r.Filename, r.handler
 }
 
-func (r Response) Reset() {
+func (r Response) Reset() Response {
 	r.Code = status.OK
 	r.Status = ""
 	r.headers = r.headers[:0]
 	r.Filename = ""
 	r.Body = nil
 	r.handler = nil
+
+	return r
 }

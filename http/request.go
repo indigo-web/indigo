@@ -147,7 +147,7 @@ func (r *Request) Reset() (err error) {
 	r.Fragment = ""
 	r.Query.Set(nil)
 	r.Ctx = context.Background()
-	r.response.Reset()
+	r.response = r.response.Reset()
 
 	if err = r.resetBody(); err != nil {
 		return err
