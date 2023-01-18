@@ -2,7 +2,6 @@ package http
 
 import (
 	"context"
-	"github.com/fakefloordiv/indigo/internal/body"
 	"io"
 	"net"
 
@@ -10,6 +9,15 @@ import (
 	methods "github.com/fakefloordiv/indigo/http/method"
 	"github.com/fakefloordiv/indigo/http/proto"
 	"github.com/fakefloordiv/indigo/http/url"
+)
+
+type (
+	onBodyCallback     func([]byte) error
+	onCompleteCallback func() error
+	BodyReader         interface {
+		Init(*Request)
+		Read() ([]byte, error)
+	}
 )
 
 type (
@@ -39,10 +47,10 @@ type Request struct {
 
 	Headers headers.Headers
 
-	ContentLength uint
+	ContentLength int
 	ChunkedTE     bool
 
-	body     *requestBody
+	body     BodyReader
 	bodyBuff []byte
 
 	Ctx      context.Context
@@ -60,37 +68,50 @@ type Request struct {
 // But maybe it's better to implement DI all the way we go? I don't know, maybe
 // someone will contribute and fix this
 func NewRequest(
-	hdrs headers.Headers, query url.Query, remote net.Addr, ctx context.Context,
-	response Response,
-) (*Request, *body.Gateway) {
-	requestBodyStruct, gateway := newRequestBody()
+	hdrs headers.Headers, query url.Query, response Response, remote net.Addr, body BodyReader,
+) *Request {
 	request := &Request{
 		Query:    query,
 		Proto:    proto.HTTP11,
 		Headers:  hdrs,
 		Remote:   remote,
-		body:     requestBodyStruct,
-		Ctx:      ctx,
+		body:     body,
+		Ctx:      context.Background(),
 		response: response,
 	}
 
-	return request, gateway
+	return request
 }
 
-// OnBody is a proxy-function for r.body.Read. This method reads body in streaming
-// processing mode by calling onBody on each body piece, and onComplete when body
-// is over (onComplete is guaranteed to be called except situation when body is already
-// read)
+// OnBody is a low-level interface accessing a request body. It takes onBody callback that is
+// being called every time a piece of body is read (note: even a single byte can be passed).
+// In case error returned, it'll be returned from OnBody method. In case onBody never did return
+// an error, onComplete will be called when the body will be finished. This callback also can
+// return an error that'll be returned from OnBody method - for example, in case body's hash sum
+// is invalid
 func (r *Request) OnBody(onBody onBodyCallback, onComplete onCompleteCallback) error {
-	return r.body.Read(onBody, onComplete)
+	for {
+		piece, err := r.body.Read()
+		switch err {
+		case nil:
+		case io.EOF:
+			return onComplete()
+		default:
+			return err
+		}
+
+		if err = onBody(piece); err != nil {
+			return err
+		}
+	}
 }
 
 // Body is a high-level function that wraps OnBody, and the only it does is reading
 // pieces of body into the buffer that is a nil by default, but may grow and will stay
 // as big as it grew until the disconnect
 func (r *Request) Body() ([]byte, error) {
-	if r.ContentLength == 0 && !r.ChunkedTE {
-		return r.bodyBuff[:0], nil
+	if !r.HasBody() {
+		return nil, nil
 	}
 
 	if r.bodyBuff == nil {
@@ -99,11 +120,11 @@ func (r *Request) Body() ([]byte, error) {
 
 	r.bodyBuff = r.bodyBuff[:0]
 
-	err := r.body.Read(func(b []byte) error {
+	err := r.OnBody(func(b []byte) error {
 		r.bodyBuff = append(r.bodyBuff, b...)
 		return nil
-	}, func(err error) {
-		// ignore error here, because it will be anyway returned from r.body.Read call
+	}, func() error {
+		return nil
 	})
 
 	return r.bodyBuff, err
@@ -112,7 +133,12 @@ func (r *Request) Body() ([]byte, error) {
 // Reader returns io.Reader for request body. This method may be called multiple times,
 // but reading from multiple readers leads to Undefined Behaviour
 func (r *Request) Reader() io.Reader {
-	return newBodyReader(r.body)
+	// TODO: implement io.Reader interface for request body
+	panic("not implemented")
+}
+
+func (r Request) HasBody() bool {
+	return r.ContentLength > 0 || r.ChunkedTE
 }
 
 // Reset resets request headers and reads body into nowhere until completed.
@@ -133,44 +159,15 @@ func (r *Request) Reset() (err error) {
 	return nil
 }
 
+// resetBody just reads the body until its end
 func (r *Request) resetBody() error {
-	if r.ContentLength == 0 && !r.ChunkedTE {
-		// in case request does not contain a body, it makes no sense to wait
-		// for the only nil from channel. This avoids some useless goroutines
-		// switches
-		r.body.Unread()
-
+	return r.OnBody(func([]byte) error {
 		return nil
-	}
-
-	return r.body.Reset()
+	}, func() error {
+		return nil
+	})
 }
 
-// Hijacker is a layer between request object and server that guarantees that request's body
-// will be completely read before connection is hijacked. Request body must be read to avoid
-// non-determination caused by possible receiving the request body instead of actual data
-// that is expected to be received.
-//
-// This function is exported only because another package (internal/server/http.go) requires
-// it. It cannot be inlined there because it uses non-exported method of the request object.
-// That is why user is supposed to not care about this function, moreover it receives a hijacker
-// function that is not used by user anywhere (except Request.Hijack method that IS NOT EXPECTED
-// TO BE PASSED HERE)
-func Hijacker(request *Request, hijacker hijackConn) func() (net.Conn, error) {
-	return func() (net.Conn, error) {
-		// we anyway don't need to have a body anymore. Also, without reading
-		// the body until complete server will not transfer into the state
-		// we need so this step is anyway compulsory
-		switch err := request.resetBody(); err {
-		case nil, ErrRead:
-		default:
-			return nil, err
-		}
-
-		return hijacker(), nil
-	}
-}
-
-func Respond(request *Request) Response {
+func RespondTo(request *Request) Response {
 	return request.response
 }
