@@ -49,6 +49,11 @@ func (h Headers) Set(key string, values []string) {
 	h.headers[key] = values
 }
 
+func (h Headers) Has(key string) bool {
+	_, found := h.headers[key]
+	return found
+}
+
 func (h Headers) Clear() {
 	for k := range h.headers {
 		delete(h.headers, k)
