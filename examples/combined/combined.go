@@ -17,8 +17,8 @@ var (
 )
 
 func Index(request *http.Request) http.Response {
-	return http.Respond(request).WithFile(index, func(err error) http.Response {
-		return http.Respond(request).
+	return http.RespondTo(request).WithFile(index, func(err error) http.Response {
+		return http.RespondTo(request).
 			WithCode(status.NotFound).
 			WithBody(
 				index + ": not found; try running this example directly from examples/combined folder",
@@ -28,34 +28,34 @@ func Index(request *http.Request) http.Response {
 
 func IndexSay(request *http.Request) http.Response {
 	if talking := request.Headers.Value("talking"); talking != "allowed" {
-		return http.Respond(request).WithCode(status.UnavailableForLegalReasons)
+		return http.RespondTo(request).WithCode(status.UnavailableForLegalReasons)
 	}
 
 	body, err := request.Body()
 	if err != nil {
-		return http.Respond(request).WithError(err)
+		return http.RespondTo(request).WithError(err)
 	}
 
 	fmt.Println("Somebody said:", strconv.Quote(string(body)))
 
-	return http.Respond(request)
+	return http.RespondTo(request)
 }
 
 func World(request *http.Request) http.Response {
-	return http.Respond(request).WithBody(
+	return http.RespondTo(request).WithBody(
 		`<h1>Hello, world!</h1>`,
 	)
 }
 
 func Easter(request *http.Request) http.Response {
 	if easter := request.Headers.Value("easter"); len(easter) > 0 {
-		return http.Respond(request).
+		return http.RespondTo(request).
 			WithCode(status.Teapot).
 			WithHeader("Easter", "Egg").
 			WithBody("You have discovered an easter egg! Congratulations!")
 	}
 
-	return http.Respond(request).WithBody("Pretty ordinary page, isn't it?")
+	return http.RespondTo(request).WithBody("Pretty ordinary page, isn't it?")
 }
 
 func main() {

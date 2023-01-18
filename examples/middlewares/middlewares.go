@@ -32,7 +32,7 @@ func SecondMiddleware(next routertypes.HandlerFunc, request *http.Request) http.
 func MyBeautifulHandler(request *http.Request) http.Response {
 	fmt.Println("running handler")
 
-	return http.Respond(request)
+	return http.RespondTo(request)
 }
 
 func main() {

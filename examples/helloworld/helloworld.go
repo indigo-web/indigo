@@ -13,7 +13,7 @@ import (
 var addr = "localhost:9090"
 
 func MyHandler(request *http.Request) http.Response {
-	return http.Respond(request).
+	return http.RespondTo(request).
 		WithCode(status.OK).
 		WithHeader("Hello", "world").
 		WithBody("<h1>How are you doing?</h1>")

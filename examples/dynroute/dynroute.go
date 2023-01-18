@@ -14,7 +14,7 @@ var addr = "localhost:9090"
 func MyDynamicHandler(request *http.Request) http.Response {
 	worldName := request.Ctx.Value("world-name").(string)
 
-	return http.Respond(request).WithBody("your world-name is " + worldName)
+	return http.RespondTo(request).WithBody("your world-name is " + worldName)
 }
 
 func main() {
