@@ -30,13 +30,17 @@ type (
 	headersMap = map[string]*defaultHeader
 )
 
-// Renderer is a session responses renderer. Its purpose is only to know
+type Renderer interface {
+	Render(*http.Request, http.Response, http.ResponseWriter) error
+}
+
+// renderer is a session responses renderer. Its purpose is only to know
 // something about client, and knowing them, render correct response
 // for example, we SHOULD not use content-codings for HTTP/1.0 clients,
 // and MUST NOT use them for HTTP/0.9 clients
 // Also in case of file is being sent, it collects some meta about it,
 // and compresses using available on both server and client encoders
-type Renderer struct {
+type renderer struct {
 	buff       []byte
 	buffOffset int
 	keepAlive  bool
@@ -45,15 +49,15 @@ type Renderer struct {
 	fileBuff       []byte
 }
 
-func NewRenderer(buff, fileBuff []byte, defaultHeaders map[string][]string) *Renderer {
-	return &Renderer{
+func NewRenderer(buff, fileBuff []byte, defaultHeaders map[string][]string) Renderer {
+	return &renderer{
 		buff:           buff,
 		defaultHeaders: parseDefaultHeaders(defaultHeaders),
 		fileBuff:       fileBuff,
 	}
 }
 
-func (r *Renderer) Response(
+func (r *renderer) Render(
 	request *http.Request, response http.Response, writer http.ResponseWriter,
 ) (err error) {
 	switch r.keepAlive {
@@ -114,7 +118,7 @@ func (r *Renderer) Response(
 		default:
 			_, handler := response.File()
 
-			return r.Response(request, handler(err), writer)
+			return r.Render(request, handler(err), writer)
 		}
 
 		return err
@@ -147,7 +151,7 @@ func (r *Renderer) Response(
 // Not very elegant solution, but uploading files is not the main purpose of web-server.
 // For small and medium projects, this may be enough, for anything serious - most of all
 // nginx will be used (the same is about https)
-func (r *Renderer) renderFileInto(
+func (r *renderer) renderFileInto(
 	method methods.Method, writer http.ResponseWriter, response http.Response,
 ) error {
 	file, err := os.OpenFile(response.Filename, os.O_RDONLY, 0)
