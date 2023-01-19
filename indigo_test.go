@@ -134,39 +134,38 @@ func getStaticRouter(t *testing.T) router.Router {
 
 	r.Post("/do-not-read-body", http.RespondTo)
 
-	// TODO: implement connection hijacking and uncomment these tests
-	//r.Get("/hijack-conn-no-body-read", func(request *http.Request) http.Response {
-	//	conn, err := request.Hijack()
-	//	require.NoError(t, err)
-	//
-	//	// just to notify client that we are ready for receiving something
-	//	_, _ = conn.Write([]byte("a"))
-	//
-	//	data, err := readN(conn, len(testRequestBody))
-	//	require.NoError(t, err)
-	//	require.Equal(t, testRequestBody, string(data))
-	//
-	//	_ = conn.Close()
-	//
-	//	return http.RespondTo(request)
-	//})
-	//
-	//r.Get("/hijack-conn-with-body-read", func(request *http.Request) http.Response {
-	//	_, _ = request.Body()
-	//
-	//	conn, err := request.Hijack()
-	//	require.NoError(t, err)
-	//
-	//	_, _ = conn.Write([]byte("a"))
-	//
-	//	data, err := readN(conn, len(testRequestBody))
-	//	require.NoError(t, err)
-	//	require.Equal(t, testRequestBody, string(data))
-	//
-	//	_ = conn.Close()
-	//
-	//	return http.RespondTo(request)
-	//})
+	r.Get("/hijack-conn-no-body-read", func(request *http.Request) http.Response {
+		conn, err := request.Hijack()
+		require.NoError(t, err)
+
+		// just to notify client that we are ready for receiving something
+		_, _ = conn.Write([]byte("a"))
+
+		data, err := readN(conn, len(testRequestBody))
+		require.NoError(t, err)
+		require.Equal(t, testRequestBody, string(data))
+
+		_ = conn.Close()
+
+		return http.RespondTo(request)
+	})
+
+	r.Get("/hijack-conn-with-body-read", func(request *http.Request) http.Response {
+		_, _ = request.Body()
+
+		conn, err := request.Hijack()
+		require.NoError(t, err)
+
+		_, _ = conn.Write([]byte("a"))
+
+		data, err := readN(conn, len(testRequestBody))
+		require.NoError(t, err)
+		require.Equal(t, testRequestBody, string(data))
+
+		_ = conn.Close()
+
+		return http.RespondTo(request)
+	})
 
 	r.Get("/with-file", func(request *http.Request) http.Response {
 		return http.RespondTo(request).WithFile(testFilename, func(err error) http.Response {
@@ -313,14 +312,13 @@ func TestServer_Static(t *testing.T) {
 		require.Equal(t, stdhttp.StatusOK, resp.StatusCode)
 	})
 
-	// TODO: uncomment these tests
-	//t.Run("/hijack-conn-no-body-read", func(t *testing.T) {
-	//	sendSimpleRequest(t, "/hijack-conn-no-body-read", addr)
-	//})
-	//
-	//t.Run("/hijack-conn-with-body-read", func(t *testing.T) {
-	//	sendSimpleRequest(t, "/hijack-conn-with-body-read", addr)
-	//})
+	t.Run("/hijack-conn-no-body-read", func(t *testing.T) {
+		sendSimpleRequest(t, "/hijack-conn-no-body-read", addr)
+	})
+
+	t.Run("/hijack-conn-with-body-read", func(t *testing.T) {
+		sendSimpleRequest(t, "/hijack-conn-with-body-read", addr)
+	})
 
 	t.Run("/with-file", func(t *testing.T) {
 		resp, err := stdhttp.DefaultClient.Get(URL + "/with-file")
