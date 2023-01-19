@@ -1,8 +1,9 @@
 package dummy
 
 import (
-	"github.com/fakefloordiv/indigo/internal/server/tcp"
 	"net"
+
+	"github.com/fakefloordiv/indigo/internal/server/tcp"
 )
 
 // circularClient is a client that on every read-operation returns the same data as it

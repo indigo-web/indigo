@@ -1,10 +1,11 @@
 package http
 
 import (
-	"github.com/fakefloordiv/indigo/internal/server/tcp/dummy"
 	"net"
 	"testing"
 	"time"
+
+	"github.com/fakefloordiv/indigo/internal/server/tcp/dummy"
 
 	"github.com/fakefloordiv/indigo/http"
 	"github.com/fakefloordiv/indigo/internal/pool"

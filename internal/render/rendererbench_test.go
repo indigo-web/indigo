@@ -1,8 +1,9 @@
 package render
 
 import (
-	"github.com/fakefloordiv/indigo/internal/server/tcp/dummy"
 	"testing"
+
+	"github.com/fakefloordiv/indigo/internal/server/tcp/dummy"
 
 	"github.com/fakefloordiv/indigo/http"
 	"github.com/fakefloordiv/indigo/internal/parser/http1"

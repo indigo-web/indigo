@@ -7,8 +7,7 @@ import (
 
 // nopConn is implemented in testing purposes, as passing a nil connection to request constructor
 // will cause a nil dereference panic
-type nopConn struct {
-}
+type nopConn struct{}
 
 func NewNopConn() net.Conn {
 	return nopConn{}
