@@ -123,15 +123,14 @@ func getStaticRouter(t *testing.T) router.Router {
 		return http.RespondTo(request)
 	})
 
-	// TODO: implement reader and uncomment this test
-	//r.Post("/body-reader", func(request *http.Request) http.Response {
-	//	reader := request.Reader()
-	//	body, err := io.ReadAll(reader)
-	//	require.NoError(t, err)
-	//	require.Equal(t, testRequestBody, string(body))
-	//
-	//	return http.RespondTo(request)
-	//})
+	r.Post("/body-reader", func(request *http.Request) http.Response {
+		reader := request.Reader()
+		body, err := io.ReadAll(reader)
+		require.NoError(t, err)
+		require.Equal(t, testRequestBody, string(body))
+
+		return http.RespondTo(request)
+	})
 
 	r.Post("/do-not-read-body", http.RespondTo)
 
@@ -292,17 +291,16 @@ func TestServer_Static(t *testing.T) {
 		require.Equal(t, stdhttp.StatusOK, resp.StatusCode)
 	})
 
-	// TODO: uncomment this test
-	//t.Run("/body-reader", func(t *testing.T) {
-	//	body := new(bytes.Buffer)
-	//	body.Write([]byte(testRequestBody))
-	//	resp, err := stdhttp.DefaultClient.Post(URL+"/body-reader", "text/html", body)
-	//	require.NoError(t, err)
-	//	defer func() {
-	//		_ = resp.Body.Close()
-	//	}()
-	//	require.Equal(t, stdhttp.StatusOK, resp.StatusCode)
-	//})
+	t.Run("/body-reader", func(t *testing.T) {
+		body := new(bytes.Buffer)
+		body.Write([]byte(testRequestBody))
+		resp, err := stdhttp.DefaultClient.Post(URL+"/body-reader", "text/html", body)
+		require.NoError(t, err)
+		defer func() {
+			_ = resp.Body.Close()
+		}()
+		require.Equal(t, stdhttp.StatusOK, resp.StatusCode)
+	})
 
 	t.Run("/do-not-read-body", func(t *testing.T) {
 		body := new(bytes.Buffer)

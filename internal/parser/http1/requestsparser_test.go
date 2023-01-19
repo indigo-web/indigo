@@ -33,17 +33,6 @@ var (
 	somePOST = []byte("POST / HTTP/1.1\r\nHello: World!\r\nContent-Length: 13\r\n\r\nHello, World!")
 
 	multipleHeaders = []byte("GET / HTTP/1.1\r\nAccept: one,two\r\nAccept: three\r\n\r\n")
-
-	// TODO: write tests for BodyReader
-	//ordinaryChunkedBody  = "d\r\nHello, world!\r\n1a\r\nBut what's wrong with you?\r\nf\r\nFinally am here\r\n0\r\n\r\n"
-	//traileredChunkedBody = "7\r\nMozilla\r\n9\r\nDeveloper\r\n7\r\nNetwork\r\n0\r\nExpires: date here\r\n\r\n"
-	//ordinaryChunked      = []byte("POST / HTTP/1.1\r\nTransfer-Encoding: chunked\r\n\r\n" + ordinaryChunkedBody)
-	//chunkedWithTrailers  = []byte(
-	//	"POST / HTTP/1.1\r\n" +
-	//		"Transfer-Encoding: chunked\r\n" +
-	//		"Trailer: Expires, Something-Else\r\n\r\n" +
-	//		traileredChunkedBody,
-	//)
 )
 
 func getParser() (httpparser.HTTPRequestsParser, *http.Request) {
