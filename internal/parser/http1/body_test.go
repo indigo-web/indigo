@@ -1,6 +1,7 @@
 package http1
 
 import (
+	"github.com/fakefloordiv/indigo/internal/server/tcp/dummy"
 	"io"
 	"strconv"
 	"testing"
@@ -9,13 +10,12 @@ import (
 	"github.com/fakefloordiv/indigo/http/headers"
 	"github.com/fakefloordiv/indigo/http/url"
 	"github.com/fakefloordiv/indigo/internal/functools"
-	"github.com/fakefloordiv/indigo/internal/server/tcp"
 	"github.com/fakefloordiv/indigo/settings"
 	"github.com/stretchr/testify/require"
 )
 
 func getRequestWithReader(chunked bool, body ...[]byte) (*http.Request, http.BodyReader) {
-	client := tcp.NewStaticClient(body...)
+	client := dummy.NewCircularClient(body...)
 	reader := NewBodyReader(client, settings.Default().Body)
 
 	var (
@@ -39,7 +39,7 @@ func getRequestWithReader(chunked bool, body ...[]byte) (*http.Request, http.Bod
 	}
 
 	request := http.NewRequest(
-		hdrs, url.Query{}, http.NewResponse(), nil, reader,
+		hdrs, url.Query{}, http.NewResponse(), dummy.NewNopConn(), reader,
 	)
 	request.ContentLength = contentLength
 	request.ChunkedTE = chunked

@@ -1,11 +1,11 @@
 package inbuilt
 
 import (
+	"github.com/fakefloordiv/indigo/internal/server/tcp/dummy"
 	"testing"
 
 	"github.com/fakefloordiv/indigo/http"
 	"github.com/fakefloordiv/indigo/internal/parser/http1"
-	"github.com/fakefloordiv/indigo/internal/server/tcp"
 	"github.com/fakefloordiv/indigo/settings"
 
 	"github.com/fakefloordiv/indigo/http/status"
@@ -110,10 +110,10 @@ func getPointApplied2Middleware(stack *callstack) routertypes.Middleware {
 
 func getRequest() *http.Request {
 	query := url.NewQuery(nil)
-	bodyReader := http1.NewBodyReader(tcp.NewNopClient(), settings.Default().Body)
+	bodyReader := http1.NewBodyReader(dummy.NewNopClient(), settings.Default().Body)
 
 	return http.NewRequest(
-		headers.NewHeaders(nil), query, http.NewResponse(), nil, bodyReader,
+		headers.NewHeaders(nil), query, http.NewResponse(), dummy.NewNopConn(), bodyReader,
 	)
 }
 
@@ -150,7 +150,7 @@ func TestMiddlewares(t *testing.T) {
 		request.Path = "/"
 
 		response := r.OnRequest(request)
-		require.Equal(t, status.OK, response.Code)
+		require.Equal(t, int(status.OK), int(response.Code))
 
 		wantChain := []middleware{
 			global2, global1,

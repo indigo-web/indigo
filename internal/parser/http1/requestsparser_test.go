@@ -1,11 +1,10 @@
 package http1
 
 import (
+	"github.com/fakefloordiv/indigo/internal/server/tcp/dummy"
 	"testing"
 
 	"github.com/fakefloordiv/indigo/http/status"
-	"github.com/fakefloordiv/indigo/internal/server/tcp"
-
 	"github.com/fakefloordiv/indigo/internal/pool"
 
 	"github.com/fakefloordiv/indigo/http"
@@ -45,9 +44,9 @@ func getParser() (httpparser.HTTPRequestsParser, *http.Request) {
 		s.Headers.ValueSpace.Default, s.Headers.ValueSpace.Maximal,
 	)
 	objPool := pool.NewObjectPool[[]string](20)
-	body := NewBodyReader(tcp.NewNopClient(), s.Body)
+	body := NewBodyReader(dummy.NewNopClient(), s.Body)
 	request := http.NewRequest(
-		headers.NewHeaders(nil), url.Query{}, http.NewResponse(), nil, body,
+		headers.NewHeaders(nil), url.Query{}, http.NewResponse(), dummy.NewNopConn(), body,
 	)
 	startLineBuff := make([]byte, s.URL.MaxLength)
 

@@ -1,11 +1,11 @@
 package render
 
 import (
+	"github.com/fakefloordiv/indigo/internal/server/tcp/dummy"
 	"testing"
 
 	"github.com/fakefloordiv/indigo/http"
 	"github.com/fakefloordiv/indigo/internal/parser/http1"
-	"github.com/fakefloordiv/indigo/internal/server/tcp"
 	"github.com/fakefloordiv/indigo/settings"
 
 	"github.com/fakefloordiv/indigo/http/headers"
@@ -43,9 +43,9 @@ func BenchmarkRenderer_Response(b *testing.B) {
 
 	hdrs := headers.NewHeaders(make(map[string][]string))
 	response := http.NewResponse()
-	bodyReader := http1.NewBodyReader(tcp.NewNopClient(), settings.Default().Body)
+	bodyReader := http1.NewBodyReader(dummy.NewNopClient(), settings.Default().Body)
 	request := http.NewRequest(
-		hdrs, url.NewQuery(nil), http.NewResponse(), nil, bodyReader,
+		hdrs, url.NewQuery(nil), http.NewResponse(), dummy.NewNopConn(), bodyReader,
 	)
 
 	b.Run("DefaultResponse_NoDefHeaders", func(b *testing.B) {
