@@ -73,6 +73,11 @@ func (h *httpServer) RunOnce(
 		reader.Init(req)
 		response := h.router.OnRequest(req)
 
+		if req.WasHijacked() {
+			_ = client.Close()
+			return false
+		}
+
 		if err = renderer.Render(req, response, client.Write); err != nil {
 			h.router.OnError(req, status.ErrCloseConnection)
 			return false
