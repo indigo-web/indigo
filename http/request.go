@@ -21,15 +21,6 @@ type (
 )
 
 type (
-	// ConnectionHijacker is for user. It returns error because it has to
-	// read full request body to stop the server in defined state. And,
-	// as we know, reading body may return an error
-	ConnectionHijacker func() (net.Conn, error)
-
-	// hijackConn is like an interface of httpServer method that notifies
-	// core about hijacking and returns connection object
-	hijackConn func() net.Conn
-
 	Path     = string
 	Fragment = string
 )
@@ -53,9 +44,10 @@ type Request struct {
 	body     BodyReader
 	bodyBuff []byte
 
-	Ctx      context.Context
-	response Response
-	Hijack   ConnectionHijacker
+	Ctx         context.Context
+	response    Response
+	conn        net.Conn
+	wasHijacked bool
 }
 
 // NewRequest returns a new instance of request object and body gateway
@@ -68,13 +60,14 @@ type Request struct {
 // But maybe it's better to implement DI all the way we go? I don't know, maybe
 // someone will contribute and fix this
 func NewRequest(
-	hdrs headers.Headers, query url.Query, response Response, remote net.Addr, body BodyReader,
+	hdrs headers.Headers, query url.Query, response Response, conn net.Conn, body BodyReader,
 ) *Request {
 	request := &Request{
 		Query:    query,
 		Proto:    proto.HTTP11,
 		Headers:  hdrs,
-		Remote:   remote,
+		Remote:   conn.RemoteAddr(),
+		conn:     conn,
 		body:     body,
 		Ctx:      context.Background(),
 		response: response,
@@ -132,9 +125,25 @@ func (r *Request) Body() ([]byte, error) {
 
 // Reader returns io.Reader for request body. This method may be called multiple times,
 // but reading from multiple readers leads to Undefined Behaviour
-func (*Request) Reader() io.Reader {
-	// TODO: implement io.Reader interface for request body
-	panic("not implemented")
+func (r *Request) Reader() io.Reader {
+	return newBodyIOReader(r.body)
+}
+
+// Hijack the connection. Request body will be implicitly read (so if you need it you
+// should read it before) all the body left. After handler exits, the connection will
+// be closed, so the connection can be hijacked only once
+func (r *Request) Hijack() (net.Conn, error) {
+	if err := r.resetBody(); err != nil {
+		return nil, err
+	}
+
+	r.wasHijacked = true
+
+	return r.conn, nil
+}
+
+func (r Request) WasHijacked() bool {
+	return r.wasHijacked
 }
 
 func (r Request) HasBody() bool {

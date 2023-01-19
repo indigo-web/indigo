@@ -49,7 +49,7 @@ func World(request *http.Request) http.Response {
 }
 
 func Easter(request *http.Request) http.Response {
-	if easter := request.Headers.Value("easter"); len(easter) > 0 {
+	if request.Headers.Has("easter") {
 		return http.RespondTo(request).
 			WithCode(status.Teapot).
 			WithHeader("Easter", "Egg").

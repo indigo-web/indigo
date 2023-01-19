@@ -5,9 +5,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/fakefloordiv/indigo/http"
-	"github.com/fakefloordiv/indigo/internal/server/tcp"
+	"github.com/fakefloordiv/indigo/internal/server/tcp/dummy"
 
+	"github.com/fakefloordiv/indigo/http"
 	"github.com/fakefloordiv/indigo/internal/pool"
 
 	"github.com/fakefloordiv/indigo/http/headers"
@@ -123,9 +123,9 @@ func BenchmarkIndigo(b *testing.B) {
 	query := url.NewQuery(func() map[string][]byte {
 		return make(map[string][]byte)
 	})
-	bodyReader := http1.NewBodyReader(tcp.NewNopClient(), settings.Default().Body)
+	bodyReader := http1.NewBodyReader(dummy.NewNopClient(), settings.Default().Body)
 	request := http.NewRequest(
-		headers.NewHeaders(nil), query, http.NewResponse(), nil, bodyReader,
+		headers.NewHeaders(nil), query, http.NewResponse(), dummy.NewNopConn(), bodyReader,
 	)
 	keyAllocator := alloc.NewAllocator(
 		s.Headers.MaxKeyLength*s.Headers.Number.Default,
@@ -140,34 +140,34 @@ func BenchmarkIndigo(b *testing.B) {
 		request, keyAllocator, valAllocator, objPool, startLineBuff, s.Headers,
 	)
 
-	client := tcp.NewNopClient()
+	client := dummy.NewNopClient()
 	render := render2.NewRenderer(make([]byte, 0, 1024), nil, make(map[string][]string))
 
 	server := NewHTTPServer(router).(*httpServer)
 	go server.Run(client, request, bodyReader, render, parser)
 
-	simpleGETClient := tcp.NewStaticClient(simpleGETRequest)
+	simpleGETClient := dummy.NewCircularClient(simpleGETRequest)
 	b.Run("SimpleGET", func(b *testing.B) {
 		for i := 0; i < b.N; i++ {
 			server.RunOnce(simpleGETClient, request, bodyReader, render, parser)
 		}
 	})
 
-	fiveHeadersGETClient := tcp.NewStaticClient(fiveHeadersGETRequest)
+	fiveHeadersGETClient := dummy.NewCircularClient(fiveHeadersGETRequest)
 	b.Run("FiveHeadersGET", func(b *testing.B) {
 		for i := 0; i < b.N; i++ {
 			server.RunOnce(fiveHeadersGETClient, request, bodyReader, render, parser)
 		}
 	})
 
-	tenHeadersGETClient := tcp.NewStaticClient(tenHeadersGETRequest)
+	tenHeadersGETClient := dummy.NewCircularClient(tenHeadersGETRequest)
 	b.Run("TenHeadersGET", func(b *testing.B) {
 		for i := 0; i < b.N; i++ {
 			server.RunOnce(tenHeadersGETClient, request, bodyReader, render, parser)
 		}
 	})
 
-	withRespHeadersGETClient := tcp.NewStaticClient(simpleGETWithHeader)
+	withRespHeadersGETClient := dummy.NewCircularClient(simpleGETWithHeader)
 	b.Run("WithRespHeader", func(b *testing.B) {
 		for i := 0; i < b.N; i++ {
 			server.RunOnce(withRespHeadersGETClient, request, bodyReader, render, parser)
