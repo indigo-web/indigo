@@ -180,3 +180,21 @@ func (r *Request) resetBody() error {
 func RespondTo(request *Request) Response {
 	return request.response
 }
+
+// bodyIOReader is an implementation of io.Reader for request body
+type bodyIOReader struct {
+	reader BodyReader
+}
+
+func newBodyIOReader(reader BodyReader) bodyIOReader {
+	return bodyIOReader{
+		reader: reader,
+	}
+}
+
+func (b bodyIOReader) Read(buff []byte) (n int, err error) {
+	data, err := b.reader.Read()
+	copy(buff, data)
+
+	return len(data), err
+}
