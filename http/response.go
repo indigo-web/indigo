@@ -3,6 +3,7 @@ package http
 import (
 	"github.com/fakefloordiv/indigo/http/status"
 	"github.com/fakefloordiv/indigo/internal"
+	"io"
 )
 
 type (
@@ -88,6 +89,20 @@ func (r Response) WithBodyByte(body []byte) Response {
 	return r
 }
 
+// WithWriter takes a function that takes an io.Writer, which allows us to stream data
+// directly into the response body.
+// Note: this method causes an allocation
+// TODO: This is not the best design solution. I would like to make this method just like
+//       all others, so returning only Response object itself. The problem is that it is
+//       impossible because io.Writer is a procedure-style thing that does not work with
+//       our builder that pretends to be clear. Hope in future this issue will be solved
+func (r Response) WithWriter(cb func(io.Writer) error) (Response, error) {
+	writer := newBodyIOWriter(r)
+	err := cb(writer)
+
+	return writer.response, err
+}
+
 // WithFile sets a file path as a file that is supposed to be uploaded as a
 // response. File replaces a response body, so in case last one is specified,
 // it'll be ignored.
@@ -147,4 +162,21 @@ func (r Response) Reset() Response {
 	r.handler = nil
 
 	return r
+}
+
+// bodyIOWriter is an implementation of io.Writer for response body
+type bodyIOWriter struct {
+	response Response
+}
+
+func newBodyIOWriter(response Response) *bodyIOWriter {
+	return &bodyIOWriter{
+		response: response,
+	}
+}
+
+func (r *bodyIOWriter) Write(data []byte) (n int, err error) {
+	r.response.Body = append(r.response.Body, data...)
+
+	return len(data), nil
 }
