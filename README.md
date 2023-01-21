@@ -1,9 +1,8 @@
-<img src="logo.png" alt="drawing" width="300" align="top" title="What are you looking for?"/>
+<img src="indigo.svg" alt="drawing" align="top" title="What are you looking for?"/>
 
 Indigo is non-idiomatic, but focusing on simplicity and performance web-server
 
-It provides such a features:
-
+It provides such features:
 - Streaming-based body processing
 - Server-wide settings
 - Response object constructor
