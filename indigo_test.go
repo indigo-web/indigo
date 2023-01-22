@@ -13,16 +13,16 @@ import (
 	"testing"
 	"time"
 
-	"github.com/fakefloordiv/indigo/http/status"
+	"github.com/indigo-web/indigo/http/status"
 
-	"github.com/fakefloordiv/indigo/settings"
+	"github.com/indigo-web/indigo/settings"
 
-	"github.com/fakefloordiv/indigo/http"
+	"github.com/indigo-web/indigo/http"
 
-	methods "github.com/fakefloordiv/indigo/http/method"
-	"github.com/fakefloordiv/indigo/http/proto"
-	"github.com/fakefloordiv/indigo/router"
-	"github.com/fakefloordiv/indigo/router/inbuilt"
+	methods "github.com/indigo-web/indigo/http/method"
+	"github.com/indigo-web/indigo/http/proto"
+	"github.com/indigo-web/indigo/router"
+	"github.com/indigo-web/indigo/router/inbuilt"
 	"github.com/stretchr/testify/require"
 )
 

@@ -1,6 +1,6 @@
 package inbuilt
 
-import "github.com/fakefloordiv/indigo/router/inbuilt/types"
+import "github.com/indigo-web/indigo/router/inbuilt/types"
 
 /*
 This file is a piece of REST across all this router

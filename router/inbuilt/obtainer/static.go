@@ -3,13 +3,13 @@ package obtainer
 import (
 	"strings"
 
-	"github.com/fakefloordiv/indigo/http"
-	"github.com/fakefloordiv/indigo/http/method"
-	"github.com/fakefloordiv/indigo/http/status"
-	"github.com/fakefloordiv/indigo/internal/functools"
-	"github.com/fakefloordiv/indigo/internal/mapconv"
-	"github.com/fakefloordiv/indigo/router/inbuilt/types"
-	"github.com/fakefloordiv/indigo/valuectx"
+	"github.com/indigo-web/indigo/http"
+	"github.com/indigo-web/indigo/http/method"
+	"github.com/indigo-web/indigo/http/status"
+	"github.com/indigo-web/indigo/internal/functools"
+	"github.com/indigo-web/indigo/internal/mapconv"
+	"github.com/indigo-web/indigo/router/inbuilt/types"
+	"github.com/indigo-web/indigo/valuectx"
 )
 
 func StaticObtainer(routes types.RoutesMap) Obtainer {

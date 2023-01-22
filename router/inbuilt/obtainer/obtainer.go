@@ -1,11 +1,11 @@
 package obtainer
 
 import (
-	"github.com/fakefloordiv/indigo/http"
+	"github.com/indigo-web/indigo/http"
 
-	"github.com/fakefloordiv/indigo/internal/mapconv"
-	"github.com/fakefloordiv/indigo/router/inbuilt/radix"
-	routertypes "github.com/fakefloordiv/indigo/router/inbuilt/types"
+	"github.com/indigo-web/indigo/internal/mapconv"
+	"github.com/indigo-web/indigo/router/inbuilt/radix"
+	routertypes "github.com/indigo-web/indigo/router/inbuilt/types"
 )
 
 type (

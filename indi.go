@@ -4,19 +4,19 @@ import (
 	"errors"
 	"net"
 
-	"github.com/fakefloordiv/indigo/http"
-	"github.com/fakefloordiv/indigo/internal/pool"
-	httpserver "github.com/fakefloordiv/indigo/internal/server/http"
-	"github.com/fakefloordiv/indigo/internal/server/tcp"
+	"github.com/indigo-web/indigo/http"
+	"github.com/indigo-web/indigo/internal/pool"
+	httpserver "github.com/indigo-web/indigo/internal/server/http"
+	"github.com/indigo-web/indigo/internal/server/tcp"
 
-	"github.com/fakefloordiv/indigo/http/encodings"
-	"github.com/fakefloordiv/indigo/http/headers"
-	"github.com/fakefloordiv/indigo/http/url"
-	"github.com/fakefloordiv/indigo/internal/alloc"
-	"github.com/fakefloordiv/indigo/internal/parser/http1"
-	"github.com/fakefloordiv/indigo/internal/render"
-	"github.com/fakefloordiv/indigo/router"
-	"github.com/fakefloordiv/indigo/settings"
+	"github.com/indigo-web/indigo/http/encodings"
+	"github.com/indigo-web/indigo/http/headers"
+	"github.com/indigo-web/indigo/http/url"
+	"github.com/indigo-web/indigo/internal/alloc"
+	"github.com/indigo-web/indigo/internal/parser/http1"
+	"github.com/indigo-web/indigo/internal/render"
+	"github.com/indigo-web/indigo/router"
+	"github.com/indigo-web/indigo/settings"
 )
 
 const (

@@ -1,8 +1,8 @@
 package queryparser
 
 import (
-	"github.com/fakefloordiv/indigo/http/status"
-	"github.com/fakefloordiv/indigo/internal"
+	"github.com/indigo-web/indigo/http/status"
+	"github.com/indigo-web/indigo/internal"
 )
 
 func Parse(data []byte, queryMapFactory func() map[string][]byte) (queries map[string][]byte, err error) {

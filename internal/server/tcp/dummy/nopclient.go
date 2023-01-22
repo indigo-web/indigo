@@ -1,7 +1,7 @@
 package dummy
 
 import (
-	"github.com/fakefloordiv/indigo/internal/server/tcp"
+	"github.com/indigo-web/indigo/internal/server/tcp"
 )
 
 func NewNopClient() tcp.Client {

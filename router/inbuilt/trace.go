@@ -1,10 +1,10 @@
 package inbuilt
 
 import (
-	"github.com/fakefloordiv/indigo/http"
-	methods "github.com/fakefloordiv/indigo/http/method"
-	"github.com/fakefloordiv/indigo/http/proto"
-	"github.com/fakefloordiv/indigo/internal/httpchars"
+	"github.com/indigo-web/indigo/http"
+	methods "github.com/indigo-web/indigo/http/method"
+	"github.com/indigo-web/indigo/http/proto"
+	"github.com/indigo-web/indigo/internal/httpchars"
 )
 
 /*

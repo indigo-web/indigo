@@ -1,7 +1,7 @@
 package inbuilt
 
 import (
-	routertypes "github.com/fakefloordiv/indigo/router/inbuilt/types"
+	routertypes "github.com/indigo-web/indigo/router/inbuilt/types"
 )
 
 /*

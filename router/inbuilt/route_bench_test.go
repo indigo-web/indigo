@@ -4,9 +4,9 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/fakefloordiv/indigo/http"
+	"github.com/indigo-web/indigo/http"
 
-	methods "github.com/fakefloordiv/indigo/http/method"
+	methods "github.com/indigo-web/indigo/http/method"
 )
 
 func nopRender(_ http.Response) error {

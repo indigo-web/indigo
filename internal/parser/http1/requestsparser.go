@@ -3,16 +3,16 @@ package http1
 import (
 	"fmt"
 
-	"github.com/fakefloordiv/indigo/http"
-	"github.com/fakefloordiv/indigo/http/headers"
-	methods "github.com/fakefloordiv/indigo/http/method"
-	"github.com/fakefloordiv/indigo/http/proto"
-	"github.com/fakefloordiv/indigo/http/status"
-	"github.com/fakefloordiv/indigo/internal"
-	"github.com/fakefloordiv/indigo/internal/alloc"
-	"github.com/fakefloordiv/indigo/internal/parser"
-	"github.com/fakefloordiv/indigo/internal/pool"
-	"github.com/fakefloordiv/indigo/settings"
+	"github.com/indigo-web/indigo/http"
+	"github.com/indigo-web/indigo/http/headers"
+	methods "github.com/indigo-web/indigo/http/method"
+	"github.com/indigo-web/indigo/http/proto"
+	"github.com/indigo-web/indigo/http/status"
+	"github.com/indigo-web/indigo/internal"
+	"github.com/indigo-web/indigo/internal/alloc"
+	"github.com/indigo-web/indigo/internal/parser"
+	"github.com/indigo-web/indigo/internal/pool"
+	"github.com/indigo-web/indigo/settings"
 )
 
 const maxMethodLength = len("CONNECT")

@@ -1,8 +1,8 @@
 package inbuilt
 
 import (
-	"github.com/fakefloordiv/indigo/http/method"
-	"github.com/fakefloordiv/indigo/router/inbuilt/types"
+	"github.com/indigo-web/indigo/http/method"
+	"github.com/indigo-web/indigo/router/inbuilt/types"
 )
 
 /*

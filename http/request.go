@@ -5,10 +5,10 @@ import (
 	"io"
 	"net"
 
-	"github.com/fakefloordiv/indigo/http/headers"
-	methods "github.com/fakefloordiv/indigo/http/method"
-	"github.com/fakefloordiv/indigo/http/proto"
-	"github.com/fakefloordiv/indigo/http/url"
+	"github.com/indigo-web/indigo/http/headers"
+	methods "github.com/indigo-web/indigo/http/method"
+	"github.com/indigo-web/indigo/http/proto"
+	"github.com/indigo-web/indigo/http/url"
 )
 
 type (

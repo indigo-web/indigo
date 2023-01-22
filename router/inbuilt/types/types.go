@@ -1,9 +1,9 @@
 package types
 
 import (
-	"github.com/fakefloordiv/indigo/http"
+	"github.com/indigo-web/indigo/http"
 
-	methods "github.com/fakefloordiv/indigo/http/method"
+	methods "github.com/indigo-web/indigo/http/method"
 )
 
 type (

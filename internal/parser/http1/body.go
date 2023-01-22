@@ -3,9 +3,9 @@ package http1
 import (
 	"io"
 
-	"github.com/fakefloordiv/indigo/http"
-	"github.com/fakefloordiv/indigo/internal/server/tcp"
-	"github.com/fakefloordiv/indigo/settings"
+	"github.com/indigo-web/indigo/http"
+	"github.com/indigo-web/indigo/internal/server/tcp"
+	"github.com/indigo-web/indigo/settings"
 )
 
 type bodyReader struct {

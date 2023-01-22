@@ -1,7 +1,7 @@
 package router
 
 import (
-	"github.com/fakefloordiv/indigo/http"
+	"github.com/indigo-web/indigo/http"
 )
 
 // Router is a general interface for any router compatible with indigo

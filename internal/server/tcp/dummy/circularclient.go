@@ -3,11 +3,11 @@ package dummy
 import (
 	"net"
 
-	"github.com/fakefloordiv/indigo/internal/server/tcp"
+	"github.com/indigo-web/indigo/internal/server/tcp"
 )
 
 // circularClient is a client that on every read-operation returns the same data as it
-//// was initialised with. This is used mainly for benchmarking
+// was initialised with. This is used mainly for benchmarking
 type circularClient struct {
 	data     [][]byte
 	pointer  int

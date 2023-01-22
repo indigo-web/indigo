@@ -4,8 +4,8 @@ import (
 	"io"
 	"testing"
 
-	"github.com/fakefloordiv/indigo/http/status"
-	"github.com/fakefloordiv/indigo/settings"
+	"github.com/indigo-web/indigo/http/status"
+	"github.com/indigo-web/indigo/settings"
 	"github.com/stretchr/testify/require"
 )
 

@@ -5,13 +5,13 @@ import (
 	"strconv"
 	"testing"
 
-	"github.com/fakefloordiv/indigo/internal/server/tcp/dummy"
+	"github.com/indigo-web/indigo/internal/server/tcp/dummy"
 
-	"github.com/fakefloordiv/indigo/http"
-	"github.com/fakefloordiv/indigo/http/headers"
-	"github.com/fakefloordiv/indigo/http/url"
-	"github.com/fakefloordiv/indigo/internal/functools"
-	"github.com/fakefloordiv/indigo/settings"
+	"github.com/indigo-web/indigo/http"
+	"github.com/indigo-web/indigo/http/headers"
+	"github.com/indigo-web/indigo/http/url"
+	"github.com/indigo-web/indigo/internal/functools"
+	"github.com/indigo-web/indigo/settings"
 	"github.com/stretchr/testify/require"
 )
 

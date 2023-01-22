@@ -19,9 +19,9 @@ package main
 import (
   "log"
   
-  "github.com/fakefloordiv/indigo"
-  "github.com/fakefloordiv/indigo/http"
-  "github.com/fakefloordiv/indigo/router/inbuilt"
+  "github.com/indigo-web/indigo"
+  "github.com/indigo-web/indigo/http"
+  "github.com/indigo-web/indigo/router/inbuilt"
 )
 
 var addr = "localhost:9090"
@@ -39,6 +39,6 @@ func main() {
 }
 ```
 
-More examples in [examples/](https://github.com/fakefloordiv/indigo/tree/master/examples) folder.
+More examples in [examples/](https://github.com/indigo-web/indigo/tree/master/examples) folder.
 
 Project workspace (TODO list included): trello.com/w/indigowebserver

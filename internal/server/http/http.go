@@ -5,13 +5,13 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/fakefloordiv/indigo/http/status"
-	"github.com/fakefloordiv/indigo/internal/render"
-	"github.com/fakefloordiv/indigo/internal/server/tcp"
+	"github.com/indigo-web/indigo/http/status"
+	"github.com/indigo-web/indigo/internal/render"
+	"github.com/indigo-web/indigo/internal/server/tcp"
 
-	"github.com/fakefloordiv/indigo/http"
-	"github.com/fakefloordiv/indigo/internal/parser"
-	"github.com/fakefloordiv/indigo/router"
+	"github.com/indigo-web/indigo/http"
+	"github.com/indigo-web/indigo/internal/parser"
+	"github.com/indigo-web/indigo/router"
 )
 
 type Server interface {

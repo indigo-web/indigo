@@ -3,19 +3,19 @@ package inbuilt
 import (
 	"testing"
 
-	"github.com/fakefloordiv/indigo/internal/server/tcp/dummy"
+	"github.com/indigo-web/indigo/internal/server/tcp/dummy"
 
-	"github.com/fakefloordiv/indigo/http"
-	"github.com/fakefloordiv/indigo/internal/parser/http1"
-	"github.com/fakefloordiv/indigo/settings"
+	"github.com/indigo-web/indigo/http"
+	"github.com/indigo-web/indigo/internal/parser/http1"
+	"github.com/indigo-web/indigo/settings"
 
-	"github.com/fakefloordiv/indigo/http/status"
+	"github.com/indigo-web/indigo/http/status"
 
-	routertypes "github.com/fakefloordiv/indigo/router/inbuilt/types"
+	routertypes "github.com/indigo-web/indigo/router/inbuilt/types"
 
-	"github.com/fakefloordiv/indigo/http/headers"
-	methods "github.com/fakefloordiv/indigo/http/method"
-	"github.com/fakefloordiv/indigo/http/url"
+	"github.com/indigo-web/indigo/http/headers"
+	methods "github.com/indigo-web/indigo/http/method"
+	"github.com/indigo-web/indigo/http/url"
 	"github.com/stretchr/testify/require"
 )
 

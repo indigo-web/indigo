@@ -1,12 +1,12 @@
 package inbuilt
 
 import (
-	"github.com/fakefloordiv/indigo/http/status"
+	"github.com/indigo-web/indigo/http/status"
 
-	"github.com/fakefloordiv/indigo/http"
-	methods "github.com/fakefloordiv/indigo/http/method"
-	"github.com/fakefloordiv/indigo/router/inbuilt/obtainer"
-	"github.com/fakefloordiv/indigo/valuectx"
+	"github.com/indigo-web/indigo/http"
+	methods "github.com/indigo-web/indigo/http/method"
+	"github.com/indigo-web/indigo/router/inbuilt/obtainer"
+	"github.com/indigo-web/indigo/valuectx"
 )
 
 /*

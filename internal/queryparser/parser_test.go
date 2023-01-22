@@ -1,7 +1,7 @@
 package queryparser
 
 import (
-	"github.com/fakefloordiv/indigo/http/status"
+	"github.com/indigo-web/indigo/http/status"
 	"testing"
 
 	"github.com/stretchr/testify/require"

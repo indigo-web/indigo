@@ -11,7 +11,7 @@ name = "go"
 enabled = true
 
 [analyzers.meta]
-import_root = "github.com/fakefloordiv/indigo"
+import_root = "github.com/indigo-web/indigo"
 
 [[transformers]]
 name = "gofumpt"

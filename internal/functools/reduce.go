@@ -1,6 +1,6 @@
 package functools
 
-import "github.com/fakefloordiv/indigo/internal/constraints"
+import "github.com/indigo-web/indigo/internal/constraints"
 
 func Reduce[T constraints.Addable](f func(T, T) T, input []T, initial ...T) (result T) {
 	switch len(initial) {

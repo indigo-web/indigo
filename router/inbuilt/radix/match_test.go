@@ -4,7 +4,7 @@ import (
 	"context"
 	"testing"
 
-	routertypes "github.com/fakefloordiv/indigo/router/inbuilt/types"
+	routertypes "github.com/indigo-web/indigo/router/inbuilt/types"
 	"github.com/stretchr/testify/require"
 )
 

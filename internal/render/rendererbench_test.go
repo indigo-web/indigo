@@ -3,14 +3,14 @@ package render
 import (
 	"testing"
 
-	"github.com/fakefloordiv/indigo/internal/server/tcp/dummy"
+	"github.com/indigo-web/indigo/internal/server/tcp/dummy"
 
-	"github.com/fakefloordiv/indigo/http"
-	"github.com/fakefloordiv/indigo/internal/parser/http1"
-	"github.com/fakefloordiv/indigo/settings"
+	"github.com/indigo-web/indigo/http"
+	"github.com/indigo-web/indigo/internal/parser/http1"
+	"github.com/indigo-web/indigo/settings"
 
-	"github.com/fakefloordiv/indigo/http/headers"
-	"github.com/fakefloordiv/indigo/http/url"
+	"github.com/indigo-web/indigo/http/headers"
+	"github.com/indigo-web/indigo/http/url"
 )
 
 func nopWriter(_ []byte) error {

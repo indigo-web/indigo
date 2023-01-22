@@ -4,11 +4,11 @@ import (
 	"fmt"
 	"log"
 
-	"github.com/fakefloordiv/indigo/http"
+	"github.com/indigo-web/indigo/http"
 
-	"github.com/fakefloordiv/indigo"
-	"github.com/fakefloordiv/indigo/http/status"
-	"github.com/fakefloordiv/indigo/router/inbuilt"
+	"github.com/indigo-web/indigo"
+	"github.com/indigo-web/indigo/http/status"
+	"github.com/indigo-web/indigo/router/inbuilt"
 )
 
 var addr = "localhost:9090"

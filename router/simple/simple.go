@@ -1,9 +1,9 @@
 package simple
 
 import (
-	"github.com/fakefloordiv/indigo/http"
-	"github.com/fakefloordiv/indigo/http/encodings"
-	router2 "github.com/fakefloordiv/indigo/router"
+	"github.com/indigo-web/indigo/http"
+	"github.com/indigo-web/indigo/http/encodings"
+	router2 "github.com/indigo-web/indigo/router"
 )
 
 type (

@@ -1,6 +1,6 @@
 package functools
 
-import "github.com/fakefloordiv/indigo/internal/constraints"
+import "github.com/indigo-web/indigo/internal/constraints"
 
 func accumulator[T constraints.Addable](prev T, curr T) T {
 	return prev + curr

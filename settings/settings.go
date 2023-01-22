@@ -4,7 +4,7 @@ import (
 	"math"
 	"time"
 
-	"github.com/fakefloordiv/indigo/internal/constraints"
+	"github.com/indigo-web/indigo/internal/constraints"
 )
 
 type (
