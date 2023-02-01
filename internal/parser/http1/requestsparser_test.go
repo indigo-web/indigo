@@ -12,7 +12,7 @@ import (
 	"github.com/indigo-web/indigo/http/headers"
 	methods "github.com/indigo-web/indigo/http/method"
 	"github.com/indigo-web/indigo/http/proto"
-	"github.com/indigo-web/indigo/http/url"
+	"github.com/indigo-web/indigo/http/query"
 	"github.com/indigo-web/indigo/internal/alloc"
 	httpparser "github.com/indigo-web/indigo/internal/parser"
 	settings2 "github.com/indigo-web/indigo/settings"
@@ -47,7 +47,7 @@ func getParser() (httpparser.HTTPRequestsParser, *http.Request) {
 	objPool := pool.NewObjectPool[[]string](20)
 	body := NewBodyReader(dummy.NewNopClient(), s.Body)
 	request := http.NewRequest(
-		headers.NewHeaders(nil), url.Query{}, http.NewResponse(), dummy.NewNopConn(), body,
+		headers.NewHeaders(nil), query.Query{}, http.NewResponse(), dummy.NewNopConn(), body,
 	)
 	startLineBuff := make([]byte, s.URL.MaxLength)
 

@@ -9,7 +9,7 @@ import (
 
 	"github.com/indigo-web/indigo/http"
 	"github.com/indigo-web/indigo/http/headers"
-	"github.com/indigo-web/indigo/http/url"
+	"github.com/indigo-web/indigo/http/query"
 	"github.com/indigo-web/indigo/internal/functools"
 	"github.com/indigo-web/indigo/settings"
 	"github.com/stretchr/testify/require"
@@ -40,10 +40,10 @@ func getRequestWithReader(chunked bool, body ...[]byte) (*http.Request, http.Bod
 	}
 
 	request := http.NewRequest(
-		hdrs, url.Query{}, http.NewResponse(), dummy.NewNopConn(), reader,
+		hdrs, query.Query{}, http.NewResponse(), dummy.NewNopConn(), reader,
 	)
 	request.ContentLength = contentLength
-	request.ChunkedTE = chunked
+	request.IsChunked = chunked
 
 	return request, reader
 }

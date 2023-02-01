@@ -23,7 +23,7 @@ func NewBodyReader(client tcp.Client, bodySettings settings.Body) http.BodyReade
 }
 
 func (b *bodyReader) Init(request *http.Request) {
-	if !request.ChunkedTE {
+	if !request.IsChunked {
 		b.bodyBytesLeft = request.ContentLength
 		return
 	}

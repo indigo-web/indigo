@@ -18,7 +18,7 @@ import (
 const maxMethodLength = len("CONNECT")
 
 // httpRequestsParser is a stream-based http requests parser. It modifies
-// request object by pointer in performance purposes. Decodes url-encoded
+// request object by pointer in performance purposes. Decodes query-encoded
 // values by its own, you can see that by presented states ePathDecode1Char,
 // ePathDecode2Char, etc. When headers are parsed, parser returns state
 // parser.HeadersCompleted to notify http server about this, attaching all
@@ -756,7 +756,7 @@ headerValueCRLF:
 		p.closeConnection = value == "close"
 	case "transfer-encoding":
 		p.chunkedTransferEncoding = headers.ValueOf(value) == "chunked"
-		p.request.ChunkedTE = p.chunkedTransferEncoding
+		p.request.IsChunked = p.chunkedTransferEncoding
 	case "trailer":
 		p.trailer = true
 	}

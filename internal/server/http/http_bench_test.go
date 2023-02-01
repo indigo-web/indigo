@@ -8,7 +8,7 @@ import (
 	"github.com/indigo-web/indigo/internal/pool"
 
 	"github.com/indigo-web/indigo/http/headers"
-	"github.com/indigo-web/indigo/http/url"
+	"github.com/indigo-web/indigo/http/query"
 	"github.com/indigo-web/indigo/internal/alloc"
 	"github.com/indigo-web/indigo/internal/parser/http1"
 	render2 "github.com/indigo-web/indigo/internal/render"
@@ -73,7 +73,7 @@ func BenchmarkIndigo(b *testing.B) {
 	router.OnStart()
 
 	s := settings.Default()
-	query := url.NewQuery(func() map[string][]byte {
+	query := query.NewQuery(func() map[string][]byte {
 		return make(map[string][]byte)
 	})
 	bodyReader := http1.NewBodyReader(dummy.NewNopClient(), settings.Default().Body)

@@ -11,7 +11,7 @@ import (
 
 	"github.com/indigo-web/indigo/http/encodings"
 	"github.com/indigo-web/indigo/http/headers"
-	"github.com/indigo-web/indigo/http/url"
+	"github.com/indigo-web/indigo/http/query"
 	"github.com/indigo-web/indigo/internal/alloc"
 	"github.com/indigo-web/indigo/internal/parser/http1"
 	"github.com/indigo-web/indigo/internal/render"
@@ -107,7 +107,7 @@ func (a Application) Serve(r router.Router, optionalSettings ...settings.Setting
 			s.Headers.ValueSpace.Maximal,
 		)
 		objPool := pool.NewObjectPool[[]string](s.Headers.ValuesObjectPoolSize.Maximal)
-		query := url.NewQuery(func() map[string][]byte {
+		query := query.NewQuery(func() map[string][]byte {
 			return make(map[string][]byte, s.URL.Query.DefaultMapSize)
 		})
 		hdrs := headers.NewHeaders(make(map[string][]string, s.Headers.Number.Default))

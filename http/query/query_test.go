@@ -1,4 +1,4 @@
-package url
+package query
 
 import (
 	"testing"

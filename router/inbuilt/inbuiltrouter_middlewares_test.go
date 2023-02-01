@@ -15,7 +15,7 @@ import (
 
 	"github.com/indigo-web/indigo/http/headers"
 	methods "github.com/indigo-web/indigo/http/method"
-	"github.com/indigo-web/indigo/http/url"
+	"github.com/indigo-web/indigo/http/query"
 	"github.com/stretchr/testify/require"
 )
 
@@ -110,7 +110,7 @@ func getPointApplied2Middleware(stack *callstack) routertypes.Middleware {
 }
 
 func getRequest() *http.Request {
-	query := url.NewQuery(nil)
+	query := query.NewQuery(nil)
 	bodyReader := http1.NewBodyReader(dummy.NewNopClient(), settings.Default().Body)
 
 	return http.NewRequest(

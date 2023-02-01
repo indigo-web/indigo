@@ -1,9 +1,10 @@
 package http
 
 import (
+	"io"
+
 	"github.com/indigo-web/indigo/http/status"
 	"github.com/indigo-web/indigo/internal"
-	"io"
 )
 
 type (
@@ -26,7 +27,7 @@ type Response struct {
 	// be modified because it's nil. This means that any data will be appended will
 	// allocate a new underlying array
 	Body     []byte
-	Filename string
+	filename string
 	handler  FileErrHandler
 }
 
@@ -109,7 +110,7 @@ func (r Response) WithWriter(cb func(io.Writer) error) (Response, error) {
 // In case any error occurred (file not found, or error occurred during reading,
 // etc.), handler will be called with a raised error
 func (r Response) WithFile(path string, handler FileErrHandler) Response {
-	r.Filename = path
+	r.filename = path
 	r.handler = handler
 	return r
 }
@@ -148,16 +149,16 @@ func (r Response) Headers() []string {
 	return r.headers
 }
 
-// File returns response filename and error handler
+// File returns response filename and error handler. Usually used by core only
 func (r Response) File() (string, FileErrHandler) {
-	return r.Filename, r.handler
+	return r.filename, r.handler
 }
 
 func (r Response) Reset() Response {
 	r.Code = status.OK
 	r.Status = ""
 	r.headers = r.headers[:0]
-	r.Filename = ""
+	r.filename = ""
 	r.Body = nil
 	r.handler = nil
 

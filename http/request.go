@@ -6,9 +6,10 @@ import (
 	"net"
 
 	"github.com/indigo-web/indigo/http/headers"
-	methods "github.com/indigo-web/indigo/http/method"
+	// I don't know why, but otherwise GoLand cries about unused import, even if it's used
+	method "github.com/indigo-web/indigo/http/method"
 	"github.com/indigo-web/indigo/http/proto"
-	"github.com/indigo-web/indigo/http/url"
+	"github.com/indigo-web/indigo/http/query"
 )
 
 type (
@@ -29,9 +30,9 @@ type (
 // About headers manager see at http/headers/headers.go:Manager
 // Headers attribute references at that one that lays in manager
 type Request struct {
-	Method   methods.Method
+	Method   method.Method
 	Path     Path
-	Query    url.Query
+	Query    query.Query
 	Fragment Fragment
 	Proto    proto.Proto
 	Remote   net.Addr
@@ -39,7 +40,7 @@ type Request struct {
 	Headers headers.Headers
 
 	ContentLength int
-	ChunkedTE     bool
+	IsChunked     bool
 
 	body     BodyReader
 	bodyBuff []byte
@@ -55,12 +56,12 @@ type Request struct {
 // HTTP/1.1 as a protocol by default is set because if first request from user
 // is invalid, we need to render a response using request method, but appears
 // that default method is a null-value (proto.Unknown)
-// Also url.Query is being constructed right here instead of passing from outside
+// Also query.Query is being constructed right here instead of passing from outside
 // because it has only optional purposes and buff will be nil anyway
 // But maybe it's better to implement DI all the way we go? I don't know, maybe
 // someone will contribute and fix this
 func NewRequest(
-	hdrs headers.Headers, query url.Query, response Response, conn net.Conn, body BodyReader,
+	hdrs headers.Headers, query query.Query, response Response, conn net.Conn, body BodyReader,
 ) *Request {
 	request := &Request{
 		Query:    query,
@@ -129,6 +130,13 @@ func (r *Request) Reader() io.Reader {
 	return newBodyIOReader(r.body)
 }
 
+// HasBody returns not actual "whether request contains a body", but a possibility.
+// So result only depends on whether content-length is more than 0, or chunked
+// transfer encoding is enabled
+func (r Request) HasBody() bool {
+	return r.ContentLength > 0 || r.IsChunked
+}
+
 // Hijack the connection. Request body will be implicitly read (so if you need it you
 // should read it before) all the body left. After handler exits, the connection will
 // be closed, so the connection can be hijacked only once
@@ -142,12 +150,9 @@ func (r *Request) Hijack() (net.Conn, error) {
 	return r.conn, nil
 }
 
+// WasHijacked returns true or false, depending on whether was a connection hijacked
 func (r Request) WasHijacked() bool {
 	return r.wasHijacked
-}
-
-func (r Request) HasBody() bool {
-	return r.ContentLength > 0 || r.ChunkedTE
 }
 
 // Reset resets request headers and reads body into nowhere until completed.
@@ -163,7 +168,7 @@ func (r *Request) Reset() (err error) {
 	}
 
 	r.ContentLength = 0
-	r.ChunkedTE = false
+	r.IsChunked = false
 
 	return nil
 }
@@ -177,6 +182,7 @@ func (r *Request) resetBody() error {
 	})
 }
 
+// RespondTo returns a response object of request
 func RespondTo(request *Request) Response {
 	return request.response
 }

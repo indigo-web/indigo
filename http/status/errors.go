@@ -22,6 +22,5 @@ var (
 	ErrNotFound         = errors.New("not found")
 	ErrMethodNotAllowed = errors.New("method is not allowed")
 
-	ErrShutdown   = errors.New("graceful shutdown")
-	ErrHijackConn = errors.New("connection hijacking (don't move stay straight)")
+	ErrShutdown = errors.New("graceful shutdown")
 )

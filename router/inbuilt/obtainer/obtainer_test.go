@@ -13,7 +13,7 @@ import (
 	"github.com/indigo-web/indigo/http"
 	"github.com/indigo-web/indigo/http/headers"
 	methods "github.com/indigo-web/indigo/http/method"
-	"github.com/indigo-web/indigo/http/url"
+	"github.com/indigo-web/indigo/http/query"
 	routertypes "github.com/indigo-web/indigo/router/inbuilt/types"
 	"github.com/stretchr/testify/require"
 )
@@ -26,7 +26,7 @@ func newRequest(path string, method methods.Method) *http.Request {
 	hdrs := headers.NewHeaders(make(map[string][]string))
 	bodyReader := http1.NewBodyReader(dummy.NewNopClient(), settings.Default().Body)
 	request := http.NewRequest(
-		hdrs, url.Query{}, http.NewResponse(), dummy.NewNopConn(), bodyReader,
+		hdrs, query.Query{}, http.NewResponse(), dummy.NewNopConn(), bodyReader,
 	)
 	request.Path = path
 	request.Method = method

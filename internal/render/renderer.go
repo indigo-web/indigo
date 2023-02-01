@@ -108,7 +108,7 @@ func (r *renderer) Render(
 		}
 	}
 
-	if len(response.Filename) > 0 {
+	if filename, handler := response.File(); len(filename) > 0 {
 		r.buff = buff
 
 		switch err := r.renderFileInto(request.Method, writer, response); err {
@@ -116,8 +116,6 @@ func (r *renderer) Render(
 		case errConnWrite:
 			return err
 		default:
-			_, handler := response.File()
-
 			return r.Render(request, handler(err), writer)
 		}
 
@@ -154,7 +152,8 @@ func (r *renderer) Render(
 func (r *renderer) renderFileInto(
 	method methods.Method, writer http.ResponseWriter, response http.Response,
 ) error {
-	file, err := os.OpenFile(response.Filename, os.O_RDONLY, 0)
+	filename, _ := response.File()
+	file, err := os.OpenFile(filename, os.O_RDONLY, 0)
 	if err != nil {
 		return err
 	}
