@@ -1,55 +1,78 @@
 package inbuilt
 
-import "github.com/indigo-web/indigo/router/inbuilt/types"
+import (
+	methods "github.com/indigo-web/indigo/http/method"
+	"github.com/indigo-web/indigo/router/inbuilt/types"
+)
 
-/*
-This file is a piece of REST across all this router
-*/
-
+// Resource is just a wrapper of a group for some resource, allowing to attach
+// multiple methods (and pointed-applied middlewares) to some single resource
+// in a bit more convenient way than ordinary groups do. Actually, the only
+// point of this object is to wrap a group to bypass an empty string into it as
+// a path
 type Resource struct {
-	resource string
-	root     *Router
+	group *Router
 }
 
+// Resource returns a new Resource object for a provided resource path
 func (r *Router) Resource(path string) Resource {
 	return Resource{
-		resource: path,
-		root:     r,
+		group: r.Group(path),
 	}
 }
 
+// Use applies middlewares to the resource, wrapping all the already registered
+// and registered in future handlers
+func (r Resource) Use(middlewares ...types.Middleware) {
+	r.group.Use(middlewares...)
+}
+
+// Route is a shortcut to group.Route, providing the extra empty path to the call
+func (r Resource) Route(method methods.Method, fun types.HandlerFunc, mwares ...types.Middleware) {
+	r.group.Route(method, "", fun, mwares...)
+}
+
+// Get is a shortcut for registering GET-requests
 func (r Resource) Get(handler types.HandlerFunc, mwares ...types.Middleware) {
-	r.root.Get(r.resource, handler, mwares...)
+	r.group.Get("", handler, mwares...)
 }
 
+// Head is a shortcut for registering HEAD-requests
 func (r Resource) Head(handler types.HandlerFunc, mwares ...types.Middleware) {
-	r.root.Head(r.resource, handler, mwares...)
+	r.group.Head("", handler, mwares...)
 }
 
+// Post is a shortcut for registering POST-requests
 func (r Resource) Post(handler types.HandlerFunc, mwares ...types.Middleware) {
-	r.root.Post(r.resource, handler, mwares...)
+	r.group.Post("", handler, mwares...)
 }
 
+// Put is a shortcut for registering PUT-requests
 func (r Resource) Put(handler types.HandlerFunc, mwares ...types.Middleware) {
-	r.root.Put(r.resource, handler, mwares...)
+	r.group.Put("", handler, mwares...)
 }
 
+// Delete is a shortcut for registering DELETE-requests
 func (r Resource) Delete(handler types.HandlerFunc, mwares ...types.Middleware) {
-	r.root.Delete(r.resource, handler, mwares...)
+	r.group.Delete("", handler, mwares...)
 }
 
+// Connect is a shortcut for registering CONNECT-requests
 func (r Resource) Connect(handler types.HandlerFunc, mwares ...types.Middleware) {
-	r.root.Connect(r.resource, handler, mwares...)
+	r.group.Connect("", handler, mwares...)
 }
 
+// Options is a shortcut for registering OPTIONS-requests
 func (r Resource) Options(handler types.HandlerFunc, mwares ...types.Middleware) {
-	r.root.Options(r.resource, handler, mwares...)
+	r.group.Options("", handler, mwares...)
 }
 
+// Trace is a shortcut for registering TRACE-requests
 func (r Resource) Trace(handler types.HandlerFunc, mwares ...types.Middleware) {
-	r.root.Trace(r.resource, handler, mwares...)
+	r.group.Trace("", handler, mwares...)
 }
 
+// Patch is a shortcut for registering PATCH-requests
 func (r Resource) Patch(handler types.HandlerFunc, mwares ...types.Middleware) {
-	r.root.Patch(r.resource, handler, mwares...)
+	r.group.Patch("", handler, mwares...)
 }
