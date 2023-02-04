@@ -3,23 +3,23 @@ package inbuilt
 import (
 	"github.com/indigo-web/indigo/http"
 
-	routertypes "github.com/indigo-web/indigo/router/inbuilt/types"
+	"github.com/indigo-web/indigo/router/inbuilt/types"
 )
 
 /*
 This file is responsible for middlewares
 */
 
-// Use adds a middleware into the global lists of group middlewares. They will
-// be applied when registered
-func (r *Router) Use(middleware routertypes.Middleware) {
+// Use adds middlewares into the global list of a group's middlewares. But they will
+// be applied only after server will be started
+func (r *Router) Use(middlewares ...types.Middleware) {
 	for _, methods := range r.routes {
 		for _, handler := range methods {
-			handler.Middlewares = append(handler.Middlewares, middleware)
+			handler.Middlewares = append(handler.Middlewares, middlewares...)
 		}
 	}
 
-	r.middlewares = append(r.middlewares, middleware)
+	r.middlewares = append(r.middlewares, middlewares...)
 }
 
 func (r Router) applyMiddlewares() {
@@ -34,7 +34,7 @@ func (r Router) applyMiddlewares() {
 // and handler in the end using anonymous functions for partials and
 // recursion for building a chain (iteration algorithm did not work
 // idk why it was causing a recursion)
-func compose(handler routertypes.HandlerFunc, middlewares []routertypes.Middleware) routertypes.HandlerFunc {
+func compose(handler types.HandlerFunc, middlewares []types.Middleware) types.HandlerFunc {
 	if len(middlewares) == 0 {
 		return handler
 	}

@@ -2,7 +2,7 @@ package inbuilt
 
 import (
 	methods "github.com/indigo-web/indigo/http/method"
-	routertypes "github.com/indigo-web/indigo/router/inbuilt/types"
+	"github.com/indigo-web/indigo/router/inbuilt/types"
 )
 
 /*
@@ -11,17 +11,17 @@ This file is responsible for registering both ordinary and error handlers
 
 // Route is a base method for registering handlers
 func (r *Router) Route(
-	method methods.Method, path string, handlerFunc routertypes.HandlerFunc,
-	middlewares ...routertypes.Middleware,
+	method methods.Method, path string, handlerFunc types.HandlerFunc,
+	middlewares ...types.Middleware,
 ) {
 	urlPath := r.prefix + path
 	methodsMap, found := r.routes[urlPath]
 	if !found {
-		methodsMap = make(routertypes.MethodsMap)
+		methodsMap = make(types.MethodsMap)
 		r.routes[urlPath] = methodsMap
 	}
 
-	handlerStruct := &routertypes.HandlerObject{
+	handlerStruct := &types.HandlerObject{
 		Fun:         handlerFunc,
 		Middlewares: append(middlewares, r.middlewares...),
 	}
@@ -44,6 +44,6 @@ func (r *Router) Route(
 // - status.ErrConnectionTimeout
 //
 // You can set your own handler and override default response
-func (r Router) RouteError(err error, handler routertypes.HandlerFunc) {
+func (r Router) RouteError(err error, handler types.HandlerFunc) {
 	r.root.errHandlers[err] = handler
 }

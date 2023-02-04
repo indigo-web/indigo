@@ -1,7 +1,7 @@
 package inbuilt
 
 import (
-	routertypes "github.com/indigo-web/indigo/router/inbuilt/types"
+	"github.com/indigo-web/indigo/router/inbuilt/types"
 )
 
 /*
@@ -13,19 +13,19 @@ This file is responsible for endpoint groups
 // in a child group MUST NOT affect parent ones, so parent middlewares
 // are copied into child ones. Everything else is inherited from parent as it is
 func (r Router) Group(prefix string) *Router {
-	var newMiddlewares []routertypes.Middleware
+	var newMiddlewares []types.Middleware
 
-	router := &Router{
+	group := &Router{
 		root:        r.root,
 		prefix:      r.prefix + prefix,
 		middlewares: append(newMiddlewares, r.middlewares...),
-		routes:      make(routertypes.RoutesMap),
+		routes:      make(types.RoutesMap),
 		errHandlers: r.errHandlers,
 	}
 
-	r.root.groups = append(r.root.groups, *router)
+	r.root.groups = append(r.root.groups, *group)
 
-	return router
+	return group
 }
 
 func (r Router) applyGroups() {
@@ -34,7 +34,7 @@ func (r Router) applyGroups() {
 	}
 }
 
-func mergeRoutes(into, values routertypes.RoutesMap) {
+func mergeRoutes(into, values types.RoutesMap) {
 	for key, value := range values {
 		into[key] = value
 	}
