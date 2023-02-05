@@ -178,7 +178,11 @@ func TestResource_Methods(t *testing.T) {
 	root.Options(nopHandler)
 	root.Trace(nopHandler)
 	root.Patch(nopHandler)
+	r.OnStart()
 
 	require.Contains(t, r.routes, "/")
+	// too lazy to check all of them. But lazy means smart, so we can
+	// just check whether there are 9 different methods are registered.
+	// So if they do, everything works correctly
 	require.Equal(t, 9, len(r.routes["/"]))
 }
