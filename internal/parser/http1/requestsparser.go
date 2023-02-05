@@ -543,7 +543,7 @@ protoCRLF:
 		p.state = eProtoCRLFCR
 		goto protoCRLFCR
 	case '\n':
-		return parser.RequestCompleted, data[1:], nil
+		return parser.HeadersCompleted, data[1:], nil
 	default:
 		// headers are here. I have to have a buffer for header key, and after receiving it,
 		// get an appender from headers manager (and keep it in httpRequestsParser struct)
@@ -559,8 +559,7 @@ protoCRLFCR:
 
 	switch data[0] {
 	case '\n':
-		// no request body because even no headers
-		return parser.RequestCompleted, data[1:], nil
+		return parser.HeadersCompleted, data[1:], nil
 	default:
 		return parser.Error, nil, status.ErrBadRequest
 	}
@@ -667,10 +666,6 @@ contentLengthCRLF:
 		p.state = eContentLengthCRLFCR
 		goto contentLengthCRLFCR
 	case '\n':
-		if p.contentLength == 0 && !p.chunkedTransferEncoding {
-			return parser.RequestCompleted, data[1:], nil
-		}
-
 		return parser.HeadersCompleted, data[1:], nil
 	default:
 		data[0] = data[0] | 0x20
@@ -685,10 +680,6 @@ contentLengthCRLFCR:
 
 	switch data[0] {
 	case '\n':
-		if p.contentLength == 0 && !p.chunkedTransferEncoding {
-			return parser.RequestCompleted, data[1:], nil
-		}
-
 		return parser.HeadersCompleted, data[1:], nil
 	default:
 		return parser.Error, nil, status.ErrBadRequest
@@ -763,10 +754,6 @@ headerValueCRLF:
 
 	switch data[0] {
 	case '\n':
-		if p.contentLength == 0 && !p.chunkedTransferEncoding {
-			return parser.RequestCompleted, data[1:], nil
-		}
-
 		return parser.HeadersCompleted, data[1:], nil
 	case '\r':
 		data = data[1:]
@@ -785,10 +772,6 @@ headerValueCRLFCR:
 
 	switch data[0] {
 	case '\n':
-		if p.contentLength == 0 && !p.chunkedTransferEncoding {
-			return parser.RequestCompleted, data[1:], nil
-		}
-
 		return parser.HeadersCompleted, data[1:], nil
 	default:
 		return parser.Error, nil, status.ErrBadRequest

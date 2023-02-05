@@ -64,11 +64,7 @@ func (h *httpServer) RunOnce(
 	state, extra, err := p.Parse(data)
 	switch state {
 	case parser.Pending:
-	case parser.Error:
-		h.router.OnError(req, err)
-		p.Release()
-		return false
-	case parser.HeadersCompleted, parser.RequestCompleted:
+	case parser.HeadersCompleted:
 		client.Unread(extra)
 		reader.Init(req)
 		response := h.router.OnRequest(req)
@@ -88,6 +84,10 @@ func (h *httpServer) RunOnce(
 			h.router.OnError(req, status.ErrCloseConnection)
 			return false
 		}
+	case parser.Error:
+		h.router.OnError(req, err)
+		p.Release()
+		return false
 	default:
 		panic(fmt.Sprintf("BUG: got unexpected parser state: %d", state))
 	}

@@ -118,7 +118,7 @@ func TestHttpRequestsParser_Parse_GET(t *testing.T) {
 	t.Run("SimpleGET", func(t *testing.T) {
 		state, extra, err := parser.Parse(simpleGET)
 		require.NoError(t, err)
-		require.Equal(t, httpparser.RequestCompleted, state)
+		require.Equal(t, httpparser.HeadersCompleted, state)
 		require.Empty(t, extra)
 
 		wanted := wantedRequest{
@@ -136,7 +136,7 @@ func TestHttpRequestsParser_Parse_GET(t *testing.T) {
 	t.Run("SimpleGETLeadingCRLF", func(t *testing.T) {
 		state, extra, err := parser.Parse(simpleGETLeadingCRLF)
 		require.NoError(t, err)
-		require.Equal(t, httpparser.RequestCompleted, state)
+		require.Equal(t, httpparser.HeadersCompleted, state)
 		require.Empty(t, extra)
 
 		wanted := wantedRequest{
@@ -154,7 +154,7 @@ func TestHttpRequestsParser_Parse_GET(t *testing.T) {
 	t.Run("BiggerGET", func(t *testing.T) {
 		state, extra, err := parser.Parse(biggerGET)
 		require.NoError(t, err)
-		require.Equal(t, httpparser.RequestCompleted, state)
+		require.Equal(t, httpparser.HeadersCompleted, state)
 		require.Empty(t, extra)
 
 		wanted := wantedRequest{
@@ -174,7 +174,7 @@ func TestHttpRequestsParser_Parse_GET(t *testing.T) {
 	t.Run("MultipleHeaderValues", func(t *testing.T) {
 		state, extra, err := parser.Parse(multipleHeaders)
 		require.NoError(t, err)
-		require.Equal(t, httpparser.RequestCompleted, state)
+		require.Equal(t, httpparser.HeadersCompleted, state)
 		require.Empty(t, extra)
 
 		wanted := wantedRequest{
@@ -194,7 +194,7 @@ func TestHttpRequestsParser_Parse_GET(t *testing.T) {
 	t.Run("BiggerGETOnlyLF", func(t *testing.T) {
 		state, extra, err := parser.Parse(biggerGETOnlyLF)
 		require.NoError(t, err)
-		require.Equal(t, httpparser.RequestCompleted, state)
+		require.Equal(t, httpparser.HeadersCompleted, state)
 		require.Empty(t, extra)
 
 		wanted := wantedRequest{
@@ -214,7 +214,7 @@ func TestHttpRequestsParser_Parse_GET(t *testing.T) {
 	t.Run("BiggerGET_URLEncoded", func(t *testing.T) {
 		state, extra, err := parser.Parse(biggerGETURLEncoded)
 		require.NoError(t, err)
-		require.Equal(t, httpparser.RequestCompleted, state)
+		require.Equal(t, httpparser.HeadersCompleted, state)
 		require.Empty(t, extra)
 
 		wanted := wantedRequest{
@@ -234,7 +234,7 @@ func TestHttpRequestsParser_Parse_GET(t *testing.T) {
 			state, extra, err := feedPartially(parser, biggerGET, i)
 			require.NoError(t, err)
 			require.Empty(t, extra)
-			require.Equal(t, httpparser.RequestCompleted, state)
+			require.Equal(t, httpparser.HeadersCompleted, state)
 
 			wanted := wantedRequest{
 				Method:   methods.GET,
@@ -254,7 +254,7 @@ func TestHttpRequestsParser_Parse_GET(t *testing.T) {
 	t.Run("SimpleGETWithAbsolutePath", func(t *testing.T) {
 		state, extra, err := parser.Parse(simpleGETAbsPath)
 		require.NoError(t, err)
-		require.Equal(t, httpparser.RequestCompleted, state)
+		require.Equal(t, httpparser.HeadersCompleted, state)
 		require.Empty(t, extra)
 
 		wanted := wantedRequest{
@@ -297,7 +297,7 @@ func TestHttpRequestsParser_ParsePOST(t *testing.T) {
 	t.Run("SimpleGETWithQuery", func(t *testing.T) {
 		state, extra, err := parser.Parse(simpleGETQuery)
 		require.NoError(t, err)
-		require.Equal(t, httpparser.RequestCompleted, state)
+		require.Equal(t, httpparser.HeadersCompleted, state)
 		require.Empty(t, extra)
 
 		wanted := wantedRequest{
@@ -396,7 +396,7 @@ func TestHttpRequestsParser_Parse_Negative(t *testing.T) {
 		state, extra, err := parser.Parse(raw)
 		require.Equal(t, []byte("\r"), extra)
 		require.NoError(t, err)
-		require.Equal(t, httpparser.RequestCompleted, state)
+		require.Equal(t, httpparser.HeadersCompleted, state)
 	})
 
 	t.Run("HeaderWithoutColon", func(t *testing.T) {
