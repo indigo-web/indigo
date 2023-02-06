@@ -734,10 +734,10 @@ headerValueCRLF:
 
 	value = internal.B2S(p.headerValueAllocator.Finish())
 
-	if buff := requestHeaders.Values(p.headerKey); buff != nil {
+	if requestHeaders.Has(p.headerKey) {
 		requestHeaders.Add(p.headerKey, value)
 	} else {
-		buff = p.headersValuesPool.Acquire()[:0]
+		buff := p.headersValuesPool.Acquire()[:0]
 		buff = append(buff, value)
 		requestHeaders.Set(p.headerKey, buff)
 	}
