@@ -24,8 +24,8 @@ var (
 )
 
 type Engine interface {
-	PreWrite(*http.Request, http.Response)
-	Write(*http.Request, http.Response, http.ResponseWriter) error
+	PreWrite(proto.Proto, http.Response)
+	Write(proto.Proto, *http.Request, http.Response, http.ResponseWriter) error
 }
 
 // engine is a renderer engine for HTTP responses. The point of it is to render response
@@ -37,7 +37,6 @@ type engine struct {
 	buff, fileBuff []byte
 	buffOffset     int
 	defaultHeaders types.HeadersMap
-
 	// TODO: add files distribution mechanism (and edit docstring)
 }
 
@@ -49,29 +48,28 @@ func NewEngine(buff, fileBuff []byte, defaultHeaders map[string][]string) Engine
 	}
 }
 
-func (e *engine) PreWrite(request *http.Request, response http.Response) {
-	if e.buffOffset == 0 {
-		e.renderProtocol(request.Proto)
-	}
-
+// PreWrite writes the response into the buffer without actually sending it. Usually used
+// for informational responses
+func (e *engine) PreWrite(protocol proto.Proto, response http.Response) {
+	e.renderProtocol(protocol)
 	e.renderHeaders(response)
 	e.crlf()
 }
 
 // Render the response, respectively to the protocol
 func (e *engine) Write(
-	request *http.Request, response http.Response, writer http.ResponseWriter,
+	protocol proto.Proto, request *http.Request, response http.Response, writer http.ResponseWriter,
 ) (err error) {
 	defer e.clear()
 
-	if e.buffOffset == 0 {
-		e.renderProtocol(request.Proto)
-	}
+	e.renderProtocol(protocol)
 
 	if path, errhandler := response.File(); len(path) > 0 {
 		switch err := e.renderFile(request, response, writer); err {
 		case errFileNotFound:
-			return e.Write(request, errhandler(status.ErrNotFound), writer)
+			e.clear()
+
+			return e.Write(protocol, request, errhandler(status.ErrNotFound), writer)
 		default:
 			// nil will also be returned here
 			return err
@@ -90,7 +88,7 @@ func (e *engine) Write(
 
 	err = writer(e.buff)
 
-	if !isKeepAlive(request) {
+	if !isKeepAlive(request) && request.Upgrade == proto.Unknown {
 		err = errConnWrite
 	}
 
@@ -110,11 +108,13 @@ func (e *engine) renderHeaders(response http.Response) {
 
 	responseHeaders := response.Headers()
 
-	for i := 0; i < len(responseHeaders)/2; i += 2 {
-		e.renderHeader(responseHeaders[i], responseHeaders[i+1])
+	if len(responseHeaders) > 0 {
+		for i := 0; i <= len(responseHeaders)/2; i += 2 {
+			e.renderHeader(responseHeaders[i], responseHeaders[i+1])
 
-		if defaultHdr, found := e.defaultHeaders[responseHeaders[i]]; found {
-			defaultHdr.Seen = true
+			if defaultHdr, found := e.defaultHeaders[responseHeaders[i]]; found {
+				defaultHdr.Seen = true
+			}
 		}
 	}
 
@@ -201,7 +201,6 @@ func (e *engine) renderContentLength(value int64) {
 
 func (e *engine) renderProtocol(protocol proto.Proto) {
 	e.buff = append(e.buff, proto.ToBytes(protocol)...)
-	e.buffOffset = len(e.buff)
 }
 
 func (e *engine) crlf() {
@@ -209,7 +208,7 @@ func (e *engine) crlf() {
 }
 
 func (e *engine) clear() {
-	e.buff = e.buff[:e.buffOffset]
+	e.buff = e.buff[:0]
 }
 
 func isKeepAlive(req *http.Request) bool {
@@ -229,6 +228,7 @@ func isKeepAlive(req *http.Request) bool {
 		return true
 	}
 }
+
 func parseDefaultHeaders(hdrs map[string][]string) types.HeadersMap {
 	m := make(types.HeadersMap, len(hdrs))
 
