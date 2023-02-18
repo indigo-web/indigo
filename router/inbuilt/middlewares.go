@@ -22,7 +22,7 @@ func (r *Router) Use(middlewares ...types.Middleware) {
 	r.middlewares = append(r.middlewares, middlewares...)
 }
 
-func (r Router) applyMiddlewares() {
+func (r *Router) applyMiddlewares() {
 	for _, methods := range r.routes {
 		for _, handler := range methods {
 			handler.Fun = compose(handler.Fun, handler.Middlewares)
@@ -33,7 +33,7 @@ func (r Router) applyMiddlewares() {
 // compose just makes a single HandlerFunc from a chain of middlewares
 // and handler in the end using anonymous functions for partials and
 // recursion for building a chain (iteration algorithm did not work
-// idk why it was causing a recursion)
+// IDK why it was causing a recursion)
 func compose(handler types.HandlerFunc, middlewares []types.Middleware) types.HandlerFunc {
 	if len(middlewares) == 0 {
 		return handler

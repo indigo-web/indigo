@@ -12,7 +12,7 @@ This file is responsible for endpoint groups
 // Middlewares has to be inherited from a parent, but adding new middlewares
 // in a child group MUST NOT affect parent ones, so parent middlewares
 // are copied into child ones. Everything else is inherited from parent as it is
-func (r Router) Group(prefix string) *Router {
+func (r *Router) Group(prefix string) *Router {
 	var newMiddlewares []types.Middleware
 
 	group := &Router{
@@ -28,7 +28,7 @@ func (r Router) Group(prefix string) *Router {
 	return group
 }
 
-func (r Router) applyGroups() {
+func (r *Router) applyGroups() {
 	for _, group := range r.groups {
 		mergeRoutes(r.routes, group.routes)
 	}

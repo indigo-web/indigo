@@ -44,6 +44,6 @@ func (r *Router) Route(
 // - status.ErrConnectionTimeout
 //
 // You can set your own handler and override default response
-func (r Router) RouteError(err error, handler types.HandlerFunc) {
+func (r *Router) RouteError(err error, handler types.HandlerFunc) {
 	r.root.errHandlers[err] = handler
 }
