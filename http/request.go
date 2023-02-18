@@ -39,6 +39,7 @@ type Request struct {
 
 	Headers headers.Headers
 
+	Upgrade       proto.Proto
 	ContentLength int
 	IsChunked     bool
 
@@ -133,7 +134,7 @@ func (r *Request) Reader() io.Reader {
 // HasBody returns not actual "whether request contains a body", but a possibility.
 // So result only depends on whether content-length is more than 0, or chunked
 // transfer encoding is enabled
-func (r Request) HasBody() bool {
+func (r *Request) HasBody() bool {
 	return r.ContentLength > 0 || r.IsChunked
 }
 
@@ -151,17 +152,17 @@ func (r *Request) Hijack() (net.Conn, error) {
 }
 
 // WasHijacked returns true or false, depending on whether was a connection hijacked
-func (r Request) WasHijacked() bool {
+func (r *Request) WasHijacked() bool {
 	return r.wasHijacked
 }
 
-// Reset resets request headers and reads body into nowhere until completed.
+// Clear resets request headers and reads body into nowhere until completed.
 // It is implemented to clear the request object between requests
-func (r *Request) Reset() (err error) {
+func (r *Request) Clear() (err error) {
 	r.Fragment = ""
 	r.Query.Set(nil)
 	r.Ctx = context.Background()
-	r.response = r.response.Reset()
+	r.response = r.response.Clear()
 
 	if err = r.resetBody(); err != nil {
 		return err
@@ -169,6 +170,7 @@ func (r *Request) Reset() (err error) {
 
 	r.ContentLength = 0
 	r.IsChunked = false
+	r.Upgrade = proto.Unknown
 
 	return nil
 }
