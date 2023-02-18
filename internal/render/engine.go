@@ -90,7 +90,7 @@ func (e *engine) Write(
 
 	err = writer(e.buff)
 
-	if err == nil && !isKeepAlive(request) {
+	if !isKeepAlive(request) {
 		err = errConnWrite
 	}
 
