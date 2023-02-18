@@ -112,6 +112,20 @@ func getStaticRouter(t *testing.T) router.Router {
 		return http.RespondTo(request)
 	})
 
+	with.Get("file", func(request *http.Request) http.Response {
+		return http.RespondTo(request).WithFile(testFilename, func(err error) http.Response {
+			t.Fail() // this callback must never be called
+
+			return http.RespondTo(request)
+		})
+	})
+
+	with.Get("file-notfound", func(request *http.Request) http.Response {
+		return http.RespondTo(request).WithFile(testFilename+"notfound", func(err error) http.Response {
+			return http.RespondTo(request).WithBody(testFileIfNotFound)
+		})
+	})
+
 	// request.OnBody() is not tested because request.Body() (wrapper for OnBody)
 	// is tested, that is enough to make sure that requestbody works correct
 
@@ -165,20 +179,6 @@ func getStaticRouter(t *testing.T) router.Router {
 		_ = conn.Close()
 
 		return http.RespondTo(request)
-	})
-
-	r.Get("/with-file", func(request *http.Request) http.Response {
-		return http.RespondTo(request).WithFile(testFilename, func(err error) http.Response {
-			t.Fail() // this callback must never be called
-
-			return http.RespondTo(request)
-		})
-	})
-
-	r.Get("/with-file-notfound", func(request *http.Request) http.Response {
-		return http.RespondTo(request).WithFile(testFilename+"notfound", func(err error) http.Response {
-			return http.RespondTo(request).WithBody(testFileIfNotFound)
-		})
 	})
 
 	return r
