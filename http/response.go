@@ -13,7 +13,7 @@ type (
 	FileErrHandler func(err error) Response
 )
 
-// idk why 7, but let it be
+// IDK why 7, but let it be
 const defaultHeadersNumber = 7
 
 type Response struct {
@@ -23,9 +23,7 @@ type Response struct {
 	// headers are just a slice of strings, length of which is always dividable by 2, because
 	// it contains pairs of keys and values
 	headers []string
-	// Body is a mutable object. But it's guaranteed that in Response it will not
-	// be modified because it's nil. This means that any data will be appended will
-	// allocate a new underlying array
+	// Body is a response body byte-slice that contains raw data
 	Body     []byte
 	filename string
 	handler  FileErrHandler
@@ -154,7 +152,7 @@ func (r Response) File() (string, FileErrHandler) {
 	return r.filename, r.handler
 }
 
-func (r Response) Reset() Response {
+func (r Response) Clear() Response {
 	r.Code = status.OK
 	r.Status = ""
 	r.headers = r.headers[:0]
