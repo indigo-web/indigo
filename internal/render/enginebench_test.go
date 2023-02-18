@@ -1,6 +1,7 @@
 package render
 
 import (
+	"github.com/indigo-web/indigo/http/status"
 	"testing"
 
 	"github.com/indigo-web/indigo/internal/server/tcp/dummy"
@@ -51,45 +52,57 @@ func BenchmarkRenderer_Response(b *testing.B) {
 
 	b.Run("DefaultResponse_NoDefHeaders", func(b *testing.B) {
 		buff := make([]byte, 0, 1024)
-		renderer := NewRenderer(buff, nil, nil)
+		renderer := NewEngine(buff, nil, nil)
 
 		b.ResetTimer()
 
 		for i := 0; i < b.N; i++ {
-			_ = renderer.Render(request, response, nopWriter)
+			_ = renderer.Write(request, response, nopWriter)
 		}
 	})
 
 	b.Run("DefaultResponse_1DefaultHeader", func(b *testing.B) {
 		buff := make([]byte, 0, 1024)
-		renderer := NewRenderer(buff, nil, defaultHeadersSmall)
+		renderer := NewEngine(buff, nil, defaultHeadersSmall)
 
 		b.ResetTimer()
 
 		for i := 0; i < b.N; i++ {
-			_ = renderer.Render(request, response, nopWriter)
+			_ = renderer.Write(request, response, nopWriter)
 		}
 	})
 
 	b.Run("DefaultResponse_3DefaultHeaders", func(b *testing.B) {
 		buff := make([]byte, 0, 1024)
-		renderer := NewRenderer(buff, nil, defaultHeadersMedium)
+		renderer := NewEngine(buff, nil, defaultHeadersMedium)
 
 		b.ResetTimer()
 
 		for i := 0; i < b.N; i++ {
-			_ = renderer.Render(request, response, nopWriter)
+			_ = renderer.Write(request, response, nopWriter)
 		}
 	})
 
 	b.Run("DefaultResponse_8DefaultHeaders", func(b *testing.B) {
 		buff := make([]byte, 0, 1024)
-		renderer := NewRenderer(buff, nil, defaultHeadersBig)
+		renderer := NewEngine(buff, nil, defaultHeadersBig)
 
 		b.ResetTimer()
 
 		for i := 0; i < b.N; i++ {
-			_ = renderer.Render(request, response, nopWriter)
+			_ = renderer.Write(request, response, nopWriter)
+		}
+	})
+
+	b.Run("101SwitchingProtocol", func(b *testing.B) {
+		resp := http.NewResponse().WithCode(status.SwitchingProtocols)
+		buff := make([]byte, 0, 128)
+		renderer := NewEngine(buff, nil, nil)
+
+		b.ResetTimer()
+
+		for i := 0; i < b.N; i++ {
+			_ = renderer.Write(request, resp, nopWriter)
 		}
 	})
 }
