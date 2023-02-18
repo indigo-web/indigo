@@ -57,7 +57,7 @@ func BenchmarkRenderer_Response(b *testing.B) {
 		b.ResetTimer()
 
 		for i := 0; i < b.N; i++ {
-			_ = renderer.Write(request, response, nopWriter)
+			_ = renderer.Write(request.Proto, request, response, nopWriter)
 		}
 	})
 
@@ -68,7 +68,7 @@ func BenchmarkRenderer_Response(b *testing.B) {
 		b.ResetTimer()
 
 		for i := 0; i < b.N; i++ {
-			_ = renderer.Write(request, response, nopWriter)
+			_ = renderer.Write(request.Proto, request, response, nopWriter)
 		}
 	})
 
@@ -79,7 +79,7 @@ func BenchmarkRenderer_Response(b *testing.B) {
 		b.ResetTimer()
 
 		for i := 0; i < b.N; i++ {
-			_ = renderer.Write(request, response, nopWriter)
+			_ = renderer.Write(request.Proto, request, response, nopWriter)
 		}
 	})
 
@@ -90,7 +90,7 @@ func BenchmarkRenderer_Response(b *testing.B) {
 		b.ResetTimer()
 
 		for i := 0; i < b.N; i++ {
-			_ = renderer.Write(request, response, nopWriter)
+			_ = renderer.Write(request.Proto, request, response, nopWriter)
 		}
 	})
 
@@ -102,7 +102,7 @@ func BenchmarkRenderer_Response(b *testing.B) {
 		b.ResetTimer()
 
 		for i := 0; i < b.N; i++ {
-			_ = renderer.Write(request, resp, nopWriter)
+			_ = renderer.Write(request.Proto, request, resp, nopWriter)
 		}
 	})
 }
