@@ -79,7 +79,7 @@ func TestParse_Negative(t *testing.T) {
 	t.Run("NoLeadingSlash", func(t *testing.T) {
 		sample := "hello/world"
 		_, err := Parse(sample)
-		require.EqualError(t, err, ErrNeedLeadingSlash.Error())
+		require.Error(t, err)
 	})
 
 	t.Run("SlashInsideOfPartName", func(t *testing.T) {

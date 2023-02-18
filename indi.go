@@ -121,7 +121,7 @@ func (a Application) Serve(r router.Router, optionalSettings ...settings.Setting
 		)
 
 		respBuff := make([]byte, 0, s.HTTP.ResponseBuffSize)
-		renderer := render.NewRenderer(respBuff, nil, a.defaultHeaders)
+		renderer := render.NewEngine(respBuff, nil, a.defaultHeaders)
 
 		httpServer := httpserver.NewHTTPServer(r)
 		httpServer.Run(client, request, bodyReader, renderer, httpParser)

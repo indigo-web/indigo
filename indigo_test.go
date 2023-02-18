@@ -91,7 +91,7 @@ func getStaticRouter(t *testing.T) router.Router {
 	})
 
 	r.Get("/get-read-body", func(request *http.Request) http.Response {
-		require.Contains(t, request.Headers.AsMap(), testHeaderKey)
+		require.Contains(t, request.Headers.Unwrap(), testHeaderKey)
 		requestHeader := strings.Join(request.Headers.Values(testHeaderKey), ",")
 		require.Equal(t, testHeaderValue, requestHeader)
 

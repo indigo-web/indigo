@@ -92,7 +92,7 @@ func BenchmarkIndigo(b *testing.B) {
 	parser := http1.NewHTTPRequestsParser(
 		request, keyAllocator, valAllocator, objPool, startLineBuff, s.Headers,
 	)
-	render := render2.NewRenderer(make([]byte, 0, 1024), nil, make(map[string][]string))
+	render := render2.NewEngine(make([]byte, 0, 1024), nil, make(map[string][]string))
 	server := NewHTTPServer(router).(*httpServer)
 
 	simpleGETClient := dummy.NewCircularClient(simpleGETRequest)

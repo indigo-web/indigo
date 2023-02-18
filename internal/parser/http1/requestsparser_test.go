@@ -68,7 +68,7 @@ func compareRequests(t *testing.T, wanted wantedRequest, actual *http.Request) {
 	require.Equal(t, wanted.Path, actual.Path)
 	require.Equal(t, wanted.Protocol, actual.Proto)
 
-	for key, values := range wanted.Headers.AsMap() {
+	for key, values := range wanted.Headers.Unwrap() {
 		actualValues := actual.Headers.Values(key)
 		require.NotNil(t, actualValues)
 		require.Equal(t, values, actualValues)
@@ -129,7 +129,7 @@ func TestHttpRequestsParser_Parse_GET(t *testing.T) {
 		}
 
 		compareRequests(t, wanted, request)
-		require.NoError(t, request.Reset())
+		require.NoError(t, request.Clear())
 		parser.Release()
 	})
 
@@ -147,7 +147,7 @@ func TestHttpRequestsParser_Parse_GET(t *testing.T) {
 		}
 
 		compareRequests(t, wanted, request)
-		require.NoError(t, request.Reset())
+		require.NoError(t, request.Clear())
 		parser.Release()
 	})
 
@@ -167,7 +167,7 @@ func TestHttpRequestsParser_Parse_GET(t *testing.T) {
 		}
 
 		compareRequests(t, wanted, request)
-		require.NoError(t, request.Reset())
+		require.NoError(t, request.Clear())
 		parser.Release()
 	})
 
@@ -187,7 +187,7 @@ func TestHttpRequestsParser_Parse_GET(t *testing.T) {
 		}
 
 		compareRequests(t, wanted, request)
-		require.NoError(t, request.Reset())
+		require.NoError(t, request.Clear())
 		parser.Release()
 	})
 
@@ -207,7 +207,7 @@ func TestHttpRequestsParser_Parse_GET(t *testing.T) {
 		}
 
 		compareRequests(t, wanted, request)
-		require.NoError(t, request.Reset())
+		require.NoError(t, request.Clear())
 		parser.Release()
 	})
 
@@ -225,7 +225,7 @@ func TestHttpRequestsParser_Parse_GET(t *testing.T) {
 		}
 
 		compareRequests(t, wanted, request)
-		require.NoError(t, request.Reset())
+		require.NoError(t, request.Clear())
 		parser.Release()
 	})
 
@@ -246,7 +246,7 @@ func TestHttpRequestsParser_Parse_GET(t *testing.T) {
 			}
 
 			compareRequests(t, wanted, request)
-			require.NoError(t, request.Reset())
+			require.NoError(t, request.Clear())
 			parser.Release()
 		}
 	})
@@ -265,7 +265,7 @@ func TestHttpRequestsParser_Parse_GET(t *testing.T) {
 		}
 
 		compareRequests(t, wanted, request)
-		require.NoError(t, request.Reset())
+		require.NoError(t, request.Clear())
 		parser.Release()
 	})
 }
@@ -289,7 +289,7 @@ func TestHttpRequestsParser_ParsePOST(t *testing.T) {
 			}
 
 			compareRequests(t, wanted, request)
-			require.NoError(t, request.Reset())
+			require.NoError(t, request.Clear())
 			parser.Release()
 		}
 	})
@@ -309,7 +309,7 @@ func TestHttpRequestsParser_ParsePOST(t *testing.T) {
 
 		compareRequests(t, wanted, request)
 		require.Equal(t, "hel lo=wor ld", string(request.Query.Raw()))
-		require.NoError(t, request.Reset())
+		require.NoError(t, request.Clear())
 		parser.Release()
 	})
 }
