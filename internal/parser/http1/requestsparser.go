@@ -2,6 +2,7 @@ package http1
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/indigo-web/indigo/http"
 	"github.com/indigo-web/indigo/http/headers"
@@ -30,7 +31,6 @@ type httpRequestsParser struct {
 	headersSettings settings.Headers
 
 	contentLength           int
-	closeConnection         bool
 	chunkedTransferEncoding bool
 	trailer                 bool
 
@@ -65,6 +65,7 @@ func NewHTTPRequestsParser(
 
 func (p *httpRequestsParser) Parse(data []byte) (state parser.RequestState, extra []byte, err error) {
 	var value string
+	_ = *p.request
 	requestHeaders := p.request.Headers
 
 	switch p.state {
@@ -743,11 +744,15 @@ headerValueCRLF:
 	}
 
 	switch p.headerKey {
-	case "connection":
-		p.closeConnection = value == "close"
+	case "upgrade":
+		p.request.Upgrade = proto.ChooseUpgrade(value)
 	case "transfer-encoding":
-		p.chunkedTransferEncoding = headers.ValueOf(value) == "chunked"
-		p.request.IsChunked = p.chunkedTransferEncoding
+		if !strings.EqualFold(headers.ValueOf(value), "chunked") {
+			return parser.Error, nil, status.ErrMethodNotImplemented
+		}
+
+		p.chunkedTransferEncoding = true
+		p.request.IsChunked = true
 	case "trailer":
 		p.trailer = true
 	}
@@ -779,7 +784,7 @@ headerValueCRLFCR:
 }
 
 func (p *httpRequestsParser) Release() {
-	requestHeaders := p.request.Headers.AsMap()
+	requestHeaders := p.request.Headers.Unwrap()
 
 	for _, values := range requestHeaders {
 		p.headersValuesPool.Release(values)
