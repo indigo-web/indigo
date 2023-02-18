@@ -1,13 +1,15 @@
 package http
 
 import (
+	"bytes"
 	"errors"
 	"fmt"
-	"os"
-
+	"github.com/indigo-web/indigo/http/proto"
 	"github.com/indigo-web/indigo/http/status"
+	"github.com/indigo-web/indigo/internal"
 	"github.com/indigo-web/indigo/internal/render"
 	"github.com/indigo-web/indigo/internal/server/tcp"
+	"os"
 
 	"github.com/indigo-web/indigo/http"
 	"github.com/indigo-web/indigo/internal/parser"
@@ -15,12 +17,16 @@ import (
 )
 
 type Server interface {
-	Run(tcp.Client, *http.Request, http.BodyReader, render.Renderer, parser.HTTPRequestsParser)
+	Run(tcp.Client, *http.Request, http.BodyReader, render.Engine, parser.HTTPRequestsParser)
 }
 
 type BenchmarkServer interface {
-	RunOnce(tcp.Client, *http.Request, http.BodyReader, render.Renderer, parser.HTTPRequestsParser)
+	RunOnce(tcp.Client, *http.Request, http.BodyReader, render.Engine, parser.HTTPRequestsParser)
 }
+
+var upgrading = http.NewResponse().
+	WithCode(status.SwitchingProtocols).
+	WithHeader("Connection", "upgrade")
 
 type httpServer struct {
 	router router.Router
@@ -34,7 +40,7 @@ func NewHTTPServer(router router.Router) Server {
 
 func (h *httpServer) Run(
 	client tcp.Client, req *http.Request, reader http.BodyReader,
-	renderer render.Renderer, p parser.HTTPRequestsParser,
+	renderer render.Engine, p parser.HTTPRequestsParser,
 ) {
 	for {
 		if !h.RunOnce(client, req, reader, renderer, p) {
@@ -47,7 +53,7 @@ func (h *httpServer) Run(
 
 func (h *httpServer) RunOnce(
 	client tcp.Client, req *http.Request, reader http.BodyReader,
-	renderer render.Renderer, p parser.HTTPRequestsParser,
+	renderer render.Engine, p parser.HTTPRequestsParser,
 ) bool {
 	data, err := client.Read()
 	if err != nil {
@@ -57,7 +63,7 @@ func (h *httpServer) RunOnce(
 			err = status.ErrCloseConnection
 		}
 
-		_ = renderer.Render(req, h.router.OnError(req, err), client.Write)
+		_ = renderer.Write(req.Proto, req, h.router.OnError(req, err), client.Write)
 		return false
 	}
 
@@ -65,6 +71,14 @@ func (h *httpServer) RunOnce(
 	switch state {
 	case parser.Pending:
 	case parser.HeadersCompleted:
+		protocol := req.Proto
+
+		if req.Upgrade != proto.Unknown && proto.HTTP1&req.Upgrade == req.Upgrade {
+			protoToken := internal.B2S(bytes.TrimSpace(proto.ToBytes(req.Upgrade)))
+			renderer.PreWrite(req.Proto, upgrading.WithHeader("Upgrade", protoToken))
+			protocol = req.Upgrade
+		}
+
 		client.Unread(extra)
 		reader.Init(req)
 		response := h.router.OnRequest(req)
@@ -74,13 +88,13 @@ func (h *httpServer) RunOnce(
 			return false
 		}
 
-		if err = renderer.Render(req, response, client.Write); err != nil {
+		if err = renderer.Write(protocol, req, response, client.Write); err != nil {
 			h.router.OnError(req, status.ErrCloseConnection)
 			return false
 		}
 
 		p.Release()
-		if err = req.Reset(); err != nil {
+		if err = req.Clear(); err != nil {
 			h.router.OnError(req, status.ErrCloseConnection)
 			return false
 		}
@@ -89,7 +103,7 @@ func (h *httpServer) RunOnce(
 		p.Release()
 		return false
 	default:
-		panic(fmt.Sprintf("BUG: got unexpected parser state: %d", state))
+		panic(fmt.Sprintf("BUG: got unexpected parser state"))
 	}
 
 	return true
