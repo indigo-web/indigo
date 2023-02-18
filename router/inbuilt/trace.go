@@ -1,6 +1,7 @@
 package inbuilt
 
 import (
+	"bytes"
 	"github.com/indigo-web/indigo/http"
 	methods "github.com/indigo-web/indigo/http/method"
 	"github.com/indigo-web/indigo/http/proto"
@@ -23,7 +24,7 @@ func renderHTTPRequest(request *http.Request, buff []byte) []byte {
 	buff = append(buff, httpchars.SP...)
 	buff = requestURI(request, buff)
 	buff = append(buff, httpchars.SP...)
-	buff = append(buff, proto.ToBytes(request.Proto)...)
+	buff = append(buff, bytes.TrimSpace(proto.ToBytes(request.Proto))...)
 	buff = append(buff, httpchars.CRLF...)
 	buff = requestHeaders(request, buff)
 	buff = append(buff, "content-length: 0\r\n"...)
@@ -48,7 +49,7 @@ func requestURI(request *http.Request, buff []byte) []byte {
 }
 
 func requestHeaders(request *http.Request, buff []byte) []byte {
-	for k, v := range request.Headers.AsMap() {
+	for k, v := range request.Headers.Unwrap() {
 		buff = append(append(buff, k...), httpchars.COLONSP...)
 		buff = joinValuesInto(buff, v)
 	}
