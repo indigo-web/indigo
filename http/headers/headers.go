@@ -37,9 +37,9 @@ func (h Headers) Values(key string) []string {
 	return h.headers[key]
 }
 
-// AsMap returns an underlying map as it is. This means that modifying it
+// Unwrap returns an underlying map as it is. This means that modifying it
 // will also affect Headers object
-func (h Headers) AsMap() map[string][]string {
+func (h Headers) Unwrap() map[string][]string {
 	return h.headers
 }
 
