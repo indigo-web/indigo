@@ -22,17 +22,5 @@ jobs:
         with:
           go-version: 1.18
 
-      - name: Install deepsource CLI tool
-        run: curl https://deepsource.io/cli | sh
-
       - name: Run tests
-        run: go test -coverprofile=cover.out ./...
-
-      - name: Run tests with -race option
         run: go test -race ./...
-
-      - name: Code coverage report
-        run: |
-          ./bin/deepsource report --analyzer test-coverage --key go --value-file ./cover.out
-        env:
-          DEEPSOURCE_DSN: ${{ secrets.DEEPSOURCE_DSN }}
