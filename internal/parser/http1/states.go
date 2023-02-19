@@ -35,7 +35,6 @@ const (
 	eHeaderValueCR
 	eHeaderValueCRLF
 	eHeaderValueCRLFCR
-	eBody
 )
 
 type chunkedBodyParserState uint8
@@ -46,6 +45,7 @@ const (
 	eChunkLengthCR
 	eChunkLengthCRLF
 	eChunkBody
+	eChunkBodyEnd
 	eChunkBodyCR
 	eChunkBodyCRLF
 	eLastChunkCR

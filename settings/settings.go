@@ -1,33 +1,29 @@
 package settings
 
-import "math"
+import (
+	"math"
+	"time"
 
-type number interface {
-	int | int8 | int16 | int32 | int64 | uint | uint8 | uint16 | uint32 | uint64
-}
-
-type Setting[T number] struct {
-	Default T // soft limit
-	Maximal T // hard limit
-}
+	"github.com/indigo-web/indigo/internal/constraints"
+)
 
 type (
-	HeadersNumber               Setting[uint8]
-	HeadersKeyLength            Setting[uint8]
-	HeadersValuesSpace          Setting[uint32]
-	HeadersValuesObjectPoolSize Setting[uint16]
+	HeadersNumber struct {
+		Default, Maximal int
+	}
+	MaxHeaderKeyLength = int
+	HeadersValuesSpace struct {
+		Default, Maximal int
+	}
+	HeadersValuesObjectPoolSize = int
+	MaxURLLength                int
 
-	URLLength Setting[uint16]
-
-	// Query is responsible for url query settings.
 	Query struct {
-		// Length is responsible for a maximal length of url query may be
-		// received.
-		// Default value is unused
-		Length QueryLength
-		// Number is responsible for an initial capacity of query entries map.
-		// Maximal value is unused because:
-		//   Maximal number of entries equals to 65535 (math.MaxUint16) divided by
+		// MaxLength is responsible for a limit of the query length
+		MaxLength int
+		// DefaultMapSize is responsible for an initial capacity of query entries map.
+		// There is no up limit because:
+		//   Maximal number of entries equals to 65536 (math.MaxUint16) divided by
 		//   3 (minimal length of query entry) that equals to 21,845.
 		//   Worst case: sizeof(int) == 64 and sizeof(unsafe.Pointer) == 64. Then
 		//   slice type takes 16 bytes
@@ -39,16 +35,16 @@ type (
 		//   that is 0.87 megabytes. IMHO that is not that much to care about. In case it
 		//   is - somebody will open an issue, or even better, implement the limit by himself
 		//   (hope he is lucky enough to find out how to handle with my hand-made DI)
-		Number QueryNumber
+		DefaultMapSize int
 	}
 
-	QueryLength Setting[uint16]
-	QueryNumber Setting[uint16]
+	TCPReadBuffSize int
+	TCPReadTimeout  = time.Duration
 
-	TCPServerRead Setting[uint16]
+	MaxBodySize      int
+	MaxBodyChunkSize = int
 
-	BodyLength    Setting[uint32]
-	BodyChunkSize Setting[uint32]
+	ResponseBuffSize int
 )
 
 type (
@@ -57,65 +53,57 @@ type (
 		// Default value is an initial size of allocated headers map.
 		// Maximal value is maximum number of headers allowed to be presented
 		Number HeadersNumber
-		// KeyLength is responsible for header key length.
-		// Maximal value is a maximal length of header key
-		KeyLength HeadersKeyLength
+		// MaxKeyLength is responsible for maximal header key length.
+		MaxKeyLength MaxHeaderKeyLength
 		// HeadersValuesSpace is responsible for a maximal space in bytes available for
 		// keeping header values in memory.
 		// Default value is initial space allocated when client connects.
 		// Maximal value is a hard limit, reaching which one client triggers server
 		// to response with 431 Header Fields Too Large
 		ValueSpace HeadersValuesSpace
-		// ValuesObjectPoolSize is responsible for a queue size in object pool of string
-		// slices.
-		// Maximal value is a queue size of the object pool queue size.
-		ValuesObjectPoolSize HeadersValuesObjectPoolSize
+		// MaxValuesObjectPoolSize is responsible for a maximal size of string slices object
+		// pool
+		MaxValuesObjectPoolSize HeadersValuesObjectPoolSize
 	}
 
 	URL struct {
-		// Length is responsible for info line buffer.
-		// Maximal is a size for buffer that'll be allocated once and will be kept
+		// MaxLength is a size for buffer that'll be allocated once and will be kept
 		// until client disconnect
-		Length URLLength
-		Query  Query
+		MaxLength MaxURLLength
+		Query     Query
 	}
 
-	TCPServer struct {
-		// Read is responsible for tcp server reading buffer settings.
-		// Default value is a size of buffer for reading from socket, also
-		// we can call this setting as a "how many bytes are read from
-		// socket at most"
-		Read TCPServerRead
-		// IDLEConnLifetime is a timer in seconds, after expiration of which one IDLE
-		// connection will be actively closed by server.
-		// IDLE conn is a connection that does not send anything
-		// -1 as value disables timeouts at all
-		IDLEConnLifetime int
+	TCP struct {
+		// ReadBufferSize is a size of buffer in bytes which will be used to read from
+		// socket
+		ReadBufferSize TCPReadBuffSize
+		// ReadTimeout is a duration after which client will be automatically disconnected
+		ReadTimeout TCPReadTimeout
 	}
 
 	Body struct {
-		// Length is responsible for body length parameters.
-		// Default value is unused.
-		// Maximal value is a maximal length of body
-		Length BodyLength
-		// BodyChunkSize is responsible for chunks in chunked transfer encoding mode.
-		// Default value is unused because chunked body parser calls callback with
-		// data taken from input stream.
-		// Maximal value is a maximal length of chunk
-		ChunkSize BodyChunkSize
+		// MaxSize is responsible for a maximal body size in case it is being transferred
+		// using ordinary Content-Length header, otherwise (e.g. chunked TE) this limit,
+		// unfortunately, doesn't work
+		MaxSize MaxBodySize
+		// MaxChunkSize is responsible for a maximal size of a single chunk being transferred
+		// via chunked TE
+		MaxChunkSize MaxBodyChunkSize
 	}
 
-	// ResponseBuff is responsible for a response buffer.
-	// Default value is a size of buffer allocated once a client connects.
-	ResponseBuff Setting[uint32]
+	HTTP struct {
+		// ResponseBuffSize is responsible for a response buffer that is being allocated when
+		// client connects and is used for rendering the response into it
+		ResponseBuffSize ResponseBuffSize
+	}
 )
 
 type Settings struct {
-	Headers      Headers
-	URL          URL
-	TCPServer    TCPServer
-	Body         Body
-	ResponseBuff ResponseBuff
+	Headers Headers
+	URL     URL
+	TCP     TCP
+	Body    Body
+	HTTP    HTTP
 }
 
 func Default() Settings {
@@ -128,9 +116,7 @@ func Default() Settings {
 				Default: 10,
 				Maximal: 100,
 			},
-			KeyLength: HeadersKeyLength{
-				Maximal: 100,
-			},
+			MaxKeyLength: 100,
 			ValueSpace: HeadersValuesSpace{
 				// for simple requests without many header values this will be enough, I hope
 				Default: 1024,
@@ -139,35 +125,22 @@ func Default() Settings {
 			},
 		},
 		URL: URL{
-			Length: URLLength{
-				Maximal: math.MaxUint16,
-			},
+			MaxLength: math.MaxUint16,
 			Query: Query{
-				Length: QueryLength{
-					Maximal: math.MaxUint16,
-				},
-				Number: QueryNumber{
-					// I don't know why 20, but let it be
-					Default: 20,
-				},
+				MaxLength:      math.MaxUint16,
+				DefaultMapSize: 20,
 			},
 		},
-		TCPServer: TCPServer{
-			Read: TCPServerRead{
-				Default: 2048,
-			},
-			IDLEConnLifetime: 90,
+		TCP: TCP{
+			ReadBufferSize: 2048,
+			ReadTimeout:    90 * time.Second,
 		},
 		Body: Body{
-			Length: BodyLength{
-				Maximal: math.MaxUint32,
-			},
-			ChunkSize: BodyChunkSize{
-				Maximal: math.MaxUint32,
-			},
+			MaxSize:      math.MaxUint32,
+			MaxChunkSize: math.MaxUint32,
 		},
-		ResponseBuff: ResponseBuff{
-			Default: 1024,
+		HTTP: HTTP{
+			ResponseBuffSize: 1024,
 		},
 	}
 }
@@ -181,39 +154,35 @@ func Fill(original Settings) (modified Settings) {
 		original.Headers.Number.Default, defaultSettings.Headers.Number.Default)
 	original.Headers.Number.Maximal = customOrDefault(
 		original.Headers.Number.Maximal, defaultSettings.Headers.Number.Maximal)
-	original.Headers.KeyLength.Default = customOrDefault(
-		original.Headers.KeyLength.Default, defaultSettings.Headers.KeyLength.Default)
-	original.Headers.KeyLength.Maximal = customOrDefault(
-		original.Headers.KeyLength.Maximal, defaultSettings.Headers.KeyLength.Maximal)
+	original.Headers.MaxKeyLength = customOrDefault(
+		original.Headers.MaxKeyLength, defaultSettings.Headers.MaxKeyLength)
 	original.Headers.ValueSpace.Default = customOrDefault(
 		original.Headers.ValueSpace.Default, defaultSettings.Headers.ValueSpace.Default)
 	original.Headers.ValueSpace.Maximal = customOrDefault(
 		original.Headers.ValueSpace.Maximal, defaultSettings.Headers.ValueSpace.Maximal)
-	original.Headers.ValuesObjectPoolSize.Maximal = customOrDefault(
-		original.Headers.ValuesObjectPoolSize.Maximal, defaultSettings.Headers.ValuesObjectPoolSize.Maximal)
-	original.URL.Length.Maximal = customOrDefault(
-		original.URL.Length.Maximal, defaultSettings.URL.Length.Maximal)
-	original.URL.Query.Length.Maximal = customOrDefault(
-		original.URL.Query.Length.Maximal, defaultSettings.URL.Query.Length.Maximal)
-	original.URL.Query.Number.Default = customOrDefault(
-		original.URL.Query.Number.Default, defaultSettings.URL.Query.Number.Default)
-	original.TCPServer.Read.Default = customOrDefault(
-		original.TCPServer.Read.Default, defaultSettings.TCPServer.Read.Default)
-	original.TCPServer.IDLEConnLifetime = customOrDefault(
-		original.TCPServer.IDLEConnLifetime, defaultSettings.TCPServer.IDLEConnLifetime)
-	original.Body.Length.Default = customOrDefault(
-		original.Body.Length.Default, defaultSettings.Body.Length.Default)
-	original.Body.Length.Maximal = customOrDefault(
-		original.Body.Length.Maximal, defaultSettings.Body.Length.Maximal)
-	original.Body.ChunkSize.Maximal = customOrDefault(
-		original.Body.ChunkSize.Maximal, defaultSettings.Body.ChunkSize.Maximal)
-	original.ResponseBuff.Default = customOrDefault(
-		original.ResponseBuff.Default, defaultSettings.ResponseBuff.Default)
+	original.Headers.MaxValuesObjectPoolSize = customOrDefault(
+		original.Headers.MaxValuesObjectPoolSize, defaultSettings.Headers.MaxValuesObjectPoolSize)
+	original.URL.MaxLength = customOrDefault(
+		original.URL.MaxLength, defaultSettings.URL.MaxLength)
+	original.URL.Query.MaxLength = customOrDefault(
+		original.URL.Query.MaxLength, defaultSettings.URL.Query.MaxLength)
+	original.URL.Query.DefaultMapSize = customOrDefault(
+		original.URL.Query.DefaultMapSize, defaultSettings.URL.Query.DefaultMapSize)
+	original.TCP.ReadBufferSize = customOrDefault(
+		original.TCP.ReadBufferSize, defaultSettings.TCP.ReadBufferSize)
+	original.TCP.ReadTimeout = customOrDefault(
+		original.TCP.ReadTimeout, defaultSettings.TCP.ReadTimeout)
+	original.Body.MaxSize = customOrDefault(
+		original.Body.MaxSize, defaultSettings.Body.MaxSize)
+	original.Body.MaxChunkSize = customOrDefault(
+		original.Body.MaxChunkSize, defaultSettings.Body.MaxChunkSize)
+	original.HTTP.ResponseBuffSize = customOrDefault(
+		original.HTTP.ResponseBuffSize, defaultSettings.HTTP.ResponseBuffSize)
 
 	return original
 }
 
-func customOrDefault[T number](custom, defaultVal T) T {
+func customOrDefault[T constraints.Number](custom, defaultVal T) T {
 	if custom == 0 {
 		return defaultVal
 	}

@@ -1,53 +1,52 @@
 package obtainer
 
 import (
-	"context"
 	"strings"
 
-	"github.com/fakefloordiv/indigo/http"
-	methods2 "github.com/fakefloordiv/indigo/http/method"
-	"github.com/fakefloordiv/indigo/internal/functools"
-	"github.com/fakefloordiv/indigo/internal/mapconv"
-	routertypes "github.com/fakefloordiv/indigo/router/inbuilt/types"
-	"github.com/fakefloordiv/indigo/types"
-	"github.com/fakefloordiv/indigo/valuectx"
+	"github.com/indigo-web/indigo/http"
+	"github.com/indigo-web/indigo/http/method"
+	"github.com/indigo-web/indigo/http/status"
+	"github.com/indigo-web/indigo/internal/functools"
+	"github.com/indigo-web/indigo/internal/mapconv"
+	"github.com/indigo-web/indigo/router/inbuilt/types"
+	"github.com/indigo-web/indigo/valuectx"
 )
 
-func StaticObtainer(routes routertypes.RoutesMap) Obtainer {
+func StaticObtainer(routes types.RoutesMap) Obtainer {
 	allowedMethods := getAllowedMethodsMap(routes)
 
-	return func(ctx context.Context, req *types.Request) (context.Context, routertypes.HandlerFunc, error) {
-		methods, found := routes[req.Path]
+	return func(req *http.Request) (types.HandlerFunc, error) {
+		methodsMap, found := routes[stripTrailingSlash(req.Path)]
 		if !found {
-			return ctx, nil, http.ErrNotFound
+			return nil, status.ErrNotFound
 		}
 
-		if handler := getHandler(req.Method, methods); handler != nil {
-			return ctx, handler, nil
+		if handler := getHandler(req.Method, methodsMap); handler != nil {
+			return handler, nil
 		}
 
-		ctx = valuectx.WithValue(ctx, "allow", allowedMethods[req.Path])
+		req.Ctx = valuectx.WithValue(req.Ctx, "allow", allowedMethods[req.Path])
 
-		return ctx, nil, http.ErrMethodNotAllowed
+		return nil, status.ErrMethodNotAllowed
 	}
 }
 
-func getAllowedMethodsMap(routes routertypes.RoutesMap) map[string]string {
+func getAllowedMethodsMap(routes types.RoutesMap) map[string]string {
 	allowedMethods := make(map[string]string, len(routes))
 
-	for resource, methods := range routes {
-		keys := functools.Map(methods2.ToString, mapconv.Keys(methods))
+	for resource, methodsMap := range routes {
+		keys := functools.Map(methods.ToString, mapconv.Keys(methodsMap))
 		allowedMethods[resource] = strings.Join(keys, ",")
 	}
 
 	return allowedMethods
 }
 
-func getHandler(method methods2.Method, methods routertypes.MethodsMap) routertypes.HandlerFunc {
-	handler, found := methods[method]
+func getHandler(method methods.Method, methodsMap types.MethodsMap) types.HandlerFunc {
+	handler, found := methodsMap[method]
 	if !found {
-		if method == methods2.HEAD {
-			return getHandler(methods2.GET, methods)
+		if method == methods.HEAD {
+			return getHandler(methods.GET, methodsMap)
 		}
 
 		return nil

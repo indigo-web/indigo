@@ -1,213 +1,304 @@
 package http1
 
 import (
-	"github.com/fakefloordiv/indigo/http"
-	"github.com/fakefloordiv/indigo/http/encodings"
-	"github.com/fakefloordiv/indigo/internal/body"
-	"github.com/fakefloordiv/indigo/settings"
+	"fmt"
+	"io"
+
+	"github.com/indigo-web/indigo/http/status"
+	"github.com/indigo-web/indigo/settings"
 )
 
 // chunkedBodyParser is a parser for chunked encoded request bodies
 // used to encapsulate process of parsing because it's more convenient
 // to leave the process here and let main parser parse only http requests
 type chunkedBodyParser struct {
-	state   chunkedBodyParserState
-	gateway *body.Gateway
+	state chunkedBodyParserState
 
-	settings    settings.Settings
-	chunkLength uint32
-	bodyOffset  int
+	settings    settings.Body
+	chunkLength int
 }
 
-func newChunkedBodyParser(gateway *body.Gateway, settings settings.Settings) chunkedBodyParser {
+func newChunkedBodyParser(settings settings.Body) chunkedBodyParser {
 	return chunkedBodyParser{
 		state:    eChunkLength1Char,
-		gateway:  gateway,
 		settings: settings,
 	}
 }
 
-// Parse takes only body as it is. Returns a flag whether parsing is done,
-// extra that are extra-bytes related to a next one request, and err if
-// occurred
-func (c *chunkedBodyParser) Parse(
-	data []byte, decoder encodings.DecoderFunc, trailer bool,
-) (done bool, extra []byte, err error) {
-	if decoder == nil {
-		decoder = func(b []byte) ([]byte, error) {
-			return b, nil
-		}
+// Parse a stream of chunked body parts. When fully parsed, nil-chunk is returned, but non-nil
+// extra and io.EOF error
+func (c *chunkedBodyParser) Parse(data []byte, trailer bool) (chunk, extra []byte, err error) {
+	var offset int
+
+	switch c.state {
+	case eChunkLength1Char:
+		goto chunkLength1Char
+	case eChunkLength:
+		goto chunkLength
+	case eChunkLengthCR:
+		goto chunkLengthCR
+	case eChunkLengthCRLF:
+		goto chunkLengthCRLF
+	case eChunkBody:
+		goto chunkBody
+	case eChunkBodyEnd:
+		goto chunkBodyEnd
+	case eChunkBodyCR:
+		goto chunkBodyCR
+	case eChunkBodyCRLF:
+		goto chunkBodyCRLF
+	case eLastChunkCR:
+		goto lastChunkCR
+	case eFooter:
+		goto footer
+	case eFooterCR:
+		goto footerCR
+	case eFooterCRLF:
+		goto footerCRLF
+	case eFooterCRLFCR:
+		goto footerCRLFCR
+	default:
+		panic(fmt.Sprintf("BUG: unknown state: %v", c.state))
 	}
 
-	for i := range data {
-		switch c.state {
-		case eChunkLength1Char:
-			if !isHex(data[i]) {
-				return true, nil, http.ErrBadRequest
+chunkLength1Char:
+	if !isHex(data[offset]) {
+		return nil, nil, status.ErrBadRequest
+	}
+
+	c.chunkLength = int(unHex(data[offset]))
+	offset++
+	c.state = eChunkLength
+	goto chunkLength
+
+chunkLength:
+	for ; offset < len(data); offset++ {
+		switch data[offset] {
+		case '\r':
+			offset++
+			c.state = eChunkLengthCR
+			goto chunkLengthCR
+		case '\n':
+			offset++
+			c.state = eChunkLengthCRLF
+			goto chunkLengthCRLF
+		default:
+			if !isHex(data[offset]) {
+				return nil, nil, status.ErrBadRequest
 			}
 
-			c.chunkLength = uint32(unHex(data[i]))
-			c.state = eChunkLength
-		case eChunkLength:
-			switch data[i] {
-			case '\r':
-				c.state = eChunkLengthCR
-			case '\n':
-				c.state = eChunkLengthCRLF
-			default:
-				if !isHex(data[i]) {
-					return true, nil, http.ErrBadRequest
-				}
-
-				c.chunkLength = (c.chunkLength << 4) | uint32(unHex(data[i]))
-				if c.chunkLength > c.settings.Body.ChunkSize.Maximal {
-					return true, nil, http.ErrTooLarge
-				}
-			}
-		case eChunkLengthCR:
-			switch data[i] {
-			case '\n':
-				c.state = eChunkLengthCRLF
-			default:
-				return true, nil, http.ErrBadRequest
-			}
-		case eChunkLengthCRLF:
-			if c.chunkLength == 0 {
-				switch data[i] {
-				case '\r':
-					c.state = eLastChunkCR
-				case '\n':
-					c.state = eChunkLength1Char
-
-					return true, data[i+1:], nil
-				default:
-					if !trailer {
-						return true, nil, http.ErrBadRequest
-					}
-
-					c.state = eFooter
-				}
-
-				continue
-			}
-
-			c.bodyOffset = i
-			c.state = eChunkBody
-		case eChunkBody:
-			c.chunkLength--
-
-			if c.chunkLength == 0 {
-				decoded, err := decoder(data[c.bodyOffset:i])
-				if err != nil {
-					return true, nil, err
-				}
-
-				c.gateway.Data <- decoded
-				<-c.gateway.Data
-				if c.gateway.Err != nil {
-					return true, nil, c.gateway.Err
-				}
-
-				switch data[i] {
-				case '\r':
-					c.state = eChunkBodyCR
-				case '\n':
-					c.state = eChunkBodyCRLF
-				default:
-					return true, nil, http.ErrBadRequest
-				}
-			}
-		case eChunkBodyCR:
-			switch data[i] {
-			case '\n':
-				c.state = eChunkBodyCRLF
-			default:
-				return true, nil, http.ErrBadRequest
-			}
-		case eChunkBodyCRLF:
-			switch data[i] {
-			case '\r':
-				c.state = eLastChunkCR
-			case '\n':
-				if !trailer {
-					c.state = eChunkLength1Char
-
-					return true, data[i+1:], nil
-				}
-
-				c.state = eFooter
-			default:
-				c.chunkLength = uint32(unHex(data[i]))
-				if c.chunkLength > c.settings.Body.ChunkSize.Maximal {
-					return true, nil, http.ErrTooLarge
-				}
-
-				c.state = eChunkLength
-			}
-		case eLastChunkCR:
-			switch data[i] {
-			case '\n':
-				if !trailer {
-					c.state = eChunkLength1Char
-
-					return true, data[i+1:], nil
-				}
-
-				c.state = eFooter
-			default:
-				return true, nil, http.ErrBadRequest
-			}
-		case eFooter:
-			switch data[i] {
-			case '\r':
-				c.state = eFooterCR
-			case '\n':
-				c.state = eFooterCRLF
-			}
-		case eFooterCR:
-			switch data[i] {
-			case '\n':
-				c.state = eFooterCRLF
-			default:
-				return true, nil, http.ErrBadRequest
-			}
-		case eFooterCRLF:
-			switch data[i] {
-			case '\r':
-				c.state = eFooterCRLFCR
-			case '\n':
-				c.state = eChunkLength1Char
-
-				return true, data[i+1:], nil
-			default:
-				c.state = eFooter
-			}
-		case eFooterCRLFCR:
-			switch data[i] {
-			case '\n':
-				c.state = eChunkLength1Char
-
-				return true, data[i+1:], nil
-			default:
-				return done, nil, http.ErrBadRequest
+			c.chunkLength = (c.chunkLength << 4) | int(unHex(data[offset]))
+			if c.chunkLength > c.settings.MaxChunkSize {
+				return nil, nil, status.ErrTooLarge
 			}
 		}
 	}
 
-	if c.state == eChunkBody {
-		decoded, err := decoder(data[c.bodyOffset:])
-		if err != nil {
-			return true, nil, err
-		}
+	return nil, nil, nil
 
-		c.gateway.Data <- decoded
-		<-c.gateway.Data
-		if c.gateway.Err != nil {
-			return true, nil, c.gateway.Err
-		}
-
-		c.bodyOffset = 0
+chunkLengthCR:
+	if offset >= len(data) {
+		return nil, nil, nil
 	}
 
-	return false, nil, nil
+	switch data[offset] {
+	case '\n':
+		offset++
+		c.state = eChunkLengthCRLF
+		goto chunkLengthCRLF
+	default:
+		return nil, nil, status.ErrBadRequest
+	}
+
+chunkLengthCRLF:
+	if offset >= len(data) {
+		return nil, nil, nil
+	}
+
+	switch c.chunkLength {
+	case 0:
+		switch data[offset] {
+		case '\r':
+			offset++
+			c.state = eLastChunkCR
+			goto lastChunkCR
+		case '\n':
+			c.state = eChunkLength1Char
+
+			return nil, data[offset+1:], io.EOF
+		default:
+			if !trailer {
+				return nil, nil, status.ErrBadRequest
+			}
+
+			offset++
+			c.state = eFooter
+			goto footer
+		}
+	default:
+		c.state = eChunkBody
+		goto chunkBody
+	}
+
+chunkBody:
+	if offset >= len(data) {
+		return nil, nil, nil
+	}
+
+	if len(data[offset:]) > c.chunkLength {
+		c.state = eChunkBodyEnd
+
+		return data[offset : offset+c.chunkLength], data[offset+c.chunkLength:], nil
+	}
+
+	c.chunkLength -= len(data[offset:])
+
+	return data[offset:], nil, nil
+
+chunkBodyEnd:
+	if offset >= len(data) {
+		return nil, nil, nil
+	}
+
+	switch data[offset] {
+	case '\r':
+		offset++
+		c.state = eChunkBodyCR
+		goto chunkBodyCR
+	case '\n':
+		offset++
+		c.state = eChunkBodyCRLF
+		goto chunkBodyCRLF
+	default:
+		return nil, nil, status.ErrBadRequest
+	}
+
+chunkBodyCR:
+	if offset >= len(data) {
+		return nil, nil, nil
+	}
+
+	switch data[offset] {
+	case '\n':
+		offset++
+		c.state = eChunkBodyCRLF
+		goto chunkBodyCRLF
+	default:
+		return nil, nil, status.ErrBadRequest
+	}
+
+chunkBodyCRLF:
+	if offset >= len(data) {
+		return nil, nil, nil
+	}
+
+	switch data[offset] {
+	case '\r':
+		offset++
+		c.state = eLastChunkCR
+		goto lastChunkCR
+	case '\n':
+		if !trailer {
+			c.state = eChunkLength1Char
+
+			return nil, data[offset+1:], io.EOF
+		}
+
+		offset++
+		c.state = eFooter
+		goto footer
+	default:
+		c.chunkLength = int(unHex(data[offset]))
+		if c.chunkLength > c.settings.MaxChunkSize {
+			return nil, nil, status.ErrTooLarge
+		}
+
+		offset++
+		c.state = eChunkLength
+		goto chunkLength
+	}
+
+lastChunkCR:
+	if offset >= len(data) {
+		return nil, nil, nil
+	}
+
+	switch data[offset] {
+	case '\n':
+		if !trailer {
+			c.state = eChunkLength1Char
+
+			return nil, data[offset+1:], io.EOF
+		}
+
+		offset++
+		c.state = eFooter
+		goto footer
+	default:
+		return nil, nil, status.ErrBadRequest
+	}
+
+footer:
+	for ; offset < len(data); offset++ {
+		switch data[offset] {
+		case '\r':
+			offset++
+			c.state = eFooterCR
+			goto footerCR
+		case '\n':
+			offset++
+			c.state = eFooterCRLF
+			goto footerCRLF
+		}
+	}
+
+	return nil, nil, nil
+
+footerCR:
+	if offset >= len(data) {
+		return nil, nil, nil
+	}
+
+	switch data[offset] {
+	case '\n':
+		offset++
+		c.state = eFooterCRLF
+		goto footerCRLF
+	default:
+		return nil, nil, status.ErrBadRequest
+	}
+
+footerCRLF:
+	if offset >= len(data) {
+		return nil, nil, nil
+	}
+
+	switch data[offset] {
+	case '\r':
+		offset++
+		c.state = eFooterCRLFCR
+		goto footerCRLFCR
+	case '\n':
+		c.state = eChunkLength1Char
+
+		return nil, data[offset+1:], io.EOF
+	default:
+		offset++
+		c.state = eFooter
+		goto footer
+	}
+
+footerCRLFCR:
+	if offset >= len(data) {
+		return nil, nil, nil
+	}
+
+	switch data[offset] {
+	case '\n':
+		c.state = eChunkLength1Char
+
+		return nil, data[offset+1:], io.EOF
+	default:
+		return nil, nil, status.ErrBadRequest
+	}
 }

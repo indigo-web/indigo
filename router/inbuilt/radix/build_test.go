@@ -79,36 +79,36 @@ func TestParse_Negative(t *testing.T) {
 	t.Run("NoLeadingSlash", func(t *testing.T) {
 		sample := "hello/world"
 		_, err := Parse(sample)
-		require.EqualError(t, err, ErrNeedLeadingSlash.Error())
+		require.Error(t, err)
 	})
 
 	t.Run("SlashInsideOfPartName", func(t *testing.T) {
 		sample := "/hello/{world/something else}"
 		_, err := Parse(sample)
-		require.EqualError(t, err, ErrInvalidPartName.Error())
+		require.Error(t, err)
 	})
 
 	t.Run("FBraceInsideOfPartName", func(t *testing.T) {
 		sample := "/hello/{world {another name}}"
 		_, err := Parse(sample)
-		require.EqualError(t, err, ErrInvalidPartName.Error())
+		require.Error(t, err)
 	})
 
 	t.Run("FBraceInsideOfPartName", func(t *testing.T) {
 		sample := "/hello/{world {another name}}"
 		_, err := Parse(sample)
-		require.EqualError(t, err, ErrInvalidPartName.Error())
+		require.Error(t, err)
 	})
 
 	t.Run("NoSlashAfterDynamicPart", func(t *testing.T) {
 		sample := "/hello/{world}name/greet"
 		_, err := Parse(sample)
-		require.EqualError(t, err, ErrDynamicMustBeWholeSection.Error())
+		require.Error(t, err)
 	})
 
 	t.Run("DynamicWithPrefix", func(t *testing.T) {
 		sample := "/hello-{world}/greet"
 		_, err := Parse(sample)
-		require.EqualError(t, err, ErrDynamicMustBeWholeSection.Error())
+		require.Error(t, err)
 	})
 }

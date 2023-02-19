@@ -38,12 +38,14 @@ func CharsetOf(str string) string {
 	return getParam(str, charsetSubstr, DefaultEncoding)
 }
 
-// ParamOf looks for a parameter in a value, and if found, returns a parameter value.
-// In case parameter is not found, empty string is returned
+// ParamOf is an alias to ParamOfOr, except no `or`-parameter is passed - empty string
+// will be returned in case not found.
 func ParamOf(str, key string) string {
 	return ParamOfOr(str, key, "")
 }
 
+// ParamOfOr looks for a parameter in a value, and if found, returns a parameter value.
+// In case parameter is not found, `or` is returned
 func ParamOfOr(str, key, or string) string {
 	return getParam(str, ";"+key+"=", or)
 }

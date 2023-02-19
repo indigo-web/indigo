@@ -4,8 +4,8 @@ import (
 	"context"
 	"errors"
 
-	routertypes "github.com/fakefloordiv/indigo/router/inbuilt/types"
-	"github.com/fakefloordiv/indigo/valuectx"
+	"github.com/indigo-web/indigo/router/inbuilt/types"
+	"github.com/indigo-web/indigo/valuectx"
 )
 
 var ErrNotImplemented = errors.New(
@@ -13,7 +13,7 @@ var ErrNotImplemented = errors.New(
 )
 
 type Payload struct {
-	MethodsMap routertypes.MethodsMap
+	MethodsMap types.MethodsMap
 	Allow      string
 }
 

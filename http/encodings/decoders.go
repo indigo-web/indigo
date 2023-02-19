@@ -1,7 +1,7 @@
 package encodings
 
 import (
-	"github.com/fakefloordiv/indigo/internal/mapconv"
+	"github.com/indigo-web/indigo/internal/mapconv"
 )
 
 type (

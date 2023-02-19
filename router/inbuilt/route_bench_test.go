@@ -4,28 +4,29 @@ import (
 	"strings"
 	"testing"
 
-	methods "github.com/fakefloordiv/indigo/http/method"
-	"github.com/fakefloordiv/indigo/types"
+	"github.com/indigo-web/indigo/http"
+
+	methods "github.com/indigo-web/indigo/http/method"
 )
 
-func nopRender(_ types.Response) error {
+func nopRender(_ http.Response) error {
 	return nil
 }
 
 func BenchmarkRequestRouting(b *testing.B) {
-	longURIRequest, _ := getRequest()
+	longURIRequest := getRequest()
 	longURIRequest.Method = methods.GET
 	longURIRequest.Path = "/" + strings.Repeat("a", 255)
 
-	shortURIRequest, _ := getRequest()
+	shortURIRequest := getRequest()
 	shortURIRequest.Method = methods.GET
 	shortURIRequest.Path = "/" + strings.Repeat("a", 15)
 
-	unknownURIRequest, _ := getRequest()
+	unknownURIRequest := getRequest()
 	unknownURIRequest.Method = methods.GET
 	unknownURIRequest.Path = "/" + strings.Repeat("b", 255)
 
-	unknownMethodRequest, _ := getRequest()
+	unknownMethodRequest := getRequest()
 	unknownMethodRequest.Method = methods.POST
 	unknownMethodRequest.Path = longURIRequest.Path
 

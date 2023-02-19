@@ -2,7 +2,6 @@ package indigo
 
 import (
 	"bytes"
-	"context"
 	"errors"
 	"fmt"
 	"io"
@@ -14,16 +13,16 @@ import (
 	"testing"
 	"time"
 
-	"github.com/fakefloordiv/indigo/settings"
+	"github.com/indigo-web/indigo/http/status"
 
-	"github.com/fakefloordiv/indigo/http"
+	"github.com/indigo-web/indigo/settings"
 
-	methods "github.com/fakefloordiv/indigo/http/method"
-	"github.com/fakefloordiv/indigo/http/proto"
-	"github.com/fakefloordiv/indigo/router"
-	"github.com/fakefloordiv/indigo/router/inbuilt"
-	"github.com/fakefloordiv/indigo/types"
+	"github.com/indigo-web/indigo/http"
 
+	methods "github.com/indigo-web/indigo/http/method"
+	"github.com/indigo-web/indigo/http/proto"
+	"github.com/indigo-web/indigo/router"
+	"github.com/indigo-web/indigo/router/inbuilt"
 	"github.com/stretchr/testify/require"
 )
 
@@ -77,22 +76,22 @@ func readN(conn net.Conn, n int) ([]byte, error) {
 func getStaticRouter(t *testing.T) router.Router {
 	r := inbuilt.NewRouter()
 
-	r.Get("/simple-get", func(_ context.Context, request *types.Request) types.Response {
+	r.Get("/simple-get", func(request *http.Request) http.Response {
 		require.Equal(t, methods.GET, request.Method)
 		_, err := request.Query.Get("some non-existing query key")
 		require.Error(t, err)
 		require.Empty(t, request.Fragment)
 		require.Equal(t, proto.HTTP11, request.Proto)
 
-		return types.WithResponse
+		return http.RespondTo(request)
 	})
 
-	r.Get("/get-resp-body", func(_ context.Context, _ *types.Request) types.Response {
-		return types.WithResponse.WithBody(testRequestBody)
+	r.Get("/get-resp-body", func(request *http.Request) http.Response {
+		return http.RespondTo(request).WithBody(testRequestBody)
 	})
 
-	r.Get("/get-read-body", func(_ context.Context, request *types.Request) types.Response {
-		require.Contains(t, request.Headers.AsMap(), testHeaderKey)
+	r.Get("/get-read-body", func(request *http.Request) http.Response {
+		require.Contains(t, request.Headers.Unwrap(), testHeaderKey)
 		requestHeader := strings.Join(request.Headers.Values(testHeaderKey), ",")
 		require.Equal(t, testHeaderValue, requestHeader)
 
@@ -100,44 +99,56 @@ func getStaticRouter(t *testing.T) router.Router {
 		require.NoError(t, err)
 		require.Empty(t, body)
 
-		return types.WithResponse
+		return http.RespondTo(request)
 	})
 
 	with := r.Group("/with-")
 
-	with.Get("query", func(_ context.Context, request *types.Request) types.Response {
+	with.Get("query", func(request *http.Request) http.Response {
 		value, err := request.Query.Get(testQueryKey)
 		require.NoError(t, err)
 		require.Equal(t, testQueryValue, string(value))
 
-		return types.WithResponse
+		return http.RespondTo(request)
+	})
+
+	with.Get("file", func(request *http.Request) http.Response {
+		return http.RespondTo(request).WithFile(testFilename, func(err error) http.Response {
+			t.Fail() // this callback must never be called
+
+			return http.RespondTo(request)
+		})
+	})
+
+	with.Get("file-notfound", func(request *http.Request) http.Response {
+		return http.RespondTo(request).WithFile(testFilename+"notfound", func(err error) http.Response {
+			return http.RespondTo(request).WithBody(testFileIfNotFound)
+		})
 	})
 
 	// request.OnBody() is not tested because request.Body() (wrapper for OnBody)
 	// is tested, that is enough to make sure that requestbody works correct
 
-	r.Post("/read-body", func(_ context.Context, request *types.Request) types.Response {
+	r.Post("/read-body", func(request *http.Request) http.Response {
 		body, err := request.Body()
 		require.NoError(t, err)
 		require.Equal(t, testRequestBody, string(body))
 
-		return types.WithResponse
+		return http.RespondTo(request)
 	})
 
-	r.Post("/body-reader", func(_ context.Context, request *types.Request) types.Response {
+	r.Post("/body-reader", func(request *http.Request) http.Response {
 		reader := request.Reader()
 		body, err := io.ReadAll(reader)
 		require.NoError(t, err)
 		require.Equal(t, testRequestBody, string(body))
 
-		return types.WithResponse
+		return http.RespondTo(request)
 	})
 
-	r.Post("/do-not-read-body", func(_ context.Context, request *types.Request) types.Response {
-		return types.WithResponse
-	})
+	r.Post("/do-not-read-body", http.RespondTo)
 
-	r.Get("/hijack-conn-no-body-read", func(_ context.Context, request *types.Request) types.Response {
+	r.Get("/hijack-conn-no-body-read", func(request *http.Request) http.Response {
 		conn, err := request.Hijack()
 		require.NoError(t, err)
 
@@ -150,10 +161,10 @@ func getStaticRouter(t *testing.T) router.Router {
 
 		_ = conn.Close()
 
-		return types.WithResponse
+		return http.RespondTo(request)
 	})
 
-	r.Get("/hijack-conn-with-body-read", func(_ context.Context, request *types.Request) types.Response {
+	r.Get("/hijack-conn-with-body-read", func(request *http.Request) http.Response {
 		_, _ = request.Body()
 
 		conn, err := request.Hijack()
@@ -167,21 +178,7 @@ func getStaticRouter(t *testing.T) router.Router {
 
 		_ = conn.Close()
 
-		return types.WithResponse
-	})
-
-	r.Get("/with-file", func(_ context.Context, request *types.Request) types.Response {
-		return types.WithResponse.WithFile(testFilename, func(err error) types.Response {
-			t.Fail() // this callback must never be called
-
-			return types.WithResponse
-		})
-	})
-
-	r.Get("/with-file-notfound", func(_ context.Context, request *types.Request) types.Response {
-		return types.WithResponse.WithFile(testFilename+"notfound", func(err error) types.Response {
-			return types.WithResponse.WithBody(testFileIfNotFound)
-		})
+		return http.RespondTo(request)
 	})
 
 	return r
@@ -194,7 +191,7 @@ func TestServer_Static(t *testing.T) {
 
 	r := getStaticRouter(t)
 	s := settings.Default()
-	s.TCPServer.IDLEConnLifetime = 2
+	s.TCP.ReadTimeout = 1 * time.Second
 	app := NewApp(addr)
 
 	runningServer := newServer(app)
@@ -411,6 +408,7 @@ func TestServer_Static(t *testing.T) {
 		}
 		resp, err := stdhttp.DefaultClient.Do(request)
 		require.NoError(t, err)
+		require.Equal(t, int(status.MethodNotAllowed), resp.StatusCode)
 
 		require.Contains(t, resp.Header, "Allow")
 		require.Equal(t, "GET", resp.Header["Allow"][0])
@@ -419,6 +417,8 @@ func TestServer_Static(t *testing.T) {
 
 	// this test must ALWAYS be on the bottom as it is the longest-duration test
 	t.Run("/test-idle-disconnect", func(t *testing.T) {
+		// t.Parallel()
+
 		conn, err := net.Dial("tcp4", addr)
 		require.NoError(t, err)
 
@@ -475,7 +475,7 @@ func newServer(app *Application) serverWrap {
 }
 
 func (s serverWrap) Start(t *testing.T, r router.Router, settings ...settings.Settings) {
-	require.Equal(t, http.ErrShutdown, s.app.Serve(r, settings...))
+	require.Equal(t, status.ErrShutdown, s.app.Serve(r, settings...))
 	s.shutdown <- struct{}{}
 }
 

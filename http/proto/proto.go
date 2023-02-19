@@ -3,20 +3,21 @@ package proto
 type Proto uint8
 
 const (
-	Unknown Proto = 1 << iota
-	HTTP09
+	Unknown Proto = 0
+	HTTP09  Proto = 1 << iota
 	HTTP10
 	HTTP11
+	HTTP2
+
+	WebSocket
 
 	HTTP1 = HTTP09 | HTTP10 | HTTP11
-
-	// HTTP2, HTTP3 - will be added when implemented
 )
 
 var (
-	http09 = []byte("HTTP/0.9")
-	http10 = []byte("HTTP/1.0")
-	http11 = []byte("HTTP/1.1")
+	http09 = []byte("HTTP/0.9 ")
+	http10 = []byte("HTTP/1.0 ")
+	http11 = []byte("HTTP/1.1 ")
 )
 
 func Parse(major, minor uint8) Proto {

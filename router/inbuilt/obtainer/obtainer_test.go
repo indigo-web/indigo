@@ -1,26 +1,32 @@
 package obtainer
 
 import (
-	"context"
 	"reflect"
 	"testing"
 
-	"github.com/fakefloordiv/indigo/http"
-	"github.com/fakefloordiv/indigo/http/headers"
-	methods "github.com/fakefloordiv/indigo/http/method"
-	"github.com/fakefloordiv/indigo/http/url"
-	routertypes "github.com/fakefloordiv/indigo/router/inbuilt/types"
-	"github.com/fakefloordiv/indigo/types"
+	"github.com/indigo-web/indigo/internal/server/tcp/dummy"
+
+	"github.com/indigo-web/indigo/http/status"
+	"github.com/indigo-web/indigo/internal/parser/http1"
+	"github.com/indigo-web/indigo/settings"
+
+	"github.com/indigo-web/indigo/http"
+	"github.com/indigo-web/indigo/http/headers"
+	methods "github.com/indigo-web/indigo/http/method"
+	"github.com/indigo-web/indigo/http/query"
+	routertypes "github.com/indigo-web/indigo/router/inbuilt/types"
 	"github.com/stretchr/testify/require"
 )
 
-func nopHandler(context.Context, *types.Request) types.Response {
-	return types.OK()
+func nopHandler(request *http.Request) http.Response {
+	return http.RespondTo(request)
 }
 
-func newRequest(path string, method methods.Method) *types.Request {
-	request, _ := types.NewRequest(
-		headers.NewHeaders(make(map[string][]string)), url.Query{}, nil,
+func newRequest(path string, method methods.Method) *http.Request {
+	hdrs := headers.NewHeaders(make(map[string][]string))
+	bodyReader := http1.NewBodyReader(dummy.NewNopClient(), settings.Default().Body)
+	request := http.NewRequest(
+		hdrs, query.Query{}, http.NewResponse(), dummy.NewNopConn(), bodyReader,
 	)
 	request.Path = path
 	request.Method = method
@@ -31,7 +37,7 @@ func newRequest(path string, method methods.Method) *types.Request {
 func testPositiveMatch(t *testing.T, obtainer Obtainer) {
 	path := "/"
 	request := newRequest(path, methods.GET)
-	_, methodsMap, err := obtainer(context.Background(), request)
+	methodsMap, err := obtainer(request)
 	require.NoError(t, err)
 	require.NotNil(t, methodsMap)
 }
@@ -39,19 +45,19 @@ func testPositiveMatch(t *testing.T, obtainer Obtainer) {
 func testNegativeMatchNotFound(t *testing.T, obtainer Obtainer) {
 	path := "/42"
 	request := newRequest(path, methods.GET)
-	_, handler, err := obtainer(context.Background(), request)
-	require.EqualError(t, err, http.ErrNotFound.Error())
+	handler, err := obtainer(request)
+	require.EqualError(t, err, status.ErrNotFound.Error())
 	require.Nil(t, handler)
 }
 
 func testNegativeMatchMethodNotAllowed(t *testing.T, obtainer Obtainer) {
 	path := "/"
 	request := newRequest(path, methods.POST)
-	ctx, handler, err := obtainer(context.Background(), request)
-	require.EqualError(t, err, http.ErrMethodNotAllowed.Error())
+	handler, err := obtainer(request)
+	require.EqualError(t, err, status.ErrMethodNotAllowed.Error())
 	require.Nil(t, handler)
 
-	allow := ctx.Value("allow")
+	allow := request.Ctx.Value("allow")
 	require.NotNil(t, allow)
 	require.Equal(t, "GET", allow.(string))
 }

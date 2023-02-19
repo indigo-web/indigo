@@ -1,59 +1,62 @@
 package main
 
 import (
-	"context"
 	"fmt"
 	"log"
 	"strconv"
 
-	"github.com/fakefloordiv/indigo"
-	"github.com/fakefloordiv/indigo/http/status"
-	"github.com/fakefloordiv/indigo/router/inbuilt"
-	"github.com/fakefloordiv/indigo/types"
+	"github.com/indigo-web/indigo/http"
+
+	"github.com/indigo-web/indigo"
+	"github.com/indigo-web/indigo/http/status"
+	"github.com/indigo-web/indigo/router/inbuilt"
 )
 
-var addr = "localhost:9090"
+var (
+	addr  = "localhost:9090"
+	index = "index.html"
+)
 
-func Index(_ context.Context, _ *types.Request) types.Response {
-	return types.WithFile("index.html", func(err error) types.Response {
-		return types.WithResponse.
+func Index(request *http.Request) http.Response {
+	return http.RespondTo(request).WithFile(index, func(err error) http.Response {
+		return http.RespondTo(request).
 			WithCode(status.NotFound).
 			WithBody(
-				"index.html: not found; try running this example directly from examples/combined folder",
+				index + ": not found; try running this example directly from examples/combined folder",
 			)
 	})
 }
 
-func IndexSay(_ context.Context, request *types.Request) types.Response {
+func IndexSay(request *http.Request) http.Response {
 	if talking := request.Headers.Value("talking"); talking != "allowed" {
-		return types.WithCode(status.UnavailableForLegalReasons)
+		return http.RespondTo(request).WithCode(status.UnavailableForLegalReasons)
 	}
 
 	body, err := request.Body()
 	if err != nil {
-		return types.WithError(err)
+		return http.RespondTo(request).WithError(err)
 	}
 
 	fmt.Println("Somebody said:", strconv.Quote(string(body)))
 
-	return types.OK()
+	return http.RespondTo(request)
 }
 
-func World(_ context.Context, _ *types.Request) types.Response {
-	return types.WithBody(
+func World(request *http.Request) http.Response {
+	return http.RespondTo(request).WithBody(
 		`<h1>Hello, world!</h1>`,
 	)
 }
 
-func Easter(_ context.Context, request *types.Request) types.Response {
-	if easter := request.Headers.Value("easter"); len(easter) > 0 {
-		return types.
+func Easter(request *http.Request) http.Response {
+	if request.Headers.Has("easter") {
+		return http.RespondTo(request).
 			WithCode(status.Teapot).
 			WithHeader("Easter", "Egg").
-			WithBody("Easter egg!")
+			WithBody("You have discovered an easter egg! Congratulations!")
 	}
 
-	return types.WithBody("Pretty ordinary page, isn't it?")
+	return http.RespondTo(request).WithBody("Pretty ordinary page, isn't it?")
 }
 
 func main() {

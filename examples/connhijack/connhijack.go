@@ -1,25 +1,24 @@
 package main
 
 import (
-	"context"
 	"fmt"
 	"log"
 	"strconv"
 
-	"github.com/fakefloordiv/indigo"
-	"github.com/fakefloordiv/indigo/http/status"
-	"github.com/fakefloordiv/indigo/router/inbuilt"
-	"github.com/fakefloordiv/indigo/types"
+	"github.com/indigo-web/indigo/http"
+
+	"github.com/indigo-web/indigo"
+	"github.com/indigo-web/indigo/router/inbuilt"
 )
 
 var addr = "localhost:9090"
 
-func MyHandler(_ context.Context, request *types.Request) types.Response {
+func MyHandler(request *http.Request) http.Response {
 	conn, err := request.Hijack()
 	if err != nil {
-		return types.
-			WithCode(status.BadRequest).
-			WithBody("bad body")
+		// in case error occurred, it may be only an error with a network, so
+		// no response may be sent anyway
+		return http.RespondTo(request)
 	}
 
 	readBuff := make([]byte, 1024)
@@ -29,7 +28,9 @@ func MyHandler(_ context.Context, request *types.Request) types.Response {
 		if n == 0 || err != nil {
 			_ = conn.Close()
 
-			return types.OK()
+			// no matter what we return here as after handler exits, even if connection was
+			// not explicitly closed, server will do it implicitly
+			return http.RespondTo(request)
 		}
 
 		fmt.Println("somebody says:", strconv.Quote(string(readBuff[:n])))

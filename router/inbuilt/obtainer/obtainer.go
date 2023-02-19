@@ -1,16 +1,15 @@
 package obtainer
 
 import (
-	"context"
+	"github.com/indigo-web/indigo/http"
 
-	"github.com/fakefloordiv/indigo/internal/mapconv"
-	"github.com/fakefloordiv/indigo/router/inbuilt/radix"
-	routertypes "github.com/fakefloordiv/indigo/router/inbuilt/types"
-	"github.com/fakefloordiv/indigo/types"
+	"github.com/indigo-web/indigo/internal/mapconv"
+	"github.com/indigo-web/indigo/router/inbuilt/radix"
+	routertypes "github.com/indigo-web/indigo/router/inbuilt/types"
 )
 
 type (
-	Obtainer    func(context.Context, *types.Request) (context.Context, routertypes.HandlerFunc, error)
+	Obtainer    func(*http.Request) (routertypes.HandlerFunc, error)
 	constructor func(routertypes.RoutesMap) Obtainer
 )
 
@@ -29,4 +28,15 @@ func getObtainer(routes []string) constructor {
 	}
 
 	return StaticObtainer
+}
+
+// stripTrailingSlash just removes a trailing slash of request path in case it is presented.
+// Note: this removes only one trailing slash. In case 2 or more are presented they'll be treated
+// as an ordinary part of the path so won't be stripped
+func stripTrailingSlash(path string) string {
+	if path[len(path)-1] == '/' && len(path) > 1 {
+		return path[:len(path)-1]
+	}
+
+	return path
 }

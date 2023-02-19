@@ -37,18 +37,29 @@ func (h Headers) Values(key string) []string {
 	return h.headers[key]
 }
 
-func (h Headers) AsMap() map[string][]string {
+// Unwrap returns an underlying map as it is. This means that modifying it
+// will also affect Headers object
+func (h Headers) Unwrap() map[string][]string {
 	return h.headers
 }
 
+// Add values to the key. In case did not exist, it'll be created
 func (h Headers) Add(key string, newValues ...string) {
 	h.headers[key] = append(h.headers[key], newValues...)
 }
 
+// Set just sets the value of the header to the provided values slice
 func (h Headers) Set(key string, values []string) {
 	h.headers[key] = values
 }
 
+// Has returns true or false depending on whether such a key exists
+func (h Headers) Has(key string) bool {
+	_, found := h.headers[key]
+	return found
+}
+
+// Clear headers map. Is a system method, that is not supposed to be ever called by user
 func (h Headers) Clear() {
 	for k := range h.headers {
 		delete(h.headers, k)

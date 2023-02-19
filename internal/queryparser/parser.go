@@ -1,8 +1,8 @@
 package queryparser
 
 import (
-	"github.com/fakefloordiv/indigo/http"
-	"github.com/fakefloordiv/indigo/internal"
+	"github.com/indigo-web/indigo/http/status"
+	"github.com/indigo-web/indigo/internal"
 )
 
 func Parse(data []byte, queryMapFactory func() map[string][]byte) (queries map[string][]byte, err error) {
@@ -26,7 +26,7 @@ func Parse(data []byte, queryMapFactory func() map[string][]byte) (queries map[s
 			if data[i] == '=' {
 				key = internal.B2S(data[offset:i])
 				if len(key) == 0 {
-					return nil, http.ErrBadQuery
+					return nil, status.ErrBadQuery
 				}
 
 				offset = i + 1
@@ -42,7 +42,7 @@ func Parse(data []byte, queryMapFactory func() map[string][]byte) (queries map[s
 	}
 
 	if state == eKey {
-		return nil, http.ErrBadQuery
+		return nil, status.ErrBadQuery
 	}
 
 	queries[key] = data[offset:]

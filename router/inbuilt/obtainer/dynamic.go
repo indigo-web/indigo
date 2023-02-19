@@ -1,37 +1,37 @@
 package obtainer
 
 import (
-	"context"
 	"strings"
 
-	"github.com/fakefloordiv/indigo/http"
-	methods "github.com/fakefloordiv/indigo/http/method"
-	"github.com/fakefloordiv/indigo/internal/functools"
-	"github.com/fakefloordiv/indigo/internal/mapconv"
-	"github.com/fakefloordiv/indigo/router/inbuilt/radix"
-	routertypes "github.com/fakefloordiv/indigo/router/inbuilt/types"
-	"github.com/fakefloordiv/indigo/types"
-	"github.com/fakefloordiv/indigo/valuectx"
+	"github.com/indigo-web/indigo/http/status"
+
+	"github.com/indigo-web/indigo/http"
+	methods "github.com/indigo-web/indigo/http/method"
+	"github.com/indigo-web/indigo/internal/functools"
+	"github.com/indigo-web/indigo/internal/mapconv"
+	"github.com/indigo-web/indigo/router/inbuilt/radix"
+	routertypes "github.com/indigo-web/indigo/router/inbuilt/types"
+	"github.com/indigo-web/indigo/valuectx"
 )
 
 func DynamicObtainer(routes routertypes.RoutesMap) Obtainer {
 	tree := getTree(routes)
 
-	return func(ctx context.Context, req *types.Request) (context.Context, routertypes.HandlerFunc, error) {
+	return func(req *http.Request) (routertypes.HandlerFunc, error) {
 		var payload *radix.Payload
-		ctx, payload = tree.Match(ctx, req.Path)
+		req.Ctx, payload = tree.Match(req.Ctx, stripTrailingSlash(req.Path))
 		if payload == nil {
-			return ctx, nil, http.ErrNotFound
+			return nil, status.ErrNotFound
 		}
 
 		handler := getHandler(req.Method, payload.MethodsMap)
 		if handler == nil {
-			ctx = valuectx.WithValue(ctx, "allow", payload.Allow)
+			req.Ctx = valuectx.WithValue(req.Ctx, "allow", payload.Allow)
 
-			return ctx, nil, http.ErrMethodNotAllowed
+			return nil, status.ErrMethodNotAllowed
 		}
 
-		return ctx, handler, nil
+		return handler, nil
 	}
 }
 

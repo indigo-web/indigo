@@ -1,21 +1,21 @@
 package main
 
 import (
-	"context"
 	"fmt"
 	"log"
 
-	"github.com/fakefloordiv/indigo"
-	"github.com/fakefloordiv/indigo/router/inbuilt"
-	"github.com/fakefloordiv/indigo/types"
+	"github.com/indigo-web/indigo/http"
+
+	"github.com/indigo-web/indigo"
+	"github.com/indigo-web/indigo/router/inbuilt"
 )
 
 var addr = "localhost:9090"
 
-func MyDynamicHandler(ctx context.Context, _ *types.Request) types.Response {
-	worldName := ctx.Value("world-name").(string)
+func MyDynamicHandler(request *http.Request) http.Response {
+	worldName := request.Ctx.Value("world-name").(string)
 
-	return types.WithBody("your world-name is " + worldName)
+	return http.RespondTo(request).WithBody("your world-name is " + worldName)
 }
 
 func main() {

@@ -1,20 +1,13 @@
 package parser
 
-// RequestState is just a general state of parser, that notifies
-// in case of something new (otherwise Pending is returned)
-// for example, it notifies http server whether headers are
-// parsed, or request is totally complete. Or RequestCompleted
-// as a special case of request with no body presented,
-// or even ConnectionClose when Connection: close header was sent,
-// and client finally disconnected (empty slice was pushed into the
-// parser, http server can know it only from parser)
+// RequestState is a general state of the parser that tells a caller about
+// current state of the request. It may be incomplete (Pending), complete
+// (HeadersCompleted), and completed with an error (Error). Due to internal
+// approaches of body handling, parser does not manage requests bodies.
 type RequestState uint8
 
 const (
-	Pending RequestState = 1 << iota
+	Pending RequestState = iota + 1
 	HeadersCompleted
-	BodyCompleted
-	ConnectionClose
 	Error
-	RequestCompleted = HeadersCompleted | BodyCompleted
 )

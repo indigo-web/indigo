@@ -1,25 +1,22 @@
 package inbuilt
 
 import (
-	"context"
 	"testing"
 
-	routertypes "github.com/fakefloordiv/indigo/router/inbuilt/types"
+	"github.com/indigo-web/indigo/http"
 
-	"github.com/fakefloordiv/indigo/http/status"
+	routertypes "github.com/indigo-web/indigo/router/inbuilt/types"
 
-	methods "github.com/fakefloordiv/indigo/http/method"
-	"github.com/fakefloordiv/indigo/types"
+	"github.com/indigo-web/indigo/http/status"
 
+	methods "github.com/indigo-web/indigo/http/method"
 	"github.com/stretchr/testify/require"
 )
 
-const respBody = "some body" // once told me
-
 // handler that does nothing, used in cases when we need nothing
 // but handler also must not be nil
-func nopHandler(_ context.Context, _ *types.Request) types.Response {
-	return types.WithResponse.WithBody(respBody)
+func nopHandler(request *http.Request) http.Response {
+	return http.RespondTo(request)
 }
 
 func TestRoute(t *testing.T) {
@@ -57,7 +54,7 @@ func TestRoute(t *testing.T) {
 	})
 
 	t.Run("HEAD", func(t *testing.T) {
-		request, _ := getRequest()
+		request := getRequest()
 		request.Method = methods.HEAD
 		request.Path = "/"
 
@@ -65,7 +62,7 @@ func TestRoute(t *testing.T) {
 		// we have not registered any HEAD-method handler yet, so GET method
 		// is expected to be called (but without body)
 		require.Equal(t, status.OK, resp.Code)
-		require.Equal(t, respBody, string(resp.Body))
+		require.Empty(t, string(resp.Body))
 	})
 }
 
@@ -181,7 +178,11 @@ func TestResource_Methods(t *testing.T) {
 	root.Options(nopHandler)
 	root.Trace(nopHandler)
 	root.Patch(nopHandler)
+	r.OnStart()
 
 	require.Contains(t, r.routes, "/")
+	// too lazy to check all of them. But lazy means smart, so we can
+	// just check whether there are 9 different methods are registered.
+	// So if they do, everything works correctly
 	require.Equal(t, 9, len(r.routes["/"]))
 }

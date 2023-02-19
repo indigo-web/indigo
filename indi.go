@@ -3,21 +3,20 @@ package indigo
 import (
 	"errors"
 	"net"
-	"sync"
 
-	"github.com/fakefloordiv/indigo/internal/pool"
+	"github.com/indigo-web/indigo/http"
+	"github.com/indigo-web/indigo/internal/pool"
+	httpserver "github.com/indigo-web/indigo/internal/server/http"
+	"github.com/indigo-web/indigo/internal/server/tcp"
 
-	server2 "github.com/fakefloordiv/indigo/internal/server"
-
-	"github.com/fakefloordiv/indigo/http/encodings"
-	"github.com/fakefloordiv/indigo/http/headers"
-	"github.com/fakefloordiv/indigo/http/url"
-	"github.com/fakefloordiv/indigo/internal/alloc"
-	"github.com/fakefloordiv/indigo/internal/parser/http1"
-	"github.com/fakefloordiv/indigo/internal/render"
-	"github.com/fakefloordiv/indigo/router"
-	settings2 "github.com/fakefloordiv/indigo/settings"
-	"github.com/fakefloordiv/indigo/types"
+	"github.com/indigo-web/indigo/http/encodings"
+	"github.com/indigo-web/indigo/http/headers"
+	"github.com/indigo-web/indigo/http/query"
+	"github.com/indigo-web/indigo/internal/alloc"
+	"github.com/indigo-web/indigo/internal/parser/http1"
+	"github.com/indigo-web/indigo/internal/render"
+	"github.com/indigo-web/indigo/router"
+	"github.com/indigo-web/indigo/settings"
 )
 
 const (
@@ -76,16 +75,16 @@ func (a *Application) SetDefaultHeaders(headers map[string][]string) {
 // Serve takes a router and someSettings, that must be only 0 or 1 elements
 // otherwise, error is returned
 // Also, if specified, Accept-Encodings default header's value will be set here
-func (a Application) Serve(r router.Router, settings ...settings2.Settings) error {
+func (a Application) Serve(r router.Router, optionalSettings ...settings.Settings) error {
 	if accept, found := a.defaultHeaders["Accept-Encodings"]; found && accept == nil {
 		a.defaultHeaders["Accept-Encodings"] = a.codings.Acceptable()
 	}
 
-	if onStart, ok := r.(router.OnStart); ok {
+	if onStart, ok := r.(router.OnStarter); ok {
 		onStart.OnStart()
 	}
 
-	s, err := getSettings(settings...)
+	s, err := getSettings(optionalSettings...)
 	if err != nil {
 		return err
 	}
@@ -95,38 +94,37 @@ func (a Application) Serve(r router.Router, settings ...settings2.Settings) erro
 		return err
 	}
 
-	return server2.StartTCPServer(sock, func(wg *sync.WaitGroup, conn net.Conn) {
+	return tcp.RunTCPServer(sock, func(conn net.Conn) {
+		readBuff := make([]byte, s.TCP.ReadBufferSize)
+		client := tcp.NewClient(conn, s.TCP.ReadTimeout, readBuff)
+
 		keyAllocator := alloc.NewAllocator(
-			int(s.Headers.KeyLength.Maximal)*int(s.Headers.Number.Default),
-			int(s.Headers.KeyLength.Maximal)*int(s.Headers.Number.Maximal),
+			s.Headers.MaxKeyLength*s.Headers.Number.Default,
+			s.Headers.MaxKeyLength*s.Headers.Number.Maximal,
 		)
 		valAllocator := alloc.NewAllocator(
-			int(s.Headers.ValueSpace.Default),
-			int(s.Headers.ValueSpace.Maximal),
+			s.Headers.ValueSpace.Default,
+			s.Headers.ValueSpace.Maximal,
 		)
-		objPool := pool.NewObjectPool[[]string](int(s.Headers.ValuesObjectPoolSize.Maximal))
-		query := url.NewQuery(func() map[string][]byte {
-			return make(map[string][]byte, s.URL.Query.Number.Default)
+		objPool := pool.NewObjectPool[[]string](s.Headers.MaxValuesObjectPoolSize)
+		q := query.NewQuery(func() map[string][]byte {
+			return make(map[string][]byte, s.URL.Query.DefaultMapSize)
 		})
 		hdrs := headers.NewHeaders(make(map[string][]string, s.Headers.Number.Default))
-		request, gateway := types.NewRequest(hdrs, query, conn.RemoteAddr())
+		response := http.NewResponse()
+		bodyReader := http1.NewBodyReader(client, s.Body)
+		request := http.NewRequest(hdrs, q, response, conn, bodyReader)
 
-		startLineBuff := make([]byte, s.URL.Length.Maximal)
-
+		startLineBuff := make([]byte, s.URL.MaxLength)
 		httpParser := http1.NewHTTPRequestsParser(
-			request, gateway, keyAllocator, valAllocator, objPool, startLineBuff, s, a.codings,
+			request, keyAllocator, valAllocator, objPool, startLineBuff, s.Headers,
 		)
 
-		respBuff := make([]byte, 0, s.ResponseBuff.Default)
-		renderer := render.NewRenderer(respBuff, nil, a.defaultHeaders)
+		respBuff := make([]byte, 0, s.HTTP.ResponseBuffSize)
+		renderer := render.NewEngine(respBuff, nil, a.defaultHeaders)
 
-		httpServer := server2.NewHTTPServer(request, r, httpParser, conn, renderer)
-		go httpServer.Run()
-
-		readBuff := make([]byte, s.TCPServer.Read.Default)
-		server2.DefaultConnHandler(
-			wg, conn, s.TCPServer.IDLEConnLifetime, httpServer.OnData, readBuff,
-		)
+		httpServer := httpserver.NewHTTPServer(r)
+		httpServer.Run(client, request, bodyReader, renderer, httpParser)
 	}, a.shutdown)
 }
 
@@ -145,13 +143,13 @@ func (a Application) Wait() {
 	<-a.shutdown
 }
 
-func getSettings(settings ...settings2.Settings) (settings2.Settings, error) {
-	switch len(settings) {
+func getSettings(s ...settings.Settings) (settings.Settings, error) {
+	switch len(s) {
 	case 0:
-		return settings2.Default(), nil
+		return settings.Default(), nil
 	case 1:
-		return settings2.Fill(settings[0]), nil
+		return settings.Fill(s[0]), nil
 	default:
-		return settings2.Settings{}, errors.New("too many settings (none or single struct is expected)")
+		return settings.Settings{}, errors.New("too many settings (none or single struct is expected)")
 	}
 }

@@ -1,12 +1,12 @@
-package url
+package query
 
 import (
 	"errors"
 
-	"github.com/fakefloordiv/indigo/internal/queryparser"
+	"github.com/indigo-web/indigo/internal/queryparser"
 )
 
-var ErrNoSuchKey = errors.New("requested key is not presented")
+var ErrNoSuchKey = errors.New("desired key does not exists")
 
 type (
 	rawQuery    []byte
@@ -37,7 +37,7 @@ func (q *Query) Set(raw []byte) {
 	q.parsedQuery = nil
 }
 
-// Get is responsible for getting a key from url query. In case this
+// Get is responsible for getting a key from query query. In case this
 // method is called a first time since rawQuery was set (or not set
 // at all), rawQuery bytearray will be parsed and value returned
 // (or ErrNoSuchKey instead). In case of invalid query bytearray,

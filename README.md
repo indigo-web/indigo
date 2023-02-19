@@ -3,6 +3,7 @@
 Indigo is non-idiomatic, but focusing on simplicity and performance web-server
 
 It provides such a features:
+
 - Streaming-based body processing
 - Server-wide settings
 - Response object constructor
@@ -16,18 +17,17 @@ It provides such a features:
 package main
 
 import (
-  "context"
   "log"
   
-  "github.com/fakefloordiv/indigo"
-  "github.com/fakefloordiv/indigo/router/inbuilt"
-  "github.com/fakefloordiv/indigo/types"
+  "github.com/indigo-web/indigo"
+  "github.com/indigo-web/indigo/http"
+  "github.com/indigo-web/indigo/router/inbuilt"
 )
 
 var addr = "localhost:9090"
 
-func MyHandler(_ context.Context, req *types.Request) types.Response {
-  return types.WithBody("Hello, world!")
+func MyHandler(request *http.Request) http.Response {
+  return http.RespondTo(request).WithBody("Hello, world!")
 }
 
 func main() {
@@ -39,7 +39,6 @@ func main() {
 }
 ```
 
-More examples in [examples/](https://github.com/fakefloordiv/indigo/tree/master/examples) folder.
-
+More examples in [examples/](https://github.com/indigo-web/indigo/tree/master/examples) folder.
 
 Project workspace (TODO list included): trello.com/w/indigowebserver

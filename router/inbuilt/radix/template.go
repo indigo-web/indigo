@@ -2,6 +2,7 @@ package radix
 
 import (
 	"errors"
+	"fmt"
 )
 
 type templateParserState uint8
@@ -13,20 +14,7 @@ const (
 	eFinishDynamic
 )
 
-var (
-	ErrNeedLeadingSlash = errors.New(
-		"a leading slash is compulsory",
-	)
-	ErrInvalidPartName = errors.New(
-		"slashes or figure braces are not allowed inside of the template part name",
-	)
-	ErrEmptyPath = errors.New(
-		"template cannot be empty",
-	)
-	ErrDynamicMustBeWholeSection = errors.New(
-		"dynamic part must be a whole path section, without prefixes and suffixes",
-	)
-)
+var ErrEmptyPath = errors.New("template cannot be empty")
 
 type Segment struct {
 	IsDynamic bool
@@ -53,7 +41,7 @@ func Parse(tmpl string) (Template, error) {
 	for i, char := range tmpl {
 		if i == 0 {
 			if char != '/' {
-				return template, ErrNeedLeadingSlash
+				return template, fmt.Errorf(`"%s": a leading slash is required`, tmpl)
 			}
 
 			// skip leading slash
@@ -71,7 +59,10 @@ func Parse(tmpl string) (Template, error) {
 				offset = i + 1
 				state = eSlash
 			case '{':
-				return template, ErrDynamicMustBeWholeSection
+				return template, fmt.Errorf(
+					`"%s": dynamic part must be a whole path section, without prefixes and suffixes`,
+					tmpl,
+				)
 			}
 		case eSlash:
 			switch char {
@@ -91,7 +82,10 @@ func Parse(tmpl string) (Template, error) {
 				})
 				state = eFinishDynamic
 			case '/', '{':
-				return template, ErrInvalidPartName
+				return template, fmt.Errorf(
+					`"%s": slashes or figure braces are not allowed inside of the template part name`,
+					tmpl,
+				)
 			}
 		case eFinishDynamic:
 			switch char {
@@ -99,7 +93,10 @@ func Parse(tmpl string) (Template, error) {
 				offset = i + 1
 				state = eSlash
 			default:
-				return template, ErrDynamicMustBeWholeSection
+				return template, fmt.Errorf(
+					`"%s": dynamic part must be a whole path section, without prefixes and suffixes`,
+					tmpl,
+				)
 			}
 		}
 	}
