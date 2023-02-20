@@ -46,6 +46,13 @@ var (
 	simplePOST = []byte("POST / HTTP/1.1\r\nContent-Length: 13\r\n\r\nHello, world!")
 )
 
+// to simulate real-world default headers, copy-pasted from indi.go
+var defaultHeaders = map[string][]string{
+	"Content-Type": {"text/html"},
+	// nil here means that value will be set later, when server will be initializing
+	"Accept-Encodings": nil,
+}
+
 func BenchmarkIndigo(b *testing.B) {
 	router := inbuilt.NewRouter()
 	root := router.Resource("/")
@@ -73,12 +80,12 @@ func BenchmarkIndigo(b *testing.B) {
 	router.OnStart()
 
 	s := settings.Default()
-	query := query.NewQuery(func() map[string][]byte {
+	q := query.NewQuery(func() map[string][]byte {
 		return make(map[string][]byte)
 	})
 	bodyReader := http1.NewBodyReader(dummy.NewNopClient(), settings.Default().Body)
 	request := http.NewRequest(
-		headers.NewHeaders(nil), query, http.NewResponse(), dummy.NewNopConn(), bodyReader,
+		headers.NewHeaders(nil), q, http.NewResponse(), dummy.NewNopConn(), bodyReader,
 	)
 	keyAllocator := alloc.NewAllocator(
 		s.Headers.MaxKeyLength*s.Headers.Number.Default,
@@ -92,7 +99,7 @@ func BenchmarkIndigo(b *testing.B) {
 	parser := http1.NewHTTPRequestsParser(
 		request, keyAllocator, valAllocator, objPool, startLineBuff, s.Headers,
 	)
-	render := render2.NewEngine(make([]byte, 0, 1024), nil, make(map[string][]string))
+	render := render2.NewEngine(make([]byte, 0, 1024), nil, defaultHeaders)
 	server := NewHTTPServer(router).(*httpServer)
 
 	simpleGETClient := dummy.NewCircularClient(simpleGETRequest)
