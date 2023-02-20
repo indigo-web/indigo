@@ -9,3 +9,7 @@ func Map[A any, B any](fun func(A) B, input []A) []B {
 
 	return result
 }
+
+func Nop[T any](a T) T {
+	return a
+}
