@@ -28,7 +28,12 @@ const (
 	defaultContentType = "text/html"
 )
 
-var defaultHeaders = map[string][]string{
+// DefaultHeaders are headers that are going to be sent unless they were overridden by
+// user.
+//
+// WARNING: if you want to edit them, do it using Application.AddDefaultHeader or
+// Application.DeleteDefaultHeader instead
+var DefaultHeaders = map[string][]string{
 	"Content-Type": {defaultContentType},
 	// nil here means that value will be set later, when server will be initializing
 	"Accept-Encodings": nil,
@@ -50,7 +55,7 @@ func NewApp(addr string) *Application {
 	return &Application{
 		addr:           addr,
 		decoders:       encodings.NewContentDecoders(),
-		defaultHeaders: mapconv.Copy(defaultHeaders),
+		defaultHeaders: mapconv.Copy(DefaultHeaders),
 		shutdown:       make(chan struct{}, 1),
 	}
 }
