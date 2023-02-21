@@ -42,14 +42,14 @@ func (s *circularClient) Unread(takeback []byte) {
 	s.takeback = takeback
 }
 
-func (circularClient) Write([]byte) error {
+func (*circularClient) Write([]byte) error {
 	return nil
 }
 
-func (circularClient) Remote() net.Addr {
+func (*circularClient) Remote() net.Addr {
 	return nil
 }
 
-func (circularClient) Close() error {
+func (*circularClient) Close() error {
 	return nil
 }

@@ -3,6 +3,7 @@ package render
 import (
 	"errors"
 	"github.com/indigo-web/indigo/http/status"
+	"github.com/indigo-web/indigo/internal/functools"
 	"github.com/indigo-web/indigo/internal/render/types"
 	"io"
 	"math"
@@ -34,17 +35,20 @@ type Engine interface {
 // to make possible files distribution be more efficient. At the moment, this feature isn't
 // implemented yet, but will be soon
 type engine struct {
-	buff, fileBuff []byte
-	buffOffset     int
-	defaultHeaders types.HeadersMap
+	buff, fileBuff                        []byte
+	buffOffset                            int
+	defaultHeaders, defaultHeadersReserve types.DefaultHeaders
 	// TODO: add files distribution mechanism (and edit docstring)
 }
 
 func NewEngine(buff, fileBuff []byte, defaultHeaders map[string][]string) Engine {
+	parsedDefaultHeaders := parseDefaultHeaders(defaultHeaders)
+
 	return &engine{
-		buff:           buff,
-		fileBuff:       fileBuff,
-		defaultHeaders: parseDefaultHeaders(defaultHeaders),
+		buff:                  buff,
+		fileBuff:              fileBuff,
+		defaultHeadersReserve: functools.Map(functools.Nop[string], parsedDefaultHeaders),
+		defaultHeaders:        parsedDefaultHeaders,
 	}
 }
 
@@ -88,7 +92,7 @@ func (e *engine) Write(
 
 	err = writer(e.buff)
 
-	if !isKeepAlive(request) && request.Upgrade == proto.Unknown {
+	if !isKeepAlive(protocol, request) && request.Upgrade == proto.Unknown {
 		err = errConnWrite
 	}
 
@@ -108,21 +112,17 @@ func (e *engine) renderHeaders(response http.Response) {
 
 	responseHeaders := response.Headers()
 
-	if len(responseHeaders) > 0 {
-		for i := 0; i <= len(responseHeaders)/2; i += 2 {
-			e.renderHeader(responseHeaders[i], responseHeaders[i+1])
-
-			if defaultHdr, found := e.defaultHeaders[responseHeaders[i]]; found {
-				defaultHdr.Seen = true
-			}
-		}
+	for i := 0; i < len(responseHeaders); i += 2 {
+		e.renderHeader(responseHeaders[i], responseHeaders[i+1])
+		e.defaultHeaders.EraseEntry(responseHeaders[i])
 	}
 
-	for key, value := range e.defaultHeaders {
-		if !value.Seen {
-			e.renderHeader(key, value.Value)
-			value.Seen = false
+	for i := 0; i < len(e.defaultHeaders); i += 2 {
+		if len(e.defaultHeaders[i]) == 0 {
+			continue
 		}
+
+		e.renderHeader(e.defaultHeaders[i], e.defaultHeaders[i+1])
 	}
 }
 
@@ -209,10 +209,11 @@ func (e *engine) crlf() {
 
 func (e *engine) clear() {
 	e.buff = e.buff[:0]
+	e.defaultHeadersReserve.Copy(e.defaultHeaders)
 }
 
-func isKeepAlive(req *http.Request) bool {
-	switch req.Proto {
+func isKeepAlive(protocol proto.Proto, req *http.Request) bool {
+	switch protocol {
 	case proto.HTTP09, proto.HTTP10:
 		// actually, HTTP/0.9 doesn't even have a Connection: keep-alive header,
 		// but who knows - let it be
@@ -229,14 +230,14 @@ func isKeepAlive(req *http.Request) bool {
 	}
 }
 
-func parseDefaultHeaders(hdrs map[string][]string) types.HeadersMap {
-	m := make(types.HeadersMap, len(hdrs))
+func parseDefaultHeaders(hdrs map[string][]string) []string {
+	parsedHeaders := make([]string, 0, len(hdrs))
 
 	for key, values := range hdrs {
-		m[key] = &types.DefaultHeader{
-			Value: strings.Join(values, ","),
+		for _, value := range values {
+			parsedHeaders = append(parsedHeaders, key, value)
 		}
 	}
 
-	return m
+	return parsedHeaders
 }

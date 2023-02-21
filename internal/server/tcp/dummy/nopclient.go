@@ -5,5 +5,5 @@ import (
 )
 
 func NewNopClient() tcp.Client {
-	return NewCircularClient([]byte("\x00"))
+	return NewCircularClient(nil)
 }
