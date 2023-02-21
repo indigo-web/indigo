@@ -209,9 +209,6 @@ func TestServer_Static(t *testing.T) {
 		require.Equal(t, stdhttp.StatusOK, resp.StatusCode)
 		require.Equal(t, "200 "+stdhttp.StatusText(stdhttp.StatusOK), resp.Status)
 		require.Equal(t, "HTTP/1.1", resp.Proto)
-		require.Contains(t, resp.Header, "Server")
-		require.Equal(t, 1, len(resp.Header["Server"]))
-		require.Equal(t, "indigo", resp.Header["Server"][0])
 	})
 
 	t.Run("/get-resp-body", func(t *testing.T) {
@@ -236,9 +233,6 @@ func TestServer_Static(t *testing.T) {
 		require.Equal(t, stdhttp.StatusOK, resp.StatusCode)
 		require.Equal(t, "200 "+stdhttp.StatusText(stdhttp.StatusOK), resp.Status)
 		require.Equal(t, "HTTP/1.1", resp.Proto)
-		require.Contains(t, resp.Header, "Server")
-		require.Equal(t, 1, len(resp.Header["Server"]))
-		require.Equal(t, "indigo", resp.Header["Server"][0])
 
 		body, err := io.ReadAll(resp.Body)
 		require.NoError(t, err)

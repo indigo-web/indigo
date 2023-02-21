@@ -5,6 +5,7 @@ import (
 	"net"
 
 	"github.com/indigo-web/indigo/http"
+	"github.com/indigo-web/indigo/internal/mapconv"
 	"github.com/indigo-web/indigo/internal/pool"
 	httpserver "github.com/indigo-web/indigo/internal/server/http"
 	"github.com/indigo-web/indigo/internal/server/tcp"
@@ -20,12 +21,6 @@ import (
 )
 
 const (
-	// not specifying version to avoid problems with vulnerable versions
-	// Also not specifying, because otherwise I should add an option to
-	// disable such a behaviour. I am too lazy for that. Preferring not
-	// specifying version at all
-	defaultServer = "indigo"
-
 	// actually, we don't know what content type of body user responds
 	// with, so due to rfc2068 7.2.1 it is supposed to be
 	// application/octet-stream, but we know that it is usually text/html,
@@ -33,8 +28,12 @@ const (
 	defaultContentType = "text/html"
 )
 
-var defaultHeaders = map[string][]string{
-	"Server":       {defaultServer},
+// DefaultHeaders are headers that are going to be sent unless they were overridden by
+// user.
+//
+// WARNING: if you want to edit them, do it using Application.AddDefaultHeader or
+// Application.DeleteDefaultHeader instead
+var DefaultHeaders = map[string][]string{
 	"Content-Type": {defaultContentType},
 	// nil here means that value will be set later, when server will be initializing
 	"Accept-Encodings": nil,
@@ -45,7 +44,7 @@ var defaultHeaders = map[string][]string{
 type Application struct {
 	addr string
 
-	codings        encodings.Decoders
+	decoders       encodings.Decoders
 	defaultHeaders map[string][]string
 
 	shutdown chan struct{}
@@ -55,15 +54,15 @@ type Application struct {
 func NewApp(addr string) *Application {
 	return &Application{
 		addr:           addr,
-		codings:        encodings.NewContentDecoders(),
-		defaultHeaders: defaultHeaders,
+		decoders:       encodings.NewContentDecoders(),
+		defaultHeaders: mapconv.Copy(DefaultHeaders),
 		shutdown:       make(chan struct{}, 1),
 	}
 }
 
 // AddContentDecoder simply adds a new content decoder
-func (a Application) AddContentDecoder(token string, decoder encodings.Decoder) {
-	a.codings.Add(token, decoder)
+func (a *Application) AddContentDecoder(token string, decoder encodings.Decoder) {
+	a.decoders.Add(token, decoder)
 }
 
 // SetDefaultHeaders overrides default headers to a passed ones.
@@ -72,12 +71,20 @@ func (a *Application) SetDefaultHeaders(headers map[string][]string) {
 	a.defaultHeaders = headers
 }
 
+func (a *Application) AddDefaultHeader(key string, values ...string) {
+	a.defaultHeaders[key] = append(a.defaultHeaders[key], values...)
+}
+
+func (a *Application) DeleteDefaultHeader(key string) {
+	delete(a.defaultHeaders, key)
+}
+
 // Serve takes a router and someSettings, that must be only 0 or 1 elements
 // otherwise, error is returned
 // Also, if specified, Accept-Encodings default header's value will be set here
-func (a Application) Serve(r router.Router, optionalSettings ...settings.Settings) error {
+func (a *Application) Serve(r router.Router, optionalSettings ...settings.Settings) error {
 	if accept, found := a.defaultHeaders["Accept-Encodings"]; found && accept == nil {
-		a.defaultHeaders["Accept-Encodings"] = a.codings.Acceptable()
+		a.defaultHeaders["Accept-Encodings"] = a.decoders.Acceptable()
 	}
 
 	if onStart, ok := r.(router.OnStarter); ok {
@@ -134,12 +141,12 @@ func (a Application) Serve(r router.Router, optionalSettings ...settings.Setting
 // and only then he'll be able to receive a shutdown notify. Moreover,
 // tcp server will wait until all the existing connections will be
 // closed
-func (a Application) Shutdown() {
+func (a *Application) Shutdown() {
 	a.shutdown <- struct{}{}
 }
 
 // Wait waits for tcp server to shut down
-func (a Application) Wait() {
+func (a *Application) Wait() {
 	<-a.shutdown
 }
 
