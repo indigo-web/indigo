@@ -209,7 +209,7 @@ func (e *engine) crlf() {
 
 func (e *engine) clear() {
 	e.buff = e.buff[:0]
-	e.defaultHeadersReserve.Copy(e.defaultHeaders[:0])
+	e.defaultHeadersReserve.Copy(e.defaultHeaders)
 }
 
 func isKeepAlive(protocol proto.Proto, req *http.Request) bool {

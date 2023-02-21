@@ -8,7 +8,7 @@ func (d DefaultHeaders) EraseEntry(key string) {
 		return
 	}
 
-	for i := 0; i <= len(d)/2; i += 2 {
+	for i := 0; i < len(d); i += 2 {
 		if d[i] == key {
 			d[i] = ""
 		}
