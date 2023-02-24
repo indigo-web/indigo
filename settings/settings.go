@@ -11,8 +11,9 @@ type (
 	HeadersNumber struct {
 		Default, Maximal int
 	}
-	MaxHeaderKeyLength = int
-	HeadersValuesSpace struct {
+	MaxHeaderKeyLength   = int
+	MaxHeaderValueLength = int
+	HeadersValuesSpace   struct {
 		Default, Maximal int
 	}
 	HeadersValuesObjectPoolSize = int
@@ -53,8 +54,10 @@ type (
 		// Default value is an initial size of allocated headers map.
 		// Maximal value is maximum number of headers allowed to be presented
 		Number HeadersNumber
-		// MaxKeyLength is responsible for maximal header key length.
+		// MaxKeyLength is responsible for maximal header key length restriction.
 		MaxKeyLength MaxHeaderKeyLength
+		// MaxValueLength is responsible for maximal header value length restriction.
+		MaxValueLength MaxHeaderValueLength
 		// HeadersValuesSpace is responsible for a maximal space in bytes available for
 		// keeping header values in memory.
 		// Default value is initial space allocated when client connects.
@@ -116,7 +119,8 @@ func Default() Settings {
 				Default: 10,
 				Maximal: 100,
 			},
-			MaxKeyLength: 100,
+			MaxKeyLength:   100,  // 100 bytes
+			MaxValueLength: 8192, // 8 kilobytes (just like nginx)
 			ValueSpace: HeadersValuesSpace{
 				// for simple requests without many header values this will be enough, I hope
 				Default: 1024,
@@ -156,6 +160,8 @@ func Fill(original Settings) (modified Settings) {
 		original.Headers.Number.Maximal, defaultSettings.Headers.Number.Maximal)
 	original.Headers.MaxKeyLength = customOrDefault(
 		original.Headers.MaxKeyLength, defaultSettings.Headers.MaxKeyLength)
+	original.Headers.MaxValueLength = customOrDefault(
+		original.Headers.MaxValueLength, defaultSettings.Headers.MaxValueLength)
 	original.Headers.ValueSpace.Default = customOrDefault(
 		original.Headers.ValueSpace.Default, defaultSettings.Headers.ValueSpace.Default)
 	original.Headers.ValueSpace.Maximal = customOrDefault(
