@@ -46,7 +46,8 @@ var (
 	simplePOST = []byte("POST / HTTP/1.1\r\nContent-Length: 13\r\n\r\nHello, world!")
 )
 
-// to simulate real-world default headers, copy-pasted from indi.go
+// Using default headers pasted from indi.go. Not using original ones as
+// this leads to cycle import (why cannot compiler handle such situations?)
 var defaultHeaders = map[string][]string{
 	"Content-Type": {"text/html"},
 	// nil here means that value will be set later, when server will be initializing

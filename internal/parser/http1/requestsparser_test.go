@@ -1,6 +1,9 @@
 package http1
 
 import (
+	"fmt"
+	"github.com/dchest/uniuri"
+	"strings"
 	"testing"
 
 	"github.com/indigo-web/indigo/internal/server/tcp/dummy"
@@ -448,4 +451,33 @@ func TestHttpRequestsParser_Parse_Negative(t *testing.T) {
 		require.EqualError(t, err, status.ErrBadRequest.Error())
 		require.Equal(t, httpparser.Error, state)
 	})
+
+	t.Run("TooLongHeaderValue", func(t *testing.T) {
+		parser, _ := getParser()
+		raw := fmt.Sprintf(
+			"GET / HTTP/1.1\r\nSome-Header: %s\r\n\r\n",
+			strings.Repeat("a", settings2.Default().Headers.MaxValueLength+1),
+		)
+		_, _, err := parser.Parse([]byte(raw))
+		require.EqualError(t, err, status.ErrHeaderFieldsTooLarge.Error())
+	})
+
+	t.Run("TooManyHeaders", func(t *testing.T) {
+		parser, _ := getParser()
+		hdrs := genHeaders(settings2.Default().Headers.Number.Maximal + 1)
+		raw := fmt.Sprintf(
+			"GET / HTTP/1.1\r\n%s\r\n\r\n",
+			strings.Join(hdrs, "\r\n"),
+		)
+		_, _, err := parser.Parse([]byte(raw))
+		require.EqualError(t, err, status.ErrTooManyHeaders.Error())
+	})
+}
+
+func genHeaders(n int) (out []string) {
+	for i := 0; i < n; i++ {
+		out = append(out, fmt.Sprintf("%s: some value", uniuri.New()))
+	}
+
+	return out
 }
