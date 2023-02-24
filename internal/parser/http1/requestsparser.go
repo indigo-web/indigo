@@ -43,6 +43,7 @@ type httpRequestsParser struct {
 	headerKey            string
 	headerKeyAllocator   alloc.Allocator
 	headerValueAllocator alloc.Allocator
+	headerValueSize      int
 	headersValuesPool    pool.ObjectPool[[]string]
 }
 
@@ -569,11 +570,11 @@ headerKey:
 	for i := range data {
 		switch data[i] {
 		case ':':
+			p.headersNumber++
+
 			if p.headersNumber > p.headersSettings.Number.Maximal {
 				return parser.Error, nil, status.ErrTooManyHeaders
 			}
-
-			p.headersNumber++
 
 			if !p.headerKeyAllocator.Append(data[:i]) {
 				return parser.Error, nil, status.ErrHeaderFieldsTooLarge
@@ -688,24 +689,40 @@ contentLengthCRLFCR:
 
 headerValue:
 	for i := range data {
-		switch char := data[i]; char {
+		switch data[i] {
 		case '\r':
+			if len(data[:i])+p.headerValueSize > p.headersSettings.MaxValueLength {
+				return parser.Error, nil, status.ErrHeaderFieldsTooLarge
+			}
+
 			if !p.headerValueAllocator.Append(data[:i]) {
 				return parser.Error, nil, status.ErrHeaderFieldsTooLarge
 			}
 
+			p.headerValueSize = 0
 			data = data[i+1:]
 			p.state = eHeaderValueCR
 			goto headerValueCR
 		case '\n':
+			if len(data[:i])+p.headerValueSize > p.headersSettings.MaxValueLength {
+				return parser.Error, nil, status.ErrHeaderFieldsTooLarge
+			}
+
 			if !p.headerValueAllocator.Append(data[:i]) {
 				return parser.Error, nil, status.ErrHeaderFieldsTooLarge
 			}
 
+			p.headerValueSize = 0
 			data = data[i+1:]
 			p.state = eHeaderValueCRLF
 			goto headerValueCRLF
 		}
+	}
+
+	p.headerValueSize += len(data)
+
+	if p.headerValueSize >= p.headersSettings.MaxValueLength {
+		return parser.Error, nil, status.ErrHeaderFieldsTooLarge
 	}
 
 	if !p.headerValueAllocator.Append(data) {
