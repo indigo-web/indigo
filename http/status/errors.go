@@ -19,8 +19,9 @@ var (
 	ErrConnectionTimeout = errors.New("connection timed out")
 	ErrCloseConnection   = errors.New("internal error as a signal")
 
-	ErrNotFound         = errors.New("not found")
-	ErrMethodNotAllowed = errors.New("method is not allowed")
+	ErrNotFound            = errors.New("not found")
+	ErrMethodNotAllowed    = errors.New("method is not allowed")
+	ErrInternalServerError = errors.New("internal server error")
 
 	ErrShutdown = errors.New("graceful shutdown")
 )
