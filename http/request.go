@@ -2,6 +2,7 @@ package http
 
 import (
 	"context"
+	"github.com/indigo-web/indigo/internal/unreader"
 	"io"
 	"net"
 
@@ -191,18 +192,26 @@ func RespondTo(request *Request) Response {
 
 // bodyIOReader is an implementation of io.Reader for request body
 type bodyIOReader struct {
-	reader BodyReader
+	unreader *unreader.Unreader
+	reader   BodyReader
 }
 
 func newBodyIOReader(reader BodyReader) bodyIOReader {
 	return bodyIOReader{
-		reader: reader,
+		unreader: new(unreader.Unreader),
+		reader:   reader,
 	}
 }
 
 func (b bodyIOReader) Read(buff []byte) (n int, err error) {
-	data, err := b.reader.Read()
+	data, err := b.unreader.PendingOr(b.reader.Read)
 	copy(buff, data)
+	n = len(data)
 
-	return len(data), err
+	if len(buff) < len(data) {
+		b.unreader.Unread(data[len(buff):])
+		n = len(buff)
+	}
+
+	return n, err
 }

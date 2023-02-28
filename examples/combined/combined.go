@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"github.com/indigo-web/indigo/router/inbuilt/middleware"
 	"log"
 	"strconv"
 
@@ -59,8 +60,20 @@ func Easter(request *http.Request) http.Response {
 	return http.RespondTo(request).WithBody("Pretty ordinary page, isn't it?")
 }
 
+func Stressful(request *http.Request) http.Response {
+	resp := http.RespondTo(request).
+		WithHeader("Should", "never be seen").
+		WithBody("Hello, world!")
+
+	panic("TOO MUCH STRESS")
+
+	return resp
+}
+
 func main() {
 	r := inbuilt.NewRouter()
+
+	r.Get("/stress", Stressful, middleware.Recover)
 
 	root := r.Resource("/")
 	root.Get(Index)
