@@ -1,6 +1,8 @@
 package dummy
 
 import (
+	"github.com/indigo-web/indigo/internal/unreader"
+	"io"
 	"net"
 
 	"github.com/indigo-web/indigo/internal/server/tcp"
@@ -9,37 +11,38 @@ import (
 // circularClient is a client that on every read-operation returns the same data as it
 // was initialised with. This is used mainly for benchmarking
 type circularClient struct {
+	unreader *unreader.Unreader
 	data     [][]byte
 	pointer  int
-	takeback []byte
+	closed   bool
 }
 
 func NewCircularClient(data ...[]byte) tcp.Client {
 	return &circularClient{
-		data:    data,
-		pointer: -1,
+		unreader: new(unreader.Unreader),
+		data:     data,
+		pointer:  -1,
 	}
 }
 
-func (s *circularClient) Read() ([]byte, error) {
-	if len(s.takeback) > 0 {
-		takeback := s.takeback
-		s.takeback = nil
-
-		return takeback, nil
+func (c *circularClient) Read() ([]byte, error) {
+	if c.closed {
+		return nil, io.EOF
 	}
 
-	s.pointer++
+	return c.unreader.PendingOr(func() ([]byte, error) {
+		c.pointer++
 
-	if s.pointer == len(s.data) {
-		s.pointer = 0
-	}
+		if c.pointer == len(c.data) {
+			c.pointer = 0
+		}
 
-	return s.data[s.pointer], nil
+		return c.data[c.pointer], nil
+	})
 }
 
-func (s *circularClient) Unread(takeback []byte) {
-	s.takeback = takeback
+func (c *circularClient) Unread(takeback []byte) {
+	c.unreader.Unread(takeback)
 }
 
 func (*circularClient) Write([]byte) error {
@@ -50,6 +53,7 @@ func (*circularClient) Remote() net.Addr {
 	return nil
 }
 
-func (*circularClient) Close() error {
+func (c *circularClient) Close() error {
+	c.closed = true
 	return nil
 }
