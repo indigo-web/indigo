@@ -215,3 +215,19 @@ func (b bodyIOReader) Read(buff []byte) (n int, err error) {
 
 	return n, err
 }
+
+func (b bodyIOReader) WriteTo(w io.Writer) (n int64, err error) {
+	for {
+		data, err := b.reader.Read()
+		switch err {
+		case nil:
+		case io.EOF:
+			return n, nil
+		default:
+			return 0, err
+		}
+
+		n1, err := w.Write(data)
+		n += int64(n1)
+	}
+}
