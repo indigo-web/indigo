@@ -1,6 +1,7 @@
 package tcp
 
 import (
+	"github.com/indigo-web/indigo/internal/unreader"
 	"net"
 	"time"
 )
@@ -14,50 +15,47 @@ type Client interface {
 }
 
 type client struct {
-	buff, takeback []byte
-	conn           net.Conn
-	timeout        time.Duration
+	unreader *unreader.Unreader
+	buff     []byte
+	conn     net.Conn
+	timeout  time.Duration
 }
 
 func NewClient(conn net.Conn, timeout time.Duration, buff []byte) Client {
 	return &client{
-		buff:    buff,
-		conn:    conn,
-		timeout: timeout,
+		unreader: new(unreader.Unreader),
+		buff:     buff,
+		conn:     conn,
+		timeout:  timeout,
 	}
 }
 
 func (c *client) Read() ([]byte, error) {
-	if len(c.takeback) > 0 {
-		data := c.takeback
-		c.takeback = nil
+	return c.unreader.PendingOr(func() ([]byte, error) {
+		if err := c.conn.SetReadDeadline(time.Now().Add(c.timeout)); err != nil {
+			return nil, err
+		}
 
-		return data, nil
-	}
+		n, err := c.conn.Read(c.buff)
 
-	if err := c.conn.SetReadDeadline(time.Now().Add(c.timeout)); err != nil {
-		return nil, err
-	}
-
-	n, err := c.conn.Read(c.buff)
-
-	return c.buff[:n], err
+		return c.buff[:n], err
+	})
 }
 
 func (c *client) Unread(b []byte) {
-	c.takeback = b
+	c.unreader.Unread(b)
 }
 
-func (c client) Write(b []byte) error {
+func (c *client) Write(b []byte) error {
 	_, err := c.conn.Write(b)
 
 	return err
 }
 
-func (c client) Remote() net.Addr {
+func (c *client) Remote() net.Addr {
 	return c.conn.RemoteAddr()
 }
 
-func (c client) Close() error {
+func (c *client) Close() error {
 	return c.conn.Close()
 }

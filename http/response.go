@@ -76,6 +76,15 @@ func (r Response) WithHeaders(headers map[string][]string) Response {
 	return resp
 }
 
+// DiscardHeaders returns response object with no any headers set.
+//
+// Warning: this action is not pure. Appending new headers will cause overriding
+// old ones
+func (r Response) DiscardHeaders() Response {
+	r.headers = r.headers[:0]
+	return r
+}
+
 // WithBody sets a string as a response body. This will override already-existing
 // body if it was set
 func (r Response) WithBody(body string) Response {
@@ -92,9 +101,10 @@ func (r Response) WithBodyByte(body []byte) Response {
 // directly into the response body.
 // Note: this method causes an allocation
 // TODO: This is not the best design solution. I would like to make this method just like
-//       all others, so returning only Response object itself. The problem is that it is
-//       impossible because io.Writer is a procedure-style thing that does not work with
-//       our builder that pretends to be clear. Hope in future this issue will be solved
+//
+//	all others, so returning only Response object itself. The problem is that it is
+//	impossible because io.Writer is a procedure-style thing that does not work with
+//	our builder that pretends to be clear. Hope in future this issue will be solved
 func (r Response) WithWriter(cb func(io.Writer) error) (Response, error) {
 	writer := newBodyIOWriter(r)
 	err := cb(writer)
