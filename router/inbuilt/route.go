@@ -1,8 +1,8 @@
 package inbuilt
 
 import (
-	methods "github.com/indigo-web/indigo/http/method"
-	"github.com/indigo-web/indigo/router/inbuilt/types"
+	methods "github.com/indigo-web/indigo/v2/http/method"
+	"github.com/indigo-web/indigo/v2/router/inbuilt/types"
 )
 
 /*

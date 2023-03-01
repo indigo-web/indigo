@@ -6,19 +6,19 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/indigo-web/indigo/internal/server/tcp/dummy"
+	"github.com/indigo-web/indigo/v2/internal/server/tcp/dummy"
 
-	"github.com/indigo-web/indigo/http/status"
-	"github.com/indigo-web/indigo/internal/pool"
+	"github.com/indigo-web/indigo/v2/http/status"
+	"github.com/indigo-web/indigo/v2/internal/pool"
 
-	"github.com/indigo-web/indigo/http"
-	"github.com/indigo-web/indigo/http/headers"
-	methods "github.com/indigo-web/indigo/http/method"
-	"github.com/indigo-web/indigo/http/proto"
-	"github.com/indigo-web/indigo/http/query"
-	"github.com/indigo-web/indigo/internal/alloc"
-	httpparser "github.com/indigo-web/indigo/internal/parser"
-	settings2 "github.com/indigo-web/indigo/settings"
+	"github.com/indigo-web/indigo/v2/http"
+	"github.com/indigo-web/indigo/v2/http/headers"
+	methods "github.com/indigo-web/indigo/v2/http/method"
+	"github.com/indigo-web/indigo/v2/http/proto"
+	"github.com/indigo-web/indigo/v2/http/query"
+	"github.com/indigo-web/indigo/v2/internal/alloc"
+	httpparser "github.com/indigo-web/indigo/v2/internal/parser"
+	settings2 "github.com/indigo-web/indigo/v2/settings"
 	"github.com/stretchr/testify/require"
 )
 

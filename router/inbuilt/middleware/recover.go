@@ -1,9 +1,9 @@
 package middleware
 
 import (
-	"github.com/indigo-web/indigo/http"
-	"github.com/indigo-web/indigo/http/status"
-	"github.com/indigo-web/indigo/router/inbuilt/types"
+	"github.com/indigo-web/indigo/v2/http"
+	"github.com/indigo-web/indigo/v2/http/status"
+	"github.com/indigo-web/indigo/v2/router/inbuilt/types"
 )
 
 // Recover is a basic middleware that catches any panics, and returns 500 Internal Server Error

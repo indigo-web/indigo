@@ -3,15 +3,15 @@ package obtainer
 import (
 	"strings"
 
-	"github.com/indigo-web/indigo/http/status"
+	"github.com/indigo-web/indigo/v2/http/status"
 
-	"github.com/indigo-web/indigo/http"
-	methods "github.com/indigo-web/indigo/http/method"
-	"github.com/indigo-web/indigo/internal/functools"
-	"github.com/indigo-web/indigo/internal/mapconv"
-	"github.com/indigo-web/indigo/router/inbuilt/radix"
-	routertypes "github.com/indigo-web/indigo/router/inbuilt/types"
-	"github.com/indigo-web/indigo/valuectx"
+	"github.com/indigo-web/indigo/v2/http"
+	methods "github.com/indigo-web/indigo/v2/http/method"
+	"github.com/indigo-web/indigo/v2/internal/functools"
+	"github.com/indigo-web/indigo/v2/internal/mapconv"
+	"github.com/indigo-web/indigo/v2/router/inbuilt/radix"
+	routertypes "github.com/indigo-web/indigo/v2/router/inbuilt/types"
+	"github.com/indigo-web/indigo/v2/valuectx"
 )
 
 func DynamicObtainer(routes routertypes.RoutesMap) Obtainer {

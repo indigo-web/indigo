@@ -3,7 +3,7 @@ package query
 import (
 	"errors"
 
-	"github.com/indigo-web/indigo/internal/queryparser"
+	"github.com/indigo-web/indigo/v2/internal/queryparser"
 )
 
 var ErrNoSuchKey = errors.New("desired key does not exists")

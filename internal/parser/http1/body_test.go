@@ -5,13 +5,13 @@ import (
 	"strconv"
 	"testing"
 
-	"github.com/indigo-web/indigo/internal/server/tcp/dummy"
+	"github.com/indigo-web/indigo/v2/internal/server/tcp/dummy"
 
-	"github.com/indigo-web/indigo/http"
-	"github.com/indigo-web/indigo/http/headers"
-	"github.com/indigo-web/indigo/http/query"
-	"github.com/indigo-web/indigo/internal/functools"
-	"github.com/indigo-web/indigo/settings"
+	"github.com/indigo-web/indigo/v2/http"
+	"github.com/indigo-web/indigo/v2/http/headers"
+	"github.com/indigo-web/indigo/v2/http/query"
+	"github.com/indigo-web/indigo/v2/internal/functools"
+	"github.com/indigo-web/indigo/v2/settings"
 	"github.com/stretchr/testify/require"
 )
 

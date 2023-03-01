@@ -1,8 +1,8 @@
 package inbuilt
 
 import (
-	"github.com/indigo-web/indigo/router/inbuilt/obtainer"
-	routertypes "github.com/indigo-web/indigo/router/inbuilt/types"
+	"github.com/indigo-web/indigo/v2/router/inbuilt/obtainer"
+	routertypes "github.com/indigo-web/indigo/v2/router/inbuilt/types"
 )
 
 // Router is a built-in implementation of router.Router interface that provides
