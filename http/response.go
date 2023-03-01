@@ -3,8 +3,8 @@ package http
 import (
 	"io"
 
-	"github.com/indigo-web/indigo/http/status"
-	"github.com/indigo-web/indigo/internal"
+	"github.com/indigo-web/indigo/v2/http/status"
+	"github.com/indigo-web/indigo/v2/internal"
 )
 
 type (

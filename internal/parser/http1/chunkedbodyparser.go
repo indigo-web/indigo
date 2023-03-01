@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"io"
 
-	"github.com/indigo-web/indigo/http/status"
-	"github.com/indigo-web/indigo/settings"
+	"github.com/indigo-web/indigo/v2/http/status"
+	"github.com/indigo-web/indigo/v2/settings"
 )
 
 // chunkedBodyParser is a parser for chunked encoded request bodies

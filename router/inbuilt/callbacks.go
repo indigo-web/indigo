@@ -1,12 +1,12 @@
 package inbuilt
 
 import (
-	"github.com/indigo-web/indigo/http/status"
+	"github.com/indigo-web/indigo/v2/http/status"
 
-	"github.com/indigo-web/indigo/http"
-	methods "github.com/indigo-web/indigo/http/method"
-	"github.com/indigo-web/indigo/router/inbuilt/obtainer"
-	"github.com/indigo-web/indigo/valuectx"
+	"github.com/indigo-web/indigo/v2/http"
+	methods "github.com/indigo-web/indigo/v2/http/method"
+	"github.com/indigo-web/indigo/v2/router/inbuilt/obtainer"
+	"github.com/indigo-web/indigo/v2/valuectx"
 )
 
 /*

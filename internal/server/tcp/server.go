@@ -4,7 +4,7 @@ import (
 	"net"
 	"sync"
 
-	"github.com/indigo-web/indigo/http/status"
+	"github.com/indigo-web/indigo/v2/http/status"
 )
 
 type onConnection func(net.Conn)

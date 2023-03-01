@@ -1,7 +1,7 @@
 package inbuilt
 
 import (
-	"github.com/indigo-web/indigo/router/inbuilt/types"
+	"github.com/indigo-web/indigo/v2/router/inbuilt/types"
 )
 
 /*

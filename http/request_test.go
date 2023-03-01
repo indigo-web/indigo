@@ -1,8 +1,8 @@
 package http
 
 import (
-	"github.com/indigo-web/indigo/internal/server/tcp"
-	"github.com/indigo-web/indigo/internal/server/tcp/dummy"
+	"github.com/indigo-web/indigo/v2/internal/server/tcp"
+	"github.com/indigo-web/indigo/v2/internal/server/tcp/dummy"
 	"github.com/stretchr/testify/require"
 	"io"
 	"testing"

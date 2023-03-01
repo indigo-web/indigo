@@ -13,16 +13,16 @@ import (
 	"testing"
 	"time"
 
-	"github.com/indigo-web/indigo/http/status"
+	"github.com/indigo-web/indigo/v2/http/status"
 
-	"github.com/indigo-web/indigo/settings"
+	"github.com/indigo-web/indigo/v2/settings"
 
-	"github.com/indigo-web/indigo/http"
+	"github.com/indigo-web/indigo/v2/http"
 
-	methods "github.com/indigo-web/indigo/http/method"
-	"github.com/indigo-web/indigo/http/proto"
-	"github.com/indigo-web/indigo/router"
-	"github.com/indigo-web/indigo/router/inbuilt"
+	methods "github.com/indigo-web/indigo/v2/http/method"
+	"github.com/indigo-web/indigo/v2/http/proto"
+	"github.com/indigo-web/indigo/v2/router"
+	"github.com/indigo-web/indigo/v2/router/inbuilt"
 	"github.com/stretchr/testify/require"
 )
 

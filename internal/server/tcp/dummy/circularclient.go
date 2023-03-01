@@ -1,11 +1,11 @@
 package dummy
 
 import (
-	"github.com/indigo-web/indigo/internal/unreader"
+	"github.com/indigo-web/indigo/v2/internal/unreader"
 	"io"
 	"net"
 
-	"github.com/indigo-web/indigo/internal/server/tcp"
+	"github.com/indigo-web/indigo/v2/internal/server/tcp"
 )
 
 // circularClient is a client that on every read-operation returns the same data as it
