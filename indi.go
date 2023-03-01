@@ -4,20 +4,20 @@ import (
 	"errors"
 	"net"
 
-	"github.com/indigo-web/indigo/http"
-	"github.com/indigo-web/indigo/internal/mapconv"
-	"github.com/indigo-web/indigo/internal/pool"
-	httpserver "github.com/indigo-web/indigo/internal/server/http"
-	"github.com/indigo-web/indigo/internal/server/tcp"
+	"github.com/indigo-web/indigo/v2/http"
+	"github.com/indigo-web/indigo/v2/internal/mapconv"
+	"github.com/indigo-web/indigo/v2/internal/pool"
+	httpserver "github.com/indigo-web/indigo/v2/internal/server/http"
+	"github.com/indigo-web/indigo/v2/internal/server/tcp"
 
-	"github.com/indigo-web/indigo/http/encodings"
-	"github.com/indigo-web/indigo/http/headers"
-	"github.com/indigo-web/indigo/http/query"
-	"github.com/indigo-web/indigo/internal/alloc"
-	"github.com/indigo-web/indigo/internal/parser/http1"
-	"github.com/indigo-web/indigo/internal/render"
-	"github.com/indigo-web/indigo/router"
-	"github.com/indigo-web/indigo/settings"
+	"github.com/indigo-web/indigo/v2/http/encodings"
+	"github.com/indigo-web/indigo/v2/http/headers"
+	"github.com/indigo-web/indigo/v2/http/query"
+	"github.com/indigo-web/indigo/v2/internal/alloc"
+	"github.com/indigo-web/indigo/v2/internal/parser/http1"
+	"github.com/indigo-web/indigo/v2/internal/render"
+	"github.com/indigo-web/indigo/v2/router"
+	"github.com/indigo-web/indigo/v2/settings"
 )
 
 const (

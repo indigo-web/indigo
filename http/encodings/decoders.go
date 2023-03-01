@@ -1,7 +1,7 @@
 package encodings
 
 import (
-	"github.com/indigo-web/indigo/internal/mapconv"
+	"github.com/indigo-web/indigo/v2/internal/mapconv"
 )
 
 type (

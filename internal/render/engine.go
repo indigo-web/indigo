@@ -2,19 +2,19 @@ package render
 
 import (
 	"errors"
-	"github.com/indigo-web/indigo/http/status"
-	"github.com/indigo-web/indigo/internal/functools"
-	"github.com/indigo-web/indigo/internal/render/types"
+	"github.com/indigo-web/indigo/v2/http/status"
+	"github.com/indigo-web/indigo/v2/internal/functools"
+	"github.com/indigo-web/indigo/v2/internal/render/types"
 	"io"
 	"math"
 	"os"
 	"strconv"
 	"strings"
 
-	"github.com/indigo-web/indigo/http"
-	methods "github.com/indigo-web/indigo/http/method"
-	"github.com/indigo-web/indigo/http/proto"
-	"github.com/indigo-web/indigo/internal/httpchars"
+	"github.com/indigo-web/indigo/v2/http"
+	methods "github.com/indigo-web/indigo/v2/http/method"
+	"github.com/indigo-web/indigo/v2/http/proto"
+	"github.com/indigo-web/indigo/v2/internal/httpchars"
 )
 
 var (

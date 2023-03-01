@@ -52,7 +52,7 @@ func (c valueCtx[K, V]) Value(key any) any {
 
 func (c valueCtx[K, V]) String() string {
 	return fmt.Sprintf(
-		"github.com/indigo-web/indigo/valuectx/patched.go:valueCtx{key: %s, value: %s}",
+		"github.com/indigo-web/indigo/v2/valuectx/patched.go:valueCtx{key: %s, value: %s}",
 		fmt.Sprint(c.key), fmt.Sprint(c.val),
 	)
 }
