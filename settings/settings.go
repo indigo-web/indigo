@@ -4,7 +4,7 @@ import (
 	"math"
 	"time"
 
-	"github.com/indigo-web/indigo/v2/internal/constraints"
+	"github.com/indigo-web/indigo/internal/constraints"
 )
 
 type (

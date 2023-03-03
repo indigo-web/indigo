@@ -1,17 +1,17 @@
 package render
 
 import (
-	"github.com/indigo-web/indigo/v2/http/status"
+	"github.com/indigo-web/indigo/http/status"
 	"testing"
 
-	"github.com/indigo-web/indigo/v2/internal/server/tcp/dummy"
+	"github.com/indigo-web/indigo/internal/server/tcp/dummy"
 
-	"github.com/indigo-web/indigo/v2/http"
-	"github.com/indigo-web/indigo/v2/internal/parser/http1"
-	"github.com/indigo-web/indigo/v2/settings"
+	"github.com/indigo-web/indigo/http"
+	"github.com/indigo-web/indigo/internal/parser/http1"
+	"github.com/indigo-web/indigo/settings"
 
-	"github.com/indigo-web/indigo/v2/http/headers"
-	"github.com/indigo-web/indigo/v2/http/query"
+	"github.com/indigo-web/indigo/http/headers"
+	"github.com/indigo-web/indigo/http/query"
 )
 
 func nopWriter(_ []byte) error {

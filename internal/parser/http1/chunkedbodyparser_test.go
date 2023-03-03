@@ -4,8 +4,8 @@ import (
 	"io"
 	"testing"
 
-	"github.com/indigo-web/indigo/v2/http/status"
-	"github.com/indigo-web/indigo/v2/settings"
+	"github.com/indigo-web/indigo/http/status"
+	"github.com/indigo-web/indigo/settings"
 	"github.com/stretchr/testify/require"
 )
 

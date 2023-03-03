@@ -1,10 +1,10 @@
 package inbuilt
 
 import (
-	"github.com/indigo-web/indigo/v2/http/status"
-	routertypes "github.com/indigo-web/indigo/v2/router/inbuilt/types"
+	"github.com/indigo-web/indigo/http/status"
+	routertypes "github.com/indigo-web/indigo/router/inbuilt/types"
 
-	"github.com/indigo-web/indigo/v2/http"
+	"github.com/indigo-web/indigo/http"
 )
 
 /*

@@ -1,7 +1,7 @@
 package queryparser
 
 import (
-	"github.com/indigo-web/indigo/v2/http/status"
+	"github.com/indigo-web/indigo/http/status"
 	"testing"
 
 	"github.com/stretchr/testify/require"

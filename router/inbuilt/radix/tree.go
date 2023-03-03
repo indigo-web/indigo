@@ -4,8 +4,8 @@ import (
 	"context"
 	"errors"
 
-	"github.com/indigo-web/indigo/v2/router/inbuilt/types"
-	"github.com/indigo-web/indigo/v2/valuectx"
+	"github.com/indigo-web/indigo/router/inbuilt/types"
+	"github.com/indigo-web/indigo/valuectx"
 )
 
 var ErrNotImplemented = errors.New(

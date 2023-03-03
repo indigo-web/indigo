@@ -1,4 +1,4 @@
-module github.com/indigo-web/indigo/v2
+module github.com/indigo-web/indigo
 
 go 1.18
 

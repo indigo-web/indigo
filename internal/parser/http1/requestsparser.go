@@ -4,16 +4,16 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/indigo-web/indigo/v2/http"
-	"github.com/indigo-web/indigo/v2/http/headers"
-	methods "github.com/indigo-web/indigo/v2/http/method"
-	"github.com/indigo-web/indigo/v2/http/proto"
-	"github.com/indigo-web/indigo/v2/http/status"
-	"github.com/indigo-web/indigo/v2/internal"
-	"github.com/indigo-web/indigo/v2/internal/alloc"
-	"github.com/indigo-web/indigo/v2/internal/parser"
-	"github.com/indigo-web/indigo/v2/internal/pool"
-	"github.com/indigo-web/indigo/v2/settings"
+	"github.com/indigo-web/indigo/http"
+	"github.com/indigo-web/indigo/http/headers"
+	methods "github.com/indigo-web/indigo/http/method"
+	"github.com/indigo-web/indigo/http/proto"
+	"github.com/indigo-web/indigo/http/status"
+	"github.com/indigo-web/indigo/internal"
+	"github.com/indigo-web/indigo/internal/alloc"
+	"github.com/indigo-web/indigo/internal/parser"
+	"github.com/indigo-web/indigo/internal/pool"
+	"github.com/indigo-web/indigo/settings"
 )
 
 const maxMethodLength = len("CONNECT")
