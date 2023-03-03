@@ -1,7 +1,7 @@
 package simple
 
 import (
-	"github.com/indigo-web/indigo/v2/http"
+	"github.com/indigo-web/indigo/http"
 )
 
 type (

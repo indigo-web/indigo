@@ -1,7 +1,7 @@
 package tcp
 
 import (
-	"github.com/indigo-web/indigo/v2/internal/unreader"
+	"github.com/indigo-web/indigo/internal/unreader"
 	"net"
 	"time"
 )

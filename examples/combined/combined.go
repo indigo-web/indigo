@@ -2,15 +2,15 @@ package main
 
 import (
 	"fmt"
-	"github.com/indigo-web/indigo/v2/router/inbuilt/middleware"
+	"github.com/indigo-web/indigo/router/inbuilt/middleware"
 	"log"
 	"strconv"
 
-	"github.com/indigo-web/indigo/v2/http"
+	"github.com/indigo-web/indigo/http"
 
-	"github.com/indigo-web/indigo/v2"
-	"github.com/indigo-web/indigo/v2/http/status"
-	"github.com/indigo-web/indigo/v2/router/inbuilt"
+	"github.com/indigo-web/indigo"
+	"github.com/indigo-web/indigo/http/status"
+	"github.com/indigo-web/indigo/router/inbuilt"
 )
 
 var (

@@ -3,13 +3,13 @@ package inbuilt
 import (
 	"testing"
 
-	"github.com/indigo-web/indigo/v2/http"
+	"github.com/indigo-web/indigo/http"
 
-	routertypes "github.com/indigo-web/indigo/v2/router/inbuilt/types"
+	routertypes "github.com/indigo-web/indigo/router/inbuilt/types"
 
-	"github.com/indigo-web/indigo/v2/http/status"
+	"github.com/indigo-web/indigo/http/status"
 
-	methods "github.com/indigo-web/indigo/v2/http/method"
+	methods "github.com/indigo-web/indigo/http/method"
 	"github.com/stretchr/testify/require"
 )
 

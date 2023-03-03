@@ -3,7 +3,7 @@ package proto
 import (
 	"strings"
 
-	"github.com/indigo-web/indigo/v2/internal/split"
+	"github.com/indigo-web/indigo/internal/split"
 )
 
 func ChooseUpgrade(line string) Proto {

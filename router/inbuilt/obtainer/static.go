@@ -1,15 +1,15 @@
 package obtainer
 
 import (
+	methods "github.com/indigo-web/indigo/http/method"
 	"strings"
 
-	"github.com/indigo-web/indigo/v2/http"
-	"github.com/indigo-web/indigo/v2/http/method"
-	"github.com/indigo-web/indigo/v2/http/status"
-	"github.com/indigo-web/indigo/v2/internal/functools"
-	"github.com/indigo-web/indigo/v2/internal/mapconv"
-	"github.com/indigo-web/indigo/v2/router/inbuilt/types"
-	"github.com/indigo-web/indigo/v2/valuectx"
+	"github.com/indigo-web/indigo/http"
+	"github.com/indigo-web/indigo/http/status"
+	"github.com/indigo-web/indigo/internal/functools"
+	"github.com/indigo-web/indigo/internal/mapconv"
+	"github.com/indigo-web/indigo/router/inbuilt/types"
+	"github.com/indigo-web/indigo/valuectx"
 )
 
 func StaticObtainer(routes types.RoutesMap) Obtainer {

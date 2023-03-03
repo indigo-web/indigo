@@ -4,17 +4,17 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/indigo-web/indigo/v2/internal/server/tcp/dummy"
+	"github.com/indigo-web/indigo/internal/server/tcp/dummy"
 
-	"github.com/indigo-web/indigo/v2/http/status"
-	"github.com/indigo-web/indigo/v2/internal/parser/http1"
-	"github.com/indigo-web/indigo/v2/settings"
+	"github.com/indigo-web/indigo/http/status"
+	"github.com/indigo-web/indigo/internal/parser/http1"
+	"github.com/indigo-web/indigo/settings"
 
-	"github.com/indigo-web/indigo/v2/http"
-	"github.com/indigo-web/indigo/v2/http/headers"
-	methods "github.com/indigo-web/indigo/v2/http/method"
-	"github.com/indigo-web/indigo/v2/http/query"
-	routertypes "github.com/indigo-web/indigo/v2/router/inbuilt/types"
+	"github.com/indigo-web/indigo/http"
+	"github.com/indigo-web/indigo/http/headers"
+	methods "github.com/indigo-web/indigo/http/method"
+	"github.com/indigo-web/indigo/http/query"
+	routertypes "github.com/indigo-web/indigo/router/inbuilt/types"
 	"github.com/stretchr/testify/require"
 )
 

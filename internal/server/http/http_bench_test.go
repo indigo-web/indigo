@@ -1,19 +1,19 @@
 package http
 
 import (
-	"github.com/indigo-web/indigo/v2/internal/server/tcp/dummy"
+	"github.com/indigo-web/indigo/internal/server/tcp/dummy"
 	"testing"
 
-	"github.com/indigo-web/indigo/v2/http"
-	"github.com/indigo-web/indigo/v2/internal/pool"
+	"github.com/indigo-web/indigo/http"
+	"github.com/indigo-web/indigo/internal/pool"
 
-	"github.com/indigo-web/indigo/v2/http/headers"
-	"github.com/indigo-web/indigo/v2/http/query"
-	"github.com/indigo-web/indigo/v2/internal/alloc"
-	"github.com/indigo-web/indigo/v2/internal/parser/http1"
-	render2 "github.com/indigo-web/indigo/v2/internal/render"
-	"github.com/indigo-web/indigo/v2/router/inbuilt"
-	"github.com/indigo-web/indigo/v2/settings"
+	"github.com/indigo-web/indigo/http/headers"
+	"github.com/indigo-web/indigo/http/query"
+	"github.com/indigo-web/indigo/internal/alloc"
+	"github.com/indigo-web/indigo/internal/parser/http1"
+	render2 "github.com/indigo-web/indigo/internal/render"
+	"github.com/indigo-web/indigo/router/inbuilt"
+	"github.com/indigo-web/indigo/settings"
 )
 
 var (

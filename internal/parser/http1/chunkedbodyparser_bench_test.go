@@ -4,7 +4,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/indigo-web/indigo/v2/settings"
+	"github.com/indigo-web/indigo/settings"
 )
 
 func BenchmarkChunkedBodyParser(b *testing.B) {
