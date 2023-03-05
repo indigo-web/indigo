@@ -391,8 +391,6 @@ proto:
 
 	switch data[0] {
 	case 'H', 'h':
-		p.begin = 0
-		p.pointer = 0
 		data = data[1:]
 		p.state = eH
 		goto protoH
@@ -823,6 +821,8 @@ func (p *httpRequestsParser) reset() {
 	p.protoMinor = 0
 	p.headersNumber = 0
 	p.chunkedTransferEncoding = false
+	p.begin = 0
+	p.pointer = 0
 	p.headerKeyAllocator.Clear()
 	p.headerValueAllocator.Clear()
 	p.trailer = false

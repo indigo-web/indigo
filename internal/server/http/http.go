@@ -4,16 +4,15 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
+	"github.com/indigo-web/indigo/http"
 	"github.com/indigo-web/indigo/http/proto"
 	"github.com/indigo-web/indigo/http/status"
 	"github.com/indigo-web/indigo/internal"
+	"github.com/indigo-web/indigo/internal/parser"
 	"github.com/indigo-web/indigo/internal/render"
 	"github.com/indigo-web/indigo/internal/server/tcp"
-	"os"
-
-	"github.com/indigo-web/indigo/http"
-	"github.com/indigo-web/indigo/internal/parser"
 	"github.com/indigo-web/indigo/router"
+	"os"
 )
 
 type Server interface {
