@@ -113,17 +113,16 @@ func getStaticRouter(t *testing.T) router.Router {
 	})
 
 	with.Get("file", func(request *http.Request) http.Response {
-		return http.RespondTo(request).WithFile(testFilename, func(err error) http.Response {
-			t.Fail() // this callback must never be called
-
-			return http.RespondTo(request)
-		})
+		resp, err := http.RespondTo(request).WithFile(testFilename)
+		require.NoError(t, err)
+		return resp
 	})
 
 	with.Get("file-notfound", func(request *http.Request) http.Response {
-		return http.RespondTo(request).WithFile(testFilename+"notfound", func(err error) http.Response {
-			return http.RespondTo(request).WithBody(testFileIfNotFound)
-		})
+		_, err := http.RespondTo(request).WithFile(testFilename + "non-existing")
+		require.Error(t, err)
+
+		return http.RespondTo(request).WithBody(testFileIfNotFound)
 	})
 
 	// request.OnBody() is not tested because request.Body() (wrapper for OnBody)

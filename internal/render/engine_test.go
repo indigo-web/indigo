@@ -14,12 +14,14 @@ import (
 	"github.com/indigo-web/indigo/settings"
 	"github.com/stretchr/testify/require"
 	"io"
+	"math"
 	stdhttp "net/http"
+	"strings"
 	"testing"
 )
 
-func getEngine(defaultHeaders map[string][]string) Engine {
-	return NewEngine(make([]byte, 0, 1024), nil, defaultHeaders)
+func getEngine(defaultHeaders map[string][]string) *engine {
+	return newEngine(make([]byte, 0, 1024), nil, defaultHeaders)
 }
 
 func newRequest() *http.Request {
@@ -47,7 +49,9 @@ func TestEngine_Write(t *testing.T) {
 		require.NoError(t, err)
 		resp, err := stdhttp.ReadResponse(bufio.NewReader(bytes.NewBuffer(data)), r)
 		require.Equal(t, 200, resp.StatusCode)
-		require.Equal(t, 1, len(resp.Header))
+		require.Equal(t, 2, len(resp.Header))
+		require.Contains(t, resp.Header, "Content-Length")
+		require.Contains(t, resp.Header, "Content-Type")
 		body, err := io.ReadAll(resp.Body)
 		require.NoError(t, err)
 		require.Empty(t, body)
@@ -131,7 +135,7 @@ func TestEngine_Write(t *testing.T) {
 			return nil
 		})
 
-		require.EqualError(t, err, errConnWrite.Error())
+		require.EqualError(t, err, status.ErrCloseConnection.Error())
 	})
 
 	t.Run("CustomCodeAndStatus", func(t *testing.T) {
@@ -194,5 +198,49 @@ func TestEngine_PreWrite(t *testing.T) {
 		require.NoError(t, err)
 		require.Equal(t, 200, resp.StatusCode)
 		require.Equal(t, "HTTP/1.1", resp.Proto)
+	})
+}
+
+func TestEngine_ChunkedTransfer(t *testing.T) {
+	t.Run("Simple", func(t *testing.T) {
+		reader := bytes.NewBuffer([]byte("Hello, world!"))
+		wantData := "d\r\nHello, world!\r\n0\r\n\r\n"
+		renderer := getEngine(nil)
+		renderer.fileBuff = make([]byte, math.MaxUint16)
+
+		var data []byte
+		err := renderer.writeChunkedBody(reader, func(b []byte) error {
+			data = append(data, b...)
+			return nil
+		})
+		require.NoError(t, err)
+		require.Equal(t, wantData, string(data))
+	})
+
+	t.Run("Long", func(t *testing.T) {
+		const buffSize = 64
+		parser := http1.NewChunkedBodyParser(settings.Default().Body)
+		payload := strings.Repeat("abcdefgh", 10*buffSize)
+		reader := bytes.NewBuffer([]byte(payload))
+		renderer := getEngine(nil)
+		renderer.fileBuff = make([]byte, buffSize)
+
+		var data []byte
+		err := renderer.writeChunkedBody(reader, func(b []byte) error {
+			for len(b) > 0 {
+				chunk, extra, err := parser.Parse(b, false)
+				if err == io.EOF {
+					return nil
+				}
+
+				require.NoError(t, err)
+				data = append(data, chunk...)
+				b = extra
+			}
+
+			return nil
+		})
+		require.NoError(t, err)
+		require.Equal(t, payload, string(data))
 	})
 }

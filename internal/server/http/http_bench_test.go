@@ -72,21 +72,15 @@ func BenchmarkIndigo(b *testing.B) {
 		return http.RespondTo(request).WithHeader("Hello", "World")
 	})
 
-	router.Get("/with-two-headers", func(request *http.Request) http.Response {
-		return http.RespondTo(request).
-			WithHeader("Hello", "World").
-			WithHeader("Lorem", "Ipsum")
-	})
-
 	router.OnStart()
 
 	s := settings.Default()
 	q := query.NewQuery(func() map[string][]byte {
 		return make(map[string][]byte)
 	})
-	bodyReader := http1.NewBodyReader(dummy.NewNopClient(), settings.Default().Body)
+	bodyReader := http1.NewBodyReader(dummy.NewNopClient(), s.Body)
 	request := http.NewRequest(
-		headers.NewHeaders(nil), q, http.NewResponse(), dummy.NewNopConn(), bodyReader,
+		headers.NewHeaders(make(map[string][]string, 10)), q, http.NewResponse(), dummy.NewNopConn(), bodyReader,
 	)
 	keyAllocator := alloc.NewAllocator(
 		s.Headers.MaxKeyLength*s.Headers.Number.Default,
@@ -105,6 +99,8 @@ func BenchmarkIndigo(b *testing.B) {
 
 	simpleGETClient := dummy.NewCircularClient(simpleGETRequest)
 	b.Run("SimpleGET", func(b *testing.B) {
+		b.ReportAllocs()
+
 		for i := 0; i < b.N; i++ {
 			server.RunOnce(simpleGETClient, request, bodyReader, render, parser)
 		}
@@ -112,6 +108,8 @@ func BenchmarkIndigo(b *testing.B) {
 
 	fiveHeadersGETClient := dummy.NewCircularClient(fiveHeadersGETRequest)
 	b.Run("FiveHeadersGET", func(b *testing.B) {
+		b.ReportAllocs()
+
 		for i := 0; i < b.N; i++ {
 			server.RunOnce(fiveHeadersGETClient, request, bodyReader, render, parser)
 		}
@@ -119,6 +117,8 @@ func BenchmarkIndigo(b *testing.B) {
 
 	tenHeadersGETClient := dummy.NewCircularClient(tenHeadersGETRequest)
 	b.Run("TenHeadersGET", func(b *testing.B) {
+		b.ReportAllocs()
+
 		for i := 0; i < b.N; i++ {
 			server.RunOnce(tenHeadersGETClient, request, bodyReader, render, parser)
 		}
@@ -126,16 +126,21 @@ func BenchmarkIndigo(b *testing.B) {
 
 	withRespHeadersGETClient := dummy.NewCircularClient(simpleGETWithHeader)
 	b.Run("WithRespHeader", func(b *testing.B) {
+		b.ReportAllocs()
+
 		for i := 0; i < b.N; i++ {
 			server.RunOnce(withRespHeadersGETClient, request, bodyReader, render, parser)
 		}
 	})
 
-	// TODO: add here some special request with special client that is able to
-	//       parse a body
-	//b.Run("SimplePOST", func(b *testing.B) {
-	//	for i := 0; i < b.N; i++ {
-	//		_ = server.OnData(simplePOST)
-	//	}
-	//})
+	withBodyClient := dummy.NewCircularClient(simplePOST)
+	b.Run("SimplePOST", func(b *testing.B) {
+		reader := http1.NewBodyReader(withBodyClient, settings.Default().Body)
+		b.ReportAllocs()
+		b.ResetTimer()
+
+		for i := 0; i < b.N; i++ {
+			server.RunOnce(withBodyClient, request, reader, render, parser)
+		}
+	})
 }
