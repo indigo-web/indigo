@@ -20,21 +20,12 @@ import (
 	"github.com/indigo-web/indigo/settings"
 )
 
-const (
-	// actually, we don't know what content type of body user responds
-	// with, so due to rfc2068 7.2.1 it is supposed to be
-	// application/octet-stream, but we know that it is usually text/html,
-	// isn't it?
-	defaultContentType = "text/html"
-)
-
 // DefaultHeaders are headers that are going to be sent unless they were overridden by
 // user.
 //
 // WARNING: if you want to edit them, do it using Application.AddDefaultHeader or
 // Application.DeleteDefaultHeader instead
 var DefaultHeaders = map[string][]string{
-	"Content-Type": {defaultContentType},
 	// nil here means that value will be set later, when server will be initializing
 	"Accept-Encodings": nil,
 }
