@@ -2,19 +2,44 @@ package http
 
 import (
 	"io"
+	"os"
+	"strings"
 
 	"github.com/indigo-web/indigo/http/status"
 	"github.com/indigo-web/indigo/internal"
 )
 
-type (
-	ResponseWriter func(b []byte) error
-	Render         func(response Response) error
-	FileErrHandler func(err error) Response
-)
+type ResponseWriter func(b []byte) error
 
 // IDK why 7, but let it be
-const defaultHeadersNumber = 7
+const (
+	defaultHeadersNumber = 7
+	defaultContentType   = "text/html"
+)
+
+// Attachment is a wrapper for io.Reader, with the difference that there is the size attribute.
+// If positive value (including 0) is set, then ordinary plain-text response will be rendered.
+// Otherwise, chunked transfer encoding is used.
+type Attachment struct {
+	content io.Reader
+	size    int
+}
+
+// NewAttachment returns a new Attachment instance
+func NewAttachment(content io.Reader, size int) Attachment {
+	return Attachment{
+		content: content,
+		size:    size,
+	}
+}
+
+func (a Attachment) Content() io.Reader {
+	return a.content
+}
+
+func (a Attachment) Size() int {
+	return a.size
+}
 
 type Response struct {
 	Code status.Code
@@ -23,16 +48,24 @@ type Response struct {
 	// headers are just a slice of strings, length of which is always dividable by 2, because
 	// it contains pairs of keys and values
 	headers []string
-	// Body is a response body byte-slice that contains raw data
-	Body     []byte
-	filename string
-	handler  FileErrHandler
+	// ContentType, as a special for core header, should be treated individually
+	ContentType string
+	// The same is about TransferEncoding
+	TransferEncoding string
+	Body             []byte
+
+	// attachment is a reader that's going to be read only at response's rendering, so its
+	// processing should usually be quite efficient.
+	//
+	// Note: if attachment is set, Body will be ignored
+	attachment Attachment
 }
 
 func NewResponse() Response {
 	return Response{
-		Code:    status.OK,
-		headers: make([]string, 0, defaultHeadersNumber*2),
+		Code:        status.OK,
+		headers:     make([]string, 0, defaultHeadersNumber*2),
+		ContentType: defaultContentType,
 	}
 }
 
@@ -52,9 +85,28 @@ func (r Response) WithStatus(status status.Status) Response {
 	return r
 }
 
+// WithContentType sets a custom Content-Type header value.
+func (r Response) WithContentType(value string) Response {
+	r.ContentType = value
+	return r
+}
+
+// WithTransferEncoding sets a custom Transfer-Encoding header value.
+func (r Response) WithTransferEncoding(value string) Response {
+	r.TransferEncoding = value
+	return r
+}
+
 // WithHeader sets header values to a key. In case it already exists the value will
-// be appended
+// be appended.
 func (r Response) WithHeader(key string, values ...string) Response {
+	switch {
+	case strings.EqualFold(key, "content-type"):
+		return r.WithContentType(values[0])
+	case strings.EqualFold(key, "transfer-encoding"):
+		return r.WithTransferEncoding(values[0])
+	}
+
 	for i := range values {
 		r.headers = append(r.headers, key, values[i])
 	}
@@ -100,6 +152,7 @@ func (r Response) WithBodyByte(body []byte) Response {
 // WithWriter takes a function that takes an io.Writer, which allows us to stream data
 // directly into the response body.
 // Note: this method causes an allocation
+//
 // TODO: This is not the best design solution. I would like to make this method just like
 //
 //	all others, so returning only Response object itself. The problem is that it is
@@ -112,20 +165,29 @@ func (r Response) WithWriter(cb func(io.Writer) error) (Response, error) {
 	return writer.response, err
 }
 
-// WithFile sets a file path as a file that is supposed to be uploaded as a
-// response. File replaces a response body, so in case last one is specified,
-// it'll be ignored.
-// In case any error occurred (file not found, or error occurred during reading,
-// etc.), handler will be called with a raised error
-func (r Response) WithFile(path string, handler FileErrHandler) Response {
-	r.filename = path
-	r.handler = handler
+// WithFile opens a file for reading, and returns a new response with attachment corresponding
+// to the file FD. In case not found or any other error, it'll be directly returned
+func (r Response) WithFile(path string) (Response, error) {
+	file, err := os.Open(path)
+	if err != nil {
+		return r, err
+	}
+
+	stat, err := file.Stat()
+	attachment := NewAttachment(file, int(stat.Size()))
+
+	return r.WithAttachment(attachment), err
+}
+
+// WithAttachment sets a response's attachment. In this case response body will be ignored
+func (r Response) WithAttachment(attachment Attachment) Response {
+	r.attachment = attachment
 	return r
 }
 
 // WithError tries to set a corresponding status code and response body equal to error text
 // if error is known to server, otherwise setting status code to status.InternalServerError
-// without setting a response body to the error text, because this possibly can reveal some
+// without setting a response body to the error text, because this possibly may reveal some
 // sensitive internal infrastructure details
 func (r Response) WithError(err error) Response {
 	resp := r.WithBody(err.Error())
@@ -157,25 +219,29 @@ func (r Response) Headers() []string {
 	return r.headers
 }
 
-// File returns response filename and error handler. Usually used by core only
-func (r Response) File() (string, FileErrHandler) {
-	return r.filename, r.handler
+// Attachment returns response's attachment.
+//
+// WARNING: do NEVER use this method in your code. It serves internal purposes ONLY
+func (r Response) Attachment() Attachment {
+	return r.attachment
 }
 
+// Clear discards everything was done with response object before
 func (r Response) Clear() Response {
 	r.Code = status.OK
 	r.Status = ""
+	r.ContentType = defaultContentType
+	r.TransferEncoding = ""
 	r.headers = r.headers[:0]
-	r.filename = ""
 	r.Body = nil
-	r.handler = nil
-
+	r.attachment = Attachment{}
 	return r
 }
 
 // bodyIOWriter is an implementation of io.Writer for response body
 type bodyIOWriter struct {
 	response Response
+	readBuff []byte
 }
 
 func newBodyIOWriter(response Response) *bodyIOWriter {
@@ -188,4 +254,26 @@ func (r *bodyIOWriter) Write(data []byte) (n int, err error) {
 	r.response.Body = append(r.response.Body, data...)
 
 	return len(data), nil
+}
+
+func (r *bodyIOWriter) ReadFrom(reader io.Reader) (n int64, err error) {
+	const readBuffSize = 2048
+
+	if len(r.readBuff) == 0 {
+		r.readBuff = make([]byte, readBuffSize)
+	}
+
+	for {
+		readN, readErr := reader.Read(r.readBuff)
+		_, _ = r.Write(r.readBuff[:n]) // bodyIOWriter.Write always returns n=len(data) and err=nil
+		n += int64(readN)
+
+		switch readErr {
+		case nil:
+		case io.EOF:
+			return n, nil
+		default:
+			return n, readErr
+		}
+	}
 }
