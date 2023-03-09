@@ -18,6 +18,12 @@ type (
 	}
 	HeadersValuesObjectPoolSize = int
 	MaxURLLength                int
+	URLParams                   struct {
+		// This option allows user to disable the automatic path params map clearing.
+		// May be useful in cases where params keys are being accessed directly only,
+		// and nothing tries to get all the map values
+		DisableMapClear bool
+	}
 
 	Query struct {
 		// MaxLength is responsible for a limit of the query length
@@ -74,6 +80,7 @@ type (
 		// until client disconnect
 		MaxLength MaxURLLength
 		Query     Query
+		Params    URLParams
 	}
 
 	TCP struct {
@@ -134,6 +141,9 @@ func Default() Settings {
 				MaxLength:      math.MaxUint16,
 				DefaultMapSize: 20,
 			},
+			Params: URLParams{
+				DisableMapClear: false,
+			},
 		},
 		TCP: TCP{
 			ReadBufferSize: 2048,
@@ -174,6 +184,7 @@ func Fill(original Settings) (modified Settings) {
 		original.URL.Query.MaxLength, defaultSettings.URL.Query.MaxLength)
 	original.URL.Query.DefaultMapSize = customOrDefault(
 		original.URL.Query.DefaultMapSize, defaultSettings.URL.Query.DefaultMapSize)
+	/* skip original.URL.Params.DisableMapClear, as its zero value is already default one */
 	original.TCP.ReadBufferSize = customOrDefault(
 		original.TCP.ReadBufferSize, defaultSettings.TCP.ReadBufferSize)
 	original.TCP.ReadTimeout = customOrDefault(

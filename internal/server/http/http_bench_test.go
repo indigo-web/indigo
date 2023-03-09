@@ -1,7 +1,12 @@
 package http
 
 import (
+	method "github.com/indigo-web/indigo/http/method"
+	"github.com/indigo-web/indigo/http/status"
 	"github.com/indigo-web/indigo/internal/server/tcp/dummy"
+	"github.com/indigo-web/indigo/router"
+	"github.com/indigo-web/indigo/router/inbuilt"
+	"github.com/indigo-web/indigo/router/simple"
 	"testing"
 
 	"github.com/indigo-web/indigo/http"
@@ -12,7 +17,6 @@ import (
 	"github.com/indigo-web/indigo/internal/alloc"
 	"github.com/indigo-web/indigo/internal/parser/http1"
 	render2 "github.com/indigo-web/indigo/internal/render"
-	"github.com/indigo-web/indigo/router/inbuilt"
 	"github.com/indigo-web/indigo/settings"
 )
 
@@ -54,9 +58,9 @@ var defaultHeaders = map[string][]string{
 	"Accept-Encodings": nil,
 }
 
-func BenchmarkIndigo(b *testing.B) {
-	router := inbuilt.NewRouter()
-	root := router.Resource("/")
+func getInbuiltRouter() router.Router {
+	r := inbuilt.NewRouter()
+	root := r.Resource("/")
 	root.Get(http.RespondTo)
 	root.Post(func(request *http.Request) http.Response {
 		_ = request.OnBody(func([]byte) error {
@@ -64,29 +68,59 @@ func BenchmarkIndigo(b *testing.B) {
 		}, func() error {
 			return nil
 		})
-
 		return http.RespondTo(request)
 	})
-
-	router.Get("/with-header", func(request *http.Request) http.Response {
+	r.Get("/with-header", func(request *http.Request) http.Response {
 		return http.RespondTo(request).WithHeader("Hello", "World")
 	})
+	r.OnStart()
 
-	router.Get("/with-two-headers", func(request *http.Request) http.Response {
-		return http.RespondTo(request).
-			WithHeader("Hello", "World").
-			WithHeader("Lorem", "Ipsum")
+	return r
+}
+
+func getSimpleRouter() router.Router {
+	r := simple.NewRouter(func(request *http.Request) http.Response {
+		switch request.Path.String {
+		case "/":
+			switch request.Method {
+			case method.GET:
+				return http.RespondTo(request)
+			case method.POST:
+				_ = request.OnBody(func([]byte) error {
+					return nil
+				}, func() error {
+					return nil
+				})
+
+				return http.RespondTo(request)
+			default:
+				return http.RespondTo(request).WithError(status.ErrMethodNotAllowed)
+			}
+		case "/with-header":
+			return http.RespondTo(request).WithHeader("Hello", "World")
+		default:
+			return http.RespondTo(request).
+				WithError(status.ErrNotFound)
+		}
+	}, func(request *http.Request, err error) http.Response {
+		return http.RespondTo(request).WithError(err)
 	})
 
-	router.OnStart()
+	return r
+}
 
+func BenchmarkIndigo(b *testing.B) {
+	// for benchmarking, using more realistic conditions. In case we want a pure performance - use
+	// getSimpleRouter() here. It is visibly faster
+	r := getInbuiltRouter()
 	s := settings.Default()
-	q := query.NewQuery(func() map[string][]byte {
-		return make(map[string][]byte)
+	q := query.NewQuery(func() query.Map {
+		return make(query.Map)
 	})
-	bodyReader := http1.NewBodyReader(dummy.NewNopClient(), settings.Default().Body)
+	bodyReader := http1.NewBodyReader(dummy.NewNopClient(), s.Body)
+	hdrs := headers.NewHeaders(make(map[string][]string, 10))
 	request := http.NewRequest(
-		headers.NewHeaders(nil), q, http.NewResponse(), dummy.NewNopConn(), bodyReader,
+		hdrs, q, http.NewResponse(), dummy.NewNopConn(), bodyReader, nil, false,
 	)
 	keyAllocator := alloc.NewAllocator(
 		s.Headers.MaxKeyLength*s.Headers.Number.Default,
@@ -101,10 +135,12 @@ func BenchmarkIndigo(b *testing.B) {
 		request, keyAllocator, valAllocator, objPool, startLineBuff, s.Headers,
 	)
 	render := render2.NewEngine(make([]byte, 0, 1024), nil, defaultHeaders)
-	server := NewHTTPServer(router).(*httpServer)
+	server := NewHTTPServer(r).(*httpServer)
 
 	simpleGETClient := dummy.NewCircularClient(simpleGETRequest)
 	b.Run("SimpleGET", func(b *testing.B) {
+		b.ReportAllocs()
+
 		for i := 0; i < b.N; i++ {
 			server.RunOnce(simpleGETClient, request, bodyReader, render, parser)
 		}
@@ -112,6 +148,8 @@ func BenchmarkIndigo(b *testing.B) {
 
 	fiveHeadersGETClient := dummy.NewCircularClient(fiveHeadersGETRequest)
 	b.Run("FiveHeadersGET", func(b *testing.B) {
+		b.ReportAllocs()
+
 		for i := 0; i < b.N; i++ {
 			server.RunOnce(fiveHeadersGETClient, request, bodyReader, render, parser)
 		}
@@ -119,6 +157,8 @@ func BenchmarkIndigo(b *testing.B) {
 
 	tenHeadersGETClient := dummy.NewCircularClient(tenHeadersGETRequest)
 	b.Run("TenHeadersGET", func(b *testing.B) {
+		b.ReportAllocs()
+
 		for i := 0; i < b.N; i++ {
 			server.RunOnce(tenHeadersGETClient, request, bodyReader, render, parser)
 		}
@@ -126,16 +166,21 @@ func BenchmarkIndigo(b *testing.B) {
 
 	withRespHeadersGETClient := dummy.NewCircularClient(simpleGETWithHeader)
 	b.Run("WithRespHeader", func(b *testing.B) {
+		b.ReportAllocs()
+
 		for i := 0; i < b.N; i++ {
 			server.RunOnce(withRespHeadersGETClient, request, bodyReader, render, parser)
 		}
 	})
 
-	// TODO: add here some special request with special client that is able to
-	//       parse a body
-	//b.Run("SimplePOST", func(b *testing.B) {
-	//	for i := 0; i < b.N; i++ {
-	//		_ = server.OnData(simplePOST)
-	//	}
-	//})
+	withBodyClient := dummy.NewCircularClient(simplePOST)
+	b.Run("SimplePOST", func(b *testing.B) {
+		reader := http1.NewBodyReader(withBodyClient, settings.Default().Body)
+		b.ReportAllocs()
+		b.ResetTimer()
+
+		for i := 0; i < b.N; i++ {
+			server.RunOnce(withBodyClient, request, reader, render, parser)
+		}
+	})
 }

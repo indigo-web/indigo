@@ -19,13 +19,16 @@ var (
 )
 
 func Index(request *http.Request) http.Response {
-	return http.RespondTo(request).WithFile(index, func(err error) http.Response {
+	resp, err := http.RespondTo(request).WithFile(index)
+	if err != nil {
 		return http.RespondTo(request).
 			WithCode(status.NotFound).
 			WithBody(
 				index + ": not found; try running this example directly from examples/combined folder",
 			)
-	})
+	}
+
+	return resp
 }
 
 func IndexSay(request *http.Request) http.Response {

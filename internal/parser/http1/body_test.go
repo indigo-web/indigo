@@ -40,7 +40,7 @@ func getRequestWithReader(chunked bool, body ...[]byte) (*http.Request, http.Bod
 	}
 
 	request := http.NewRequest(
-		hdrs, query.Query{}, http.NewResponse(), dummy.NewNopConn(), reader,
+		hdrs, query.Query{}, http.NewResponse(), dummy.NewNopConn(), reader, nil, false,
 	)
 	request.ContentLength = contentLength
 	request.IsChunked = chunked
