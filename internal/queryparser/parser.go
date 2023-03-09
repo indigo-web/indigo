@@ -5,7 +5,7 @@ import (
 	"github.com/indigo-web/indigo/internal"
 )
 
-func Parse(data []byte, queryMapFactory func() map[string][]byte) (queries map[string][]byte, err error) {
+func Parse(data []byte, queryMapFactory func() map[string]string) (queries map[string]string, err error) {
 	// TODO: make queryMapFactory map[string][]string, just like headers
 
 	var (
@@ -34,7 +34,7 @@ func Parse(data []byte, queryMapFactory func() map[string][]byte) (queries map[s
 			}
 		case eValue:
 			if data[i] == '&' {
-				queries[key] = data[offset:i]
+				queries[key] = internal.B2S(data[offset:i])
 				offset = i + 1
 				state = eKey
 			}
@@ -45,7 +45,7 @@ func Parse(data []byte, queryMapFactory func() map[string][]byte) (queries map[s
 		return nil, status.ErrBadQuery
 	}
 
-	queries[key] = data[offset:]
+	queries[key] = internal.B2S(data[offset:])
 
 	return queries, nil
 }
