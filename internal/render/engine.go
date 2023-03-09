@@ -5,7 +5,6 @@ import (
 	"github.com/indigo-web/indigo/internal/functools"
 	"github.com/indigo-web/indigo/internal/render/types"
 	"io"
-	"math"
 	"strconv"
 	"strings"
 
@@ -35,7 +34,7 @@ type engine struct {
 	buff, fileBuff                        []byte
 	buffOffset                            int
 	defaultHeaders, defaultHeadersReserve types.DefaultHeaders
-	// TODO: add files distribution mechanism (and edit docstring)
+	// TODO: add files distribution mechanism (and probably edit docstring)
 }
 
 func NewEngine(buff, fileBuff []byte, defaultHeaders map[string][]string) Engine {
@@ -160,7 +159,8 @@ func (e *engine) sendAttachment(
 		// write by blocks 64kb each. Not really efficient, but in close future
 		// file distributors will be implemented, so files uploading capabilities
 		// will be extended
-		e.fileBuff = make([]byte, math.MaxUint16)
+		const fileBuffSize = 128 /* kilobytes */ * 1024 /* bytes */
+		e.fileBuff = make([]byte, fileBuffSize)
 	}
 
 	if size := attachment.Size(); size >= 0 {
@@ -171,6 +171,10 @@ func (e *engine) sendAttachment(
 }
 
 func (e *engine) writePlainBody(r io.Reader, writer http.ResponseWriter) error {
+	// TODO: implement checking whether r implements io.ReaderAt interface. In case it does
+	//       body may be transferred more efficiently. This requires implementing io.Writer
+	//       http.ResponseWriter
+
 	for {
 		n, err := r.Read(e.fileBuff)
 		switch err {
