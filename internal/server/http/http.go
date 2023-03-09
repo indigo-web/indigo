@@ -83,7 +83,6 @@ func (h *httpServer) RunOnce(
 		response := h.router.OnRequest(req)
 
 		if req.WasHijacked() {
-			_ = client.Close()
 			return false
 		}
 
