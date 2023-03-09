@@ -111,8 +111,8 @@ func (a *Application) Serve(r router.Router, optionalSettings ...settings.Settin
 		hdrs := headers.NewHeaders(make(map[string][]string, s.Headers.Number.Default))
 		response := http.NewResponse()
 		bodyReader := http1.NewBodyReader(client, s.Body)
-		request := http.NewRequest(hdrs, q, response, conn, bodyReader, s.URL.Params.DisableMapClear)
-		request.Path.Params = make(http.Params)
+		params := make(http.Params)
+		request := http.NewRequest(hdrs, q, response, conn, bodyReader, params, s.URL.Params.DisableMapClear)
 
 		startLineBuff := make([]byte, s.URL.MaxLength)
 		httpParser := http1.NewHTTPRequestsParser(

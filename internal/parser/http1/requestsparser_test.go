@@ -51,7 +51,7 @@ func getParser() (httpparser.HTTPRequestsParser, *http.Request) {
 	body := NewBodyReader(dummy.NewNopClient(), s.Body)
 	request := http.NewRequest(
 		headers.NewHeaders(nil), query.Query{}, http.NewResponse(), dummy.NewNopConn(), body,
-		false,
+		nil, false,
 	)
 	startLineBuff := make([]byte, s.URL.MaxLength)
 
@@ -312,7 +312,7 @@ func TestHttpRequestsParser_ParsePOST(t *testing.T) {
 		}
 
 		compareRequests(t, wanted, request)
-		require.Equal(t, "hel lo=wor ld", string(request.Query.Raw()))
+		require.Equal(t, "hel lo=wor ld", string(request.Path.Query.Raw()))
 		require.NoError(t, request.Clear())
 		parser.Release()
 	})

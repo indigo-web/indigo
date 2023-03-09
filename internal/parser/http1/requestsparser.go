@@ -260,7 +260,7 @@ query:
 	for i := range data {
 		switch data[i] {
 		case ' ':
-			p.request.Query.Set(p.startLineBuff[p.begin:p.pointer])
+			p.request.Path.Query.Set(p.startLineBuff[p.begin:p.pointer])
 			data = data[i+1:]
 			p.state = eProto
 			goto proto
@@ -330,7 +330,7 @@ fragment:
 	for i := range data {
 		switch data[i] {
 		case ' ':
-			p.request.Fragment = internal.B2S(p.startLineBuff[p.begin:p.pointer])
+			p.request.Path.Fragment = internal.B2S(p.startLineBuff[p.begin:p.pointer])
 			data = data[i+1:]
 			p.state = eProto
 			goto proto

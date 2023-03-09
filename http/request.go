@@ -26,8 +26,10 @@ type (
 	Params = map[string]string
 
 	Path struct {
-		String string
-		Params Params
+		String   string
+		Params   Params
+		Query    query.Query
+		Fragment Fragment
 	}
 
 	Fragment = string
@@ -37,12 +39,10 @@ type (
 // About headers manager see at http/headers/headers.go:Manager
 // Headers attribute references at that one that lays in manager
 type Request struct {
-	Method   method.Method
-	Path     Path
-	Query    query.Query
-	Fragment Fragment
-	Proto    proto.Proto
-	Remote   net.Addr
+	Method method.Method
+	Path   Path
+	Proto  proto.Proto
+	Remote net.Addr
 
 	Headers headers.Headers
 
@@ -67,10 +67,13 @@ type Request struct {
 // that default method is a null-value (proto.Unknown)
 func NewRequest(
 	hdrs headers.Headers, query query.Query, response Response, conn net.Conn, body BodyReader,
-	disableParamsMapClearing bool,
+	paramsMap Params, disableParamsMapClearing bool,
 ) *Request {
 	request := &Request{
-		Query:          query,
+		Path: Path{
+			Params: paramsMap,
+			Query:  query,
+		},
 		Proto:          proto.HTTP11,
 		Headers:        hdrs,
 		Remote:         conn.RemoteAddr(),
@@ -165,8 +168,8 @@ func (r *Request) WasHijacked() bool {
 // Clear resets request headers and reads body into nowhere until completed.
 // It is implemented to clear the request object between requests
 func (r *Request) Clear() (err error) {
-	r.Fragment = ""
-	r.Query.Set(nil)
+	r.Path.Fragment = ""
+	r.Path.Query.Set(nil)
 	r.Ctx = context.Background()
 	r.response = r.response.Clear()
 

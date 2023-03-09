@@ -120,7 +120,7 @@ func BenchmarkIndigo(b *testing.B) {
 	bodyReader := http1.NewBodyReader(dummy.NewNopClient(), s.Body)
 	hdrs := headers.NewHeaders(make(map[string][]string, 10))
 	request := http.NewRequest(
-		hdrs, q, http.NewResponse(), dummy.NewNopConn(), bodyReader, false,
+		hdrs, q, http.NewResponse(), dummy.NewNopConn(), bodyReader, nil, false,
 	)
 	keyAllocator := alloc.NewAllocator(
 		s.Headers.MaxKeyLength*s.Headers.Number.Default,

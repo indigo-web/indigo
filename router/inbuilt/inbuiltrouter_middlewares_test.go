@@ -115,7 +115,7 @@ func getRequest() *http.Request {
 
 	return http.NewRequest(
 		headers.NewHeaders(nil), q, http.NewResponse(), dummy.NewNopConn(), bodyReader,
-		false,
+		nil, false,
 	)
 }
 

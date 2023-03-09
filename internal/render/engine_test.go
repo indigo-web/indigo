@@ -31,7 +31,7 @@ func newRequest() *http.Request {
 			dummy.NewNopClient(),
 			settings.Default().Body,
 		),
-		false,
+		nil, false,
 	)
 }
 

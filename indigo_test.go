@@ -78,9 +78,9 @@ func getStaticRouter(t *testing.T) router.Router {
 
 	r.Get("/simple-get", func(request *http.Request) http.Response {
 		require.Equal(t, methods.GET, request.Method)
-		_, err := request.Query.Get("some non-existing query key")
+		_, err := request.Path.Query.Get("some non-existing query key")
 		require.Error(t, err)
-		require.Empty(t, request.Fragment)
+		require.Empty(t, request.Path.Fragment)
 		require.Equal(t, proto.HTTP11, request.Proto)
 
 		return http.RespondTo(request)
@@ -105,7 +105,7 @@ func getStaticRouter(t *testing.T) router.Router {
 	with := r.Group("/with-")
 
 	with.Get("query", func(request *http.Request) http.Response {
-		value, err := request.Query.Get(testQueryKey)
+		value, err := request.Path.Query.Get(testQueryKey)
 		require.NoError(t, err)
 		require.Equal(t, testQueryValue, string(value))
 

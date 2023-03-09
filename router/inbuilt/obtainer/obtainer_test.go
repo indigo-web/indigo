@@ -26,7 +26,7 @@ func newRequest(path string, method methods.Method) *http.Request {
 	hdrs := headers.NewHeaders(make(map[string][]string))
 	bodyReader := http1.NewBodyReader(dummy.NewNopClient(), settings.Default().Body)
 	request := http.NewRequest(
-		hdrs, query.Query{}, http.NewResponse(), dummy.NewNopConn(), bodyReader, false,
+		hdrs, query.Query{}, http.NewResponse(), dummy.NewNopConn(), bodyReader, nil, false,
 	)
 	request.Path.String = path
 	request.Method = method
