@@ -10,16 +10,15 @@ import (
 	"github.com/indigo-web/indigo/internal/functools"
 	"github.com/indigo-web/indigo/internal/mapconv"
 	"github.com/indigo-web/indigo/router/inbuilt/radix"
-	routertypes "github.com/indigo-web/indigo/router/inbuilt/types"
+	"github.com/indigo-web/indigo/router/inbuilt/types"
 	"github.com/indigo-web/indigo/valuectx"
 )
 
-func DynamicObtainer(routes routertypes.RoutesMap) Obtainer {
+func DynamicObtainer(routes types.RoutesMap) Obtainer {
 	tree := getTree(routes)
 
-	return func(req *http.Request) (routertypes.HandlerFunc, error) {
-		var payload *radix.Payload
-		req.Ctx, payload = tree.Match(req.Ctx, stripTrailingSlash(req.Path))
+	return func(req *http.Request) (types.HandlerFunc, error) {
+		payload := tree.Match(req.Path.Params, stripTrailingSlash(req.Path.String))
 		if payload == nil {
 			return nil, status.ErrNotFound
 		}
@@ -35,7 +34,7 @@ func DynamicObtainer(routes routertypes.RoutesMap) Obtainer {
 	}
 }
 
-func getTree(routes routertypes.RoutesMap) radix.Tree {
+func getTree(routes types.RoutesMap) radix.Tree {
 	tree := radix.NewTree()
 
 	for k, v := range routes {
