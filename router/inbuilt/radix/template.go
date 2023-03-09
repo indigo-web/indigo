@@ -38,19 +38,14 @@ func Parse(tmpl string) (Template, error) {
 		return template, ErrEmptyPath
 	}
 
-	for i, char := range tmpl {
-		if i == 0 {
-			if char != '/' {
-				return template, fmt.Errorf(`"%s": a leading slash is required`, tmpl)
-			}
+	if tmpl[0] != '/' {
+		return template, fmt.Errorf(`"%s": a leading slash is required`, tmpl)
+	}
 
-			// skip leading slash
-			continue
-		}
-
+	for i := 1; i < len(tmpl); i++ {
 		switch state {
 		case eStatic:
-			switch char {
+			switch tmpl[i] {
 			case '/':
 				template.segments = append(template.segments, Segment{
 					IsDynamic: false,
@@ -65,7 +60,7 @@ func Parse(tmpl string) (Template, error) {
 				)
 			}
 		case eSlash:
-			switch char {
+			switch tmpl[i] {
 			case '/':
 			case '{':
 				offset = i + 1
@@ -74,7 +69,7 @@ func Parse(tmpl string) (Template, error) {
 				state = eStatic
 			}
 		case eDynamic:
-			switch char {
+			switch tmpl[i] {
 			case '}':
 				template.segments = append(template.segments, Segment{
 					IsDynamic: true,
@@ -88,7 +83,7 @@ func Parse(tmpl string) (Template, error) {
 				)
 			}
 		case eFinishDynamic:
-			switch char {
+			switch tmpl[i] {
 			case '/':
 				offset = i + 1
 				state = eSlash

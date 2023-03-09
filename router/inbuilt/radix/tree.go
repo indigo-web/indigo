@@ -1,16 +1,16 @@
 package radix
 
 import (
-	"context"
 	"errors"
 
 	"github.com/indigo-web/indigo/router/inbuilt/types"
-	"github.com/indigo-web/indigo/valuectx"
 )
 
 var ErrNotImplemented = errors.New(
 	"different dynamic segment names are not allowed for common path prefix",
 )
+
+type Params map[string]string
 
 type Payload struct {
 	MethodsMap types.MethodsMap
@@ -20,7 +20,7 @@ type Payload struct {
 type Tree interface {
 	Insert(Template, Payload) error
 	MustInsert(Template, Payload)
-	Match(context.Context, string) (context.Context, *Payload)
+	Match(Params, string) *Payload
 }
 
 type Node struct {
@@ -90,10 +90,10 @@ func (n *Node) insertRecursively(segments []Segment, payload *Payload) error {
 	return node.insertRecursively(segments[1:], payload)
 }
 
-func (n *Node) Match(ctx context.Context, path string) (context.Context, *Payload) {
+func (n *Node) Match(params Params, path string) *Payload {
 	if path[0] != '/' {
 		// all http request paths MUST have a leading slash
-		return ctx, n.payload
+		return nil
 	}
 
 	path = path[1:]
@@ -106,9 +106,9 @@ func (n *Node) Match(ctx context.Context, path string) (context.Context, *Payloa
 	for i := range path {
 		if path[i] == '/' {
 			var ok bool
-			ctx, node, ok = processSegment(ctx, path[offset:i], node)
+			node, ok = processSegment(params, path[offset:i], node)
 			if !ok {
-				return ctx, nil
+				return nil
 			}
 
 			offset = i + 1
@@ -117,27 +117,27 @@ func (n *Node) Match(ctx context.Context, path string) (context.Context, *Payloa
 
 	if offset < len(path) {
 		var ok bool
-		ctx, node, ok = processSegment(ctx, path[offset:], node)
+		node, ok = processSegment(params, path[offset:], node)
 		if !ok {
-			return ctx, nil
+			return nil
 		}
 	}
 
-	return ctx, node.payload
+	return node.payload
 }
 
-func processSegment(ctx context.Context, segment string, node *Node) (context.Context, *Node, bool) {
+func processSegment(params Params, segment string, node *Node) (*Node, bool) {
 	if nextNode, found := node.staticSegments[segment]; found {
-		return ctx, nextNode, true
+		return nextNode, true
 	}
 
 	if !node.isDynamic || len(segment) == 0 {
-		return ctx, nil, false
+		return nil, false
 	}
 
 	if len(node.dynamicName) > 0 {
-		ctx = valuectx.WithValue(ctx, node.dynamicName, segment)
+		params[node.dynamicName] = segment
 	}
 
-	return ctx, node.next, true
+	return node.next, true
 }

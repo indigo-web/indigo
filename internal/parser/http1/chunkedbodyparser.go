@@ -8,6 +8,10 @@ import (
 	"github.com/indigo-web/indigo/settings"
 )
 
+type ChunkedBodyParser interface {
+	Parse(data []byte, trailer bool) (chunk, extra []byte, err error)
+}
+
 // chunkedBodyParser is a parser for chunked encoded request bodies
 // used to encapsulate process of parsing because it's more convenient
 // to leave the process here and let main parser parse only http requests
@@ -16,6 +20,12 @@ type chunkedBodyParser struct {
 
 	settings    settings.Body
 	chunkLength int
+}
+
+func NewChunkedBodyParser(settings settings.Body) ChunkedBodyParser {
+	parser := newChunkedBodyParser(settings)
+
+	return &parser
 }
 
 func newChunkedBodyParser(settings settings.Body) chunkedBodyParser {

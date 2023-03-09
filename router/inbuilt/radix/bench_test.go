@@ -1,7 +1,6 @@
 package radix
 
 import (
-	"context"
 	"testing"
 
 	routertypes "github.com/indigo-web/indigo/router/inbuilt/types"
@@ -34,28 +33,30 @@ func BenchmarkTreeMatch(b *testing.B) {
 	tree.MustInsert(MustParse(shortTemplateSample), payload)
 	tree.MustInsert(MustParse(mediumTemplateSample), payload)
 	tree.MustInsert(MustParse(longTemplateSample), payload)
+	const paramsMapDefaultSize = 5
+	params := make(Params, paramsMapDefaultSize)
 
 	b.Run("OnlyStatic", func(b *testing.B) {
 		for i := 0; i < b.N; i++ {
-			tree.Match(context.Background(), staticSample)
+			tree.Match(params, staticSample)
 		}
 	})
 
 	b.Run("Short", func(b *testing.B) {
 		for i := 0; i < b.N; i++ {
-			tree.Match(context.Background(), shortSample)
+			tree.Match(params, shortSample)
 		}
 	})
 
 	b.Run("Medium", func(b *testing.B) {
 		for i := 0; i < b.N; i++ {
-			tree.Match(context.Background(), mediumSample)
+			tree.Match(params, mediumSample)
 		}
 	})
 
 	b.Run("Long", func(b *testing.B) {
 		for i := 0; i < b.N; i++ {
-			tree.Match(context.Background(), longSample)
+			tree.Match(params, longSample)
 		}
 	})
 }

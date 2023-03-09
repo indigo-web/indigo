@@ -78,9 +78,9 @@ func getStaticRouter(t *testing.T) router.Router {
 
 	r.Get("/simple-get", func(request *http.Request) http.Response {
 		require.Equal(t, methods.GET, request.Method)
-		_, err := request.Query.Get("some non-existing query key")
+		_, err := request.Path.Query.Get("some non-existing query key")
 		require.Error(t, err)
-		require.Empty(t, request.Fragment)
+		require.Empty(t, request.Path.Fragment)
 		require.Equal(t, proto.HTTP11, request.Proto)
 
 		return http.RespondTo(request)
@@ -105,7 +105,7 @@ func getStaticRouter(t *testing.T) router.Router {
 	with := r.Group("/with-")
 
 	with.Get("query", func(request *http.Request) http.Response {
-		value, err := request.Query.Get(testQueryKey)
+		value, err := request.Path.Query.Get(testQueryKey)
 		require.NoError(t, err)
 		require.Equal(t, testQueryValue, string(value))
 
@@ -113,17 +113,16 @@ func getStaticRouter(t *testing.T) router.Router {
 	})
 
 	with.Get("file", func(request *http.Request) http.Response {
-		return http.RespondTo(request).WithFile(testFilename, func(err error) http.Response {
-			t.Fail() // this callback must never be called
-
-			return http.RespondTo(request)
-		})
+		resp, err := http.RespondTo(request).WithFile(testFilename)
+		require.NoError(t, err)
+		return resp
 	})
 
 	with.Get("file-notfound", func(request *http.Request) http.Response {
-		return http.RespondTo(request).WithFile(testFilename+"notfound", func(err error) http.Response {
-			return http.RespondTo(request).WithBody(testFileIfNotFound)
-		})
+		_, err := http.RespondTo(request).WithFile(testFilename + "non-existing")
+		require.Error(t, err)
+
+		return http.RespondTo(request).WithBody(testFileIfNotFound)
 	})
 
 	// request.OnBody() is not tested because request.Body() (wrapper for OnBody)

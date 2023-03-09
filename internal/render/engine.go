@@ -1,13 +1,10 @@
 package render
 
 import (
-	"errors"
 	"github.com/indigo-web/indigo/http/status"
 	"github.com/indigo-web/indigo/internal/functools"
 	"github.com/indigo-web/indigo/internal/render/types"
 	"io"
-	"math"
-	"os"
 	"strconv"
 	"strings"
 
@@ -20,8 +17,7 @@ import (
 var (
 	contentLength = []byte("Content-Length: ")
 
-	errConnWrite    = errors.New("error occurred while communicating with conn")
-	errFileNotFound = errors.New("desired file not found")
+	emptyChunkedPart = []byte("0\r\n\r\n")
 )
 
 type Engine interface {
@@ -38,10 +34,14 @@ type engine struct {
 	buff, fileBuff                        []byte
 	buffOffset                            int
 	defaultHeaders, defaultHeadersReserve types.DefaultHeaders
-	// TODO: add files distribution mechanism (and edit docstring)
+	// TODO: add files distribution mechanism (and probably edit docstring)
 }
 
 func NewEngine(buff, fileBuff []byte, defaultHeaders map[string][]string) Engine {
+	return newEngine(buff, fileBuff, defaultHeaders)
+}
+
+func newEngine(buff, fileBuff []byte, defaultHeaders map[string][]string) *engine {
 	parsedDefaultHeaders := parseDefaultHeaders(defaultHeaders)
 
 	return &engine{
@@ -68,16 +68,8 @@ func (e *engine) Write(
 
 	e.renderProtocol(protocol)
 
-	if path, errhandler := response.File(); len(path) > 0 {
-		switch err := e.renderFile(request, response, writer); err {
-		case errFileNotFound:
-			e.clear()
-
-			return e.Write(protocol, request, errhandler(status.ErrNotFound), writer)
-		default:
-			// nil will also be returned here
-			return err
-		}
+	if response.Attachment().Content() != nil {
+		return e.sendAttachment(request, response, writer)
 	}
 
 	e.renderHeaders(response)
@@ -93,7 +85,7 @@ func (e *engine) Write(
 	err = writer(e.buff)
 
 	if !isKeepAlive(protocol, request) && request.Upgrade == proto.Unknown {
-		err = errConnWrite
+		err = status.ErrCloseConnection
 	}
 
 	return err
@@ -107,7 +99,7 @@ func (e *engine) renderHeaders(response http.Response) {
 	} else {
 		// in case we have a custom response status text or unknown code, fallback to an old way
 		e.buff = append(strconv.AppendInt(e.buff, int64(response.Code), 10), httpchars.SP...)
-		e.buff = append(append(e.buff, status.Text(response.Code)...), httpchars.CRLF...)
+		e.buff = append(append(e.buff, status.Text(response.Code)...), httpchars.CR, httpchars.LF)
 	}
 
 	responseHeaders := response.Headers()
@@ -124,37 +116,37 @@ func (e *engine) renderHeaders(response http.Response) {
 
 		e.renderHeader(e.defaultHeaders[i], e.defaultHeaders[i+1])
 	}
+
+	// Content-Type is compulsory. Transfer-Encoding is not
+	// TODO: maybe, we can make similar to renderContentLength() functions for
+	//       these well-known headers? This may a bit improve performance
+	e.renderHeader("Content-Type", response.ContentType)
+	if len(response.TransferEncoding) > 0 {
+		e.renderHeader("Transfer-Encoding", response.TransferEncoding)
+	}
 }
 
-// renderFileInto opens a file in os.O_RDONLY mode, reading its size and appends
-// a Content-Length header equal to size of the file, after that headers are being
-// sent. Then 64kb buffer is allocated for reading from file and writing to the
-// connection. In case network error occurred, errConnWrite is returned. Otherwise,
-// received error is returned
-//
-// Not very elegant solution, but uploading files is not the main purpose of web-server.
-// For small and medium projects, this may be enough, for anything serious - most of all
-// nginx will be used (the same is about https)
-func (e *engine) renderFile(
+// sendAttachment simply encapsulates
+func (e *engine) sendAttachment(
 	request *http.Request, response http.Response, writer http.ResponseWriter,
 ) error {
-	filename, _ := response.File()
-	file, err := os.OpenFile(filename, os.O_RDONLY, 0)
-	if err != nil {
-		return errFileNotFound
+	attachment := response.Attachment()
+
+	if size := attachment.Size(); size >= 0 {
+		e.renderHeaders(response)
+		e.renderContentLength(int64(size))
+	} else {
+		e.renderHeaders(response.WithTransferEncoding("chunked"))
 	}
 
-	stat, err := file.Stat()
-	if err != nil {
-		return err
-	}
+	// now we have to send the body via plain text or chunked transfer encoding.
+	// I'm proposing to make an exception for chunked transfer encoding with a
+	// separate method that'll handle with it by its own. Maybe, even for plain-text
 
-	e.renderHeaders(response)
-	e.renderContentLength(stat.Size())
 	e.crlf()
 
-	if err = writer(e.buff); err != nil {
-		return errConnWrite
+	if err := writer(e.buff); err != nil {
+		return status.ErrCloseConnection
 	}
 
 	if request.Method == methods.HEAD {
@@ -163,25 +155,73 @@ func (e *engine) renderFile(
 		return nil
 	}
 
-	if e.fileBuff == nil {
+	if len(e.fileBuff) == 0 {
 		// write by blocks 64kb each. Not really efficient, but in close future
 		// file distributors will be implemented, so files uploading capabilities
 		// will be extended
-		e.fileBuff = make([]byte, math.MaxUint16)
+		const fileBuffSize = 128 /* kilobytes */ * 1024 /* bytes */
+		e.fileBuff = make([]byte, fileBuffSize)
 	}
 
+	if size := attachment.Size(); size >= 0 {
+		return e.writePlainBody(attachment.Content(), writer)
+	}
+
+	return e.writeChunkedBody(attachment.Content(), writer)
+}
+
+func (e *engine) writePlainBody(r io.Reader, writer http.ResponseWriter) error {
+	// TODO: implement checking whether r implements io.ReaderAt interface. In case it does
+	//       body may be transferred more efficiently. This requires implementing io.Writer
+	//       http.ResponseWriter
+
 	for {
-		n, err := file.Read(e.fileBuff)
+		n, err := r.Read(e.fileBuff)
 		switch err {
 		case nil:
 		case io.EOF:
 			return nil
 		default:
-			return errConnWrite
+			return status.ErrCloseConnection
 		}
 
 		if err = writer(e.fileBuff[:n]); err != nil {
-			return errConnWrite
+			return status.ErrCloseConnection
+		}
+	}
+}
+
+func (e *engine) writeChunkedBody(r io.Reader, writer http.ResponseWriter) error {
+	const (
+		hexValueOffset = 8
+		crlfSize       = 1 /* CR */ + 1 /* LF */
+		buffOffset     = hexValueOffset + crlfSize
+	)
+
+	for {
+		n, err := r.Read(e.fileBuff[buffOffset : len(e.fileBuff)-crlfSize])
+
+		if n > 0 {
+			// first rewrite begin of the fileBuff to contain our hexdecimal value
+			buff := strconv.AppendUint(e.fileBuff[:0], uint64(n), 16)
+			// now we can determine the length of the hexdecimal value and make an
+			// offset for it
+			blankSpace := hexValueOffset - len(buff)
+			copy(e.fileBuff[blankSpace:], buff)
+			copy(e.fileBuff[hexValueOffset:], httpchars.CRLF)
+			copy(e.fileBuff[buffOffset+n:], httpchars.CRLF)
+
+			if err := writer(e.fileBuff[blankSpace : buffOffset+n+crlfSize]); err != nil {
+				return status.ErrCloseConnection
+			}
+		}
+
+		switch err {
+		case nil:
+		case io.EOF:
+			return writer(emptyChunkedPart)
+		default:
+			return status.ErrCloseConnection
 		}
 	}
 }

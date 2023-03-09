@@ -10,8 +10,8 @@ func TestQuery(t *testing.T) {
 	// here we test laziness of query
 
 	// just test that passed buffer's content will not be used
-	query := NewQuery(func() map[string][]byte {
-		return make(map[string][]byte)
+	query := NewQuery(func() Map {
+		return make(Map)
 	})
 	query.Set([]byte("hello=world"))
 	require.Equal(t, "hello=world", string(query.rawQuery))
@@ -20,7 +20,7 @@ func TestQuery(t *testing.T) {
 	t.Run("GetExistingKey", func(t *testing.T) {
 		value, err := query.Get("hello")
 		require.NoError(t, err)
-		require.Equal(t, "world", string(value))
+		require.Equal(t, "world", value)
 	})
 
 	t.Run("GetNonExistingKey", func(t *testing.T) {

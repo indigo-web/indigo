@@ -33,16 +33,16 @@ func renderHTTPRequest(request *http.Request, buff []byte) []byte {
 }
 
 func requestURI(request *http.Request, buff []byte) []byte {
-	buff = append(buff, request.Path...)
+	buff = append(buff, request.Path.String...)
 
-	if query := request.Query.Raw(); len(query) > 0 {
+	if query := request.Path.Query.Raw(); len(query) > 0 {
 		buff = append(buff, '?')
 		buff = append(buff, query...)
 	}
 
-	if len(request.Fragment) > 0 {
+	if len(request.Path.Fragment) > 0 {
 		buff = append(buff, '#')
-		buff = append(buff, request.Fragment...)
+		buff = append(buff, request.Path.Fragment...)
 	}
 
 	return buff

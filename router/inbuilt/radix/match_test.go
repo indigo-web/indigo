@@ -1,19 +1,18 @@
 package radix
 
 import (
-	"context"
 	"testing"
 
-	routertypes "github.com/indigo-web/indigo/router/inbuilt/types"
+	"github.com/indigo-web/indigo/router/inbuilt/types"
 	"github.com/stretchr/testify/require"
 )
 
 func TestNode_Match_Positive(t *testing.T) {
 	tree := NewTree()
+	params := make(Params)
 
 	payload := Payload{
-		MethodsMap: routertypes.MethodsMap{},
-		Allow:      "",
+		MethodsMap: types.MethodsMap{},
 	}
 	tree.MustInsert(MustParse(staticSample), payload)
 	tree.MustInsert(MustParse(unnamedTemplateSample), payload)
@@ -23,42 +22,42 @@ func TestNode_Match_Positive(t *testing.T) {
 	tree.MustInsert(MustParse("/"), payload)
 
 	t.Run("StaticMatch", func(t *testing.T) {
-		_, handler := tree.Match(context.Background(), staticSample)
+		handler := tree.Match(params, staticSample)
 		require.NotNil(t, handler)
 	})
 
 	t.Run("UnnamedMatch", func(t *testing.T) {
-		ctx, handler := tree.Match(context.Background(), unnamedSample)
-		require.Nil(t, ctx.Value(""))
+		handler := tree.Match(params, unnamedSample)
+		require.Empty(t, params[""])
 		require.NotNil(t, handler)
 	})
 
 	t.Run("ShortTemplateMatch", func(t *testing.T) {
-		ctx, handler := tree.Match(context.Background(), shortSample)
+		handler := tree.Match(params, shortSample)
 		require.NotNil(t, handler)
-		require.Equal(t, "some-very-long-world", ctx.Value("world"))
+		require.Equal(t, "some-very-long-world", params["world"])
 	})
 
 	t.Run("MediumTemplateMatch", func(t *testing.T) {
-		ctx, handler := tree.Match(context.Background(), mediumSample)
+		handler := tree.Match(params, mediumSample)
 		require.NotNil(t, handler)
-		require.Equal(t, "world-finally-became", ctx.Value("world"))
-		require.Equal(t, "good-as-fuck", ctx.Value("good"))
-		require.Equal(t, "ok-let-it-be", ctx.Value("ok"))
+		require.Equal(t, "world-finally-became", params["world"])
+		require.Equal(t, "good-as-fuck", params["good"])
+		require.Equal(t, "ok-let-it-be", params["ok"])
 	})
 
 	t.Run("Root", func(t *testing.T) {
-		_, handler := tree.Match(context.Background(), "/")
+		handler := tree.Match(params, "/")
 		require.NotNil(t, handler)
 	})
 }
 
 func TestNode_Match_Negative(t *testing.T) {
 	tree := NewTree()
+	params := make(Params)
 
 	payload := Payload{
-		MethodsMap: routertypes.MethodsMap{},
-		Allow:      "",
+		MethodsMap: types.MethodsMap{},
 	}
 	tree.MustInsert(MustParse(staticSample), payload)
 	tree.MustInsert(MustParse(shortTemplateSample), payload)
@@ -66,17 +65,17 @@ func TestNode_Match_Negative(t *testing.T) {
 	tree.MustInsert(MustParse(longTemplateSample), payload)
 
 	t.Run("EmptyDynamicPath_WithTrailingSlash", func(t *testing.T) {
-		_, handler := tree.Match(context.Background(), "/hello/")
+		handler := tree.Match(params, "/hello/")
 		require.Nil(t, handler)
 	})
 
 	t.Run("EmptyDynamicPath_NoTrailingSlash", func(t *testing.T) {
-		_, handler := tree.Match(context.Background(), "/hello")
+		handler := tree.Match(params, "/hello")
 		require.Nil(t, handler)
 	})
 
 	t.Run("EmptyDynamicPath_BetweenStatic", func(t *testing.T) {
-		_, handler := tree.Match(context.Background(), "/hello//very/good/ok")
+		handler := tree.Match(params, "/hello//very/good/ok")
 		require.Nil(t, handler)
 	})
 }

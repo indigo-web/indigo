@@ -7,8 +7,8 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func defaultFactory() map[string][]byte {
-	return make(map[string][]byte)
+func defaultFactory() map[string]string {
+	return make(map[string]string)
 }
 
 func TestParse_Positive(t *testing.T) {

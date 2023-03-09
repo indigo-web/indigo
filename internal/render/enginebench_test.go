@@ -48,6 +48,7 @@ func BenchmarkRenderer_Response(b *testing.B) {
 	bodyReader := http1.NewBodyReader(dummy.NewNopClient(), settings.Default().Body)
 	request := http.NewRequest(
 		hdrs, query.NewQuery(nil), http.NewResponse(), dummy.NewNopConn(), bodyReader,
+		nil, false,
 	)
 
 	b.Run("DefaultResponse_NoDefHeaders", func(b *testing.B) {

@@ -9,21 +9,20 @@ import (
 var ErrNoSuchKey = errors.New("desired key does not exists")
 
 type (
-	rawQuery    []byte
-	parsedQuery map[string][]byte
-
-	queryFactory func() map[string][]byte
+	rawQuery   []byte
+	Map        = map[string]string
+	mapFactory func() Map
 )
 
 // Query is optional, it may contain rawQuery, but it will not be parsed until
 // needed
 type Query struct {
 	rawQuery     rawQuery
-	parsedQuery  parsedQuery
-	queryFactory queryFactory
+	parsedQuery  Map
+	queryFactory mapFactory
 }
 
-func NewQuery(queryFactory queryFactory) Query {
+func NewQuery(queryFactory mapFactory) Query {
 	return Query{
 		queryFactory: queryFactory,
 	}
@@ -37,16 +36,16 @@ func (q *Query) Set(raw []byte) {
 	q.parsedQuery = nil
 }
 
-// Get is responsible for getting a key from query query. In case this
+// Get is responsible for getting a key from query. In case this
 // method is called a first time since rawQuery was set (or not set
 // at all), rawQuery bytearray will be parsed and value returned
 // (or ErrNoSuchKey instead). In case of invalid query bytearray,
 // ErrBadQuery will be returned
-func (q *Query) Get(key string) (value []byte, err error) {
+func (q *Query) Get(key string) (value string, err error) {
 	if q.parsedQuery == nil {
 		q.parsedQuery, err = queryparser.Parse(q.rawQuery, q.queryFactory)
 		if err != nil {
-			return nil, err
+			return "", err
 		}
 	}
 
@@ -59,6 +58,6 @@ func (q *Query) Get(key string) (value []byte, err error) {
 }
 
 // Raw just returns a raw value of query as it is
-func (q Query) Raw() []byte {
+func (q *Query) Raw() []byte {
 	return q.rawQuery
 }
