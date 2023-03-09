@@ -180,7 +180,7 @@ path:
 				return parser.Error, nil, status.ErrBadRequest
 			}
 
-			p.request.Path = internal.B2S(p.startLineBuff[p.begin:p.pointer])
+			p.request.Path.String = internal.B2S(p.startLineBuff[p.begin:p.pointer])
 			data = data[i+1:]
 			p.state = eProto
 			goto proto
@@ -189,9 +189,9 @@ path:
 			p.state = ePathDecode1Char
 			goto pathDecode1Char
 		case '?':
-			p.request.Path = internal.B2S(p.startLineBuff[p.begin:p.pointer])
-			if len(p.request.Path) == 0 {
-				p.request.Path = "/"
+			p.request.Path.String = internal.B2S(p.startLineBuff[p.begin:p.pointer])
+			if len(p.request.Path.String) == 0 {
+				p.request.Path.String = "/"
 			}
 
 			p.begin = p.pointer
@@ -199,9 +199,9 @@ path:
 			p.state = eQuery
 			goto query
 		case '#':
-			p.request.Path = internal.B2S(p.startLineBuff[p.begin:p.pointer])
-			if len(p.request.Path) == 0 {
-				p.request.Path = "/"
+			p.request.Path.String = internal.B2S(p.startLineBuff[p.begin:p.pointer])
+			if len(p.request.Path.String) == 0 {
+				p.request.Path.String = "/"
 			}
 
 			p.begin = p.pointer

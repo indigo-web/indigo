@@ -33,7 +33,7 @@ func renderHTTPRequest(request *http.Request, buff []byte) []byte {
 }
 
 func requestURI(request *http.Request, buff []byte) []byte {
-	buff = append(buff, request.Path...)
+	buff = append(buff, request.Path.String...)
 
 	if query := request.Query.Raw(); len(query) > 0 {
 		buff = append(buff, '?')
