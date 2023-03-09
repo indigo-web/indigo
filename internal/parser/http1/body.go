@@ -33,10 +33,12 @@ func (b *bodyReader) Init(request *http.Request) {
 }
 
 func (b *bodyReader) Read() ([]byte, error) {
+	const chunkedBody = -1
+
 	switch b.bodyBytesLeft {
 	case 0:
 		return nil, io.EOF
-	case -1:
+	case chunkedBody:
 		return b.chunkedBodyReader()
 	default:
 		return b.plainBodyReader()
