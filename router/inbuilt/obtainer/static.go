@@ -16,7 +16,7 @@ func StaticObtainer(routes types.RoutesMap) Obtainer {
 	allowedMethods := getAllowedMethodsMap(routes)
 
 	return func(req *http.Request) (types.HandlerFunc, error) {
-		methodsMap, found := routes[stripTrailingSlash(req.Path)]
+		methodsMap, found := routes[stripTrailingSlash(req.Path.String)]
 		if !found {
 			return nil, status.ErrNotFound
 		}
@@ -25,7 +25,7 @@ func StaticObtainer(routes types.RoutesMap) Obtainer {
 			return handler, nil
 		}
 
-		req.Ctx = valuectx.WithValue(req.Ctx, "allow", allowedMethods[req.Path])
+		req.Ctx = valuectx.WithValue(req.Ctx, "allow", allowedMethods[req.Path.String])
 
 		return nil, status.ErrMethodNotAllowed
 	}

@@ -51,6 +51,7 @@ func getParser() (httpparser.HTTPRequestsParser, *http.Request) {
 	body := NewBodyReader(dummy.NewNopClient(), s.Body)
 	request := http.NewRequest(
 		headers.NewHeaders(nil), query.Query{}, http.NewResponse(), dummy.NewNopConn(), body,
+		false,
 	)
 	startLineBuff := make([]byte, s.URL.MaxLength)
 
@@ -68,7 +69,7 @@ type wantedRequest struct {
 
 func compareRequests(t *testing.T, wanted wantedRequest, actual *http.Request) {
 	require.Equal(t, wanted.Method, actual.Method)
-	require.Equal(t, wanted.Path, actual.Path)
+	require.Equal(t, wanted.Path, actual.Path.String)
 	require.Equal(t, wanted.Protocol, actual.Proto)
 
 	for key, values := range wanted.Headers.Unwrap() {

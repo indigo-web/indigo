@@ -105,13 +105,14 @@ func (a *Application) Serve(r router.Router, optionalSettings ...settings.Settin
 			s.Headers.ValueSpace.Maximal,
 		)
 		objPool := pool.NewObjectPool[[]string](s.Headers.MaxValuesObjectPoolSize)
-		q := query.NewQuery(func() map[string][]byte {
-			return make(map[string][]byte, s.URL.Query.DefaultMapSize)
+		q := query.NewQuery(func() query.Map {
+			return make(query.Map, s.URL.Query.DefaultMapSize)
 		})
 		hdrs := headers.NewHeaders(make(map[string][]string, s.Headers.Number.Default))
 		response := http.NewResponse()
 		bodyReader := http1.NewBodyReader(client, s.Body)
-		request := http.NewRequest(hdrs, q, response, conn, bodyReader)
+		request := http.NewRequest(hdrs, q, response, conn, bodyReader, s.URL.Params.DisableMapClear)
+		request.Path.Params = make(http.Params)
 
 		startLineBuff := make([]byte, s.URL.MaxLength)
 		httpParser := http1.NewHTTPRequestsParser(
@@ -141,6 +142,7 @@ func (a *Application) Wait() {
 	<-a.shutdown
 }
 
+// getSettings converts optional settings to concrete
 func getSettings(s ...settings.Settings) (settings.Settings, error) {
 	switch len(s) {
 	case 0:

@@ -56,7 +56,7 @@ func TestRoute(t *testing.T) {
 	t.Run("HEAD", func(t *testing.T) {
 		request := getRequest()
 		request.Method = methods.HEAD
-		request.Path = "/"
+		request.Path.String = "/"
 
 		resp := r.processRequest(request)
 		// we have not registered any HEAD-method handler yet, so GET method

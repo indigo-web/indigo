@@ -4,35 +4,29 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/indigo-web/indigo/http"
-
 	methods "github.com/indigo-web/indigo/http/method"
 )
-
-func nopRender(_ http.Response) error {
-	return nil
-}
 
 func BenchmarkRequestRouting(b *testing.B) {
 	longURIRequest := getRequest()
 	longURIRequest.Method = methods.GET
-	longURIRequest.Path = "/" + strings.Repeat("a", 255)
+	longURIRequest.Path.String = "/" + strings.Repeat("a", 255)
 
 	shortURIRequest := getRequest()
 	shortURIRequest.Method = methods.GET
-	shortURIRequest.Path = "/" + strings.Repeat("a", 15)
+	shortURIRequest.Path.String = "/" + strings.Repeat("a", 15)
 
 	unknownURIRequest := getRequest()
 	unknownURIRequest.Method = methods.GET
-	unknownURIRequest.Path = "/" + strings.Repeat("b", 255)
+	unknownURIRequest.Path.String = "/" + strings.Repeat("b", 255)
 
 	unknownMethodRequest := getRequest()
 	unknownMethodRequest.Method = methods.POST
-	unknownMethodRequest.Path = longURIRequest.Path
+	unknownMethodRequest.Path.String = longURIRequest.Path.String
 
 	router := NewRouter()
-	router.Get(longURIRequest.Path, nopHandler)
-	router.Get(shortURIRequest.Path, nopHandler)
+	router.Get(longURIRequest.Path.String, nopHandler)
+	router.Get(shortURIRequest.Path.String, nopHandler)
 
 	router.OnStart()
 

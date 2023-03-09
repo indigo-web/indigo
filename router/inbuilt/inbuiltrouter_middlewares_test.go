@@ -110,11 +110,12 @@ func getPointApplied2Middleware(stack *callstack) routertypes.Middleware {
 }
 
 func getRequest() *http.Request {
-	query := query.NewQuery(nil)
+	q := query.NewQuery(nil)
 	bodyReader := http1.NewBodyReader(dummy.NewNopClient(), settings.Default().Body)
 
 	return http.NewRequest(
-		headers.NewHeaders(nil), query, http.NewResponse(), dummy.NewNopConn(), bodyReader,
+		headers.NewHeaders(nil), q, http.NewResponse(), dummy.NewNopConn(), bodyReader,
+		false,
 	)
 }
 
@@ -148,7 +149,7 @@ func TestMiddlewares(t *testing.T) {
 	t.Run("/", func(t *testing.T) {
 		request := getRequest()
 		request.Method = methods.GET
-		request.Path = "/"
+		request.Path.String = "/"
 
 		response := r.OnRequest(request)
 		require.Equal(t, int(status.OK), int(response.Code))
@@ -164,7 +165,7 @@ func TestMiddlewares(t *testing.T) {
 	t.Run("/api/v1/hello", func(t *testing.T) {
 		request := getRequest()
 		request.Method = methods.GET
-		request.Path = "/api/v1/hello"
+		request.Path.String = "/api/v1/hello"
 
 		response := r.OnRequest(request)
 		require.Equal(t, status.OK, response.Code)
@@ -180,7 +181,7 @@ func TestMiddlewares(t *testing.T) {
 	t.Run("/api/v2/world", func(t *testing.T) {
 		request := getRequest()
 		request.Method = methods.GET
-		request.Path = "/api/v2/world"
+		request.Path.String = "/api/v2/world"
 
 		response := r.OnRequest(request)
 		require.Equal(t, status.OK, response.Code)

@@ -2,15 +2,14 @@ package queryparser
 
 import "testing"
 
-const initialQueryMapSize = 10
-
-var queriesMap = make(map[string][]byte, initialQueryMapSize)
-
 func BenchmarkParse(b *testing.B) {
-	queriesFactory := func() map[string][]byte {
-		return make(map[string][]byte, initialQueryMapSize)
+	const initialQueryMapSize = 10
+	queriesMap := make(map[string]string, initialQueryMapSize)
+
+	queriesFactory := func() map[string]string {
+		return make(map[string]string, initialQueryMapSize)
 	}
-	queriesFactoryNoAlloc := func() map[string][]byte {
+	queriesFactoryNoAlloc := func() map[string]string {
 		return queriesMap
 	}
 
