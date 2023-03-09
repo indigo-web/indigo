@@ -23,7 +23,13 @@ type (
 )
 
 type (
-	Path     = string
+	Params = map[string]string
+
+	Path struct {
+		String string
+		Params Params
+	}
+
 	Fragment = string
 )
 
@@ -47,10 +53,11 @@ type Request struct {
 	body     BodyReader
 	bodyBuff []byte
 
-	Ctx         context.Context
-	response    Response
-	conn        net.Conn
-	wasHijacked bool
+	Ctx            context.Context
+	response       Response
+	conn           net.Conn
+	wasHijacked    bool
+	clearParamsMap bool
 }
 
 // NewRequest returns a new instance of request object and body gateway
@@ -58,22 +65,20 @@ type Request struct {
 // HTTP/1.1 as a protocol by default is set because if first request from user
 // is invalid, we need to render a response using request method, but appears
 // that default method is a null-value (proto.Unknown)
-// Also query.Query is being constructed right here instead of passing from outside
-// because it has only optional purposes and buff will be nil anyway
-// But maybe it's better to implement DI all the way we go? I don't know, maybe
-// someone will contribute and fix this
 func NewRequest(
 	hdrs headers.Headers, query query.Query, response Response, conn net.Conn, body BodyReader,
+	disableParamsMapClearing bool,
 ) *Request {
 	request := &Request{
-		Query:    query,
-		Proto:    proto.HTTP11,
-		Headers:  hdrs,
-		Remote:   conn.RemoteAddr(),
-		conn:     conn,
-		body:     body,
-		Ctx:      context.Background(),
-		response: response,
+		Query:          query,
+		Proto:          proto.HTTP11,
+		Headers:        hdrs,
+		Remote:         conn.RemoteAddr(),
+		conn:           conn,
+		body:           body,
+		Ctx:            context.Background(),
+		response:       response,
+		clearParamsMap: !disableParamsMapClearing,
 	}
 
 	return request
@@ -172,6 +177,12 @@ func (r *Request) Clear() (err error) {
 	r.ContentLength = 0
 	r.IsChunked = false
 	r.Upgrade = proto.Unknown
+
+	if r.clearParamsMap && len(r.Path.Params) > 0 {
+		for k := range r.Path.Params {
+			delete(r.Path.Params, k)
+		}
+	}
 
 	return nil
 }
