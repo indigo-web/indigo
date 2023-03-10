@@ -29,6 +29,7 @@ func (b *bodyReader) Init(request *http.Request) {
 	}
 
 	b.bodyBytesLeft = -1
+	// TODO: optimize this by adding trailer value into the request object
 	b.chunkedBodyTrailer = request.Headers.Has("trailer")
 }
 

@@ -265,6 +265,7 @@ query:
 			p.state = eProto
 			goto proto
 		case '#':
+			p.request.Path.Query.Set(p.startLineBuff[p.begin:p.pointer])
 			p.begin = p.pointer
 			data = data[i+1:]
 			p.state = eFragment

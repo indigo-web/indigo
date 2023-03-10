@@ -63,6 +63,7 @@ func getParser() (httpparser.HTTPRequestsParser, *http.Request) {
 type wantedRequest struct {
 	Method   methods.Method
 	Path     string
+	Fragment string
 	Protocol proto.Proto
 	Headers  headers.Headers
 }
@@ -70,6 +71,7 @@ type wantedRequest struct {
 func compareRequests(t *testing.T, wanted wantedRequest, actual *http.Request) {
 	require.Equal(t, wanted.Method, actual.Method)
 	require.Equal(t, wanted.Path, actual.Path.String)
+	require.Equal(t, wanted.Fragment, actual.Path.Fragment)
 	require.Equal(t, wanted.Protocol, actual.Proto)
 
 	for key, values := range wanted.Headers.Unwrap() {
@@ -269,6 +271,68 @@ func TestHttpRequestsParser_Parse_GET(t *testing.T) {
 		}
 
 		compareRequests(t, wanted, request)
+		require.NoError(t, request.Clear())
+		parser.Release()
+	})
+
+	t.Run("FragmentAfterPath", func(t *testing.T) {
+		req := "GET /#Some%20where HTTP/1.1\r\n\r\n"
+		state, extra, err := parser.Parse([]byte(req))
+		require.NoError(t, err)
+		require.Equal(t, httpparser.HeadersCompleted, state)
+		require.Empty(t, extra)
+
+		wanted := wantedRequest{
+			Method:   methods.GET,
+			Path:     "/",
+			Fragment: "Some where",
+			Protocol: proto.HTTP11,
+			Headers:  headers.Headers{},
+		}
+
+		compareRequests(t, wanted, request)
+		require.NoError(t, request.Clear())
+		parser.Release()
+	})
+
+	t.Run("FragmentNoPath", func(t *testing.T) {
+		req := "GET #Some%20where HTTP/1.1\r\n\r\n"
+		state, extra, err := parser.Parse([]byte(req))
+		require.NoError(t, err)
+		require.Equal(t, httpparser.HeadersCompleted, state)
+		require.Empty(t, extra)
+
+		wanted := wantedRequest{
+			Method:   methods.GET,
+			Path:     "/",
+			Fragment: "Some where",
+			Protocol: proto.HTTP11,
+			Headers:  headers.Headers{},
+		}
+
+		compareRequests(t, wanted, request)
+		require.NoError(t, request.Clear())
+		parser.Release()
+	})
+
+	t.Run("QueryDecode_UrlEncoded", func(t *testing.T) {
+		fmt.Println("ENTER")
+		req := "GET /?some%20where=wo%20rld#Fragment HTTP/1.1\r\n\r\n"
+		state, extra, err := parser.Parse([]byte(req))
+		require.NoError(t, err)
+		require.Equal(t, httpparser.HeadersCompleted, state)
+		require.Empty(t, extra)
+
+		wanted := wantedRequest{
+			Method:   methods.GET,
+			Path:     "/",
+			Fragment: "Fragment",
+			Protocol: proto.HTTP11,
+			Headers:  headers.Headers{},
+		}
+
+		compareRequests(t, wanted, request)
+		require.Equal(t, "some where=wo rld", string(request.Path.Query.Raw()))
 		require.NoError(t, request.Clear())
 		parser.Release()
 	})
