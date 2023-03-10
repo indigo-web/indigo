@@ -50,8 +50,8 @@ func (b *bodyReader) plainBodyReader() ([]byte, error) {
 
 	b.bodyBytesLeft -= len(data)
 	if b.bodyBytesLeft < 0 {
-		b.client.Unread(data[len(data)+b.bodyBytesLeft-1:])
-		data = data[:len(data)+b.bodyBytesLeft-1]
+		b.client.Unread(data[len(data)+b.bodyBytesLeft:])
+		data = data[:len(data)+b.bodyBytesLeft]
 		b.bodyBytesLeft = 0
 	}
 
