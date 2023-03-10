@@ -30,9 +30,8 @@ type httpRequestsParser struct {
 
 	headersSettings settings.Headers
 
-	contentLength           int
-	chunkedTransferEncoding bool
-	trailer                 bool
+	contentLength int
+	trailer       bool
 
 	startLineBuff          []byte
 	begin, pointer         int
@@ -767,7 +766,6 @@ headerValueCRLF:
 			return parser.Error, nil, status.ErrMethodNotImplemented
 		}
 
-		p.chunkedTransferEncoding = true
 		p.request.IsChunked = true
 	case "trailer":
 		p.trailer = true
@@ -821,7 +819,6 @@ func (p *httpRequestsParser) reset() {
 	p.protoMajor = 0
 	p.protoMinor = 0
 	p.headersNumber = 0
-	p.chunkedTransferEncoding = false
 	p.begin = 0
 	p.pointer = 0
 	p.headerKeyAllocator.Clear()
