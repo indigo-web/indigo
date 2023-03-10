@@ -53,31 +53,76 @@ func testDifferentPartSizes(t *testing.T, request []byte, wantBody string, trail
 }
 
 func TestChunkedBodyParser_Parse(t *testing.T) {
-	chunked := []byte("d\r\nHello, world!\r\n1a\r\nBut what's wrong with you?\r\nf\r\nFinally am here\r\n0\r\n\r\n")
-	wantedBody := "Hello, world!But what's wrong with you?Finally am here"
-	testDifferentPartSizes(t, chunked, wantedBody, false)
-}
+	t.Run("Ordinary", func(t *testing.T) {
+		chunked := "d\r\nHello, world!\r\n1a\r\nBut what's wrong with you?\r\nf\r\nFinally am here\r\n0\r\n\r\n"
+		wantedBody := "Hello, world!But what's wrong with you?Finally am here"
+		testDifferentPartSizes(t, []byte(chunked), wantedBody, false)
+	})
 
-func TestChunkedBodyParser_Parse_LFOnly(t *testing.T) {
-	chunked := []byte("d\nHello, world!\n1a\nBut what's wrong with you?\nf\nFinally am here\n0\n\n")
-	wantedBody := "Hello, world!But what's wrong with you?Finally am here"
-	testDifferentPartSizes(t, chunked, wantedBody, false)
-}
+	t.Run("LFOnly", func(t *testing.T) {
+		chunked := "d\nHello, world!\n1a\nBut what's wrong with you?\nf\nFinally am here\n0\n\n"
+		wantedBody := "Hello, world!But what's wrong with you?Finally am here"
+		testDifferentPartSizes(t, []byte(chunked), wantedBody, false)
+	})
 
-func TestChunkedBodyParser_Parse_FooterHeaders(t *testing.T) {
-	chunked := []byte("7\r\nMozilla\r\n9\r\nDeveloper\r\n7\r\nNetwork\r\n0\r\nExpires: date here\r\n\r\n")
-	wantedBody := "MozillaDeveloperNetwork"
-	testDifferentPartSizes(t, chunked, wantedBody, true)
+	t.Run("FooterHeaders", func(t *testing.T) {
+		chunked := "7\r\nMozilla\r\n9\r\nDeveloper\r\n7\r\nNetwork\r\n0\r\nExpires: date here\r\n\r\n"
+		wantedBody := "MozillaDeveloperNetwork"
+		testDifferentPartSizes(t, []byte(chunked), wantedBody, true)
+	})
+
+	t.Run("4DigitChunkLen", func(t *testing.T) {
+		var (
+			chunked   = "0001\r\nabcd"
+			wantChunk = "a"
+			wantExtra = "bcd"
+		)
+
+		parser := newChunkedBodyParser(settings.Default().Body)
+		chunk, extra, err := parser.Parse([]byte(chunked), false)
+		require.NoError(t, err)
+		require.Equal(t, wantChunk, string(chunk))
+		require.Equal(t, wantExtra, string(extra))
+	})
 }
 
 func TestChunkedBodyParser_Parse_Negative(t *testing.T) {
-	t.Run("BeginWithCRLF", func(t *testing.T) {
-		chunked := []byte("\r\nd\r\nHello, world!\r\n1a\r\nBut what's wrong with you?\r\nf\r\nFinally am here\r\n0\r\n\r\n")
-
+	check := func(t *testing.T, s string) {
 		parser := newChunkedBodyParser(settings.Default().Body)
-		piece, extra, err := parser.Parse(chunked, false)
+		piece, extra, err := parser.Parse([]byte(s), false)
 		require.Empty(t, piece)
 		require.Empty(t, extra)
 		require.EqualError(t, err, status.ErrBadRequest.Error())
+	}
+
+	t.Run("BeginWithCRLF", func(t *testing.T) {
+		check(t, "\r\nd\r\nHello, world!\r\n1a\r\nBut what's wrong with you?\r\nf\r\nFinally am here\r\n0\r\n\r\n")
+	})
+
+	t.Run("InvalidLength", func(t *testing.T) {
+		check(t, "[\r\nHello, world!\r\n1a\r\nBut what's wrong with you?\r\nf\r\nFinally am here\r\n0\r\n\r\n")
+	})
+
+	t.Run("InvalidLength", func(t *testing.T) {
+		check(t, "[\r\nHello, world!\r\n1a\r\nBut what's wrong with you?\r\nf\r\nFinally am here\r\n0\r\n\r\n")
+	})
+
+	t.Run("InvalidLengthSecondChar", func(t *testing.T) {
+		check(t, "d[\r\nHello, world!\r\n1a\r\nBut what's wrong with you?\r\nf\r\nFinally am here\r\n0\r\n\r\n")
+	})
+
+	t.Run("IncompleteChunkLength", func(t *testing.T) {
+		first := "000"
+		payload := "Hello, world!"
+		second := "d\r\n" + payload + "\r\n0\r\n\r\n"
+		parser := newChunkedBodyParser(settings.Default().Body)
+		piece, extra, err := parser.Parse([]byte(first), false)
+		require.NoError(t, err)
+		require.Empty(t, piece)
+		require.Empty(t, extra)
+
+		piece, extra, err = parser.Parse([]byte(second), false)
+		require.NoError(t, err)
+		require.Equal(t, payload, string(piece))
 	})
 }
