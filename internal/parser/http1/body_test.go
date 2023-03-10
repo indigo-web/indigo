@@ -3,6 +3,7 @@ package http1
 import (
 	"io"
 	"strconv"
+	"strings"
 	"testing"
 
 	"github.com/indigo-web/indigo/internal/server/tcp/dummy"
@@ -91,6 +92,36 @@ func TestBodyReader_Plain(t *testing.T) {
 		actualBody, err := readFullBody(reader)
 		require.NoError(t, err)
 		require.Equal(t, bodyString, string(actualBody))
+	})
+
+	t.Run("ALotOfData", func(t *testing.T) {
+		const buffSize = 10
+		var (
+			first  = strings.Repeat("a", buffSize)
+			second = strings.Repeat("b", buffSize)
+		)
+
+		client := dummy.NewCircularClient([]byte(first + second))
+
+		hdrs := headers.NewHeaders(nil)
+		request := http.NewRequest(
+			hdrs, query.Query{}, http.NewResponse(), dummy.NewNopConn(), nil, nil, false,
+		)
+		request.ContentLength = buffSize
+		reader := NewBodyReader(client, settings.Default().Body)
+		reader.Init(request)
+
+		data, err := reader.Read()
+		require.NoError(t, err)
+		require.Equal(t, first, string(data))
+
+		data, err = reader.Read()
+		require.EqualError(t, err, io.EOF.Error())
+		require.Empty(t, data)
+
+		data, err = client.Read()
+		require.NoError(t, err)
+		require.Equal(t, second, string(data))
 	})
 }
 
