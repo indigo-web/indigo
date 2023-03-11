@@ -37,7 +37,8 @@ func newRequest() *http.Request {
 
 func TestEngine_Write(t *testing.T) {
 	request := newRequest()
-	r, err := stdhttp.NewRequest(stdhttp.MethodGet, "/", nil)
+	request.Method = method.GET
+	stdreq, err := stdhttp.NewRequest(stdhttp.MethodGet, "/", nil)
 	require.NoError(t, err)
 
 	t.Run("NoHeaders", func(t *testing.T) {
@@ -48,7 +49,7 @@ func TestEngine_Write(t *testing.T) {
 			return nil
 		})
 		require.NoError(t, err)
-		resp, err := stdhttp.ReadResponse(bufio.NewReader(bytes.NewBuffer(data)), r)
+		resp, err := stdhttp.ReadResponse(bufio.NewReader(bytes.NewBuffer(data)), stdreq)
 		require.Equal(t, 200, resp.StatusCode)
 		require.Equal(t, 2, len(resp.Header))
 		require.Contains(t, resp.Header, "Content-Length")
@@ -68,7 +69,7 @@ func TestEngine_Write(t *testing.T) {
 			data = b
 			return nil
 		}))
-		resp, err := stdhttp.ReadResponse(bufio.NewReader(bytes.NewBuffer(data)), r)
+		resp, err := stdhttp.ReadResponse(bufio.NewReader(bytes.NewBuffer(data)), stdreq)
 		require.Equal(t, 200, resp.StatusCode)
 
 		require.Equal(t, 1, len(resp.Header["Hello"]))
@@ -149,8 +150,74 @@ func TestEngine_Write(t *testing.T) {
 			return nil
 		})
 		require.NoError(t, err)
-		resp, err := stdhttp.ReadResponse(bufio.NewReader(bytes.NewBuffer(data)), r)
+		resp, err := stdhttp.ReadResponse(bufio.NewReader(bytes.NewBuffer(data)), stdreq)
 		require.Equal(t, 600, resp.StatusCode)
+	})
+
+	t.Run("WithAttachment_KnownSize", func(t *testing.T) {
+		const body = "Hello, world!"
+		reader := strings.NewReader(body)
+		renderer := getEngine(nil)
+		response := http.NewResponse().WithAttachment(reader, reader.Len())
+
+		var data []byte
+		require.NoError(t, renderer.Write(proto.HTTP11, request, response, func(b []byte) error {
+			data = append(data, b...)
+			return nil
+		}))
+
+		resp, err := stdhttp.ReadResponse(bufio.NewReader(bytes.NewBuffer(data)), stdreq)
+		require.NoError(t, err)
+		require.Equal(t, len(body), int(resp.ContentLength))
+		require.Nil(t, resp.TransferEncoding)
+		fullBody, err := io.ReadAll(resp.Body)
+		require.NoError(t, err)
+		require.Equal(t, body, string(fullBody))
+	})
+
+	t.Run("WithAttachment_UnknownSize", func(t *testing.T) {
+		const body = "Hello, world!"
+		reader := strings.NewReader(body)
+		renderer := getEngine(nil)
+		response := http.NewResponse().WithAttachment(reader, 0)
+
+		var data []byte
+		require.NoError(t, renderer.Write(proto.HTTP11, request, response, func(b []byte) error {
+			data = append(data, b...)
+			return nil
+		}))
+
+		resp, err := stdhttp.ReadResponse(bufio.NewReader(bytes.NewBuffer(data)), stdreq)
+		require.NoError(t, err)
+		require.Equal(t, 1, len(resp.TransferEncoding))
+		require.Equal(t, "chunked", resp.TransferEncoding[0])
+		fullBody, err := io.ReadAll(resp.Body)
+		require.NoError(t, err)
+		require.Equal(t, body, string(fullBody))
+	})
+
+	t.Run("WithAttachment_HeadRequest", func(t *testing.T) {
+		const body = "Hello, world!"
+		reader := strings.NewReader(body)
+		renderer := getEngine(nil)
+		response := http.NewResponse().WithAttachment(reader, reader.Len())
+		request.Method = method.HEAD
+		stdreq, err := stdhttp.NewRequest(stdhttp.MethodHead, "/", nil)
+		require.NoError(t, err)
+
+		var data []byte
+		require.NoError(t, renderer.Write(proto.HTTP11, request, response, func(b []byte) error {
+			data = append(data, b...)
+			return nil
+		}))
+
+		resp, err := stdhttp.ReadResponse(bufio.NewReader(bytes.NewBuffer(data)), stdreq)
+		require.NoError(t, err)
+		require.Nil(t, resp.TransferEncoding)
+		require.Equal(t, len(body), int(resp.ContentLength))
+		fullBody, err := io.ReadAll(resp.Body)
+		require.NoError(t, err)
+		require.Empty(t, string(fullBody))
 	})
 }
 
