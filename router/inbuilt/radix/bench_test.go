@@ -3,7 +3,7 @@ package radix
 import (
 	"testing"
 
-	routertypes "github.com/indigo-web/indigo/router/inbuilt/types"
+	"github.com/indigo-web/indigo/router/inbuilt/types"
 )
 
 var (
@@ -26,7 +26,7 @@ func BenchmarkTreeMatch(b *testing.B) {
 	tree := NewTree()
 
 	payload := Payload{
-		MethodsMap: routertypes.MethodsMap{},
+		MethodsMap: types.MethodsMap{},
 		Allow:      "",
 	}
 	tree.MustInsert(MustParse(staticSample), payload)

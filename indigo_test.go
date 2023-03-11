@@ -107,7 +107,7 @@ func getStaticRouter(t *testing.T) router.Router {
 	with.Get("query", func(request *http.Request) http.Response {
 		value, err := request.Path.Query.Get(testQueryKey)
 		require.NoError(t, err)
-		require.Equal(t, testQueryValue, string(value))
+		require.Equal(t, testQueryValue, value)
 
 		return http.RespondTo(request)
 	})
