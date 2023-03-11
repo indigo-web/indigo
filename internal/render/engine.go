@@ -126,13 +126,14 @@ func (e *engine) renderHeaders(response http.Response) {
 	}
 }
 
-// sendAttachment simply encapsulates
+// sendAttachment simply encapsulates all the logic related to rendering arbitrary
+// io.Reader implementations
 func (e *engine) sendAttachment(
 	request *http.Request, response http.Response, writer http.ResponseWriter,
 ) error {
 	attachment := response.Attachment()
 
-	if size := attachment.Size(); size >= 0 {
+	if size := attachment.Size(); size > 0 {
 		e.renderHeaders(response)
 		e.renderContentLength(int64(size))
 	} else {
@@ -163,7 +164,7 @@ func (e *engine) sendAttachment(
 		e.fileBuff = make([]byte, fileBuffSize)
 	}
 
-	if size := attachment.Size(); size >= 0 {
+	if size := attachment.Size(); size > 0 {
 		return e.writePlainBody(attachment.Content(), writer)
 	}
 
