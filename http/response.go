@@ -1,6 +1,7 @@
 package http
 
 import (
+	"github.com/indigo-web/indigo/internal/render/types"
 	"io"
 	"os"
 	"strings"
@@ -16,30 +17,6 @@ const (
 	defaultHeadersNumber = 7
 	defaultContentType   = "text/html"
 )
-
-// Attachment is a wrapper for io.Reader, with the difference that there is the size attribute.
-// If positive value (including 0) is set, then ordinary plain-text response will be rendered.
-// Otherwise, chunked transfer encoding is used.
-type Attachment struct {
-	content io.Reader
-	size    int
-}
-
-// NewAttachment returns a new Attachment instance
-func NewAttachment(content io.Reader, size int) Attachment {
-	return Attachment{
-		content: content,
-		size:    size,
-	}
-}
-
-func (a Attachment) Content() io.Reader {
-	return a.content
-}
-
-func (a Attachment) Size() int {
-	return a.size
-}
 
 type Response struct {
 	Code status.Code
@@ -58,7 +35,7 @@ type Response struct {
 	// processing should usually be quite efficient.
 	//
 	// Note: if attachment is set, Body will be ignored
-	attachment Attachment
+	attachment types.Attachment
 }
 
 func NewResponse() Response {
@@ -174,14 +151,14 @@ func (r Response) WithFile(path string) (Response, error) {
 	}
 
 	stat, err := file.Stat()
-	attachment := NewAttachment(file, int(stat.Size()))
 
-	return r.WithAttachment(attachment), err
+	return r.WithAttachment(file, int(stat.Size())), err
 }
 
-// WithAttachment sets a response's attachment. In this case response body will be ignored
-func (r Response) WithAttachment(attachment Attachment) Response {
-	r.attachment = attachment
+// WithAttachment sets a response's attachment. In this case response body will be ignored.
+// If size <= 0, then Transfer-Encoding: chunked will be used
+func (r Response) WithAttachment(reader io.Reader, size int) Response {
+	r.attachment = types.NewAttachment(reader, size)
 	return r
 }
 
@@ -222,7 +199,7 @@ func (r Response) Headers() []string {
 // Attachment returns response's attachment.
 //
 // WARNING: do NEVER use this method in your code. It serves internal purposes ONLY
-func (r Response) Attachment() Attachment {
+func (r Response) Attachment() types.Attachment {
 	return r.attachment
 }
 
@@ -234,7 +211,7 @@ func (r Response) Clear() Response {
 	r.TransferEncoding = ""
 	r.headers = r.headers[:0]
 	r.Body = nil
-	r.attachment = Attachment{}
+	r.attachment = types.Attachment{}
 	return r
 }
 
