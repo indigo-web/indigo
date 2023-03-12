@@ -143,7 +143,9 @@ func (r Response) WithWriter(cb func(io.Writer) error) (Response, error) {
 }
 
 // WithFile opens a file for reading, and returns a new response with attachment corresponding
-// to the file FD. In case not found or any other error, it'll be directly returned
+// to the file FD. In case not found or any other error, it'll be directly returned.
+// In case error occurred while opening the file, response builder won't be affected and stay
+// clean
 func (r Response) WithFile(path string) (Response, error) {
 	file, err := os.Open(path)
 	if err != nil {
@@ -151,8 +153,11 @@ func (r Response) WithFile(path string) (Response, error) {
 	}
 
 	stat, err := file.Stat()
+	if err != nil {
+		return r, err
+	}
 
-	return r.WithAttachment(file, int(stat.Size())), err
+	return r.WithAttachment(file, int(stat.Size())), nil
 }
 
 // WithAttachment sets a response's attachment. In this case response body will be ignored.
