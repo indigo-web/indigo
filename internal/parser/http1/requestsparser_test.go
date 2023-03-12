@@ -65,7 +65,7 @@ type wantedRequest struct {
 	Path     string
 	Fragment string
 	Protocol proto.Proto
-	Headers  headers.Headers
+	Headers  *headers.Headers
 }
 
 func compareRequests(t *testing.T, wanted wantedRequest, actual *http.Request) {
@@ -74,10 +74,12 @@ func compareRequests(t *testing.T, wanted wantedRequest, actual *http.Request) {
 	require.Equal(t, wanted.Fragment, actual.Path.Fragment)
 	require.Equal(t, wanted.Protocol, actual.Proto)
 
-	for key, values := range wanted.Headers.Unwrap() {
-		actualValues := actual.Headers.Values(key)
+	hdrs := wanted.Headers.Unwrap()
+
+	for i := 0; i < len(hdrs); i += 2 {
+		actualValues := actual.Headers.Values(hdrs[i])
 		require.NotNil(t, actualValues)
-		require.Equal(t, values, actualValues)
+		require.Equal(t, wanted.Headers.Values(hdrs[i]), actualValues)
 	}
 }
 
@@ -131,7 +133,7 @@ func TestHttpRequestsParser_Parse_GET(t *testing.T) {
 			Method:   methods.GET,
 			Path:     "/",
 			Protocol: proto.HTTP11,
-			Headers:  headers.Headers{},
+			Headers:  headers.NewHeaders(nil),
 		}
 
 		compareRequests(t, wanted, request)
@@ -149,7 +151,7 @@ func TestHttpRequestsParser_Parse_GET(t *testing.T) {
 			Method:   methods.GET,
 			Path:     "/",
 			Protocol: proto.HTTP11,
-			Headers:  headers.Headers{},
+			Headers:  headers.NewHeaders(nil),
 		}
 
 		compareRequests(t, wanted, request)
@@ -227,7 +229,7 @@ func TestHttpRequestsParser_Parse_GET(t *testing.T) {
 			Method:   methods.GET,
 			Path:     "/hello world",
 			Protocol: proto.HTTP11,
-			Headers:  headers.Headers{},
+			Headers:  headers.NewHeaders(nil),
 		}
 
 		compareRequests(t, wanted, request)
@@ -267,7 +269,7 @@ func TestHttpRequestsParser_Parse_GET(t *testing.T) {
 			Method:   methods.GET,
 			Path:     "http://www.w3.org/pub/WWW/TheProject.html",
 			Protocol: proto.HTTP11,
-			Headers:  headers.Headers{},
+			Headers:  headers.NewHeaders(nil),
 		}
 
 		compareRequests(t, wanted, request)
@@ -287,7 +289,7 @@ func TestHttpRequestsParser_Parse_GET(t *testing.T) {
 			Path:     "/",
 			Fragment: "Some where",
 			Protocol: proto.HTTP11,
-			Headers:  headers.Headers{},
+			Headers:  headers.NewHeaders(nil),
 		}
 
 		compareRequests(t, wanted, request)
@@ -307,7 +309,7 @@ func TestHttpRequestsParser_Parse_GET(t *testing.T) {
 			Path:     "/",
 			Fragment: "Some where",
 			Protocol: proto.HTTP11,
-			Headers:  headers.Headers{},
+			Headers:  headers.NewHeaders(nil),
 		}
 
 		compareRequests(t, wanted, request)
@@ -327,7 +329,7 @@ func TestHttpRequestsParser_Parse_GET(t *testing.T) {
 			Path:     "/",
 			Fragment: "Fragment",
 			Protocol: proto.HTTP11,
-			Headers:  headers.Headers{},
+			Headers:  headers.NewHeaders(nil),
 		}
 
 		compareRequests(t, wanted, request)
@@ -395,7 +397,7 @@ func TestHttpRequestsParser_ParsePOST(t *testing.T) {
 			Method:   methods.GET,
 			Path:     "/path",
 			Protocol: proto.HTTP11,
-			Headers:  headers.Headers{},
+			Headers:  headers.NewHeaders(nil),
 		}
 
 		compareRequests(t, wanted, request)
