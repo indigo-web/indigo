@@ -92,6 +92,7 @@ func (h *httpServer) RunOnce(
 		}
 
 		p.Release()
+
 		if err = req.Clear(); err != nil {
 			h.router.OnError(req, status.ErrCloseConnection)
 			return false
