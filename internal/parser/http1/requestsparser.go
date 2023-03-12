@@ -31,7 +31,6 @@ type httpRequestsParser struct {
 	headersSettings settings.Headers
 
 	contentLength int
-	trailer       bool
 
 	startLineBuff          []byte
 	begin, pointer         int
@@ -749,14 +748,7 @@ headerValueCRLF:
 	}
 
 	value = internal.B2S(p.headerValueAllocator.Finish())
-
-	if requestHeaders.Has(p.headerKey) {
-		requestHeaders.Add(p.headerKey, value)
-	} else {
-		buff := p.headersValuesPool.Acquire()[:0]
-		buff = append(buff, value)
-		requestHeaders.Set(p.headerKey, buff)
-	}
+	requestHeaders.Add(p.headerKey, value)
 
 	switch p.headerKey {
 	case "upgrade":
@@ -766,9 +758,9 @@ headerValueCRLF:
 			return parser.Error, nil, status.ErrMethodNotImplemented
 		}
 
-		p.request.IsChunked = true
+		p.request.TransferEncoding.Chunked = true
 	case "trailer":
-		p.trailer = true
+		p.request.TransferEncoding.HasTrailer = true
 	}
 
 	switch data[0] {
@@ -798,24 +790,7 @@ headerValueCRLFCR:
 }
 
 func (p *httpRequestsParser) Release() {
-	requestHeaders := p.request.Headers.Unwrap()
-
-	for _, values := range requestHeaders {
-		p.headersValuesPool.Release(values)
-	}
-
-	// separated delete-loop from releasing headers values pool because go's standard (Google's)
-	// compiler optimizes delete-loop ONLY in case there is a single expression that is a delete
-	// function call. So maybe such an optimization will make some difference
-	// TODO: profile this and proof that this optimization makes sense
-	for k := range requestHeaders {
-		delete(requestHeaders, k)
-	}
-
-	p.reset()
-}
-
-func (p *httpRequestsParser) reset() {
+	p.request.Headers.Clear()
 	p.protoMajor = 0
 	p.protoMinor = 0
 	p.headersNumber = 0
@@ -823,7 +798,6 @@ func (p *httpRequestsParser) reset() {
 	p.pointer = 0
 	p.headerKeyAllocator.Clear()
 	p.headerValueAllocator.Clear()
-	p.trailer = false
 	p.contentLength = 0
 	p.state = eMethod
 }
