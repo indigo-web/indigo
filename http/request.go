@@ -32,6 +32,10 @@ type (
 		Fragment Fragment
 	}
 
+	TransferEncoding struct {
+		Chunked, HasTrailer bool
+	}
+
 	Fragment = string
 )
 
@@ -44,11 +48,11 @@ type Request struct {
 	Proto  proto.Proto
 	Remote net.Addr
 
-	Headers headers.Headers
+	Headers *headers.Headers
 
-	Upgrade       proto.Proto
-	ContentLength int
-	IsChunked     bool
+	Upgrade          proto.Proto
+	ContentLength    int
+	TransferEncoding TransferEncoding
 
 	body     BodyReader
 	bodyBuff []byte
@@ -66,7 +70,7 @@ type Request struct {
 // is invalid, we need to render a response using request method, but appears
 // that default method is a null-value (proto.Unknown)
 func NewRequest(
-	hdrs headers.Headers, query query.Query, response Response, conn net.Conn, body BodyReader,
+	hdrs *headers.Headers, query query.Query, response Response, conn net.Conn, body BodyReader,
 	paramsMap Params, disableParamsMapClearing bool,
 ) *Request {
 	request := &Request{
@@ -144,7 +148,7 @@ func (r *Request) Reader() io.Reader {
 // So result only depends on whether content-length is more than 0, or chunked
 // transfer encoding is enabled
 func (r *Request) HasBody() bool {
-	return r.ContentLength > 0 || r.IsChunked
+	return r.ContentLength > 0 || r.TransferEncoding.Chunked
 }
 
 // Hijack the connection. Request body will be implicitly read (so if you need it you
@@ -178,7 +182,7 @@ func (r *Request) Clear() (err error) {
 	}
 
 	r.ContentLength = 0
-	r.IsChunked = false
+	r.TransferEncoding = TransferEncoding{}
 	r.Upgrade = proto.Unknown
 
 	if r.clearParamsMap && len(r.Path.Params) > 0 {
@@ -192,11 +196,16 @@ func (r *Request) Clear() (err error) {
 
 // resetBody just reads the body until its end
 func (r *Request) resetBody() error {
-	return r.OnBody(func([]byte) error {
-		return nil
-	}, func() error {
-		return nil
-	})
+	for {
+		_, err := r.body.Read()
+		switch err {
+		case nil:
+		case io.EOF:
+			return nil
+		default:
+			return err
+		}
+	}
 }
 
 // RespondTo returns a response object of request
