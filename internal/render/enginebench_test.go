@@ -54,7 +54,7 @@ func BenchmarkRenderer_Response(b *testing.B) {
 	b.Run("DefaultResponse_NoDefHeaders", func(b *testing.B) {
 		buff := make([]byte, 0, 1024)
 		renderer := NewEngine(buff, nil, nil)
-
+		b.ReportAllocs()
 		b.ResetTimer()
 
 		for i := 0; i < b.N; i++ {
@@ -65,7 +65,7 @@ func BenchmarkRenderer_Response(b *testing.B) {
 	b.Run("DefaultResponse_1DefaultHeader", func(b *testing.B) {
 		buff := make([]byte, 0, 1024)
 		renderer := NewEngine(buff, nil, defaultHeadersSmall)
-
+		b.ReportAllocs()
 		b.ResetTimer()
 
 		for i := 0; i < b.N; i++ {
@@ -76,7 +76,7 @@ func BenchmarkRenderer_Response(b *testing.B) {
 	b.Run("DefaultResponse_3DefaultHeaders", func(b *testing.B) {
 		buff := make([]byte, 0, 1024)
 		renderer := NewEngine(buff, nil, defaultHeadersMedium)
-
+		b.ReportAllocs()
 		b.ResetTimer()
 
 		for i := 0; i < b.N; i++ {
@@ -87,7 +87,7 @@ func BenchmarkRenderer_Response(b *testing.B) {
 	b.Run("DefaultResponse_8DefaultHeaders", func(b *testing.B) {
 		buff := make([]byte, 0, 1024)
 		renderer := NewEngine(buff, nil, defaultHeadersBig)
-
+		b.ReportAllocs()
 		b.ResetTimer()
 
 		for i := 0; i < b.N; i++ {
@@ -99,7 +99,7 @@ func BenchmarkRenderer_Response(b *testing.B) {
 		resp := http.NewResponse().WithCode(status.SwitchingProtocols)
 		buff := make([]byte, 0, 128)
 		renderer := NewEngine(buff, nil, nil)
-
+		b.ReportAllocs()
 		b.ResetTimer()
 
 		for i := 0; i < b.N; i++ {
