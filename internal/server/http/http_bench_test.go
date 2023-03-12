@@ -140,6 +140,7 @@ func BenchmarkIndigo(b *testing.B) {
 	simpleGETClient := dummy.NewCircularClient(simpleGETRequest)
 	b.Run("SimpleGET", func(b *testing.B) {
 		b.ReportAllocs()
+		b.ResetTimer()
 
 		for i := 0; i < b.N; i++ {
 			server.RunOnce(simpleGETClient, request, bodyReader, render, parser)
@@ -149,6 +150,7 @@ func BenchmarkIndigo(b *testing.B) {
 	fiveHeadersGETClient := dummy.NewCircularClient(fiveHeadersGETRequest)
 	b.Run("FiveHeadersGET", func(b *testing.B) {
 		b.ReportAllocs()
+		b.ResetTimer()
 
 		for i := 0; i < b.N; i++ {
 			server.RunOnce(fiveHeadersGETClient, request, bodyReader, render, parser)
@@ -158,6 +160,7 @@ func BenchmarkIndigo(b *testing.B) {
 	tenHeadersGETClient := dummy.NewCircularClient(tenHeadersGETRequest)
 	b.Run("TenHeadersGET", func(b *testing.B) {
 		b.ReportAllocs()
+		b.ResetTimer()
 
 		for i := 0; i < b.N; i++ {
 			server.RunOnce(tenHeadersGETClient, request, bodyReader, render, parser)
@@ -167,6 +170,7 @@ func BenchmarkIndigo(b *testing.B) {
 	withRespHeadersGETClient := dummy.NewCircularClient(simpleGETWithHeader)
 	b.Run("WithRespHeader", func(b *testing.B) {
 		b.ReportAllocs()
+		b.ResetTimer()
 
 		for i := 0; i < b.N; i++ {
 			server.RunOnce(withRespHeadersGETClient, request, bodyReader, render, parser)
