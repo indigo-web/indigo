@@ -140,41 +140,45 @@ func Benchmark_Get(b *testing.B) {
 
 	b.Run("SimpleGET", func(b *testing.B) {
 		simpleGETClient := dummy.NewCircularClient(simpleGETRequest)
+		writer := simpleGETClient.Write
 		b.ReportAllocs()
 		b.ResetTimer()
 
 		for i := 0; i < b.N; i++ {
-			server.RunOnce(simpleGETClient, request, bodyReader, render, parser)
+			server.RunOnce(simpleGETClient, writer, request, bodyReader, render, parser)
 		}
 	})
 
 	b.Run("FiveHeadersGET", func(b *testing.B) {
 		fiveHeadersGETClient := dummy.NewCircularClient(fiveHeadersGETRequest)
+		writer := fiveHeadersGETClient.Write
 		b.ReportAllocs()
 		b.ResetTimer()
 
 		for i := 0; i < b.N; i++ {
-			server.RunOnce(fiveHeadersGETClient, request, bodyReader, render, parser)
+			server.RunOnce(fiveHeadersGETClient, writer, request, bodyReader, render, parser)
 		}
 	})
 
 	b.Run("TenHeadersGET", func(b *testing.B) {
 		tenHeadersGETClient := dummy.NewCircularClient(tenHeadersGETRequest)
+		writer := tenHeadersGETClient.Write
 		b.ReportAllocs()
 		b.ResetTimer()
 
 		for i := 0; i < b.N; i++ {
-			server.RunOnce(tenHeadersGETClient, request, bodyReader, render, parser)
+			server.RunOnce(tenHeadersGETClient, writer, request, bodyReader, render, parser)
 		}
 	})
 
 	b.Run("WithRespHeader", func(b *testing.B) {
 		withRespHeadersGETClient := dummy.NewCircularClient(simpleGETWithHeader)
+		writer := withRespHeadersGETClient.Write
 		b.ReportAllocs()
 		b.ResetTimer()
 
 		for i := 0; i < b.N; i++ {
-			server.RunOnce(withRespHeadersGETClient, request, bodyReader, render, parser)
+			server.RunOnce(withRespHeadersGETClient, writer, request, bodyReader, render, parser)
 		}
 	})
 }
@@ -187,6 +191,7 @@ func Benchmark_Post(b *testing.B) {
 	})
 	hdrs := headers.NewHeaders(make(map[string][]string, 10))
 	withBodyClient := dummy.NewCircularClient(simplePOST)
+	writer := withBodyClient.Write
 	reader := http1.NewBodyReader(withBodyClient, settings.Default().Body)
 	request := http.NewRequest(
 		hdrs, q, http.NewResponse(), dummy.NewNopConn(), reader, nil, false,
@@ -211,7 +216,7 @@ func Benchmark_Post(b *testing.B) {
 		b.ResetTimer()
 
 		for i := 0; i < b.N; i++ {
-			server.RunOnce(withBodyClient, request, reader, render, parser)
+			server.RunOnce(withBodyClient, writer, request, reader, render, parser)
 		}
 	})
 }
