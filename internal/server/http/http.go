@@ -41,13 +41,8 @@ func (h *httpServer) Run(
 	client tcp.Client, req *http.Request, reader http.BodyReader,
 	renderer render.Engine, p parser.HTTPRequestsParser,
 ) {
-	// because suddenly I found out, that passing a method in such a manner
-	// leads to the allocation of 24 bytes. I don't know how, I don't know why,
-	// but this is the only way to avoid this
-	writer := client.Write
-
 	for {
-		if !h.RunOnce(client, writer, req, reader, renderer, p) {
+		if !h.RunOnce(client, req, reader, renderer, p) {
 			break
 		}
 	}
@@ -56,7 +51,7 @@ func (h *httpServer) Run(
 }
 
 func (h *httpServer) RunOnce(
-	client tcp.Client, writer http.ResponseWriter, req *http.Request, reader http.BodyReader,
+	client tcp.Client, req *http.Request, reader http.BodyReader,
 	renderer render.Engine, p parser.HTTPRequestsParser,
 ) (continue_ bool) {
 	data, err := client.Read()
@@ -67,7 +62,7 @@ func (h *httpServer) RunOnce(
 			err = status.ErrCloseConnection
 		}
 
-		_ = renderer.Write(req.Proto, req, h.router.OnError(req, err), writer)
+		_ = renderer.Write(req.Proto, req, h.router.OnError(req, err), client)
 		return false
 	}
 
@@ -91,7 +86,7 @@ func (h *httpServer) RunOnce(
 			return false
 		}
 
-		if err = renderer.Write(protocol, req, response, writer); err != nil {
+		if err = renderer.Write(protocol, req, response, client); err != nil {
 			h.router.OnError(req, status.ErrCloseConnection)
 			return false
 		}
