@@ -124,7 +124,7 @@ func Default() Settings {
 		Headers: Headers{
 			Number: HeadersNumber{
 				Default: 10,
-				Maximal: 100,
+				Maximal: 50,
 			},
 			MaxKeyLength:   100,  // 100 bytes
 			MaxValueLength: 8192, // 8 kilobytes (just like nginx)
