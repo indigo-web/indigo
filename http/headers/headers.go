@@ -10,12 +10,6 @@ type Headers struct {
 }
 
 func NewHeaders(underlying map[string][]string) *Headers {
-	if underlying == nil {
-		// underlying MUST NEVER be nil, otherwise this causes panics in different places
-		// that are difficult to debug, mostly in tests
-		underlying = make(map[string][]string)
-	}
-
 	return &Headers{
 		headers: map2slice(underlying),
 	}
