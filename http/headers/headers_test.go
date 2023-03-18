@@ -27,8 +27,16 @@ func TestHeaders(t *testing.T) {
 	})
 
 	t.Run("Values_Existing", func(t *testing.T) {
+		headers := NewHeaders(map[string][]string{
+			"Hello": {"world"},
+			"Some":  {"multiple", "values"},
+		})
+
+		headers.Add("Hello", "nether")
+		headers.Add("Some", "injustice")
+
 		values := headers.Values("Some")
-		require.Equal(t, []string{"multiple", "values"}, values)
+		require.Equal(t, []string{"multiple", "values", "injustice"}, values)
 	})
 
 	t.Run("Values_NonExisting", func(t *testing.T) {
@@ -53,5 +61,30 @@ func TestHeaders(t *testing.T) {
 		headers.Add("SomeHeader", "SomeValue1", "SomeValue2")
 		values := headers.Values("SomeHeader")
 		require.Equal(t, []string{"SomeValue1", "SomeValue2"}, values)
+	})
+
+	t.Run("KeysIter", func(t *testing.T) {
+		headers := NewHeaders(map[string][]string{
+			"Hello": {"world"},
+			"Some":  {"multiple", "values"},
+		})
+
+		headers.Add("Hello", "nether")
+
+		iter := headers.KeysIter()
+		require.Equal(t, []string{"Hello", "Some"}, collectIterator(iter))
+	})
+
+	t.Run("ValuesIter", func(t *testing.T) {
+		headers := NewHeaders(map[string][]string{
+			"Hello": {"world"},
+			"Some":  {"multiple", "values"},
+		})
+
+		headers.Add("Hello", "nether")
+		headers.Add("Some", "injustice")
+
+		iter := headers.ValuesIter("Some")
+		require.Equal(t, []string{"multiple", "values", "injustice"}, collectIterator(iter))
 	})
 }
