@@ -17,18 +17,36 @@ func NewHeaders(underlying map[string][]string) *Headers {
 
 func (h *Headers) KeysIter() Iterator[string] {
 	// TODO: implement the same method, but using arenas
-	var index int
+	var (
+		index int
+		seen  []string
+	)
 
 	return func() (element string, continue_ bool) {
-		if index >= len(h.headers) {
-			return element, false
+		for index < len(h.headers) {
+			key := h.headers[index]
+			index += 2
+
+			if !contains(seen, key) {
+				// finally, unique key
+				seen = append(seen, key)
+
+				return key, true
+			}
 		}
 
-		element = h.headers[index]
-		index += 2
-
-		return element, true
+		return "", false
 	}
+}
+
+func contains(elements []string, key string) bool {
+	for i := range elements {
+		if elements[i] == key {
+			return true
+		}
+	}
+
+	return false
 }
 
 // Value does the same as ValueOr does but returning an empty string by default
@@ -57,7 +75,10 @@ func (h *Headers) ValuesIter(key string) Iterator[string] {
 
 		for ; offset < len(h.headers); offset += 2 {
 			if h.headers[offset] == key {
-				return h.headers[offset+1], true
+				value := h.headers[offset+1]
+				offset += 2
+
+				return value, true
 			}
 		}
 
@@ -68,13 +89,7 @@ func (h *Headers) ValuesIter(key string) Iterator[string] {
 // Values returns a slice of values including parameters
 func (h *Headers) Values(key string) (values []string) {
 	// TODO: amortize allocations by using arena
-	for i := 0; i < len(h.headers); i += 2 {
-		if h.headers[i] == key {
-			values = append(values, h.headers[i+1])
-		}
-	}
-
-	return values
+	return collectIterator(h.ValuesIter(key))
 }
 
 // Unwrap returns an underlying map as it is. This means that modifying it
@@ -116,4 +131,17 @@ func map2slice(m map[string][]string) []string {
 	}
 
 	return headers
+}
+
+func collectIterator(iter Iterator[string]) (values []string) {
+	for {
+		element, cont := iter()
+		if !cont {
+			break
+		}
+
+		values = append(values, element)
+	}
+
+	return values
 }
