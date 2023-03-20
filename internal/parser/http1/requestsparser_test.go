@@ -16,7 +16,7 @@ import (
 	methods "github.com/indigo-web/indigo/http/method"
 	"github.com/indigo-web/indigo/http/proto"
 	"github.com/indigo-web/indigo/http/query"
-	"github.com/indigo-web/indigo/internal/alloc"
+	"github.com/indigo-web/indigo/internal/arena"
 	httpparser "github.com/indigo-web/indigo/internal/parser"
 	settings2 "github.com/indigo-web/indigo/settings"
 	"github.com/stretchr/testify/require"
@@ -40,11 +40,11 @@ var (
 
 func getParser() (httpparser.HTTPRequestsParser, *http.Request) {
 	s := settings2.Default()
-	keyAllocator := alloc.NewAllocator(
+	keyArena := arena.NewArena(
 		s.Headers.MaxKeyLength*s.Headers.Number.Default,
 		s.Headers.MaxKeyLength*s.Headers.Number.Maximal,
 	)
-	valAllocator := alloc.NewAllocator(
+	valArena := arena.NewArena(
 		s.Headers.ValueSpace.Default, s.Headers.ValueSpace.Maximal,
 	)
 	objPool := pool.NewObjectPool[[]string](20)
@@ -56,7 +56,7 @@ func getParser() (httpparser.HTTPRequestsParser, *http.Request) {
 	startLineBuff := make([]byte, s.URL.MaxLength)
 
 	return NewHTTPRequestsParser(
-		request, keyAllocator, valAllocator, objPool, startLineBuff, s.Headers,
+		request, keyArena, valArena, objPool, startLineBuff, s.Headers,
 	), request
 }
 

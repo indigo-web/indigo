@@ -4,7 +4,7 @@ import (
 	"github.com/indigo-web/indigo/http"
 	"github.com/indigo-web/indigo/http/headers"
 	"github.com/indigo-web/indigo/http/query"
-	"github.com/indigo-web/indigo/internal/alloc"
+	"github.com/indigo-web/indigo/internal/arena"
 	httpparser "github.com/indigo-web/indigo/internal/parser"
 	"github.com/indigo-web/indigo/internal/parser/http1"
 	"github.com/indigo-web/indigo/internal/pool"
@@ -20,17 +20,17 @@ func newClient(tcpSettings settings.TCP, conn net.Conn) tcp.Client {
 	return tcp.NewClient(conn, tcpSettings.ReadTimeout, readBuff)
 }
 
-func newKeyValueAllocators(s settings.Headers) (alloc.Allocator, alloc.Allocator) {
-	keyAllocator := alloc.NewAllocator(
+func newKeyValueArenas(s settings.Headers) (arena.Arena, arena.Arena) {
+	keyArena := arena.NewArena(
 		s.MaxKeyLength*s.Number.Default,
 		s.MaxKeyLength*s.Number.Maximal,
 	)
-	valAllocator := alloc.NewAllocator(
+	valArena := arena.NewArena(
 		s.ValueSpace.Default,
 		s.ValueSpace.Maximal,
 	)
 
-	return keyAllocator, valAllocator
+	return keyArena, valArena
 }
 
 func newRequest(
@@ -53,7 +53,7 @@ func newRenderer(httpSettings settings.HTTP, a *Application) render.Engine {
 }
 
 func newHTTPParser(s settings.Settings, req *http.Request) httpparser.HTTPRequestsParser {
-	keyAlloc, valAlloc := newKeyValueAllocators(s.Headers)
+	keyAlloc, valAlloc := newKeyValueArenas(s.Headers)
 	objPool := pool.NewObjectPool[[]string](s.Headers.MaxValuesObjectPoolSize)
 
 	startLineBuff := make([]byte, s.URL.MaxLength)

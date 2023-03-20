@@ -10,7 +10,7 @@ import (
 	"github.com/indigo-web/indigo/http/proto"
 	"github.com/indigo-web/indigo/http/status"
 	"github.com/indigo-web/indigo/internal"
-	"github.com/indigo-web/indigo/internal/alloc"
+	"github.com/indigo-web/indigo/internal/arena"
 	"github.com/indigo-web/indigo/internal/parser"
 	"github.com/indigo-web/indigo/internal/pool"
 	"github.com/indigo-web/indigo/settings"
@@ -37,16 +37,16 @@ type httpRequestsParser struct {
 	urlEncodedChar         uint8
 	protoMajor, protoMinor uint8
 
-	headersNumber        int
-	headerKey            string
-	headerKeyAllocator   alloc.Allocator
-	headerValueAllocator alloc.Allocator
-	headerValueSize      int
-	headersValuesPool    pool.ObjectPool[[]string]
+	headersNumber     int
+	headerKey         string
+	headerKeyArena    arena.Arena
+	headerValueArena  arena.Arena
+	headerValueSize   int
+	headersValuesPool pool.ObjectPool[[]string]
 }
 
 func NewHTTPRequestsParser(
-	request *http.Request, keyAllocator, valAllocator alloc.Allocator,
+	request *http.Request, keyArena, valArena arena.Arena,
 	valuesPool pool.ObjectPool[[]string], startLineBuff []byte, headersSettings settings.Headers,
 ) parser.HTTPRequestsParser {
 	return &httpRequestsParser{
@@ -56,9 +56,9 @@ func NewHTTPRequestsParser(
 
 		startLineBuff: startLineBuff,
 
-		headerKeyAllocator:   keyAllocator,
-		headerValueAllocator: valAllocator,
-		headersValuesPool:    valuesPool,
+		headerKeyArena:    keyArena,
+		headerValueArena:  valArena,
+		headersValuesPool: valuesPool,
 	}
 }
 
@@ -573,11 +573,11 @@ headerKey:
 				return parser.Error, nil, status.ErrTooManyHeaders
 			}
 
-			if !p.headerKeyAllocator.Append(data[:i]) {
+			if !p.headerKeyArena.Append(data[:i]) {
 				return parser.Error, nil, status.ErrHeaderFieldsTooLarge
 			}
 
-			p.headerKey = internal.B2S(p.headerKeyAllocator.Finish())
+			p.headerKey = internal.B2S(p.headerKeyArena.Finish())
 			data = data[i+1:]
 
 			if p.headerKey == "content-length" {
@@ -594,7 +594,7 @@ headerKey:
 		}
 	}
 
-	if !p.headerKeyAllocator.Append(data) {
+	if !p.headerKeyArena.Append(data) {
 		return parser.Error, nil, status.ErrHeaderFieldsTooLarge
 	}
 
@@ -692,7 +692,7 @@ headerValue:
 				return parser.Error, nil, status.ErrHeaderFieldsTooLarge
 			}
 
-			if !p.headerValueAllocator.Append(data[:i]) {
+			if !p.headerValueArena.Append(data[:i]) {
 				return parser.Error, nil, status.ErrHeaderFieldsTooLarge
 			}
 
@@ -705,7 +705,7 @@ headerValue:
 				return parser.Error, nil, status.ErrHeaderFieldsTooLarge
 			}
 
-			if !p.headerValueAllocator.Append(data[:i]) {
+			if !p.headerValueArena.Append(data[:i]) {
 				return parser.Error, nil, status.ErrHeaderFieldsTooLarge
 			}
 
@@ -722,7 +722,7 @@ headerValue:
 		return parser.Error, nil, status.ErrHeaderFieldsTooLarge
 	}
 
-	if !p.headerValueAllocator.Append(data) {
+	if !p.headerValueArena.Append(data) {
 		return parser.Error, nil, status.ErrHeaderFieldsTooLarge
 	}
 
@@ -747,7 +747,7 @@ headerValueCRLF:
 		return parser.Pending, nil, nil
 	}
 
-	value = internal.B2S(p.headerValueAllocator.Finish())
+	value = internal.B2S(p.headerValueArena.Finish())
 	requestHeaders.Add(p.headerKey, value)
 
 	switch p.headerKey {
@@ -796,8 +796,8 @@ func (p *httpRequestsParser) Release() {
 	p.headersNumber = 0
 	p.begin = 0
 	p.pointer = 0
-	p.headerKeyAllocator.Clear()
-	p.headerValueAllocator.Clear()
+	p.headerKeyArena.Clear()
+	p.headerValueArena.Clear()
 	p.contentLength = 0
 	p.state = eMethod
 }

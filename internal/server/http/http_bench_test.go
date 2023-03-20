@@ -14,7 +14,7 @@ import (
 
 	"github.com/indigo-web/indigo/http/headers"
 	"github.com/indigo-web/indigo/http/query"
-	"github.com/indigo-web/indigo/internal/alloc"
+	"github.com/indigo-web/indigo/internal/arena"
 	"github.com/indigo-web/indigo/internal/parser/http1"
 	render2 "github.com/indigo-web/indigo/internal/render"
 	"github.com/indigo-web/indigo/settings"
@@ -123,17 +123,17 @@ func Benchmark_Get(b *testing.B) {
 	request := http.NewRequest(
 		hdrs, q, http.NewResponse(), dummy.NewNopConn(), bodyReader, nil, false,
 	)
-	keyAllocator := alloc.NewAllocator(
+	keyArena := arena.NewArena(
 		s.Headers.MaxKeyLength*s.Headers.Number.Default,
 		s.Headers.MaxKeyLength*s.Headers.Number.Maximal,
 	)
-	valAllocator := alloc.NewAllocator(
+	valArena := arena.NewArena(
 		s.Headers.ValueSpace.Default, s.Headers.ValueSpace.Maximal,
 	)
 	objPool := pool.NewObjectPool[[]string](20)
 	startLineBuff := make([]byte, s.URL.MaxLength)
 	parser := http1.NewHTTPRequestsParser(
-		request, keyAllocator, valAllocator, objPool, startLineBuff, s.Headers,
+		request, keyArena, valArena, objPool, startLineBuff, s.Headers,
 	)
 	render := render2.NewEngine(make([]byte, 0, 1024), nil, defaultHeaders)
 	server := NewHTTPServer(r).(*httpServer)
@@ -191,17 +191,17 @@ func Benchmark_Post(b *testing.B) {
 	request := http.NewRequest(
 		hdrs, q, http.NewResponse(), dummy.NewNopConn(), reader, nil, false,
 	)
-	keyAllocator := alloc.NewAllocator(
+	keyArena := arena.NewArena(
 		s.Headers.MaxKeyLength*s.Headers.Number.Default,
 		s.Headers.MaxKeyLength*s.Headers.Number.Maximal,
 	)
-	valAllocator := alloc.NewAllocator(
+	valArena := arena.NewArena(
 		s.Headers.ValueSpace.Default, s.Headers.ValueSpace.Maximal,
 	)
 	objPool := pool.NewObjectPool[[]string](20)
 	startLineBuff := make([]byte, s.URL.MaxLength)
 	parser := http1.NewHTTPRequestsParser(
-		request, keyAllocator, valAllocator, objPool, startLineBuff, s.Headers,
+		request, keyArena, valArena, objPool, startLineBuff, s.Headers,
 	)
 	render := render2.NewEngine(make([]byte, 0, 1024), nil, defaultHeaders)
 	server := NewHTTPServer(r).(*httpServer)
