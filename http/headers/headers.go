@@ -17,6 +17,7 @@ func NewHeaders(underlying map[string][]string) *Headers {
 
 func (h *Headers) KeysIter() Iterator[string] {
 	// TODO: implement the same method, but using arenas
+	// TODO: amortize allocations here with seen-buffer
 	var (
 		index int
 		seen  []string
@@ -37,16 +38,6 @@ func (h *Headers) KeysIter() Iterator[string] {
 
 		return "", false
 	}
-}
-
-func contains(elements []string, key string) bool {
-	for i := range elements {
-		if elements[i] == key {
-			return true
-		}
-	}
-
-	return false
 }
 
 // Value does the same as ValueOr does but returning an empty string by default
@@ -144,4 +135,14 @@ func collectIterator(iter Iterator[string]) (values []string) {
 	}
 
 	return values
+}
+
+func contains(elements []string, key string) bool {
+	for i := range elements {
+		if elements[i] == key {
+			return true
+		}
+	}
+
+	return false
 }
