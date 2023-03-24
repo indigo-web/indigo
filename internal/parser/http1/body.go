@@ -23,13 +23,13 @@ func NewBodyReader(client tcp.Client, bodySettings settings.Body) http.BodyReade
 }
 
 func (b *bodyReader) Init(request *http.Request) {
-	if !request.IsChunked {
+	if !request.TransferEncoding.Chunked {
 		b.bodyBytesLeft = request.ContentLength
 		return
 	}
 
 	b.bodyBytesLeft = -1
-	b.chunkedBodyTrailer = request.Headers.Has("trailer")
+	b.chunkedBodyTrailer = request.TransferEncoding.HasTrailer
 }
 
 func (b *bodyReader) Read() ([]byte, error) {

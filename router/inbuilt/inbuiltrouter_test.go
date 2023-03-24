@@ -5,7 +5,7 @@ import (
 
 	"github.com/indigo-web/indigo/http"
 
-	routertypes "github.com/indigo-web/indigo/router/inbuilt/types"
+	"github.com/indigo-web/indigo/router/inbuilt/types"
 
 	"github.com/indigo-web/indigo/http/status"
 
@@ -68,7 +68,7 @@ func TestRoute(t *testing.T) {
 
 func testMethodShorthand(
 	t *testing.T, router *Router,
-	route func(string, routertypes.HandlerFunc, ...routertypes.Middleware),
+	route func(string, types.HandlerFunc, ...types.Middleware),
 	method methods.Method,
 ) {
 	route("/", nopHandler)

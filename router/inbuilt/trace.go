@@ -49,18 +49,12 @@ func requestURI(request *http.Request, buff []byte) []byte {
 }
 
 func requestHeaders(request *http.Request, buff []byte) []byte {
-	for k, v := range request.Headers.Unwrap() {
-		buff = append(append(buff, k...), httpchars.COLONSP...)
-		buff = joinValuesInto(buff, v)
+	unwrapped := request.Headers.Unwrap()
+
+	for i := 0; i < len(unwrapped); i += 2 {
+		buff = append(append(buff, unwrapped[i]...), httpchars.COLONSP...)
+		buff = append(append(buff, unwrapped[i+1]...), httpchars.CRLF...)
 	}
 
 	return buff
-}
-
-func joinValuesInto(buff []byte, values []string) []byte {
-	for i := range values[:len(values)-1] {
-		buff = append(append(buff, values[i]...), httpchars.COMMA...)
-	}
-
-	return append(append(buff, values[len(values)-1]...), httpchars.CRLF...)
 }

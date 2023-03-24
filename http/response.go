@@ -1,6 +1,7 @@
 package http
 
 import (
+	"github.com/indigo-web/indigo/internal/render/types"
 	"io"
 	"os"
 	"strings"
@@ -16,30 +17,6 @@ const (
 	defaultHeadersNumber = 7
 	defaultContentType   = "text/html"
 )
-
-// Attachment is a wrapper for io.Reader, with the difference that there is the size attribute.
-// If positive value (including 0) is set, then ordinary plain-text response will be rendered.
-// Otherwise, chunked transfer encoding is used.
-type Attachment struct {
-	content io.Reader
-	size    int
-}
-
-// NewAttachment returns a new Attachment instance
-func NewAttachment(content io.Reader, size int) Attachment {
-	return Attachment{
-		content: content,
-		size:    size,
-	}
-}
-
-func (a Attachment) Content() io.Reader {
-	return a.content
-}
-
-func (a Attachment) Size() int {
-	return a.size
-}
 
 type Response struct {
 	Code status.Code
@@ -58,7 +35,7 @@ type Response struct {
 	// processing should usually be quite efficient.
 	//
 	// Note: if attachment is set, Body will be ignored
-	attachment Attachment
+	attachment types.Attachment
 }
 
 func NewResponse() Response {
@@ -166,7 +143,9 @@ func (r Response) WithWriter(cb func(io.Writer) error) (Response, error) {
 }
 
 // WithFile opens a file for reading, and returns a new response with attachment corresponding
-// to the file FD. In case not found or any other error, it'll be directly returned
+// to the file FD. In case not found or any other error, it'll be directly returned.
+// In case error occurred while opening the file, response builder won't be affected and stay
+// clean
 func (r Response) WithFile(path string) (Response, error) {
 	file, err := os.Open(path)
 	if err != nil {
@@ -174,14 +153,17 @@ func (r Response) WithFile(path string) (Response, error) {
 	}
 
 	stat, err := file.Stat()
-	attachment := NewAttachment(file, int(stat.Size()))
+	if err != nil {
+		return r, err
+	}
 
-	return r.WithAttachment(attachment), err
+	return r.WithAttachment(file, int(stat.Size())), nil
 }
 
-// WithAttachment sets a response's attachment. In this case response body will be ignored
-func (r Response) WithAttachment(attachment Attachment) Response {
-	r.attachment = attachment
+// WithAttachment sets a response's attachment. In this case response body will be ignored.
+// If size <= 0, then Transfer-Encoding: chunked will be used
+func (r Response) WithAttachment(reader io.Reader, size int) Response {
+	r.attachment = types.NewAttachment(reader, size)
 	return r
 }
 
@@ -222,7 +204,7 @@ func (r Response) Headers() []string {
 // Attachment returns response's attachment.
 //
 // WARNING: do NEVER use this method in your code. It serves internal purposes ONLY
-func (r Response) Attachment() Attachment {
+func (r Response) Attachment() types.Attachment {
 	return r.attachment
 }
 
@@ -234,7 +216,7 @@ func (r Response) Clear() Response {
 	r.TransferEncoding = ""
 	r.headers = r.headers[:0]
 	r.Body = nil
-	r.attachment = Attachment{}
+	r.attachment = types.Attachment{}
 	return r
 }
 

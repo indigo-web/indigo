@@ -5,18 +5,18 @@ import (
 
 	"github.com/indigo-web/indigo/internal/mapconv"
 	"github.com/indigo-web/indigo/router/inbuilt/radix"
-	routertypes "github.com/indigo-web/indigo/router/inbuilt/types"
+	"github.com/indigo-web/indigo/router/inbuilt/types"
 )
 
 type (
-	Obtainer    func(*http.Request) (routertypes.HandlerFunc, error)
-	constructor func(routertypes.RoutesMap) Obtainer
+	Obtainer    func(*http.Request) (types.HandlerFunc, error)
+	constructor func(types.RoutesMap) Obtainer
 )
 
 // Auto simply checks all the routes, and returns a corresponding obtainer.
 // In case all the routes are static, StaticObtainer is returned.
 // In case at least one route is dynamic, DynamicObtainer is returned
-func Auto(routes routertypes.RoutesMap) Obtainer {
+func Auto(routes types.RoutesMap) Obtainer {
 	return getObtainer(mapconv.Keys(routes))(routes)
 }
 

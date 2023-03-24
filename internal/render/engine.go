@@ -20,9 +20,13 @@ var (
 	emptyChunkedPart = []byte("0\r\n\r\n")
 )
 
+type ClientWriter interface {
+	Write([]byte) error
+}
+
 type Engine interface {
 	PreWrite(proto.Proto, http.Response)
-	Write(proto.Proto, *http.Request, http.Response, http.ResponseWriter) error
+	Write(proto.Proto, *http.Request, http.Response, ClientWriter) error
 }
 
 // engine is a renderer engine for HTTP responses. The point of it is to render response
@@ -62,7 +66,7 @@ func (e *engine) PreWrite(protocol proto.Proto, response http.Response) {
 
 // Render the response, respectively to the protocol
 func (e *engine) Write(
-	protocol proto.Proto, request *http.Request, response http.Response, writer http.ResponseWriter,
+	protocol proto.Proto, request *http.Request, response http.Response, writer ClientWriter,
 ) (err error) {
 	defer e.clear()
 
@@ -82,7 +86,7 @@ func (e *engine) Write(
 		e.buff = append(e.buff, response.Body...)
 	}
 
-	err = writer(e.buff)
+	err = writer.Write(e.buff)
 
 	if !isKeepAlive(protocol, request) && request.Upgrade == proto.Unknown {
 		err = status.ErrCloseConnection
@@ -126,13 +130,14 @@ func (e *engine) renderHeaders(response http.Response) {
 	}
 }
 
-// sendAttachment simply encapsulates
+// sendAttachment simply encapsulates all the logic related to rendering arbitrary
+// io.Reader implementations
 func (e *engine) sendAttachment(
-	request *http.Request, response http.Response, writer http.ResponseWriter,
+	request *http.Request, response http.Response, writer ClientWriter,
 ) error {
 	attachment := response.Attachment()
 
-	if size := attachment.Size(); size >= 0 {
+	if size := attachment.Size(); size > 0 {
 		e.renderHeaders(response)
 		e.renderContentLength(int64(size))
 	} else {
@@ -145,7 +150,7 @@ func (e *engine) sendAttachment(
 
 	e.crlf()
 
-	if err := writer(e.buff); err != nil {
+	if err := writer.Write(e.buff); err != nil {
 		return status.ErrCloseConnection
 	}
 
@@ -163,14 +168,14 @@ func (e *engine) sendAttachment(
 		e.fileBuff = make([]byte, fileBuffSize)
 	}
 
-	if size := attachment.Size(); size >= 0 {
+	if size := attachment.Size(); size > 0 {
 		return e.writePlainBody(attachment.Content(), writer)
 	}
 
 	return e.writeChunkedBody(attachment.Content(), writer)
 }
 
-func (e *engine) writePlainBody(r io.Reader, writer http.ResponseWriter) error {
+func (e *engine) writePlainBody(r io.Reader, writer ClientWriter) error {
 	// TODO: implement checking whether r implements io.ReaderAt interface. In case it does
 	//       body may be transferred more efficiently. This requires implementing io.Writer
 	//       http.ResponseWriter
@@ -185,13 +190,13 @@ func (e *engine) writePlainBody(r io.Reader, writer http.ResponseWriter) error {
 			return status.ErrCloseConnection
 		}
 
-		if err = writer(e.fileBuff[:n]); err != nil {
+		if err = writer.Write(e.fileBuff[:n]); err != nil {
 			return status.ErrCloseConnection
 		}
 	}
 }
 
-func (e *engine) writeChunkedBody(r io.Reader, writer http.ResponseWriter) error {
+func (e *engine) writeChunkedBody(r io.Reader, writer ClientWriter) error {
 	const (
 		hexValueOffset = 8
 		crlfSize       = 1 /* CR */ + 1 /* LF */
@@ -211,7 +216,7 @@ func (e *engine) writeChunkedBody(r io.Reader, writer http.ResponseWriter) error
 			copy(e.fileBuff[hexValueOffset:], httpchars.CRLF)
 			copy(e.fileBuff[buffOffset+n:], httpchars.CRLF)
 
-			if err := writer(e.fileBuff[blankSpace : buffOffset+n+crlfSize]); err != nil {
+			if err := writer.Write(e.fileBuff[blankSpace : buffOffset+n+crlfSize]); err != nil {
 				return status.ErrCloseConnection
 			}
 		}
@@ -219,7 +224,7 @@ func (e *engine) writeChunkedBody(r io.Reader, writer http.ResponseWriter) error
 		switch err {
 		case nil:
 		case io.EOF:
-			return writer(emptyChunkedPart)
+			return writer.Write(emptyChunkedPart)
 		default:
 			return status.ErrCloseConnection
 		}
