@@ -64,11 +64,10 @@ func TestHeaders(t *testing.T) {
 	})
 
 	t.Run("KeysIter", func(t *testing.T) {
-		headers := NewHeaders(map[string][]string{
-			"Hello": {"world"},
-			"Some":  {"multiple", "values"},
-		})
-
+		// using direct slice, as determined positions of keys are required
+		headers := Headers{
+			headers: []string{"Hello", "World", "Some", "multiple", "Some", "values"},
+		}
 		headers.Add("Hello", "nether")
 
 		iter := headers.KeysIter()
