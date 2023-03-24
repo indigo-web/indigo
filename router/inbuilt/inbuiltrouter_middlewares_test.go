@@ -11,7 +11,7 @@ import (
 
 	"github.com/indigo-web/indigo/http/status"
 
-	routertypes "github.com/indigo-web/indigo/router/inbuilt/types"
+	"github.com/indigo-web/indigo/router/inbuilt/types"
 
 	"github.com/indigo-web/indigo/http/headers"
 	methods "github.com/indigo-web/indigo/http/method"
@@ -45,7 +45,7 @@ func (c *callstack) Push(ware middleware) {
 	c.chain = append(c.chain, ware)
 }
 
-func (c callstack) Chain() []middleware {
+func (c *callstack) Chain() []middleware {
 	return c.chain
 }
 
@@ -53,56 +53,56 @@ func (c *callstack) Clear() {
 	c.chain = c.chain[:0]
 }
 
-func getGlobal1Middleware(stack *callstack) routertypes.Middleware {
-	return func(next routertypes.HandlerFunc, request *http.Request) http.Response {
+func getGlobal1Middleware(stack *callstack) types.Middleware {
+	return func(next types.HandlerFunc, request *http.Request) http.Response {
 		stack.Push(global1)
 
 		return next(request)
 	}
 }
 
-func getGlobal2Middleware(stack *callstack) routertypes.Middleware {
-	return func(next routertypes.HandlerFunc, request *http.Request) http.Response {
+func getGlobal2Middleware(stack *callstack) types.Middleware {
+	return func(next types.HandlerFunc, request *http.Request) http.Response {
 		stack.Push(global2)
 
 		return next(request)
 	}
 }
 
-func getLocal1Middleware(stack *callstack) routertypes.Middleware {
-	return func(next routertypes.HandlerFunc, request *http.Request) http.Response {
+func getLocal1Middleware(stack *callstack) types.Middleware {
+	return func(next types.HandlerFunc, request *http.Request) http.Response {
 		stack.Push(local1)
 
 		return next(request)
 	}
 }
 
-func getLocal2Middleware(stack *callstack) routertypes.Middleware {
-	return func(next routertypes.HandlerFunc, request *http.Request) http.Response {
+func getLocal2Middleware(stack *callstack) types.Middleware {
+	return func(next types.HandlerFunc, request *http.Request) http.Response {
 		stack.Push(local2)
 
 		return next(request)
 	}
 }
 
-func getLocal3Middleware(stack *callstack) routertypes.Middleware {
-	return func(next routertypes.HandlerFunc, request *http.Request) http.Response {
+func getLocal3Middleware(stack *callstack) types.Middleware {
+	return func(next types.HandlerFunc, request *http.Request) http.Response {
 		stack.Push(local3)
 
 		return next(request)
 	}
 }
 
-func getPointApplied1Middleware(stack *callstack) routertypes.Middleware {
-	return func(next routertypes.HandlerFunc, request *http.Request) http.Response {
+func getPointApplied1Middleware(stack *callstack) types.Middleware {
+	return func(next types.HandlerFunc, request *http.Request) http.Response {
 		stack.Push(pointApplied1)
 
 		return next(request)
 	}
 }
 
-func getPointApplied2Middleware(stack *callstack) routertypes.Middleware {
-	return func(next routertypes.HandlerFunc, request *http.Request) http.Response {
+func getPointApplied2Middleware(stack *callstack) types.Middleware {
+	return func(next types.HandlerFunc, request *http.Request) http.Response {
 		stack.Push(pointApplied2)
 
 		return next(request)

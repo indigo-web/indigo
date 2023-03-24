@@ -2,7 +2,7 @@ package inbuilt
 
 import (
 	"github.com/indigo-web/indigo/router/inbuilt/obtainer"
-	routertypes "github.com/indigo-web/indigo/router/inbuilt/types"
+	"github.com/indigo-web/indigo/router/inbuilt/types"
 )
 
 // Router is a built-in implementation of router.Router interface that provides
@@ -14,12 +14,12 @@ type Router struct {
 	groups []Router
 
 	prefix      string
-	middlewares []routertypes.Middleware
+	middlewares []types.Middleware
 
 	obtainer obtainer.Obtainer
 
-	routes      routertypes.RoutesMap
-	errHandlers routertypes.ErrHandlers
+	routes      types.RoutesMap
+	errHandlers types.ErrHandlers
 
 	traceBuff []byte
 }
@@ -27,7 +27,7 @@ type Router struct {
 // NewRouter constructs a new instance of inbuilt router
 func NewRouter() *Router {
 	r := &Router{
-		routes:      make(routertypes.RoutesMap),
+		routes:      make(types.RoutesMap),
 		errHandlers: newErrorHandlers(),
 	}
 

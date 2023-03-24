@@ -6,7 +6,7 @@ import (
 
 	"github.com/indigo-web/indigo/http"
 
-	routertypes "github.com/indigo-web/indigo/router/inbuilt/types"
+	"github.com/indigo-web/indigo/router/inbuilt/types"
 
 	"github.com/indigo-web/indigo"
 	"github.com/indigo-web/indigo/router/inbuilt"
@@ -14,7 +14,7 @@ import (
 
 var addr = "localhost:9090"
 
-func HelloWorldMiddleware(next routertypes.HandlerFunc, request *http.Request) http.Response {
+func HelloWorldMiddleware(next types.HandlerFunc, request *http.Request) http.Response {
 	fmt.Println("running middleware before handler")
 	response := next(request)
 	fmt.Println("running middleware after handler")
@@ -22,7 +22,7 @@ func HelloWorldMiddleware(next routertypes.HandlerFunc, request *http.Request) h
 	return response
 }
 
-func SecondMiddleware(next routertypes.HandlerFunc, request *http.Request) http.Response {
+func SecondMiddleware(next types.HandlerFunc, request *http.Request) http.Response {
 	fmt.Println("running second middleware before first one")
 	response := next(request)
 	fmt.Println("running second middleware after first one")

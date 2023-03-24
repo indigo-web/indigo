@@ -17,7 +17,7 @@ func TestParse_Positive(t *testing.T) {
 		parsed, err := Parse([]byte(query), defaultFactory)
 		require.NoError(t, err)
 		require.Contains(t, parsed, "hello")
-		require.Equal(t, "world", string(parsed["hello"]))
+		require.Equal(t, "world", parsed["hello"])
 	})
 
 	t.Run("TwoPairs", func(t *testing.T) {
@@ -25,9 +25,9 @@ func TestParse_Positive(t *testing.T) {
 		parsed, err := Parse([]byte(query), defaultFactory)
 		require.NoError(t, err)
 		require.Contains(t, parsed, "hello")
-		require.Equal(t, "world", string(parsed["hello"]))
+		require.Equal(t, "world", parsed["hello"])
 		require.Contains(t, parsed, "lorem")
-		require.Equal(t, "ipsum", string(parsed["lorem"]))
+		require.Equal(t, "ipsum", parsed["lorem"])
 	})
 }
 

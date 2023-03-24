@@ -14,7 +14,7 @@ import (
 	"github.com/indigo-web/indigo/http/headers"
 	methods "github.com/indigo-web/indigo/http/method"
 	"github.com/indigo-web/indigo/http/query"
-	routertypes "github.com/indigo-web/indigo/router/inbuilt/types"
+	"github.com/indigo-web/indigo/router/inbuilt/types"
 	"github.com/stretchr/testify/require"
 )
 
@@ -63,9 +63,9 @@ func testNegativeMatchMethodNotAllowed(t *testing.T, obtainer Obtainer) {
 }
 
 func TestStaticObtainer(t *testing.T) {
-	routes := routertypes.RoutesMap{
-		"/": routertypes.MethodsMap{
-			methods.GET: &routertypes.HandlerObject{
+	routes := types.RoutesMap{
+		"/": types.MethodsMap{
+			methods.GET: &types.HandlerObject{
 				Fun: nopHandler,
 			},
 		},
@@ -86,9 +86,9 @@ func TestStaticObtainer(t *testing.T) {
 }
 
 func TestDynamicObtainer(t *testing.T) {
-	routes := routertypes.RoutesMap{
-		"/": routertypes.MethodsMap{
-			methods.GET: &routertypes.HandlerObject{
+	routes := types.RoutesMap{
+		"/": types.MethodsMap{
+			methods.GET: &types.HandlerObject{
 				Fun: nopHandler,
 			},
 		},

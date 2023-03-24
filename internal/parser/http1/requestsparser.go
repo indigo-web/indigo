@@ -10,7 +10,7 @@ import (
 	"github.com/indigo-web/indigo/http/proto"
 	"github.com/indigo-web/indigo/http/status"
 	"github.com/indigo-web/indigo/internal"
-	"github.com/indigo-web/indigo/internal/alloc"
+	"github.com/indigo-web/indigo/internal/arena"
 	"github.com/indigo-web/indigo/internal/parser"
 	"github.com/indigo-web/indigo/internal/pool"
 	"github.com/indigo-web/indigo/settings"
@@ -30,25 +30,23 @@ type httpRequestsParser struct {
 
 	headersSettings settings.Headers
 
-	contentLength           int
-	chunkedTransferEncoding bool
-	trailer                 bool
+	contentLength int
 
 	startLineBuff          []byte
 	begin, pointer         int
 	urlEncodedChar         uint8
 	protoMajor, protoMinor uint8
 
-	headersNumber        int
-	headerKey            string
-	headerKeyAllocator   alloc.Allocator
-	headerValueAllocator alloc.Allocator
-	headerValueSize      int
-	headersValuesPool    pool.ObjectPool[[]string]
+	headersNumber     int
+	headerKey         string
+	headerKeyArena    arena.Arena
+	headerValueArena  arena.Arena
+	headerValueSize   int
+	headersValuesPool pool.ObjectPool[[]string]
 }
 
 func NewHTTPRequestsParser(
-	request *http.Request, keyAllocator, valAllocator alloc.Allocator,
+	request *http.Request, keyArena, valArena arena.Arena,
 	valuesPool pool.ObjectPool[[]string], startLineBuff []byte, headersSettings settings.Headers,
 ) parser.HTTPRequestsParser {
 	return &httpRequestsParser{
@@ -58,9 +56,9 @@ func NewHTTPRequestsParser(
 
 		startLineBuff: startLineBuff,
 
-		headerKeyAllocator:   keyAllocator,
-		headerValueAllocator: valAllocator,
-		headersValuesPool:    valuesPool,
+		headerKeyArena:    keyArena,
+		headerValueArena:  valArena,
+		headersValuesPool: valuesPool,
 	}
 }
 
@@ -265,6 +263,7 @@ query:
 			p.state = eProto
 			goto proto
 		case '#':
+			p.request.Path.Query.Set(p.startLineBuff[p.begin:p.pointer])
 			p.begin = p.pointer
 			data = data[i+1:]
 			p.state = eFragment
@@ -574,11 +573,11 @@ headerKey:
 				return parser.Error, nil, status.ErrTooManyHeaders
 			}
 
-			if !p.headerKeyAllocator.Append(data[:i]) {
+			if !p.headerKeyArena.Append(data[:i]) {
 				return parser.Error, nil, status.ErrHeaderFieldsTooLarge
 			}
 
-			p.headerKey = internal.B2S(p.headerKeyAllocator.Finish())
+			p.headerKey = internal.B2S(p.headerKeyArena.Finish())
 			data = data[i+1:]
 
 			if p.headerKey == "content-length" {
@@ -595,7 +594,7 @@ headerKey:
 		}
 	}
 
-	if !p.headerKeyAllocator.Append(data) {
+	if !p.headerKeyArena.Append(data) {
 		return parser.Error, nil, status.ErrHeaderFieldsTooLarge
 	}
 
@@ -693,7 +692,7 @@ headerValue:
 				return parser.Error, nil, status.ErrHeaderFieldsTooLarge
 			}
 
-			if !p.headerValueAllocator.Append(data[:i]) {
+			if !p.headerValueArena.Append(data[:i]) {
 				return parser.Error, nil, status.ErrHeaderFieldsTooLarge
 			}
 
@@ -706,7 +705,7 @@ headerValue:
 				return parser.Error, nil, status.ErrHeaderFieldsTooLarge
 			}
 
-			if !p.headerValueAllocator.Append(data[:i]) {
+			if !p.headerValueArena.Append(data[:i]) {
 				return parser.Error, nil, status.ErrHeaderFieldsTooLarge
 			}
 
@@ -723,7 +722,7 @@ headerValue:
 		return parser.Error, nil, status.ErrHeaderFieldsTooLarge
 	}
 
-	if !p.headerValueAllocator.Append(data) {
+	if !p.headerValueArena.Append(data) {
 		return parser.Error, nil, status.ErrHeaderFieldsTooLarge
 	}
 
@@ -748,15 +747,8 @@ headerValueCRLF:
 		return parser.Pending, nil, nil
 	}
 
-	value = internal.B2S(p.headerValueAllocator.Finish())
-
-	if requestHeaders.Has(p.headerKey) {
-		requestHeaders.Add(p.headerKey, value)
-	} else {
-		buff := p.headersValuesPool.Acquire()[:0]
-		buff = append(buff, value)
-		requestHeaders.Set(p.headerKey, buff)
-	}
+	value = internal.B2S(p.headerValueArena.Finish())
+	requestHeaders.Add(p.headerKey, value)
 
 	switch p.headerKey {
 	case "upgrade":
@@ -766,10 +758,9 @@ headerValueCRLF:
 			return parser.Error, nil, status.ErrMethodNotImplemented
 		}
 
-		p.chunkedTransferEncoding = true
-		p.request.IsChunked = true
+		p.request.TransferEncoding.Chunked = true
 	case "trailer":
-		p.trailer = true
+		p.request.TransferEncoding.HasTrailer = true
 	}
 
 	switch data[0] {
@@ -799,33 +790,14 @@ headerValueCRLFCR:
 }
 
 func (p *httpRequestsParser) Release() {
-	requestHeaders := p.request.Headers.Unwrap()
-
-	for _, values := range requestHeaders {
-		p.headersValuesPool.Release(values)
-	}
-
-	// separated delete-loop from releasing headers values pool because go's standard (Google's)
-	// compiler optimizes delete-loop ONLY in case there is a single expression that is a delete
-	// function call. So maybe such an optimization will make some difference
-	// TODO: profile this and proof that this optimization makes sense
-	for k := range requestHeaders {
-		delete(requestHeaders, k)
-	}
-
-	p.reset()
-}
-
-func (p *httpRequestsParser) reset() {
+	p.request.Headers.Clear()
 	p.protoMajor = 0
 	p.protoMinor = 0
 	p.headersNumber = 0
-	p.chunkedTransferEncoding = false
 	p.begin = 0
 	p.pointer = 0
-	p.headerKeyAllocator.Clear()
-	p.headerValueAllocator.Clear()
-	p.trailer = false
+	p.headerKeyArena.Clear()
+	p.headerValueArena.Clear()
 	p.contentLength = 0
 	p.state = eMethod
 }

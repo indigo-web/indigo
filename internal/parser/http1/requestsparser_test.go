@@ -16,7 +16,7 @@ import (
 	methods "github.com/indigo-web/indigo/http/method"
 	"github.com/indigo-web/indigo/http/proto"
 	"github.com/indigo-web/indigo/http/query"
-	"github.com/indigo-web/indigo/internal/alloc"
+	"github.com/indigo-web/indigo/internal/arena"
 	httpparser "github.com/indigo-web/indigo/internal/parser"
 	settings2 "github.com/indigo-web/indigo/settings"
 	"github.com/stretchr/testify/require"
@@ -40,11 +40,11 @@ var (
 
 func getParser() (httpparser.HTTPRequestsParser, *http.Request) {
 	s := settings2.Default()
-	keyAllocator := alloc.NewAllocator(
+	keyArena := arena.NewArena(
 		s.Headers.MaxKeyLength*s.Headers.Number.Default,
 		s.Headers.MaxKeyLength*s.Headers.Number.Maximal,
 	)
-	valAllocator := alloc.NewAllocator(
+	valArena := arena.NewArena(
 		s.Headers.ValueSpace.Default, s.Headers.ValueSpace.Maximal,
 	)
 	objPool := pool.NewObjectPool[[]string](20)
@@ -56,26 +56,30 @@ func getParser() (httpparser.HTTPRequestsParser, *http.Request) {
 	startLineBuff := make([]byte, s.URL.MaxLength)
 
 	return NewHTTPRequestsParser(
-		request, keyAllocator, valAllocator, objPool, startLineBuff, s.Headers,
+		request, keyArena, valArena, objPool, startLineBuff, s.Headers,
 	), request
 }
 
 type wantedRequest struct {
 	Method   methods.Method
 	Path     string
+	Fragment string
 	Protocol proto.Proto
-	Headers  headers.Headers
+	Headers  *headers.Headers
 }
 
 func compareRequests(t *testing.T, wanted wantedRequest, actual *http.Request) {
 	require.Equal(t, wanted.Method, actual.Method)
 	require.Equal(t, wanted.Path, actual.Path.String)
+	require.Equal(t, wanted.Fragment, actual.Path.Fragment)
 	require.Equal(t, wanted.Protocol, actual.Proto)
 
-	for key, values := range wanted.Headers.Unwrap() {
-		actualValues := actual.Headers.Values(key)
+	hdrs := wanted.Headers.Unwrap()
+
+	for i := 0; i < len(hdrs); i += 2 {
+		actualValues := actual.Headers.Values(hdrs[i])
 		require.NotNil(t, actualValues)
-		require.Equal(t, values, actualValues)
+		require.Equal(t, wanted.Headers.Values(hdrs[i]), actualValues)
 	}
 }
 
@@ -129,7 +133,7 @@ func TestHttpRequestsParser_Parse_GET(t *testing.T) {
 			Method:   methods.GET,
 			Path:     "/",
 			Protocol: proto.HTTP11,
-			Headers:  headers.Headers{},
+			Headers:  headers.NewHeaders(nil),
 		}
 
 		compareRequests(t, wanted, request)
@@ -147,7 +151,7 @@ func TestHttpRequestsParser_Parse_GET(t *testing.T) {
 			Method:   methods.GET,
 			Path:     "/",
 			Protocol: proto.HTTP11,
-			Headers:  headers.Headers{},
+			Headers:  headers.NewHeaders(nil),
 		}
 
 		compareRequests(t, wanted, request)
@@ -225,7 +229,7 @@ func TestHttpRequestsParser_Parse_GET(t *testing.T) {
 			Method:   methods.GET,
 			Path:     "/hello world",
 			Protocol: proto.HTTP11,
-			Headers:  headers.Headers{},
+			Headers:  headers.NewHeaders(nil),
 		}
 
 		compareRequests(t, wanted, request)
@@ -265,10 +269,95 @@ func TestHttpRequestsParser_Parse_GET(t *testing.T) {
 			Method:   methods.GET,
 			Path:     "http://www.w3.org/pub/WWW/TheProject.html",
 			Protocol: proto.HTTP11,
-			Headers:  headers.Headers{},
+			Headers:  headers.NewHeaders(nil),
 		}
 
 		compareRequests(t, wanted, request)
+		require.NoError(t, request.Clear())
+		parser.Release()
+	})
+
+	t.Run("FragmentAfterPath", func(t *testing.T) {
+		req := "GET /#Some%20where HTTP/1.1\r\n\r\n"
+		state, extra, err := parser.Parse([]byte(req))
+		require.NoError(t, err)
+		require.Equal(t, httpparser.HeadersCompleted, state)
+		require.Empty(t, extra)
+
+		wanted := wantedRequest{
+			Method:   methods.GET,
+			Path:     "/",
+			Fragment: "Some where",
+			Protocol: proto.HTTP11,
+			Headers:  headers.NewHeaders(nil),
+		}
+
+		compareRequests(t, wanted, request)
+		require.NoError(t, request.Clear())
+		parser.Release()
+	})
+
+	t.Run("FragmentNoPath", func(t *testing.T) {
+		req := "GET #Some%20where HTTP/1.1\r\n\r\n"
+		state, extra, err := parser.Parse([]byte(req))
+		require.NoError(t, err)
+		require.Equal(t, httpparser.HeadersCompleted, state)
+		require.Empty(t, extra)
+
+		wanted := wantedRequest{
+			Method:   methods.GET,
+			Path:     "/",
+			Fragment: "Some where",
+			Protocol: proto.HTTP11,
+			Headers:  headers.NewHeaders(nil),
+		}
+
+		compareRequests(t, wanted, request)
+		require.NoError(t, request.Clear())
+		parser.Release()
+	})
+
+	t.Run("QueryDecode_UrlEncoded", func(t *testing.T) {
+		req := "GET /?some%20where=wo%20rld#Fragment HTTP/1.1\r\n\r\n"
+		state, extra, err := parser.Parse([]byte(req))
+		require.NoError(t, err)
+		require.Equal(t, httpparser.HeadersCompleted, state)
+		require.Empty(t, extra)
+
+		wanted := wantedRequest{
+			Method:   methods.GET,
+			Path:     "/",
+			Fragment: "Fragment",
+			Protocol: proto.HTTP11,
+			Headers:  headers.NewHeaders(nil),
+		}
+
+		compareRequests(t, wanted, request)
+		require.Equal(t, "some where=wo rld", string(request.Path.Query.Raw()))
+		require.NoError(t, request.Clear())
+		parser.Release()
+	})
+
+	t.Run("TheOnlyContentLength", func(t *testing.T) {
+		raw := "GET / HTTP/1.1\r\nContent-Length: 13\n\r\nHello, world!"
+		state, extra, err := parser.Parse([]byte(raw))
+		require.NoError(t, err)
+		require.Equal(t, httpparser.HeadersCompleted, state)
+		require.Equal(t, "Hello, world!", string(extra))
+		require.Equal(t, 13, request.ContentLength)
+		require.NoError(t, request.Clear())
+		parser.Release()
+	})
+
+	t.Run("ContentLength", func(t *testing.T) {
+		raw := "GET / HTTP/1.1\r\nContent-Length: 13\r\nHi-Hi: ha-ha\r\n\r\nHello, world!"
+		state, extra, err := parser.Parse([]byte(raw))
+		require.NoError(t, err)
+		require.Equal(t, httpparser.HeadersCompleted, state)
+		require.Equal(t, "Hello, world!", string(extra))
+		require.Equal(t, 13, request.ContentLength)
+		require.True(t, request.Headers.Has("hi-hi"))
+		require.Equal(t, "ha-ha", request.Headers.Value("hi-hi"))
 		require.NoError(t, request.Clear())
 		parser.Release()
 	})
@@ -308,7 +397,7 @@ func TestHttpRequestsParser_ParsePOST(t *testing.T) {
 			Method:   methods.GET,
 			Path:     "/path",
 			Protocol: proto.HTTP11,
-			Headers:  headers.Headers{},
+			Headers:  headers.NewHeaders(nil),
 		}
 
 		compareRequests(t, wanted, request)
@@ -359,7 +448,7 @@ func TestHttpRequestsParser_Parse_Negative(t *testing.T) {
 		require.Equal(t, httpparser.Error, state)
 	})
 
-	t.Run("ShortInvalidProtocol", func(t *testing.T) {
+	t.Run("ShortInvalidProtocolString", func(t *testing.T) {
 		parser, _ := getParser()
 		raw := []byte("GET / HTT\r\n\r\n")
 		state, _, err := parser.Parse(raw)
@@ -367,7 +456,7 @@ func TestHttpRequestsParser_Parse_Negative(t *testing.T) {
 		require.Equal(t, httpparser.Error, state)
 	})
 
-	t.Run("LongInvalidProtocol", func(t *testing.T) {
+	t.Run("LongInvalidProtocolString", func(t *testing.T) {
 		parser, _ := getParser()
 		raw := []byte("GET / HTTPS/1.1\r\n\r\n")
 		state, _, err := parser.Parse(raw)
@@ -375,9 +464,25 @@ func TestHttpRequestsParser_Parse_Negative(t *testing.T) {
 		require.Equal(t, httpparser.Error, state)
 	})
 
-	t.Run("UnsupportedProtocol", func(t *testing.T) {
+	t.Run("UnsupportedProtocolVersion", func(t *testing.T) {
 		parser, _ := getParser()
 		raw := []byte("GET / HTTP/1.2\r\n\r\n")
+		state, _, err := parser.Parse(raw)
+		require.EqualError(t, err, status.ErrUnsupportedProtocol.Error())
+		require.Equal(t, httpparser.Error, state)
+	})
+
+	t.Run("InvalidProtocolVersion_Minor", func(t *testing.T) {
+		parser, _ := getParser()
+		raw := []byte("GET / HTTP/1.x\r\n\r\n")
+		state, _, err := parser.Parse(raw)
+		require.EqualError(t, err, status.ErrUnsupportedProtocol.Error())
+		require.Equal(t, httpparser.Error, state)
+	})
+
+	t.Run("InvalidProtocolVersion_Major", func(t *testing.T) {
+		parser, _ := getParser()
+		raw := []byte("GET / HTTP/x.1\r\n\r\n")
 		state, _, err := parser.Parse(raw)
 		require.EqualError(t, err, status.ErrUnsupportedProtocol.Error())
 		require.Equal(t, httpparser.Error, state)
@@ -451,6 +556,17 @@ func TestHttpRequestsParser_Parse_Negative(t *testing.T) {
 		state, _, err := parser.Parse(raw)
 		require.EqualError(t, err, status.ErrBadRequest.Error())
 		require.Equal(t, httpparser.Error, state)
+	})
+
+	t.Run("TooLongHeaderKey", func(t *testing.T) {
+		parser, _ := getParser()
+		s := settings2.Default().Headers
+		raw := fmt.Sprintf(
+			"GET / HTTP/1.1\r\n%s: some value\r\n\r\n",
+			strings.Repeat("a", s.MaxKeyLength*s.Number.Maximal+1),
+		)
+		_, _, err := parser.Parse([]byte(raw))
+		require.EqualError(t, err, status.ErrHeaderFieldsTooLarge.Error())
 	})
 
 	t.Run("TooLongHeaderValue", func(t *testing.T) {

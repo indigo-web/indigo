@@ -2,7 +2,7 @@ package inbuilt
 
 import (
 	"github.com/indigo-web/indigo/http/status"
-	routertypes "github.com/indigo-web/indigo/router/inbuilt/types"
+	"github.com/indigo-web/indigo/router/inbuilt/types"
 
 	"github.com/indigo-web/indigo/http"
 )
@@ -16,8 +16,8 @@ is 405 Method Not Allowed, because http requires Allow header, that is why
 we have to customize a behaviour of response with such a code
 */
 
-func newErrorHandlers() routertypes.ErrHandlers {
-	return routertypes.ErrHandlers{
+func newErrorHandlers() types.ErrHandlers {
+	return types.ErrHandlers{
 		status.ErrMethodNotAllowed: defaultMethodNotAllowedHandler,
 	}
 }

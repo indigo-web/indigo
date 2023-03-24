@@ -22,7 +22,7 @@ func getRequestWithReader(chunked bool, body ...[]byte) (*http.Request, http.Bod
 
 	var (
 		contentLength int
-		hdrs          headers.Headers
+		hdrs          *headers.Headers
 	)
 
 	if chunked {
@@ -44,7 +44,7 @@ func getRequestWithReader(chunked bool, body ...[]byte) (*http.Request, http.Bod
 		hdrs, query.Query{}, http.NewResponse(), dummy.NewNopConn(), reader, nil, false,
 	)
 	request.ContentLength = contentLength
-	request.IsChunked = chunked
+	request.TransferEncoding.Chunked = chunked
 
 	return request, reader
 }
