@@ -35,6 +35,15 @@ func newRequest() *http.Request {
 	)
 }
 
+type accumulativeClient struct {
+	Data []byte
+}
+
+func (a *accumulativeClient) Write(b []byte) error {
+	a.Data = append(a.Data, b...)
+	return nil
+}
+
 func TestEngine_Write(t *testing.T) {
 	request := newRequest()
 	request.Method = method.GET
@@ -43,13 +52,9 @@ func TestEngine_Write(t *testing.T) {
 
 	t.Run("NoHeaders", func(t *testing.T) {
 		renderer := getEngine(nil)
-		var data []byte
-		err := renderer.Write(proto.HTTP11, request, http.NewResponse(), func(b []byte) error {
-			data = b
-			return nil
-		})
-		require.NoError(t, err)
-		resp, err := stdhttp.ReadResponse(bufio.NewReader(bytes.NewBuffer(data)), stdreq)
+		writer := new(accumulativeClient)
+		require.NoError(t, renderer.Write(proto.HTTP11, request, http.NewResponse(), writer))
+		resp, err := stdhttp.ReadResponse(bufio.NewReader(bytes.NewBuffer(writer.Data)), stdreq)
 		require.Equal(t, 200, resp.StatusCode)
 		require.Equal(t, 2, len(resp.Header))
 		require.Contains(t, resp.Header, "Content-Length")
@@ -64,12 +69,9 @@ func TestEngine_Write(t *testing.T) {
 			WithHeader("Hello", "nether").
 			WithHeader("Something", "special", "here")
 
-		var data []byte
-		require.NoError(t, renderer.Write(proto.HTTP11, request, response, func(b []byte) error {
-			data = b
-			return nil
-		}))
-		resp, err := stdhttp.ReadResponse(bufio.NewReader(bytes.NewBuffer(data)), stdreq)
+		writer := new(accumulativeClient)
+		require.NoError(t, renderer.Write(proto.HTTP11, request, response, writer))
+		resp, err := stdhttp.ReadResponse(bufio.NewReader(bytes.NewBuffer(writer.Data)), stdreq)
 		require.Equal(t, 200, resp.StatusCode)
 
 		require.Equal(t, 1, len(resp.Header["Hello"]))
@@ -113,15 +115,12 @@ func TestEngine_Write(t *testing.T) {
 		request := newRequest()
 		request.Method = method.HEAD
 
-		var data []byte
-		require.NoError(t, renderer.Write(proto.HTTP11, request, response, func(b []byte) error {
-			data = b
-			return nil
-		}))
+		writer := new(accumulativeClient)
+		require.NoError(t, renderer.Write(proto.HTTP11, request, response, writer))
 
 		r, err := stdhttp.NewRequest(stdhttp.MethodHead, "/", nil)
 		require.NoError(t, err)
-		resp, err := stdhttp.ReadResponse(bufio.NewReader(bytes.NewBuffer(data)), r)
+		resp, err := stdhttp.ReadResponse(bufio.NewReader(bytes.NewBuffer(writer.Data)), r)
 		require.NoError(t, err)
 		require.Equal(t, len(body), int(resp.ContentLength))
 		fullBody, err := io.ReadAll(resp.Body)
@@ -132,11 +131,7 @@ func TestEngine_Write(t *testing.T) {
 	t.Run("HTTP/1.0_NoKeepAlive", func(t *testing.T) {
 		renderer := getEngine(nil)
 		response := http.NewResponse()
-
-		err := renderer.Write(proto.HTTP10, request, response, func([]byte) error {
-			return nil
-		})
-
+		err := renderer.Write(proto.HTTP10, request, response, new(accumulativeClient))
 		require.EqualError(t, err, status.ErrCloseConnection.Error())
 	})
 
@@ -144,13 +139,11 @@ func TestEngine_Write(t *testing.T) {
 		renderer := getEngine(nil)
 		response := http.NewResponse().WithCode(600)
 
-		var data []byte
-		err := renderer.Write(proto.HTTP11, request, response, func(b []byte) error {
-			data = b
-			return nil
-		})
+		writer := new(accumulativeClient)
+		require.NoError(t, renderer.Write(proto.HTTP11, request, response, writer))
 		require.NoError(t, err)
-		resp, err := stdhttp.ReadResponse(bufio.NewReader(bytes.NewBuffer(data)), stdreq)
+		resp, err := stdhttp.ReadResponse(bufio.NewReader(bytes.NewBuffer(writer.Data)), stdreq)
+		require.NoError(t, err)
 		require.Equal(t, 600, resp.StatusCode)
 	})
 
@@ -160,13 +153,10 @@ func TestEngine_Write(t *testing.T) {
 		renderer := getEngine(nil)
 		response := http.NewResponse().WithAttachment(reader, reader.Len())
 
-		var data []byte
-		require.NoError(t, renderer.Write(proto.HTTP11, request, response, func(b []byte) error {
-			data = append(data, b...)
-			return nil
-		}))
+		writer := new(accumulativeClient)
+		require.NoError(t, renderer.Write(proto.HTTP11, request, response, writer))
 
-		resp, err := stdhttp.ReadResponse(bufio.NewReader(bytes.NewBuffer(data)), stdreq)
+		resp, err := stdhttp.ReadResponse(bufio.NewReader(bytes.NewBuffer(writer.Data)), stdreq)
 		require.NoError(t, err)
 		require.Equal(t, len(body), int(resp.ContentLength))
 		require.Nil(t, resp.TransferEncoding)
@@ -181,13 +171,9 @@ func TestEngine_Write(t *testing.T) {
 		renderer := getEngine(nil)
 		response := http.NewResponse().WithAttachment(reader, 0)
 
-		var data []byte
-		require.NoError(t, renderer.Write(proto.HTTP11, request, response, func(b []byte) error {
-			data = append(data, b...)
-			return nil
-		}))
-
-		resp, err := stdhttp.ReadResponse(bufio.NewReader(bytes.NewBuffer(data)), stdreq)
+		writer := new(accumulativeClient)
+		require.NoError(t, renderer.Write(proto.HTTP11, request, response, writer))
+		resp, err := stdhttp.ReadResponse(bufio.NewReader(bytes.NewBuffer(writer.Data)), stdreq)
 		require.NoError(t, err)
 		require.Equal(t, 1, len(resp.TransferEncoding))
 		require.Equal(t, "chunked", resp.TransferEncoding[0])
@@ -205,13 +191,10 @@ func TestEngine_Write(t *testing.T) {
 		stdreq, err := stdhttp.NewRequest(stdhttp.MethodHead, "/", nil)
 		require.NoError(t, err)
 
-		var data []byte
-		require.NoError(t, renderer.Write(proto.HTTP11, request, response, func(b []byte) error {
-			data = append(data, b...)
-			return nil
-		}))
+		writer := new(accumulativeClient)
+		require.NoError(t, renderer.Write(proto.HTTP11, request, response, writer))
 
-		resp, err := stdhttp.ReadResponse(bufio.NewReader(bytes.NewBuffer(data)), stdreq)
+		resp, err := stdhttp.ReadResponse(bufio.NewReader(bytes.NewBuffer(writer.Data)), stdreq)
 		require.NoError(t, err)
 		require.Nil(t, resp.TransferEncoding)
 		require.Equal(t, len(body), int(resp.ContentLength))
@@ -236,11 +219,8 @@ func TestEngine_PreWrite(t *testing.T) {
 			WithHeader("Upgrade", "HTTP/1.1")
 		renderer.PreWrite(request.Proto, preResponse)
 
-		var data []byte
-		require.NoError(t, renderer.Write(request.Upgrade, request, http.NewResponse(), func(b []byte) error {
-			data = b
-			return nil
-		}))
+		writer := new(accumulativeClient)
+		require.NoError(t, renderer.Write(proto.HTTP11, request, http.NewResponse(), writer))
 
 		r := &stdhttp.Request{
 			Method:     stdhttp.MethodGet,
@@ -254,7 +234,7 @@ func TestEngine_PreWrite(t *testing.T) {
 			RemoteAddr: "",
 			RequestURI: "/",
 		}
-		reader := bufio.NewReader(bytes.NewBuffer(data))
+		reader := bufio.NewReader(bytes.NewBuffer(writer.Data))
 		resp, err := stdhttp.ReadResponse(reader, r)
 		require.NoError(t, err)
 		require.Equal(t, 101, resp.StatusCode)
@@ -276,13 +256,10 @@ func TestEngine_ChunkedTransfer(t *testing.T) {
 		renderer := getEngine(nil)
 		renderer.fileBuff = make([]byte, math.MaxUint16)
 
-		var data []byte
-		err := renderer.writeChunkedBody(reader, func(b []byte) error {
-			data = append(data, b...)
-			return nil
-		})
+		writer := new(accumulativeClient)
+		err := renderer.writeChunkedBody(reader, writer)
 		require.NoError(t, err)
-		require.Equal(t, wantData, string(data))
+		require.Equal(t, wantData, string(writer.Data))
 	})
 
 	t.Run("Long", func(t *testing.T) {
@@ -293,22 +270,22 @@ func TestEngine_ChunkedTransfer(t *testing.T) {
 		renderer := getEngine(nil)
 		renderer.fileBuff = make([]byte, buffSize)
 
-		var data []byte
-		err := renderer.writeChunkedBody(reader, func(b []byte) error {
-			for len(b) > 0 {
-				chunk, extra, err := parser.Parse(b, false)
-				if err == io.EOF {
-					return nil
-				}
+		writer := new(accumulativeClient)
+		require.NoError(t, renderer.writeChunkedBody(reader, writer))
 
-				require.NoError(t, err)
-				data = append(data, chunk...)
-				b = extra
+		var data []byte
+		for len(writer.Data) > 0 {
+			chunk, extra, err := parser.Parse(writer.Data, false)
+			if err != nil {
+				require.EqualError(t, err, io.EOF.Error())
+				break
 			}
 
-			return nil
-		})
-		require.NoError(t, err)
+			require.NoError(t, err)
+			data = append(data, chunk...)
+			writer.Data = extra
+		}
+
 		require.Equal(t, payload, string(data))
 	})
 }

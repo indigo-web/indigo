@@ -53,7 +53,7 @@ func (h *httpServer) Run(
 func (h *httpServer) RunOnce(
 	client tcp.Client, req *http.Request, reader http.BodyReader,
 	renderer render.Engine, p parser.HTTPRequestsParser,
-) bool {
+) (continue_ bool) {
 	data, err := client.Read()
 	if err != nil {
 		if errors.Is(err, os.ErrDeadlineExceeded) {
@@ -62,7 +62,7 @@ func (h *httpServer) RunOnce(
 			err = status.ErrCloseConnection
 		}
 
-		_ = renderer.Write(req.Proto, req, h.router.OnError(req, err), client.Write)
+		_ = renderer.Write(req.Proto, req, h.router.OnError(req, err), client)
 		return false
 	}
 
@@ -86,12 +86,13 @@ func (h *httpServer) RunOnce(
 			return false
 		}
 
-		if err = renderer.Write(protocol, req, response, client.Write); err != nil {
+		if err = renderer.Write(protocol, req, response, client); err != nil {
 			h.router.OnError(req, status.ErrCloseConnection)
 			return false
 		}
 
 		p.Release()
+
 		if err = req.Clear(); err != nil {
 			h.router.OnError(req, status.ErrCloseConnection)
 			return false

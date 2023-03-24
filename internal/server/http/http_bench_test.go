@@ -14,7 +14,7 @@ import (
 
 	"github.com/indigo-web/indigo/http/headers"
 	"github.com/indigo-web/indigo/http/query"
-	"github.com/indigo-web/indigo/internal/alloc"
+	"github.com/indigo-web/indigo/internal/arena"
 	"github.com/indigo-web/indigo/internal/parser/http1"
 	render2 "github.com/indigo-web/indigo/internal/render"
 	"github.com/indigo-web/indigo/settings"
@@ -68,6 +68,7 @@ func getInbuiltRouter() router.Router {
 		}, func() error {
 			return nil
 		})
+
 		return http.RespondTo(request)
 	})
 	r.Get("/with-header", func(request *http.Request) http.Response {
@@ -109,7 +110,7 @@ func getSimpleRouter() router.Router {
 	return r
 }
 
-func BenchmarkIndigo(b *testing.B) {
+func Benchmark_Get(b *testing.B) {
 	// for benchmarking, using more realistic conditions. In case we want a pure performance - use
 	// getSimpleRouter() here. It is visibly faster
 	r := getInbuiltRouter()
@@ -122,23 +123,23 @@ func BenchmarkIndigo(b *testing.B) {
 	request := http.NewRequest(
 		hdrs, q, http.NewResponse(), dummy.NewNopConn(), bodyReader, nil, false,
 	)
-	keyAllocator := alloc.NewAllocator(
+	keyArena := arena.NewArena(
 		s.Headers.MaxKeyLength*s.Headers.Number.Default,
 		s.Headers.MaxKeyLength*s.Headers.Number.Maximal,
 	)
-	valAllocator := alloc.NewAllocator(
+	valArena := arena.NewArena(
 		s.Headers.ValueSpace.Default, s.Headers.ValueSpace.Maximal,
 	)
 	objPool := pool.NewObjectPool[[]string](20)
 	startLineBuff := make([]byte, s.URL.MaxLength)
 	parser := http1.NewHTTPRequestsParser(
-		request, keyAllocator, valAllocator, objPool, startLineBuff, s.Headers,
+		request, keyArena, valArena, objPool, startLineBuff, s.Headers,
 	)
 	render := render2.NewEngine(make([]byte, 0, 1024), nil, defaultHeaders)
 	server := NewHTTPServer(r).(*httpServer)
 
-	simpleGETClient := dummy.NewCircularClient(simpleGETRequest)
 	b.Run("SimpleGET", func(b *testing.B) {
+		simpleGETClient := dummy.NewCircularClient(simpleGETRequest)
 		b.ReportAllocs()
 		b.ResetTimer()
 
@@ -147,8 +148,8 @@ func BenchmarkIndigo(b *testing.B) {
 		}
 	})
 
-	fiveHeadersGETClient := dummy.NewCircularClient(fiveHeadersGETRequest)
 	b.Run("FiveHeadersGET", func(b *testing.B) {
+		fiveHeadersGETClient := dummy.NewCircularClient(fiveHeadersGETRequest)
 		b.ReportAllocs()
 		b.ResetTimer()
 
@@ -157,8 +158,8 @@ func BenchmarkIndigo(b *testing.B) {
 		}
 	})
 
-	tenHeadersGETClient := dummy.NewCircularClient(tenHeadersGETRequest)
 	b.Run("TenHeadersGET", func(b *testing.B) {
+		tenHeadersGETClient := dummy.NewCircularClient(tenHeadersGETRequest)
 		b.ReportAllocs()
 		b.ResetTimer()
 
@@ -167,8 +168,8 @@ func BenchmarkIndigo(b *testing.B) {
 		}
 	})
 
-	withRespHeadersGETClient := dummy.NewCircularClient(simpleGETWithHeader)
 	b.Run("WithRespHeader", func(b *testing.B) {
+		withRespHeadersGETClient := dummy.NewCircularClient(simpleGETWithHeader)
 		b.ReportAllocs()
 		b.ResetTimer()
 
@@ -176,10 +177,36 @@ func BenchmarkIndigo(b *testing.B) {
 			server.RunOnce(withRespHeadersGETClient, request, bodyReader, render, parser)
 		}
 	})
+}
 
+func Benchmark_Post(b *testing.B) {
+	r := getInbuiltRouter()
+	s := settings.Default()
+	q := query.NewQuery(func() query.Map {
+		return make(query.Map)
+	})
+	hdrs := headers.NewHeaders(make(map[string][]string, 10))
 	withBodyClient := dummy.NewCircularClient(simplePOST)
+	reader := http1.NewBodyReader(withBodyClient, settings.Default().Body)
+	request := http.NewRequest(
+		hdrs, q, http.NewResponse(), dummy.NewNopConn(), reader, nil, false,
+	)
+	keyArena := arena.NewArena(
+		s.Headers.MaxKeyLength*s.Headers.Number.Default,
+		s.Headers.MaxKeyLength*s.Headers.Number.Maximal,
+	)
+	valArena := arena.NewArena(
+		s.Headers.ValueSpace.Default, s.Headers.ValueSpace.Maximal,
+	)
+	objPool := pool.NewObjectPool[[]string](20)
+	startLineBuff := make([]byte, s.URL.MaxLength)
+	parser := http1.NewHTTPRequestsParser(
+		request, keyArena, valArena, objPool, startLineBuff, s.Headers,
+	)
+	render := render2.NewEngine(make([]byte, 0, 1024), nil, defaultHeaders)
+	server := NewHTTPServer(r).(*httpServer)
+
 	b.Run("SimplePOST", func(b *testing.B) {
-		reader := http1.NewBodyReader(withBodyClient, settings.Default().Body)
 		b.ReportAllocs()
 		b.ResetTimer()
 

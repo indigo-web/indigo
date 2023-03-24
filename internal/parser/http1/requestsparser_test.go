@@ -16,7 +16,7 @@ import (
 	methods "github.com/indigo-web/indigo/http/method"
 	"github.com/indigo-web/indigo/http/proto"
 	"github.com/indigo-web/indigo/http/query"
-	"github.com/indigo-web/indigo/internal/alloc"
+	"github.com/indigo-web/indigo/internal/arena"
 	httpparser "github.com/indigo-web/indigo/internal/parser"
 	settings2 "github.com/indigo-web/indigo/settings"
 	"github.com/stretchr/testify/require"
@@ -40,11 +40,11 @@ var (
 
 func getParser() (httpparser.HTTPRequestsParser, *http.Request) {
 	s := settings2.Default()
-	keyAllocator := alloc.NewAllocator(
+	keyArena := arena.NewArena(
 		s.Headers.MaxKeyLength*s.Headers.Number.Default,
 		s.Headers.MaxKeyLength*s.Headers.Number.Maximal,
 	)
-	valAllocator := alloc.NewAllocator(
+	valArena := arena.NewArena(
 		s.Headers.ValueSpace.Default, s.Headers.ValueSpace.Maximal,
 	)
 	objPool := pool.NewObjectPool[[]string](20)
@@ -56,7 +56,7 @@ func getParser() (httpparser.HTTPRequestsParser, *http.Request) {
 	startLineBuff := make([]byte, s.URL.MaxLength)
 
 	return NewHTTPRequestsParser(
-		request, keyAllocator, valAllocator, objPool, startLineBuff, s.Headers,
+		request, keyArena, valArena, objPool, startLineBuff, s.Headers,
 	), request
 }
 
@@ -65,7 +65,7 @@ type wantedRequest struct {
 	Path     string
 	Fragment string
 	Protocol proto.Proto
-	Headers  headers.Headers
+	Headers  *headers.Headers
 }
 
 func compareRequests(t *testing.T, wanted wantedRequest, actual *http.Request) {
@@ -74,10 +74,12 @@ func compareRequests(t *testing.T, wanted wantedRequest, actual *http.Request) {
 	require.Equal(t, wanted.Fragment, actual.Path.Fragment)
 	require.Equal(t, wanted.Protocol, actual.Proto)
 
-	for key, values := range wanted.Headers.Unwrap() {
-		actualValues := actual.Headers.Values(key)
+	hdrs := wanted.Headers.Unwrap()
+
+	for i := 0; i < len(hdrs); i += 2 {
+		actualValues := actual.Headers.Values(hdrs[i])
 		require.NotNil(t, actualValues)
-		require.Equal(t, values, actualValues)
+		require.Equal(t, wanted.Headers.Values(hdrs[i]), actualValues)
 	}
 }
 
@@ -131,7 +133,7 @@ func TestHttpRequestsParser_Parse_GET(t *testing.T) {
 			Method:   methods.GET,
 			Path:     "/",
 			Protocol: proto.HTTP11,
-			Headers:  headers.Headers{},
+			Headers:  headers.NewHeaders(nil),
 		}
 
 		compareRequests(t, wanted, request)
@@ -149,7 +151,7 @@ func TestHttpRequestsParser_Parse_GET(t *testing.T) {
 			Method:   methods.GET,
 			Path:     "/",
 			Protocol: proto.HTTP11,
-			Headers:  headers.Headers{},
+			Headers:  headers.NewHeaders(nil),
 		}
 
 		compareRequests(t, wanted, request)
@@ -227,7 +229,7 @@ func TestHttpRequestsParser_Parse_GET(t *testing.T) {
 			Method:   methods.GET,
 			Path:     "/hello world",
 			Protocol: proto.HTTP11,
-			Headers:  headers.Headers{},
+			Headers:  headers.NewHeaders(nil),
 		}
 
 		compareRequests(t, wanted, request)
@@ -267,7 +269,7 @@ func TestHttpRequestsParser_Parse_GET(t *testing.T) {
 			Method:   methods.GET,
 			Path:     "http://www.w3.org/pub/WWW/TheProject.html",
 			Protocol: proto.HTTP11,
-			Headers:  headers.Headers{},
+			Headers:  headers.NewHeaders(nil),
 		}
 
 		compareRequests(t, wanted, request)
@@ -287,7 +289,7 @@ func TestHttpRequestsParser_Parse_GET(t *testing.T) {
 			Path:     "/",
 			Fragment: "Some where",
 			Protocol: proto.HTTP11,
-			Headers:  headers.Headers{},
+			Headers:  headers.NewHeaders(nil),
 		}
 
 		compareRequests(t, wanted, request)
@@ -307,7 +309,7 @@ func TestHttpRequestsParser_Parse_GET(t *testing.T) {
 			Path:     "/",
 			Fragment: "Some where",
 			Protocol: proto.HTTP11,
-			Headers:  headers.Headers{},
+			Headers:  headers.NewHeaders(nil),
 		}
 
 		compareRequests(t, wanted, request)
@@ -327,7 +329,7 @@ func TestHttpRequestsParser_Parse_GET(t *testing.T) {
 			Path:     "/",
 			Fragment: "Fragment",
 			Protocol: proto.HTTP11,
-			Headers:  headers.Headers{},
+			Headers:  headers.NewHeaders(nil),
 		}
 
 		compareRequests(t, wanted, request)
@@ -395,7 +397,7 @@ func TestHttpRequestsParser_ParsePOST(t *testing.T) {
 			Method:   methods.GET,
 			Path:     "/path",
 			Protocol: proto.HTTP11,
-			Headers:  headers.Headers{},
+			Headers:  headers.NewHeaders(nil),
 		}
 
 		compareRequests(t, wanted, request)

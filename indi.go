@@ -4,18 +4,12 @@ import (
 	"errors"
 	"net"
 
-	"github.com/indigo-web/indigo/http"
 	"github.com/indigo-web/indigo/internal/mapconv"
-	"github.com/indigo-web/indigo/internal/pool"
 	httpserver "github.com/indigo-web/indigo/internal/server/http"
 	"github.com/indigo-web/indigo/internal/server/tcp"
 
 	"github.com/indigo-web/indigo/http/encodings"
-	"github.com/indigo-web/indigo/http/headers"
-	"github.com/indigo-web/indigo/http/query"
-	"github.com/indigo-web/indigo/internal/alloc"
 	"github.com/indigo-web/indigo/internal/parser/http1"
-	"github.com/indigo-web/indigo/internal/render"
 	"github.com/indigo-web/indigo/router"
 	"github.com/indigo-web/indigo/settings"
 )
@@ -82,7 +76,7 @@ func (a *Application) Serve(r router.Router, optionalSettings ...settings.Settin
 		onStart.OnStart()
 	}
 
-	s, err := getSettings(optionalSettings...)
+	s, err := concreteSettings(optionalSettings...)
 	if err != nil {
 		return err
 	}
@@ -93,34 +87,11 @@ func (a *Application) Serve(r router.Router, optionalSettings ...settings.Settin
 	}
 
 	return tcp.RunTCPServer(sock, func(conn net.Conn) {
-		readBuff := make([]byte, s.TCP.ReadBufferSize)
-		client := tcp.NewClient(conn, s.TCP.ReadTimeout, readBuff)
-
-		keyAllocator := alloc.NewAllocator(
-			s.Headers.MaxKeyLength*s.Headers.Number.Default,
-			s.Headers.MaxKeyLength*s.Headers.Number.Maximal,
-		)
-		valAllocator := alloc.NewAllocator(
-			s.Headers.ValueSpace.Default,
-			s.Headers.ValueSpace.Maximal,
-		)
-		objPool := pool.NewObjectPool[[]string](s.Headers.MaxValuesObjectPoolSize)
-		q := query.NewQuery(func() query.Map {
-			return make(query.Map, s.URL.Query.DefaultMapSize)
-		})
-		hdrs := headers.NewHeaders(make(map[string][]string, s.Headers.Number.Default))
-		response := http.NewResponse()
+		client := newClient(s.TCP, conn)
 		bodyReader := http1.NewBodyReader(client, s.Body)
-		params := make(http.Params)
-		request := http.NewRequest(hdrs, q, response, conn, bodyReader, params, s.URL.Params.DisableMapClear)
-
-		startLineBuff := make([]byte, s.URL.MaxLength)
-		httpParser := http1.NewHTTPRequestsParser(
-			request, keyAllocator, valAllocator, objPool, startLineBuff, s.Headers,
-		)
-
-		respBuff := make([]byte, 0, s.HTTP.ResponseBuffSize)
-		renderer := render.NewEngine(respBuff, nil, a.defaultHeaders)
+		request := newRequest(s, conn, bodyReader)
+		renderer := newRenderer(s.HTTP, a)
+		httpParser := newHTTPParser(s, request)
 
 		httpServer := httpserver.NewHTTPServer(r)
 		httpServer.Run(client, request, bodyReader, renderer, httpParser)
@@ -142,8 +113,8 @@ func (a *Application) Wait() {
 	<-a.shutdown
 }
 
-// getSettings converts optional settings to concrete
-func getSettings(s ...settings.Settings) (settings.Settings, error) {
+// concreteSettings converts optional settings to concrete ones
+func concreteSettings(s ...settings.Settings) (settings.Settings, error) {
 	switch len(s) {
 	case 0:
 		return settings.Default(), nil
