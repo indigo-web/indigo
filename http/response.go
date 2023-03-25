@@ -167,33 +167,19 @@ func (r Response) WithAttachment(reader io.Reader, size int) Response {
 	return r
 }
 
-// WithError tries to set a corresponding status code and response body equal to error text
-// if error is known to server, otherwise setting status code to status.InternalServerError
-// without setting a response body to the error text, because this possibly may reveal some
-// sensitive internal infrastructure details
+// WithError checks, whether the passed error is a HTTPError instance. In this case,
+// setting response code and body to HTTPError.Code and HTTPError.Message respectively.
+// If the check failed, simply setting the code to status.InternalServerError. Error
+// message won't be included in the response, as this possibly can spoil project internals,
+// creating security breaches
 func (r Response) WithError(err error) Response {
-	resp := r.WithBody(err.Error())
-
-	switch err {
-	case status.ErrBadRequest:
-		return resp.WithCode(status.BadRequest)
-	case status.ErrNotFound:
-		return resp.WithCode(status.NotFound)
-	case status.ErrMethodNotAllowed:
-		return resp.WithCode(status.MethodNotAllowed)
-	case status.ErrTooLarge, status.ErrURITooLong:
-		return resp.WithCode(status.RequestEntityTooLarge)
-	case status.ErrHeaderFieldsTooLarge:
-		return resp.WithCode(status.RequestHeaderFieldsTooLarge)
-	case status.ErrUnsupportedProtocol:
-		return resp.WithCode(status.NotImplemented)
-	case status.ErrUnsupportedEncoding:
-		return resp.WithCode(status.NotAcceptable)
-	case status.ErrConnectionTimeout:
-		return resp.WithCode(status.RequestTimeout)
-	default:
-		return r.WithCode(status.InternalServerError)
+	if http, ok := err.(status.HTTPError); ok {
+		return r.
+			WithCode(http.Code).
+			WithBody(http.Message)
 	}
+
+	return r.WithCode(status.InternalServerError)
 }
 
 // Headers returns an underlying response headers
