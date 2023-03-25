@@ -68,6 +68,7 @@ const (
 	PreconditionRequired         Code = 428 // RFC 6585, 3
 	TooManyRequests              Code = 429 // RFC 6585, 4
 	RequestHeaderFieldsTooLarge  Code = 431 // RFC 6585, 5
+	CloseConnection              Code = 439
 	UnavailableForLegalReasons   Code = 451 // RFC 7725, 3
 
 	InternalServerError           Code = 500 // RFC 9110, 15.6.1
