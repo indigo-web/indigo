@@ -12,7 +12,14 @@ var (
 func Reduce[T constraints.Addable](f func(T, T) T, input []T, initial ...T) (result T) {
 	switch len(input) {
 	case 0:
-		return result
+		switch len(initial) {
+		case 0:
+			return result
+		case 1:
+			return initial[0]
+		default:
+			panic(errTooManyInitialValues)
+		}
 	case 1:
 		switch len(initial) {
 		case 0:
