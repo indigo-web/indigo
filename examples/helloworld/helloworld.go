@@ -4,9 +4,8 @@ import (
 	"fmt"
 	"log"
 
-	"github.com/indigo-web/indigo/http"
-
 	"github.com/indigo-web/indigo"
+	"github.com/indigo-web/indigo/http"
 	"github.com/indigo-web/indigo/http/status"
 	"github.com/indigo-web/indigo/router/inbuilt"
 )
