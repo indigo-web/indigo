@@ -12,7 +12,7 @@ import (
 
 	"github.com/indigo-web/indigo/http"
 	"github.com/indigo-web/indigo/http/headers"
-	methods "github.com/indigo-web/indigo/http/method"
+	"github.com/indigo-web/indigo/http/method"
 	"github.com/indigo-web/indigo/http/query"
 	"github.com/indigo-web/indigo/router/inbuilt/types"
 	"github.com/stretchr/testify/require"
@@ -22,7 +22,7 @@ func nopHandler(request *http.Request) http.Response {
 	return http.RespondTo(request)
 }
 
-func newRequest(path string, method methods.Method) *http.Request {
+func newRequest(path string, method method.Method) *http.Request {
 	hdrs := headers.NewHeaders(make(map[string][]string))
 	bodyReader := http1.NewBodyReader(dummy.NewNopClient(), settings.Default().Body)
 	request := http.NewRequest(
@@ -36,7 +36,7 @@ func newRequest(path string, method methods.Method) *http.Request {
 
 func testPositiveMatch(t *testing.T, obtainer Obtainer) {
 	path := "/"
-	request := newRequest(path, methods.GET)
+	request := newRequest(path, method.GET)
 	methodsMap, err := obtainer(request)
 	require.NoError(t, err)
 	require.NotNil(t, methodsMap)
@@ -44,7 +44,7 @@ func testPositiveMatch(t *testing.T, obtainer Obtainer) {
 
 func testNegativeMatchNotFound(t *testing.T, obtainer Obtainer) {
 	path := "/42"
-	request := newRequest(path, methods.GET)
+	request := newRequest(path, method.GET)
 	handler, err := obtainer(request)
 	require.EqualError(t, err, status.ErrNotFound.Error())
 	require.Nil(t, handler)
@@ -52,7 +52,7 @@ func testNegativeMatchNotFound(t *testing.T, obtainer Obtainer) {
 
 func testNegativeMatchMethodNotAllowed(t *testing.T, obtainer Obtainer) {
 	path := "/"
-	request := newRequest(path, methods.POST)
+	request := newRequest(path, method.POST)
 	handler, err := obtainer(request)
 	require.EqualError(t, err, status.ErrMethodNotAllowed.Error())
 	require.Nil(t, handler)
@@ -65,7 +65,7 @@ func testNegativeMatchMethodNotAllowed(t *testing.T, obtainer Obtainer) {
 func TestStaticObtainer(t *testing.T) {
 	routes := types.RoutesMap{
 		"/": types.MethodsMap{
-			methods.GET: &types.HandlerObject{
+			method.GET: &types.HandlerObject{
 				Fun: nopHandler,
 			},
 		},
@@ -88,7 +88,7 @@ func TestStaticObtainer(t *testing.T) {
 func TestDynamicObtainer(t *testing.T) {
 	routes := types.RoutesMap{
 		"/": types.MethodsMap{
-			methods.GET: &types.HandlerObject{
+			method.GET: &types.HandlerObject{
 				Fun: nopHandler,
 			},
 		},

@@ -1,4 +1,4 @@
-package methods
+package method
 
 type Method uint8
 

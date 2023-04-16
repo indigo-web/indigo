@@ -4,7 +4,7 @@ import (
 	"github.com/indigo-web/indigo/http/status"
 
 	"github.com/indigo-web/indigo/http"
-	methods "github.com/indigo-web/indigo/http/method"
+	"github.com/indigo-web/indigo/http/method"
 	"github.com/indigo-web/indigo/router/inbuilt/obtainer"
 	"github.com/indigo-web/indigo/valuectx"
 )
@@ -45,7 +45,7 @@ func (r *Router) OnError(request *http.Request, err error) http.Response {
 }
 
 func (r *Router) processError(request *http.Request, err error) http.Response {
-	if request.Method == methods.TRACE && err == status.ErrMethodNotAllowed {
+	if request.Method == method.TRACE && err == status.ErrMethodNotAllowed {
 		r.traceBuff = renderHTTPRequest(request, r.traceBuff)
 
 		return traceResponse(http.RespondTo(request), r.traceBuff)

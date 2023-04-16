@@ -3,7 +3,7 @@ package inbuilt
 import (
 	"github.com/indigo-web/indigo/http"
 	"github.com/indigo-web/indigo/http/headers"
-	method "github.com/indigo-web/indigo/http/method"
+	"github.com/indigo-web/indigo/http/method"
 	"github.com/indigo-web/indigo/http/query"
 	"github.com/indigo-web/indigo/internal/parser/http1"
 	"github.com/indigo-web/indigo/internal/server/tcp/dummy"

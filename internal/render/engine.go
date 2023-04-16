@@ -9,7 +9,7 @@ import (
 	"strings"
 
 	"github.com/indigo-web/indigo/http"
-	methods "github.com/indigo-web/indigo/http/method"
+	"github.com/indigo-web/indigo/http/method"
 	"github.com/indigo-web/indigo/http/proto"
 	"github.com/indigo-web/indigo/internal/httpchars"
 )
@@ -80,7 +80,7 @@ func (e *engine) Write(
 	e.renderContentLength(int64(len(response.Body)))
 	e.crlf()
 
-	if request.Method != methods.HEAD {
+	if request.Method != method.HEAD {
 		// HEAD request responses must be similar to GET request responses, except
 		// forced lack of body, even if Content-Length is specified
 		e.buff = append(e.buff, response.Body...)
@@ -154,7 +154,7 @@ func (e *engine) sendAttachment(
 		return status.ErrCloseConnection
 	}
 
-	if request.Method == methods.HEAD {
+	if request.Method == method.HEAD {
 		// HEAD requests MUST NOT contain response bodies. They are just like
 		// GET request, but without response entities
 		return nil

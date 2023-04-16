@@ -19,7 +19,7 @@ import (
 
 	"github.com/indigo-web/indigo/http"
 
-	methods "github.com/indigo-web/indigo/http/method"
+	"github.com/indigo-web/indigo/http/method"
 	"github.com/indigo-web/indigo/http/proto"
 	"github.com/indigo-web/indigo/router"
 	"github.com/indigo-web/indigo/router/inbuilt"
@@ -77,7 +77,7 @@ func getStaticRouter(t *testing.T) router.Router {
 	r := inbuilt.NewRouter()
 
 	r.Get("/simple-get", func(request *http.Request) http.Response {
-		require.Equal(t, methods.GET, request.Method)
+		require.Equal(t, method.GET, request.Method)
 		_, err := request.Path.Query.Get("some non-existing query key")
 		require.Error(t, err)
 		require.Empty(t, request.Path.Fragment)
