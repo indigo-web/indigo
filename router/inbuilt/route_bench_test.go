@@ -4,24 +4,24 @@ import (
 	"strings"
 	"testing"
 
-	methods "github.com/indigo-web/indigo/http/method"
+	"github.com/indigo-web/indigo/http/method"
 )
 
 func BenchmarkRequestRouting(b *testing.B) {
 	longURIRequest := getRequest()
-	longURIRequest.Method = methods.GET
+	longURIRequest.Method = method.GET
 	longURIRequest.Path.String = "/" + strings.Repeat("a", 255)
 
 	shortURIRequest := getRequest()
-	shortURIRequest.Method = methods.GET
+	shortURIRequest.Method = method.GET
 	shortURIRequest.Path.String = "/" + strings.Repeat("a", 15)
 
 	unknownURIRequest := getRequest()
-	unknownURIRequest.Method = methods.GET
+	unknownURIRequest.Method = method.GET
 	unknownURIRequest.Path.String = "/" + strings.Repeat("b", 255)
 
 	unknownMethodRequest := getRequest()
-	unknownMethodRequest.Method = methods.POST
+	unknownMethodRequest.Method = method.POST
 	unknownMethodRequest.Path.String = longURIRequest.Path.String
 
 	router := NewRouter()

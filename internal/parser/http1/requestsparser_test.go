@@ -13,7 +13,7 @@ import (
 
 	"github.com/indigo-web/indigo/http"
 	"github.com/indigo-web/indigo/http/headers"
-	methods "github.com/indigo-web/indigo/http/method"
+	"github.com/indigo-web/indigo/http/method"
 	"github.com/indigo-web/indigo/http/proto"
 	"github.com/indigo-web/indigo/http/query"
 	"github.com/indigo-web/indigo/internal/arena"
@@ -61,7 +61,7 @@ func getParser() (httpparser.HTTPRequestsParser, *http.Request) {
 }
 
 type wantedRequest struct {
-	Method   methods.Method
+	Method   method.Method
 	Path     string
 	Fragment string
 	Protocol proto.Proto
@@ -130,7 +130,7 @@ func TestHttpRequestsParser_Parse_GET(t *testing.T) {
 		require.Empty(t, extra)
 
 		wanted := wantedRequest{
-			Method:   methods.GET,
+			Method:   method.GET,
 			Path:     "/",
 			Protocol: proto.HTTP11,
 			Headers:  headers.NewHeaders(nil),
@@ -148,7 +148,7 @@ func TestHttpRequestsParser_Parse_GET(t *testing.T) {
 		require.Empty(t, extra)
 
 		wanted := wantedRequest{
-			Method:   methods.GET,
+			Method:   method.GET,
 			Path:     "/",
 			Protocol: proto.HTTP11,
 			Headers:  headers.NewHeaders(nil),
@@ -166,7 +166,7 @@ func TestHttpRequestsParser_Parse_GET(t *testing.T) {
 		require.Empty(t, extra)
 
 		wanted := wantedRequest{
-			Method:   methods.GET,
+			Method:   method.GET,
 			Path:     "/",
 			Protocol: proto.HTTP11,
 			Headers: headers.NewHeaders(map[string][]string{
@@ -186,7 +186,7 @@ func TestHttpRequestsParser_Parse_GET(t *testing.T) {
 		require.Empty(t, extra)
 
 		wanted := wantedRequest{
-			Method:   methods.GET,
+			Method:   method.GET,
 			Path:     "/",
 			Protocol: proto.HTTP11,
 			Headers: headers.NewHeaders(map[string][]string{
@@ -206,7 +206,7 @@ func TestHttpRequestsParser_Parse_GET(t *testing.T) {
 		require.Empty(t, extra)
 
 		wanted := wantedRequest{
-			Method:   methods.GET,
+			Method:   method.GET,
 			Path:     "/",
 			Protocol: proto.HTTP11,
 			Headers: headers.NewHeaders(map[string][]string{
@@ -226,7 +226,7 @@ func TestHttpRequestsParser_Parse_GET(t *testing.T) {
 		require.Empty(t, extra)
 
 		wanted := wantedRequest{
-			Method:   methods.GET,
+			Method:   method.GET,
 			Path:     "/hello world",
 			Protocol: proto.HTTP11,
 			Headers:  headers.NewHeaders(nil),
@@ -245,7 +245,7 @@ func TestHttpRequestsParser_Parse_GET(t *testing.T) {
 			require.Equal(t, httpparser.HeadersCompleted, state)
 
 			wanted := wantedRequest{
-				Method:   methods.GET,
+				Method:   method.GET,
 				Path:     "/",
 				Protocol: proto.HTTP11,
 				Headers: headers.NewHeaders(map[string][]string{
@@ -266,7 +266,7 @@ func TestHttpRequestsParser_Parse_GET(t *testing.T) {
 		require.Empty(t, extra)
 
 		wanted := wantedRequest{
-			Method:   methods.GET,
+			Method:   method.GET,
 			Path:     "http://www.w3.org/pub/WWW/TheProject.html",
 			Protocol: proto.HTTP11,
 			Headers:  headers.NewHeaders(nil),
@@ -285,7 +285,7 @@ func TestHttpRequestsParser_Parse_GET(t *testing.T) {
 		require.Empty(t, extra)
 
 		wanted := wantedRequest{
-			Method:   methods.GET,
+			Method:   method.GET,
 			Path:     "/",
 			Fragment: "Some where",
 			Protocol: proto.HTTP11,
@@ -305,7 +305,7 @@ func TestHttpRequestsParser_Parse_GET(t *testing.T) {
 		require.Empty(t, extra)
 
 		wanted := wantedRequest{
-			Method:   methods.GET,
+			Method:   method.GET,
 			Path:     "/",
 			Fragment: "Some where",
 			Protocol: proto.HTTP11,
@@ -325,7 +325,7 @@ func TestHttpRequestsParser_Parse_GET(t *testing.T) {
 		require.Empty(t, extra)
 
 		wanted := wantedRequest{
-			Method:   methods.GET,
+			Method:   method.GET,
 			Path:     "/",
 			Fragment: "Fragment",
 			Protocol: proto.HTTP11,
@@ -373,7 +373,7 @@ func TestHttpRequestsParser_ParsePOST(t *testing.T) {
 			require.Equal(t, httpparser.HeadersCompleted, state)
 
 			wanted := wantedRequest{
-				Method:   methods.POST,
+				Method:   method.POST,
 				Path:     "/",
 				Protocol: proto.HTTP11,
 				Headers: headers.NewHeaders(map[string][]string{
@@ -394,7 +394,7 @@ func TestHttpRequestsParser_ParsePOST(t *testing.T) {
 		require.Empty(t, extra)
 
 		wanted := wantedRequest{
-			Method:   methods.GET,
+			Method:   method.GET,
 			Path:     "/path",
 			Protocol: proto.HTTP11,
 			Headers:  headers.NewHeaders(nil),

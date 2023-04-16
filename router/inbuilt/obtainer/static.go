@@ -1,10 +1,10 @@
 package obtainer
 
 import (
-	methods "github.com/indigo-web/indigo/http/method"
 	"strings"
 
 	"github.com/indigo-web/indigo/http"
+	"github.com/indigo-web/indigo/http/method"
 	"github.com/indigo-web/indigo/http/status"
 	"github.com/indigo-web/indigo/internal/functools"
 	"github.com/indigo-web/indigo/internal/mapconv"
@@ -35,18 +35,18 @@ func getAllowedMethodsMap(routes types.RoutesMap) map[string]string {
 	allowedMethods := make(map[string]string, len(routes))
 
 	for resource, methodsMap := range routes {
-		keys := functools.Map(methods.ToString, mapconv.Keys(methodsMap))
+		keys := functools.Map(method.ToString, mapconv.Keys(methodsMap))
 		allowedMethods[resource] = strings.Join(keys, ",")
 	}
 
 	return allowedMethods
 }
 
-func getHandler(method methods.Method, methodsMap types.MethodsMap) types.HandlerFunc {
-	handler, found := methodsMap[method]
+func getHandler(reqMethod method.Method, methodsMap types.MethodsMap) types.HandlerFunc {
+	handler, found := methodsMap[reqMethod]
 	if !found {
-		if method == methods.HEAD {
-			return getHandler(methods.GET, methodsMap)
+		if reqMethod == method.HEAD {
+			return getHandler(method.GET, methodsMap)
 		}
 
 		return nil

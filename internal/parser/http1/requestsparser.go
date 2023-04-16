@@ -6,7 +6,7 @@ import (
 
 	"github.com/indigo-web/indigo/http"
 	"github.com/indigo-web/indigo/http/headers"
-	methods "github.com/indigo-web/indigo/http/method"
+	"github.com/indigo-web/indigo/http/method"
 	"github.com/indigo-web/indigo/http/proto"
 	"github.com/indigo-web/indigo/http/status"
 	"github.com/indigo-web/indigo/internal"
@@ -148,9 +148,9 @@ method:
 				return parser.Error, nil, status.ErrBadRequest
 			}
 
-			p.request.Method = methods.Parse(internal.B2S(p.startLineBuff[:p.pointer]))
+			p.request.Method = method.Parse(internal.B2S(p.startLineBuff[:p.pointer]))
 
-			if p.request.Method == methods.Unknown {
+			if p.request.Method == method.Unknown {
 				return parser.Error, nil, status.ErrMethodNotImplemented
 			}
 

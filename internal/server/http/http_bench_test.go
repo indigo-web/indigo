@@ -1,7 +1,7 @@
 package http
 
 import (
-	method "github.com/indigo-web/indigo/http/method"
+	"github.com/indigo-web/indigo/http/method"
 	"github.com/indigo-web/indigo/http/status"
 	"github.com/indigo-web/indigo/internal/server/tcp/dummy"
 	"github.com/indigo-web/indigo/router"

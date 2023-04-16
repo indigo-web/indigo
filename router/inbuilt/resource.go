@@ -1,7 +1,7 @@
 package inbuilt
 
 import (
-	methods "github.com/indigo-web/indigo/http/method"
+	"github.com/indigo-web/indigo/http/method"
 	"github.com/indigo-web/indigo/router/inbuilt/types"
 )
 
@@ -29,7 +29,7 @@ func (r Resource) Use(middlewares ...types.Middleware) Resource {
 }
 
 // Route is a shortcut to group.Route, providing the extra empty path to the call
-func (r Resource) Route(method methods.Method, fun types.HandlerFunc, mwares ...types.Middleware) Resource {
+func (r Resource) Route(method method.Method, fun types.HandlerFunc, mwares ...types.Middleware) Resource {
 	r.group.Route(method, "", fun, mwares...)
 	return r
 }

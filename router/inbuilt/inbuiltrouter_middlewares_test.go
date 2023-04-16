@@ -14,7 +14,7 @@ import (
 	"github.com/indigo-web/indigo/router/inbuilt/types"
 
 	"github.com/indigo-web/indigo/http/headers"
-	methods "github.com/indigo-web/indigo/http/method"
+	"github.com/indigo-web/indigo/http/method"
 	"github.com/indigo-web/indigo/http/query"
 	"github.com/stretchr/testify/require"
 )
@@ -148,7 +148,7 @@ func TestMiddlewares(t *testing.T) {
 
 	t.Run("/", func(t *testing.T) {
 		request := getRequest()
-		request.Method = methods.GET
+		request.Method = method.GET
 		request.Path.String = "/"
 
 		response := r.OnRequest(request)
@@ -164,7 +164,7 @@ func TestMiddlewares(t *testing.T) {
 
 	t.Run("/api/v1/hello", func(t *testing.T) {
 		request := getRequest()
-		request.Method = methods.GET
+		request.Method = method.GET
 		request.Path.String = "/api/v1/hello"
 
 		response := r.OnRequest(request)
@@ -180,7 +180,7 @@ func TestMiddlewares(t *testing.T) {
 
 	t.Run("/api/v2/world", func(t *testing.T) {
 		request := getRequest()
-		request.Method = methods.GET
+		request.Method = method.GET
 		request.Path.String = "/api/v2/world"
 
 		response := r.OnRequest(request)

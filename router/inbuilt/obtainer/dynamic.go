@@ -6,7 +6,7 @@ import (
 	"github.com/indigo-web/indigo/http/status"
 
 	"github.com/indigo-web/indigo/http"
-	methods "github.com/indigo-web/indigo/http/method"
+	"github.com/indigo-web/indigo/http/method"
 	"github.com/indigo-web/indigo/internal/functools"
 	"github.com/indigo-web/indigo/internal/mapconv"
 	"github.com/indigo-web/indigo/router/inbuilt/radix"
@@ -40,7 +40,7 @@ func getTree(routes types.RoutesMap) radix.Tree {
 	for k, v := range routes {
 		tree.MustInsert(radix.MustParse(k), radix.Payload{
 			MethodsMap: v,
-			Allow:      strings.Join(functools.Map(methods.ToString, mapconv.Keys(v)), ","),
+			Allow:      strings.Join(functools.Map(method.ToString, mapconv.Keys(v)), ","),
 		})
 	}
 

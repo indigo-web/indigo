@@ -8,7 +8,7 @@ import (
 
 	"github.com/indigo-web/indigo/http/headers"
 	// I don't know why, but otherwise GoLand cries about unused import, even if it's used
-	method "github.com/indigo-web/indigo/http/method"
+	"github.com/indigo-web/indigo/http/method"
 	"github.com/indigo-web/indigo/http/proto"
 	"github.com/indigo-web/indigo/http/query"
 )

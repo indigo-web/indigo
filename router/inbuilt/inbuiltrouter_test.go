@@ -9,7 +9,7 @@ import (
 
 	"github.com/indigo-web/indigo/http/status"
 
-	methods "github.com/indigo-web/indigo/http/method"
+	"github.com/indigo-web/indigo/http/method"
 	"github.com/stretchr/testify/require"
 )
 
@@ -24,38 +24,38 @@ func TestRoute(t *testing.T) {
 	r.OnStart()
 
 	t.Run("NewRoute", func(t *testing.T) {
-		r.Route(methods.GET, "/", nopHandler)
+		r.Route(method.GET, "/", nopHandler)
 
 		require.Contains(t, r.routes, "/")
 		require.Equal(t, 1, len(r.routes))
 		require.Equal(t, 1, len(r.routes["/"]))
-		require.Contains(t, r.routes["/"], methods.GET)
-		require.NotNil(t, r.routes["/"][methods.GET])
+		require.Contains(t, r.routes["/"], method.GET)
+		require.NotNil(t, r.routes["/"][method.GET])
 	})
 
 	t.Run("SamePathDifferentMethod", func(t *testing.T) {
-		r.Route(methods.POST, "/", nopHandler)
+		r.Route(method.POST, "/", nopHandler)
 
 		require.Contains(t, r.routes, "/")
 		require.Equal(t, 1, len(r.routes))
 		require.Equal(t, 2, len(r.routes["/"]))
-		require.Contains(t, r.routes["/"], methods.POST)
-		require.NotNil(t, r.routes["/"][methods.POST])
+		require.Contains(t, r.routes["/"], method.POST)
+		require.NotNil(t, r.routes["/"][method.POST])
 	})
 
 	t.Run("DifferentPath", func(t *testing.T) {
-		r.Route(methods.POST, "/hello", nopHandler)
+		r.Route(method.POST, "/hello", nopHandler)
 
 		require.Contains(t, r.routes, "/hello")
 		require.Equal(t, 2, len(r.routes))
 		require.Equal(t, 1, len(r.routes["/hello"]))
-		require.Contains(t, r.routes["/hello"], methods.POST)
-		require.NotNil(t, r.routes["/hello"][methods.POST])
+		require.Contains(t, r.routes["/hello"], method.POST)
+		require.NotNil(t, r.routes["/hello"][method.POST])
 	})
 
 	t.Run("HEAD", func(t *testing.T) {
 		request := getRequest()
-		request.Method = methods.HEAD
+		request.Method = method.HEAD
 		request.Path.String = "/"
 
 		resp := r.processRequest(request)
@@ -69,7 +69,7 @@ func TestRoute(t *testing.T) {
 func testMethodShorthand(
 	t *testing.T, router *Router,
 	route func(string, types.HandlerFunc, ...types.Middleware),
-	method methods.Method,
+	method method.Method,
 ) {
 	route("/", nopHandler)
 	require.Contains(t, router.routes, "/")
@@ -81,31 +81,31 @@ func TestMethodShorthands(t *testing.T) {
 	r := NewRouter()
 
 	t.Run("GET", func(t *testing.T) {
-		testMethodShorthand(t, r, r.Get, methods.GET)
+		testMethodShorthand(t, r, r.Get, method.GET)
 	})
 	t.Run("HEAD", func(t *testing.T) {
-		testMethodShorthand(t, r, r.Head, methods.HEAD)
+		testMethodShorthand(t, r, r.Head, method.HEAD)
 	})
 	t.Run("POST", func(t *testing.T) {
-		testMethodShorthand(t, r, r.Post, methods.POST)
+		testMethodShorthand(t, r, r.Post, method.POST)
 	})
 	t.Run("PUT", func(t *testing.T) {
-		testMethodShorthand(t, r, r.Put, methods.PUT)
+		testMethodShorthand(t, r, r.Put, method.PUT)
 	})
 	t.Run("DELETE", func(t *testing.T) {
-		testMethodShorthand(t, r, r.Delete, methods.DELETE)
+		testMethodShorthand(t, r, r.Delete, method.DELETE)
 	})
 	t.Run("CONNECT", func(t *testing.T) {
-		testMethodShorthand(t, r, r.Connect, methods.CONNECT)
+		testMethodShorthand(t, r, r.Connect, method.CONNECT)
 	})
 	t.Run("OPTIONS", func(t *testing.T) {
-		testMethodShorthand(t, r, r.Options, methods.OPTIONS)
+		testMethodShorthand(t, r, r.Options, method.OPTIONS)
 	})
 	t.Run("TRACE", func(t *testing.T) {
-		testMethodShorthand(t, r, r.Trace, methods.TRACE)
+		testMethodShorthand(t, r, r.Trace, method.TRACE)
 	})
 	t.Run("PATCH", func(t *testing.T) {
-		testMethodShorthand(t, r, r.Patch, methods.PATCH)
+		testMethodShorthand(t, r, r.Patch, method.PATCH)
 	})
 }
 
@@ -146,8 +146,8 @@ func TestResource(t *testing.T) {
 	t.Run("Root", func(t *testing.T) {
 		require.Contains(t, r.routes, "/")
 		rootMethods := r.routes["/"]
-		require.Contains(t, rootMethods, methods.GET)
-		require.Contains(t, rootMethods, methods.POST)
+		require.Contains(t, rootMethods, method.GET)
+		require.Contains(t, rootMethods, method.POST)
 		require.Equal(
 			t, 2, len(rootMethods),
 			"only GET and POST methods are expected to be presented",
@@ -157,8 +157,8 @@ func TestResource(t *testing.T) {
 	t.Run("Group", func(t *testing.T) {
 		require.Contains(t, r.routes, "/api/stat")
 		apiMethods := r.routes["/api/stat"]
-		require.Contains(t, apiMethods, methods.GET)
-		require.Contains(t, apiMethods, methods.POST)
+		require.Contains(t, apiMethods, method.GET)
+		require.Contains(t, apiMethods, method.POST)
 		require.Equal(
 			t, 2, len(apiMethods),
 			"only GET and POST methods are expected to be presented",

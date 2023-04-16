@@ -3,7 +3,7 @@ package types
 import (
 	"github.com/indigo-web/indigo/http"
 
-	methods "github.com/indigo-web/indigo/http/method"
+	"github.com/indigo-web/indigo/http/method"
 )
 
 type (
@@ -16,7 +16,7 @@ type (
 )
 
 type (
-	MethodsMap map[methods.Method]*HandlerObject
+	MethodsMap map[method.Method]*HandlerObject
 	RoutesMap  map[string]MethodsMap
 
 	HandlerObject struct {

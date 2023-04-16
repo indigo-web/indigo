@@ -7,7 +7,7 @@ import (
 	"github.com/indigo-web/indigo"
 	"github.com/indigo-web/indigo/http"
 	"github.com/indigo-web/indigo/http/status"
-	"github.com/indigo-web/indigo/router/inbuilt"
+	"github.com/indigo-web/indigo/router/simple"
 )
 
 var addr = "localhost:9090"
@@ -20,8 +20,9 @@ func MyHandler(request *http.Request) http.Response {
 }
 
 func main() {
-	myRouter := inbuilt.NewRouter()
-	myRouter.Get("/", MyHandler)
+	myRouter := simple.NewRouter(MyHandler, func(request *http.Request, err error) http.Response {
+		return http.RespondTo(request).WithError(err)
+	})
 
 	fmt.Println("Listening on", addr)
 	app := indigo.NewApp(addr)
