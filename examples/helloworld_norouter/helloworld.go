@@ -2,11 +2,22 @@ package main
 
 import (
 	"fmt"
+	"log"
+
 	"github.com/indigo-web/indigo"
 	"github.com/indigo-web/indigo/http"
+	"github.com/indigo-web/indigo/http/status"
 	"github.com/indigo-web/indigo/router/simple"
-	"log"
 )
+
+var addr = "localhost:9090"
+
+func MyHandler(request *http.Request) http.Response {
+	return http.RespondTo(request).
+		WithCode(status.OK).
+		WithHeader("Hello", "world").
+		WithBody("<h1>How are you doing?</h1>")
+}
 
 func main() {
 	myRouter := simple.NewRouter(MyHandler, func(request *http.Request, err error) http.Response {
