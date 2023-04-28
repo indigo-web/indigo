@@ -61,11 +61,11 @@ func getParser() (httpparser.HTTPRequestsParser, *http.Request) {
 }
 
 type wantedRequest struct {
-	Method   method.Method
+	Headers  *headers.Headers
 	Path     string
 	Fragment string
+	Method   method.Method
 	Protocol proto.Proto
-	Headers  *headers.Headers
 }
 
 func compareRequests(t *testing.T, wanted wantedRequest, actual *http.Request) {

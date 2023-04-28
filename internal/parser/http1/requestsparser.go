@@ -25,24 +25,22 @@ const maxMethodLength = len("CONNECT")
 // parser.HeadersCompleted to notify http server about this, attaching all
 // the pending data as an extra. Body must be processed separately
 type httpRequestsParser struct {
-	state   parserState
-	request *http.Request
-
-	headersSettings settings.Headers
-
-	contentLength int
-
-	startLineBuff          []byte
-	begin, pointer         int
-	urlEncodedChar         uint8
-	protoMajor, protoMinor uint8
-
-	headersNumber     int
+	request           *http.Request
 	headerKey         string
+	startLineBuff     []byte
+	headersValuesPool pool.ObjectPool[[]string]
 	headerKeyArena    arena.Arena
 	headerValueArena  arena.Arena
+	headersSettings   settings.Headers
+	begin             int
+	pointer           int
+	headersNumber     int
+	contentLength     int
 	headerValueSize   int
-	headersValuesPool pool.ObjectPool[[]string]
+	urlEncodedChar    uint8
+	protoMajor        uint8
+	protoMinor        uint8
+	state             parserState
 }
 
 func NewHTTPRequestsParser(

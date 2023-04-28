@@ -17,9 +17,9 @@ type (
 // Query is optional, it may contain rawQuery, but it will not be parsed until
 // needed
 type Query struct {
-	rawQuery     rawQuery
 	parsedQuery  Map
 	queryFactory mapFactory
+	rawQuery     rawQuery
 }
 
 func NewQuery(queryFactory mapFactory) Query {

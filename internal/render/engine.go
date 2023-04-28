@@ -35,10 +35,11 @@ type Engine interface {
 // to make possible files distribution be more efficient. At the moment, this feature isn't
 // implemented yet, but will be soon
 type engine struct {
-	buff, fileBuff                        []byte
-	buffOffset                            int
-	defaultHeaders, defaultHeadersReserve types.DefaultHeaders
-	// TODO: add files distribution mechanism (and probably edit docstring)
+	buff                  []byte
+	fileBuff              []byte
+	defaultHeaders        types.DefaultHeaders
+	defaultHeadersReserve types.DefaultHeaders
+	buffOffset            int
 }
 
 func NewEngine(buff, fileBuff []byte, defaultHeaders map[string][]string) Engine {

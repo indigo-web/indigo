@@ -17,8 +17,8 @@ const (
 var ErrEmptyPath = errors.New("template cannot be empty")
 
 type Segment struct {
-	IsDynamic bool
 	Payload   string
+	IsDynamic bool
 }
 
 // Template is a parsed template. It simply contains static parts, and marker names

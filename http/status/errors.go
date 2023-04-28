@@ -1,8 +1,8 @@
 package status
 
 type HTTPError struct {
-	Code    Code
 	Message string
+	Code    Code
 }
 
 func newErr(code Code, message string) HTTPError {

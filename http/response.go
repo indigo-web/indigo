@@ -19,23 +19,13 @@ const (
 )
 
 type Response struct {
-	Code status.Code
-	// Status is empty by default, in this case renderer must put a default one
-	Status status.Status
-	// headers are just a slice of strings, length of which is always dividable by 2, because
-	// it contains pairs of keys and values
-	headers []string
-	// ContentType, as a special for core header, should be treated individually
-	ContentType string
-	// The same is about TransferEncoding
+	attachment       types.Attachment
+	Status           status.Status
+	ContentType      string
 	TransferEncoding string
+	headers          []string
 	Body             []byte
-
-	// attachment is a reader that's going to be read only at response's rendering, so its
-	// processing should usually be quite efficient.
-	//
-	// Note: if attachment is set, Body will be ignored
-	attachment types.Attachment
+	Code             status.Code
 }
 
 func NewResponse() Response {

@@ -43,25 +43,21 @@ type (
 // About headers manager see at http/headers/headers.go:Manager
 // Headers attribute references at that one that lays in manager
 type Request struct {
-	Method method.Method
-	Path   Path
-	Proto  proto.Proto
-	Remote net.Addr
-
-	Headers *headers.Headers
-
-	Upgrade          proto.Proto
+	body             BodyReader
+	conn             net.Conn
+	Remote           net.Addr
+	Ctx              context.Context
+	Headers          *headers.Headers
+	response         Response
+	Path             Path
+	bodyBuff         []byte
 	ContentLength    int
 	TransferEncoding TransferEncoding
-
-	body     BodyReader
-	bodyBuff []byte
-
-	Ctx            context.Context
-	response       Response
-	conn           net.Conn
-	wasHijacked    bool
-	clearParamsMap bool
+	Method           method.Method
+	Upgrade          proto.Proto
+	Proto            proto.Proto
+	wasHijacked      bool
+	clearParamsMap   bool
 }
 
 // NewRequest returns a new instance of request object and body gateway

@@ -27,12 +27,10 @@ var DefaultHeaders = map[string][]string{
 // Application is just a struct with addr and shutdown channel that is currently
 // not used. Planning to replace it with context.WithCancel()
 type Application struct {
-	addr string
-
 	decoders       encodings.Decoders
 	defaultHeaders map[string][]string
-
-	shutdown chan struct{}
+	shutdown       chan struct{}
+	addr           string
 }
 
 // NewApp returns a new application object with initialized shutdown chan
