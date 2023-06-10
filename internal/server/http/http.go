@@ -98,7 +98,9 @@ func (h *httpServer) RunOnce(
 			return false
 		}
 	case parser.Error:
-		h.router.OnError(req, err)
+		// as fatal error already happened and connection will anyway be closed, we don't
+		// care about any socket errors anymore
+		_ = renderer.Write(req.Proto, req, h.router.OnError(req, err), client)
 		p.Release()
 		return false
 	default:
