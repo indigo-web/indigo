@@ -3,8 +3,10 @@ package main
 import (
 	"fmt"
 	"github.com/indigo-web/indigo/router/inbuilt/middleware"
+	"github.com/indigo-web/indigo/settings"
 	"log"
 	"strconv"
+	"time"
 
 	"github.com/indigo-web/indigo/http"
 
@@ -86,7 +88,13 @@ func main() {
 	hello.Get("/world", World)
 	hello.Get("/easter", Easter)
 
+	s := settings.Default()
+	s.TCP.ReadTimeout = time.Hour
+
 	fmt.Println("Listening on", addr)
 	app := indigo.NewApp(addr)
-	log.Fatal(app.Serve(r))
+
+	if err := app.Serve(r, s); err != nil {
+		log.Fatal(err)
+	}
 }
