@@ -8,7 +8,7 @@ import (
 	httpserver "github.com/indigo-web/indigo/internal/server/http"
 	"github.com/indigo-web/indigo/internal/server/tcp"
 
-	"github.com/indigo-web/indigo/http/encodings"
+	"github.com/indigo-web/indigo/http/decode"
 	"github.com/indigo-web/indigo/internal/parser/http1"
 	"github.com/indigo-web/indigo/router"
 	"github.com/indigo-web/indigo/settings"
@@ -27,7 +27,7 @@ var DefaultHeaders = map[string][]string{
 // Application is just a struct with addr and shutdown channel that is currently
 // not used. Planning to replace it with context.WithCancel()
 type Application struct {
-	decoders       encodings.Decoders
+	decoder        *decode.Decoder
 	defaultHeaders map[string][]string
 	shutdown       chan struct{}
 	addr           string
@@ -37,15 +37,15 @@ type Application struct {
 func NewApp(addr string) *Application {
 	return &Application{
 		addr:           addr,
-		decoders:       encodings.NewContentDecoders(),
+		decoder:        decode.NewDecoder(),
 		defaultHeaders: mapconv.Copy(DefaultHeaders),
 		shutdown:       make(chan struct{}, 1),
 	}
 }
 
 // AddContentDecoder simply adds a new content decoder
-func (a *Application) AddContentDecoder(token string, decoder encodings.Decoder) {
-	a.decoders.Add(token, decoder)
+func (a *Application) AddContentDecoder(token string, decoder decode.DecoderFactory) {
+	a.decoder.Add(token, decoder)
 }
 
 // SetDefaultHeaders overrides default headers to a passed ones.
@@ -67,11 +67,11 @@ func (a *Application) DeleteDefaultHeader(key string) {
 // Also, if specified, Accept-Encodings default header's value will be set here
 func (a *Application) Serve(r router.Router, optionalSettings ...settings.Settings) error {
 	if accept, found := a.defaultHeaders["Accept-Encodings"]; found && accept == nil {
-		a.defaultHeaders["Accept-Encodings"] = a.decoders.Acceptable()
+		a.defaultHeaders["Accept-Encodings"] = a.decoder.Acceptable()
 	}
 
-	if onStart, ok := r.(router.OnStarter); ok {
-		onStart.OnStart()
+	if err := r.OnStart(); err != nil {
+		return err
 	}
 
 	s, err := concreteSettings(optionalSettings...)
