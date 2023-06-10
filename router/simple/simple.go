@@ -2,7 +2,10 @@ package simple
 
 import (
 	"github.com/indigo-web/indigo/http"
+	"github.com/indigo-web/indigo/router"
 )
+
+var _ router.Router = Router{}
 
 type (
 	Handler      func(*http.Request) http.Response
@@ -19,6 +22,10 @@ func NewRouter(handler Handler, errHandler ErrorHandler) Router {
 		handler:    handler,
 		errHandler: errHandler,
 	}
+}
+
+func (r Router) OnStart() error {
+	return nil
 }
 
 func (r Router) OnRequest(request *http.Request) http.Response {

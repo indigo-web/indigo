@@ -1,9 +1,12 @@
 package inbuilt
 
 import (
+	"github.com/indigo-web/indigo/router"
 	"github.com/indigo-web/indigo/router/inbuilt/obtainer"
 	"github.com/indigo-web/indigo/router/inbuilt/types"
 )
+
+var _ router.Router = &Router{}
 
 // Router is a built-in implementation of router.Router interface that provides
 // some basic router features like middlewares, groups, dynamic routing, error

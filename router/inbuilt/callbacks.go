@@ -16,11 +16,13 @@ Methods listed here MUST NOT be called by user ever
 */
 
 // OnStart composes all the registered handlers with middlewares
-func (r *Router) OnStart() {
+func (r *Router) OnStart() error {
 	r.applyGroups()
 	r.applyMiddlewares()
 
 	r.obtainer = obtainer.Auto(r.routes)
+
+	return nil
 }
 
 // OnRequest routes the request
