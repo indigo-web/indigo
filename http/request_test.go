@@ -21,6 +21,10 @@ func newDummyReader(client tcp.Client) dummyBodyReader {
 func (d dummyBodyReader) Init(*Request) {}
 
 func (d dummyBodyReader) Read() ([]byte, error) {
+	return d.ReadNoDecoding()
+}
+
+func (d dummyBodyReader) ReadNoDecoding() ([]byte, error) {
 	return d.client.Read()
 }
 
@@ -28,7 +32,8 @@ func TestRequest_Reader(t *testing.T) {
 	t.Run("Ordinary", func(t *testing.T) {
 		first, second := []byte("Hello"), []byte("World!")
 		client := dummy.NewCircularClient(first, second)
-		reader := newBodyIOReader(newDummyReader(client))
+		reader := newBodyIOReader()
+		reader.reader = newDummyReader(client)
 		buff := make([]byte, 1024)
 
 		n, err := reader.Read(buff)
@@ -48,7 +53,8 @@ func TestRequest_Reader(t *testing.T) {
 	t.Run("Partially", func(t *testing.T) {
 		first, second := []byte("Hello"), []byte("World!")
 		client := dummy.NewCircularClient(first, second)
-		reader := newBodyIOReader(newDummyReader(client))
+		reader := newBodyIOReader()
+		reader.reader = newDummyReader(client)
 		buff := make([]byte, 3)
 
 		n, err := reader.Read(buff)

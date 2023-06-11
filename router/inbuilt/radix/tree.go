@@ -25,12 +25,10 @@ type Tree interface {
 
 type Node struct {
 	staticSegments map[string]*Node
-	isDynamic      bool
+	next           *Node
+	payload        *Payload
 	dynamicName    string
-	// Next is used only in case current node is dynamic
-	next *Node
-
-	payload *Payload
+	isDynamic      bool
 }
 
 func NewTree() Tree {

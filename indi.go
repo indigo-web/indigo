@@ -3,12 +3,13 @@ package indigo
 import (
 	"errors"
 	"net"
+	"strings"
 
 	"github.com/indigo-web/indigo/internal/mapconv"
 	httpserver "github.com/indigo-web/indigo/internal/server/http"
 	"github.com/indigo-web/indigo/internal/server/tcp"
 
-	"github.com/indigo-web/indigo/http/encodings"
+	"github.com/indigo-web/indigo/http/decode"
 	"github.com/indigo-web/indigo/internal/parser/http1"
 	"github.com/indigo-web/indigo/router"
 	"github.com/indigo-web/indigo/settings"
@@ -27,27 +28,25 @@ var DefaultHeaders = map[string][]string{
 // Application is just a struct with addr and shutdown channel that is currently
 // not used. Planning to replace it with context.WithCancel()
 type Application struct {
-	addr string
-
-	decoders       encodings.Decoders
+	decoder        *decode.Decoder
 	defaultHeaders map[string][]string
-
-	shutdown chan struct{}
+	shutdown       chan struct{}
+	addr           string
 }
 
 // NewApp returns a new application object with initialized shutdown chan
 func NewApp(addr string) *Application {
 	return &Application{
 		addr:           addr,
-		decoders:       encodings.NewContentDecoders(),
+		decoder:        decode.NewDecoder(),
 		defaultHeaders: mapconv.Copy(DefaultHeaders),
 		shutdown:       make(chan struct{}, 1),
 	}
 }
 
 // AddContentDecoder simply adds a new content decoder
-func (a *Application) AddContentDecoder(token string, decoder encodings.Decoder) {
-	a.decoders.Add(token, decoder)
+func (a *Application) AddContentDecoder(token string, decoder decode.DecoderFactory) {
+	a.decoder.Add(token, decoder)
 }
 
 // SetDefaultHeaders overrides default headers to a passed ones.
@@ -69,11 +68,14 @@ func (a *Application) DeleteDefaultHeader(key string) {
 // Also, if specified, Accept-Encodings default header's value will be set here
 func (a *Application) Serve(r router.Router, optionalSettings ...settings.Settings) error {
 	if accept, found := a.defaultHeaders["Accept-Encodings"]; found && accept == nil {
-		a.defaultHeaders["Accept-Encodings"] = a.decoders.Acceptable()
+		// because of the special treatment of default headers by rendering engine, better to
+		// join these values manually. Otherwise, each value will be rendered individually, that
+		// still follows the standard, but brings some unnecessary networking overhead
+		a.defaultHeaders["Accept-Encodings"] = []string{strings.Join(a.decoder.Acceptable(), ",")}
 	}
 
-	if onStart, ok := r.(router.OnStarter); ok {
-		onStart.OnStart()
+	if err := r.OnStart(); err != nil {
+		return err
 	}
 
 	s, err := concreteSettings(optionalSettings...)
@@ -89,12 +91,12 @@ func (a *Application) Serve(r router.Router, optionalSettings ...settings.Settin
 	return tcp.RunTCPServer(sock, func(conn net.Conn) {
 		client := newClient(s.TCP, conn)
 		bodyReader := http1.NewBodyReader(client, s.Body)
-		request := newRequest(s, conn, bodyReader)
+		request := newRequest(s, conn, bodyReader, a.decoder)
 		renderer := newRenderer(s.HTTP, a)
 		httpParser := newHTTPParser(s, request)
 
 		httpServer := httpserver.NewHTTPServer(r)
-		httpServer.Run(client, request, bodyReader, renderer, httpParser)
+		httpServer.Run(client, request, request.Body(), renderer, httpParser)
 	}, a.shutdown)
 }
 

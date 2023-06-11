@@ -15,9 +15,9 @@ type Client interface {
 }
 
 type client struct {
+	conn     net.Conn
 	unreader *unreader.Unreader
 	buff     []byte
-	conn     net.Conn
 	timeout  time.Duration
 }
 

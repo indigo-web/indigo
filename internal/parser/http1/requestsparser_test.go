@@ -3,6 +3,7 @@ package http1
 import (
 	"fmt"
 	"github.com/dchest/uniuri"
+	"github.com/indigo-web/indigo/http/decode"
 	"strings"
 	"testing"
 
@@ -50,8 +51,8 @@ func getParser() (httpparser.HTTPRequestsParser, *http.Request) {
 	objPool := pool.NewObjectPool[[]string](20)
 	body := NewBodyReader(dummy.NewNopClient(), s.Body)
 	request := http.NewRequest(
-		headers.NewHeaders(nil), query.Query{}, http.NewResponse(), dummy.NewNopConn(), body,
-		nil, false,
+		headers.NewHeaders(nil), query.Query{}, http.NewResponse(), dummy.NewNopConn(),
+		http.NewBody(body, decode.NewDecoder()), nil, false,
 	)
 	startLineBuff := make([]byte, s.URL.MaxLength)
 
@@ -61,11 +62,11 @@ func getParser() (httpparser.HTTPRequestsParser, *http.Request) {
 }
 
 type wantedRequest struct {
-	Method   method.Method
+	Headers  *headers.Headers
 	Path     string
 	Fragment string
+	Method   method.Method
 	Protocol proto.Proto
-	Headers  *headers.Headers
 }
 
 func compareRequests(t *testing.T, wanted wantedRequest, actual *http.Request) {
@@ -588,6 +589,55 @@ func TestHttpRequestsParser_Parse_Negative(t *testing.T) {
 		)
 		_, _, err := parser.Parse([]byte(raw))
 		require.EqualError(t, err, status.ErrTooManyHeaders.Error())
+	})
+}
+
+func TestParseTransferEncoding(t *testing.T) {
+	t.Run("EmptyString", func(t *testing.T) {
+		te := parseTransferEncoding("")
+		require.False(t, te.Chunked)
+		require.Empty(t, te.Token)
+	})
+
+	t.Run("JustChunked", func(t *testing.T) {
+		te := parseTransferEncoding("chunked")
+		require.True(t, te.Chunked)
+		require.Empty(t, te.Token)
+	})
+
+	t.Run("JustToken", func(t *testing.T) {
+		te := parseTransferEncoding("gzip")
+		require.False(t, te.Chunked)
+		require.Equal(t, "gzip", te.Token)
+	})
+
+	t.Run("ChunkedAndToken NoSpace", func(t *testing.T) {
+		te := parseTransferEncoding("chunked,gzip")
+		require.True(t, te.Chunked)
+		require.Equal(t, "gzip", te.Token)
+
+		te = parseTransferEncoding("gzip,chunked")
+		require.True(t, te.Chunked)
+		require.Equal(t, "gzip", te.Token)
+	})
+
+	t.Run("ChunkedAndToken WithSpace", func(t *testing.T) {
+		te := parseTransferEncoding("chunked,  gzip")
+		require.True(t, te.Chunked)
+		require.Equal(t, "gzip", te.Token)
+
+		te = parseTransferEncoding("gzip,  chunked")
+		require.True(t, te.Chunked)
+		require.Equal(t, "gzip", te.Token)
+	})
+
+	t.Run("ExtraCommas", func(t *testing.T) {
+		te := parseTransferEncoding(" , chunked, gzip, ")
+		require.True(t, te.Chunked)
+		require.Equal(t, "gzip", te.Token)
+
+		te = parseTransferEncoding(" , chunked")
+		require.True(t, te.Chunked)
 	})
 }
 

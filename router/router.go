@@ -11,12 +11,7 @@ import (
 // and when you are ready, just notify core that he can safely close
 // the connection (even if it's already closed from client side).
 type Router interface {
+	OnStart() error
 	OnRequest(request *http.Request) http.Response
 	OnError(request *http.Request, err error) http.Response
-}
-
-// OnStarter is an interface that provides OnStart() method that will be called
-// just once, when server is initializing.
-type OnStarter interface {
-	OnStart()
 }

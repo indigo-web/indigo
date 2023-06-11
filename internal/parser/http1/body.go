@@ -1,6 +1,7 @@
 package http1
 
 import (
+	"github.com/indigo-web/indigo/http/headers"
 	"io"
 
 	"github.com/indigo-web/indigo/http"
@@ -9,10 +10,10 @@ import (
 )
 
 type bodyReader struct {
-	client             tcp.Client
-	bodyBytesLeft      int
-	chunkedParser      chunkedBodyParser
-	chunkedBodyTrailer bool
+	client           tcp.Client
+	bodyBytesLeft    int
+	chunkedParser    chunkedBodyParser
+	transferEncoding headers.TransferEncoding
 }
 
 func NewBodyReader(client tcp.Client, bodySettings settings.Body) http.BodyReader {
@@ -23,13 +24,14 @@ func NewBodyReader(client tcp.Client, bodySettings settings.Body) http.BodyReade
 }
 
 func (b *bodyReader) Init(request *http.Request) {
+	b.transferEncoding = request.TransferEncoding
+
 	if !request.TransferEncoding.Chunked {
 		b.bodyBytesLeft = request.ContentLength
 		return
 	}
 
 	b.bodyBytesLeft = -1
-	b.chunkedBodyTrailer = request.TransferEncoding.HasTrailer
 }
 
 func (b *bodyReader) Read() ([]byte, error) {
@@ -64,7 +66,7 @@ func (b *bodyReader) chunkedBodyReader() ([]byte, error) {
 		return nil, err
 	}
 
-	chunk, extra, err := b.chunkedParser.Parse(data, b.chunkedBodyTrailer)
+	chunk, extra, err := b.chunkedParser.Parse(data, b.transferEncoding.HasTrailer)
 	switch err {
 	case nil:
 	case io.EOF:

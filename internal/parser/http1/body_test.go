@@ -1,6 +1,7 @@
 package http1
 
 import (
+	"github.com/indigo-web/indigo/http/decode"
 	"io"
 	"strconv"
 	"strings"
@@ -19,6 +20,7 @@ import (
 func getRequestWithReader(chunked bool, body ...[]byte) (*http.Request, http.BodyReader) {
 	client := dummy.NewCircularClient(body...)
 	reader := NewBodyReader(client, settings.Default().Body)
+	reqBody := http.NewBody(reader, decode.NewDecoder())
 
 	var (
 		contentLength int
@@ -41,7 +43,7 @@ func getRequestWithReader(chunked bool, body ...[]byte) (*http.Request, http.Bod
 	}
 
 	request := http.NewRequest(
-		hdrs, query.Query{}, http.NewResponse(), dummy.NewNopConn(), reader, nil, false,
+		hdrs, query.Query{}, http.NewResponse(), dummy.NewNopConn(), reqBody, nil, false,
 	)
 	request.ContentLength = contentLength
 	request.TransferEncoding.Chunked = chunked

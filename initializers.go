@@ -2,6 +2,7 @@ package indigo
 
 import (
 	"github.com/indigo-web/indigo/http"
+	"github.com/indigo-web/indigo/http/decode"
 	"github.com/indigo-web/indigo/http/headers"
 	"github.com/indigo-web/indigo/http/query"
 	"github.com/indigo-web/indigo/internal/arena"
@@ -34,7 +35,7 @@ func newKeyValueArenas(s settings.Headers) (arena.Arena, arena.Arena) {
 }
 
 func newRequest(
-	s settings.Settings, conn net.Conn, r http.BodyReader,
+	s settings.Settings, conn net.Conn, r http.BodyReader, decoder *decode.Decoder,
 ) *http.Request {
 	q := query.NewQuery(func() query.Map {
 		return make(query.Map, s.URL.Query.DefaultMapSize)
@@ -42,8 +43,9 @@ func newRequest(
 	hdrs := headers.NewHeaders(make(map[string][]string, s.Headers.Number.Default))
 	response := http.NewResponse()
 	params := make(http.Params)
+	body := http.NewBody(r, decoder)
 
-	return http.NewRequest(hdrs, q, response, conn, r, params, s.URL.Params.DisableMapClear)
+	return http.NewRequest(hdrs, q, response, conn, body, params, s.URL.Params.DisableMapClear)
 }
 
 func newRenderer(httpSettings settings.HTTP, a *Application) render.Engine {

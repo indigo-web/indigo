@@ -1,6 +1,7 @@
 package inbuilt
 
 import (
+	"github.com/indigo-web/indigo/http/decode"
 	"testing"
 
 	"github.com/indigo-web/indigo/internal/server/tcp/dummy"
@@ -114,8 +115,8 @@ func getRequest() *http.Request {
 	bodyReader := http1.NewBodyReader(dummy.NewNopClient(), settings.Default().Body)
 
 	return http.NewRequest(
-		headers.NewHeaders(nil), q, http.NewResponse(), dummy.NewNopConn(), bodyReader,
-		nil, false,
+		headers.NewHeaders(nil), q, http.NewResponse(), dummy.NewNopConn(),
+		http.NewBody(bodyReader, decode.NewDecoder()), nil, false,
 	)
 }
 
