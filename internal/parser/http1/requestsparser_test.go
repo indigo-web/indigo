@@ -3,6 +3,7 @@ package http1
 import (
 	"fmt"
 	"github.com/dchest/uniuri"
+	"github.com/indigo-web/indigo/http/decode"
 	"strings"
 	"testing"
 
@@ -48,7 +49,7 @@ func getParser() (httpparser.HTTPRequestsParser, *http.Request) {
 		s.Headers.ValueSpace.Default, s.Headers.ValueSpace.Maximal,
 	)
 	objPool := pool.NewObjectPool[[]string](20)
-	body := NewBodyReader(dummy.NewNopClient(), s.Body)
+	body := NewBodyReader(dummy.NewNopClient(), s.Body, decode.NewDecoder())
 	request := http.NewRequest(
 		headers.NewHeaders(nil), query.Query{}, http.NewResponse(), dummy.NewNopConn(), body,
 		nil, false,
@@ -588,6 +589,55 @@ func TestHttpRequestsParser_Parse_Negative(t *testing.T) {
 		)
 		_, _, err := parser.Parse([]byte(raw))
 		require.EqualError(t, err, status.ErrTooManyHeaders.Error())
+	})
+}
+
+func TestParseTransferEncoding(t *testing.T) {
+	t.Run("EmptyString", func(t *testing.T) {
+		te := parseTransferEncoding("")
+		require.False(t, te.Chunked)
+		require.Empty(t, te.Token)
+	})
+
+	t.Run("JustChunked", func(t *testing.T) {
+		te := parseTransferEncoding("chunked")
+		require.True(t, te.Chunked)
+		require.Empty(t, te.Token)
+	})
+
+	t.Run("JustToken", func(t *testing.T) {
+		te := parseTransferEncoding("gzip")
+		require.False(t, te.Chunked)
+		require.Equal(t, "gzip", te.Token)
+	})
+
+	t.Run("ChunkedAndToken NoSpace", func(t *testing.T) {
+		te := parseTransferEncoding("chunked,gzip")
+		require.True(t, te.Chunked)
+		require.Equal(t, "gzip", te.Token)
+
+		te = parseTransferEncoding("gzip,chunked")
+		require.True(t, te.Chunked)
+		require.Equal(t, "gzip", te.Token)
+	})
+
+	t.Run("ChunkedAndToken WithSpace", func(t *testing.T) {
+		te := parseTransferEncoding("chunked,  gzip")
+		require.True(t, te.Chunked)
+		require.Equal(t, "gzip", te.Token)
+
+		te = parseTransferEncoding("gzip,  chunked")
+		require.True(t, te.Chunked)
+		require.Equal(t, "gzip", te.Token)
+	})
+
+	t.Run("ExtraCommas", func(t *testing.T) {
+		te := parseTransferEncoding(" , chunked, gzip, ")
+		require.True(t, te.Chunked)
+		require.Equal(t, "gzip", te.Token)
+
+		te = parseTransferEncoding(" , chunked")
+		require.True(t, te.Chunked)
 	})
 }
 
