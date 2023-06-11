@@ -3,6 +3,7 @@ package indigo
 import (
 	"errors"
 	"net"
+	"strings"
 
 	"github.com/indigo-web/indigo/internal/mapconv"
 	httpserver "github.com/indigo-web/indigo/internal/server/http"
@@ -67,7 +68,10 @@ func (a *Application) DeleteDefaultHeader(key string) {
 // Also, if specified, Accept-Encodings default header's value will be set here
 func (a *Application) Serve(r router.Router, optionalSettings ...settings.Settings) error {
 	if accept, found := a.defaultHeaders["Accept-Encodings"]; found && accept == nil {
-		a.defaultHeaders["Accept-Encodings"] = a.decoder.Acceptable()
+		// because of the special treatment of default headers by rendering engine, better to
+		// join these values manually. Otherwise, each value will be rendered individually, that
+		// still follows the standard, but brings some unnecessary networking overhead
+		a.defaultHeaders["Accept-Encodings"] = []string{strings.Join(a.decoder.Acceptable(), ",")}
 	}
 
 	if err := r.OnStart(); err != nil {
@@ -86,7 +90,7 @@ func (a *Application) Serve(r router.Router, optionalSettings ...settings.Settin
 
 	return tcp.RunTCPServer(sock, func(conn net.Conn) {
 		client := newClient(s.TCP, conn)
-		bodyReader := http1.NewBodyReader(client, s.Body)
+		bodyReader := http1.NewBodyReader(client, s.Body, a.decoder)
 		request := newRequest(s, conn, bodyReader)
 		renderer := newRenderer(s.HTTP, a)
 		httpParser := newHTTPParser(s, request)
