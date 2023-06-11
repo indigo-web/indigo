@@ -1,7 +1,6 @@
 package http1
 
 import (
-	"github.com/indigo-web/indigo/http/decode"
 	"github.com/indigo-web/indigo/http/headers"
 	"io"
 
@@ -14,15 +13,13 @@ type bodyReader struct {
 	client           tcp.Client
 	bodyBytesLeft    int
 	chunkedParser    chunkedBodyParser
-	decoder          *decode.Decoder
 	transferEncoding headers.TransferEncoding
 }
 
-func NewBodyReader(client tcp.Client, bodySettings settings.Body, decoder *decode.Decoder) http.BodyReader {
+func NewBodyReader(client tcp.Client, bodySettings settings.Body) http.BodyReader {
 	return &bodyReader{
 		client:        client,
 		chunkedParser: newChunkedBodyParser(bodySettings),
-		decoder:       decoder,
 	}
 }
 
@@ -38,15 +35,6 @@ func (b *bodyReader) Init(request *http.Request) {
 }
 
 func (b *bodyReader) Read() ([]byte, error) {
-	encoded, err := b.ReadNoDecoding()
-	if err != nil {
-		return nil, err
-	}
-
-	return b.decoder.Decode(b.transferEncoding.Token, encoded)
-}
-
-func (b *bodyReader) ReadNoDecoding() ([]byte, error) {
 	const chunkedBody = -1
 
 	switch b.bodyBytesLeft {

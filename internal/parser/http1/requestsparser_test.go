@@ -49,10 +49,10 @@ func getParser() (httpparser.HTTPRequestsParser, *http.Request) {
 		s.Headers.ValueSpace.Default, s.Headers.ValueSpace.Maximal,
 	)
 	objPool := pool.NewObjectPool[[]string](20)
-	body := NewBodyReader(dummy.NewNopClient(), s.Body, decode.NewDecoder())
+	body := NewBodyReader(dummy.NewNopClient(), s.Body)
 	request := http.NewRequest(
-		headers.NewHeaders(nil), query.Query{}, http.NewResponse(), dummy.NewNopConn(), body,
-		nil, false,
+		headers.NewHeaders(nil), query.Query{}, http.NewResponse(), dummy.NewNopConn(),
+		http.NewBody(body, decode.NewDecoder()), nil, false,
 	)
 	startLineBuff := make([]byte, s.URL.MaxLength)
 

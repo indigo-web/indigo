@@ -28,11 +28,10 @@ func getEngine(defaultHeaders map[string][]string) *engine {
 func newRequest() *http.Request {
 	return http.NewRequest(
 		headers.NewHeaders(nil), query.Query{}, http.NewResponse(), dummy.NewNopConn(),
-		http1.NewBodyReader(
+		http.NewBody(http1.NewBodyReader(
 			dummy.NewNopClient(),
 			settings.Default().Body,
-			decode.NewDecoder(),
-		),
+		), decode.NewDecoder()),
 		nil, false,
 	)
 }

@@ -21,26 +21,26 @@ func BenchmarkRouter_OnRequest_Static(b *testing.B) {
 		http.RespondTo,
 	)
 
-	r.OnStart()
+	_ = r.OnStart()
 
-	body := http1.NewBodyReader(dummy.NewNopClient(), settings.Default().Body, decode.NewDecoder())
+	body := http1.NewBodyReader(dummy.NewNopClient(), settings.Default().Body)
 	GETShortReq := http.NewRequest(
-		headers.NewHeaders(nil), query.Query{}, http.NewResponse(), dummy.NewNopConn(), body,
-		nil, false,
+		headers.NewHeaders(nil), query.Query{}, http.NewResponse(), dummy.NewNopConn(),
+		http.NewBody(body, decode.NewDecoder()), nil, false,
 	)
 	GETShortReq.Path.String = "/"
 	GETShortReq.Method = method.GET
 
 	POSTShortReq := http.NewRequest(
-		headers.NewHeaders(nil), query.Query{}, http.NewResponse(), dummy.NewNopConn(), body,
-		nil, false,
+		headers.NewHeaders(nil), query.Query{}, http.NewResponse(), dummy.NewNopConn(),
+		http.NewBody(body, decode.NewDecoder()), nil, false,
 	)
 	POSTShortReq.Path.String = "/"
 	POSTShortReq.Method = method.POST
 
 	GETLongReq := http.NewRequest(
-		headers.NewHeaders(nil), query.Query{}, http.NewResponse(), dummy.NewNopConn(), body,
-		nil, false,
+		headers.NewHeaders(nil), query.Query{}, http.NewResponse(), dummy.NewNopConn(),
+		http.NewBody(body, decode.NewDecoder()), nil, false,
 	)
 	GETLongReq.Path.String = "/some/very/long/path/that/is/not/gonna/end/somewhere/in/close/future/or/no/haha/I/lied"
 	GETLongReq.Method = method.GET

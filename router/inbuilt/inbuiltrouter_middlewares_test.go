@@ -112,11 +112,11 @@ func getPointApplied2Middleware(stack *callstack) types.Middleware {
 
 func getRequest() *http.Request {
 	q := query.NewQuery(nil)
-	bodyReader := http1.NewBodyReader(dummy.NewNopClient(), settings.Default().Body, decode.NewDecoder())
+	bodyReader := http1.NewBodyReader(dummy.NewNopClient(), settings.Default().Body)
 
 	return http.NewRequest(
-		headers.NewHeaders(nil), q, http.NewResponse(), dummy.NewNopConn(), bodyReader,
-		nil, false,
+		headers.NewHeaders(nil), q, http.NewResponse(), dummy.NewNopConn(),
+		http.NewBody(bodyReader, decode.NewDecoder()), nil, false,
 	)
 }
 

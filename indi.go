@@ -90,13 +90,13 @@ func (a *Application) Serve(r router.Router, optionalSettings ...settings.Settin
 
 	return tcp.RunTCPServer(sock, func(conn net.Conn) {
 		client := newClient(s.TCP, conn)
-		bodyReader := http1.NewBodyReader(client, s.Body, a.decoder)
-		request := newRequest(s, conn, bodyReader)
+		bodyReader := http1.NewBodyReader(client, s.Body)
+		request := newRequest(s, conn, bodyReader, a.decoder)
 		renderer := newRenderer(s.HTTP, a)
 		httpParser := newHTTPParser(s, request)
 
 		httpServer := httpserver.NewHTTPServer(r)
-		httpServer.Run(client, request, bodyReader, renderer, httpParser)
+		httpServer.Run(client, request, request.Body(), renderer, httpParser)
 	}, a.shutdown)
 }
 

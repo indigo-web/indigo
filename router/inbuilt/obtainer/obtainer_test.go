@@ -25,9 +25,10 @@ func nopHandler(request *http.Request) http.Response {
 
 func newRequest(path string, method method.Method) *http.Request {
 	hdrs := headers.NewHeaders(make(map[string][]string))
-	bodyReader := http1.NewBodyReader(dummy.NewNopClient(), settings.Default().Body, decode.NewDecoder())
+	bodyReader := http1.NewBodyReader(dummy.NewNopClient(), settings.Default().Body)
 	request := http.NewRequest(
-		hdrs, query.Query{}, http.NewResponse(), dummy.NewNopConn(), bodyReader, nil, false,
+		hdrs, query.Query{}, http.NewResponse(), dummy.NewNopConn(),
+		http.NewBody(bodyReader, decode.NewDecoder()), nil, false,
 	)
 	request.Path.String = path
 	request.Method = method

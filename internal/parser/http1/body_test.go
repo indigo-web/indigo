@@ -19,7 +19,8 @@ import (
 
 func getRequestWithReader(chunked bool, body ...[]byte) (*http.Request, http.BodyReader) {
 	client := dummy.NewCircularClient(body...)
-	reader := NewBodyReader(client, settings.Default().Body, decode.NewDecoder())
+	reader := NewBodyReader(client, settings.Default().Body)
+	reqBody := http.NewBody(reader, decode.NewDecoder())
 
 	var (
 		contentLength int
@@ -42,7 +43,7 @@ func getRequestWithReader(chunked bool, body ...[]byte) (*http.Request, http.Bod
 	}
 
 	request := http.NewRequest(
-		hdrs, query.Query{}, http.NewResponse(), dummy.NewNopConn(), reader, nil, false,
+		hdrs, query.Query{}, http.NewResponse(), dummy.NewNopConn(), reqBody, nil, false,
 	)
 	request.ContentLength = contentLength
 	request.TransferEncoding.Chunked = chunked
@@ -109,7 +110,7 @@ func TestBodyReader_Plain(t *testing.T) {
 			hdrs, query.Query{}, http.NewResponse(), dummy.NewNopConn(), nil, nil, false,
 		)
 		request.ContentLength = buffSize
-		reader := NewBodyReader(client, settings.Default().Body, decode.NewDecoder())
+		reader := NewBodyReader(client, settings.Default().Body)
 		reader.Init(request)
 
 		data, err := reader.Read()
