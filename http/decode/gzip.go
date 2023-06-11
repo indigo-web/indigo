@@ -1,8 +1,16 @@
 package decode
 
-type GZIPDecompressor struct {
+type GZIPDecoder struct {
 }
 
-func (g *GZIPDecompressor) Decompress(input []byte) (output []byte, err error) {
+func NewGZIPDecoder() DecoderFactory {
+	return &GZIPDecoder{}
+}
+
+func (g *GZIPDecoder) New() DecoderFunc {
+	return g.decode
+}
+
+func (g *GZIPDecoder) decode(input []byte) (output []byte, err error) {
 	panic("gzip decoder not implemented yet")
 }
