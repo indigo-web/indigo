@@ -1,6 +1,7 @@
 package inbuilt
 
 import (
+	"github.com/indigo-web/indigo/http/decode"
 	"testing"
 
 	"github.com/indigo-web/indigo/internal/server/tcp/dummy"
@@ -111,7 +112,7 @@ func getPointApplied2Middleware(stack *callstack) types.Middleware {
 
 func getRequest() *http.Request {
 	q := query.NewQuery(nil)
-	bodyReader := http1.NewBodyReader(dummy.NewNopClient(), settings.Default().Body)
+	bodyReader := http1.NewBodyReader(dummy.NewNopClient(), settings.Default().Body, decode.NewDecoder())
 
 	return http.NewRequest(
 		headers.NewHeaders(nil), q, http.NewResponse(), dummy.NewNopConn(), bodyReader,

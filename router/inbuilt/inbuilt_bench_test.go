@@ -2,6 +2,7 @@ package inbuilt
 
 import (
 	"github.com/indigo-web/indigo/http"
+	"github.com/indigo-web/indigo/http/decode"
 	"github.com/indigo-web/indigo/http/headers"
 	"github.com/indigo-web/indigo/http/method"
 	"github.com/indigo-web/indigo/http/query"
@@ -22,7 +23,7 @@ func BenchmarkRouter_OnRequest_Static(b *testing.B) {
 
 	r.OnStart()
 
-	body := http1.NewBodyReader(dummy.NewNopClient(), settings.Default().Body)
+	body := http1.NewBodyReader(dummy.NewNopClient(), settings.Default().Body, decode.NewDecoder())
 	GETShortReq := http.NewRequest(
 		headers.NewHeaders(nil), query.Query{}, http.NewResponse(), dummy.NewNopConn(), body,
 		nil, false,

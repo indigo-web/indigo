@@ -1,6 +1,7 @@
 package obtainer
 
 import (
+	"github.com/indigo-web/indigo/http/decode"
 	"reflect"
 	"testing"
 
@@ -24,7 +25,7 @@ func nopHandler(request *http.Request) http.Response {
 
 func newRequest(path string, method method.Method) *http.Request {
 	hdrs := headers.NewHeaders(make(map[string][]string))
-	bodyReader := http1.NewBodyReader(dummy.NewNopClient(), settings.Default().Body)
+	bodyReader := http1.NewBodyReader(dummy.NewNopClient(), settings.Default().Body, decode.NewDecoder())
 	request := http.NewRequest(
 		hdrs, query.Query{}, http.NewResponse(), dummy.NewNopConn(), bodyReader, nil, false,
 	)
