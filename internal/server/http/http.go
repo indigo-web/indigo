@@ -87,6 +87,10 @@ func (h *httpServer) RunOnce(
 		}
 
 		if err = renderer.Write(protocol, req, response, client); err != nil {
+			// in case we failed to render the response, just close the connection silently.
+			// This may affect cases, when the error occurred during rendering an attachment,
+			// but server anyway cannot recognize them, so the only thing will be done here
+			// is notifying the router about disconnection
 			h.router.OnError(req, status.ErrCloseConnection)
 			return false
 		}
@@ -94,6 +98,10 @@ func (h *httpServer) RunOnce(
 		p.Release()
 
 		if err = req.Clear(); err != nil {
+			// abusing the fact, that req.Clear() will return an error ONLY if socket error
+			// occurred while reading.
+			// TODO: what's if decoding is in charge here? We anyway will close the connection,
+			//       but client is still has to be notified about the error
 			h.router.OnError(req, status.ErrCloseConnection)
 			return false
 		}
