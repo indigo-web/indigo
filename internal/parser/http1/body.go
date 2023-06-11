@@ -1,6 +1,8 @@
 package http1
 
 import (
+	"github.com/indigo-web/indigo/http/decode"
+	"github.com/indigo-web/indigo/http/headers"
 	"io"
 
 	"github.com/indigo-web/indigo/http"
@@ -9,30 +11,42 @@ import (
 )
 
 type bodyReader struct {
-	client             tcp.Client
-	bodyBytesLeft      int
-	chunkedParser      chunkedBodyParser
-	chunkedBodyTrailer bool
+	client           tcp.Client
+	bodyBytesLeft    int
+	chunkedParser    chunkedBodyParser
+	decoder          *decode.Decoder
+	transferEncoding headers.TransferEncoding
 }
 
-func NewBodyReader(client tcp.Client, bodySettings settings.Body) http.BodyReader {
+func NewBodyReader(client tcp.Client, bodySettings settings.Body, decoder *decode.Decoder) http.BodyReader {
 	return &bodyReader{
 		client:        client,
 		chunkedParser: newChunkedBodyParser(bodySettings),
+		decoder:       decoder,
 	}
 }
 
 func (b *bodyReader) Init(request *http.Request) {
+	b.transferEncoding = request.TransferEncoding
+
 	if !request.TransferEncoding.Chunked {
 		b.bodyBytesLeft = request.ContentLength
 		return
 	}
 
 	b.bodyBytesLeft = -1
-	b.chunkedBodyTrailer = request.TransferEncoding.HasTrailer
 }
 
 func (b *bodyReader) Read() ([]byte, error) {
+	encoded, err := b.ReadNoDecoding()
+	if err != nil {
+		return nil, err
+	}
+
+	return b.decoder.Decode(b.transferEncoding.Token, encoded)
+}
+
+func (b *bodyReader) ReadNoDecoding() ([]byte, error) {
 	const chunkedBody = -1
 
 	switch b.bodyBytesLeft {
@@ -64,7 +78,7 @@ func (b *bodyReader) chunkedBodyReader() ([]byte, error) {
 		return nil, err
 	}
 
-	chunk, extra, err := b.chunkedParser.Parse(data, b.chunkedBodyTrailer)
+	chunk, extra, err := b.chunkedParser.Parse(data, b.transferEncoding.HasTrailer)
 	switch err {
 	case nil:
 	case io.EOF:

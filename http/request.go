@@ -19,6 +19,7 @@ type (
 	BodyReader         interface {
 		Init(*Request)
 		Read() ([]byte, error)
+		ReadNoDecoding() ([]byte, error)
 	}
 )
 
@@ -189,7 +190,9 @@ func (r *Request) Clear() (err error) {
 // resetBody just reads the body until its end
 func (r *Request) resetBody() error {
 	for {
-		_, err := r.body.Read()
+		// this is just a dummy nop-reader. Why do we spend resources on decoding data,
+		// that'll anyway never be ever read?
+		_, err := r.body.ReadNoDecoding()
 		switch err {
 		case nil:
 		case io.EOF:

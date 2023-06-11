@@ -1,6 +1,7 @@
 package http1
 
 import (
+	"github.com/indigo-web/indigo/http/decode"
 	"io"
 	"strconv"
 	"strings"
@@ -18,7 +19,7 @@ import (
 
 func getRequestWithReader(chunked bool, body ...[]byte) (*http.Request, http.BodyReader) {
 	client := dummy.NewCircularClient(body...)
-	reader := NewBodyReader(client, settings.Default().Body)
+	reader := NewBodyReader(client, settings.Default().Body, decode.NewDecoder())
 
 	var (
 		contentLength int
@@ -108,7 +109,7 @@ func TestBodyReader_Plain(t *testing.T) {
 			hdrs, query.Query{}, http.NewResponse(), dummy.NewNopConn(), nil, nil, false,
 		)
 		request.ContentLength = buffSize
-		reader := NewBodyReader(client, settings.Default().Body)
+		reader := NewBodyReader(client, settings.Default().Body, decode.NewDecoder())
 		reader.Init(request)
 
 		data, err := reader.Read()
