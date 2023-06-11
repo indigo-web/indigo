@@ -37,7 +37,7 @@ func NewDecoder() *Decoder {
 
 // Decode decodes the input data, based on a token, where token is a key
 func (d *Decoder) Decode(token string, encoded []byte) (decoded []byte, err error) {
-	if token == identity {
+	if len(token) == 0 || token == identity {
 		return encoded, nil
 	}
 
