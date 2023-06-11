@@ -752,11 +752,9 @@ headerValueCRLF:
 	case "upgrade":
 		p.request.Upgrade = proto.ChooseUpgrade(value)
 	case "transfer-encoding":
-		if !strings.EqualFold(headers.ValueOf(value), "chunked") {
-			return parser.Error, nil, status.ErrMethodNotImplemented
-		}
-
-		p.request.TransferEncoding.Chunked = true
+		te := parseTransferEncoding(value)
+		te.HasTrailer = p.request.TransferEncoding.HasTrailer
+		p.request.TransferEncoding = te
 	case "trailer":
 		p.request.TransferEncoding.HasTrailer = true
 	}
@@ -798,4 +796,36 @@ func (p *httpRequestsParser) Release() {
 	p.headerValueArena.Clear()
 	p.contentLength = 0
 	p.state = eMethod
+}
+
+func parseTransferEncoding(value string) (te headers.TransferEncoding) {
+	for len(value) > 0 {
+		for i := range value {
+			switch value[i] {
+			case ' ':
+			case ',':
+				te = processTEToken(value[:i], te)
+				value = value[i+1:]
+				goto nextToken
+			}
+		}
+
+		return processTEToken(value, te)
+
+	nextToken:
+	}
+
+	return te
+}
+
+func processTEToken(rawToken string, te headers.TransferEncoding) headers.TransferEncoding {
+	switch token := strings.TrimSpace(rawToken); token {
+	case "":
+	case "chunked":
+		te.Chunked = true
+	default:
+		te.Token = token
+	}
+
+	return te
 }
