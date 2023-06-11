@@ -21,6 +21,10 @@ func newDummyReader(client tcp.Client) dummyBodyReader {
 func (d dummyBodyReader) Init(*Request) {}
 
 func (d dummyBodyReader) Read() ([]byte, error) {
+	return d.ReadNoDecoding()
+}
+
+func (d dummyBodyReader) ReadNoDecoding() ([]byte, error) {
 	return d.client.Read()
 }
 
