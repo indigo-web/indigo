@@ -32,10 +32,6 @@ type (
 		Fragment Fragment
 	}
 
-	TransferEncoding struct {
-		Chunked, HasTrailer bool
-	}
-
 	Fragment = string
 )
 
@@ -52,7 +48,7 @@ type Request struct {
 	Path             Path
 	bodyBuff         []byte
 	ContentLength    int
-	TransferEncoding TransferEncoding
+	TransferEncoding headers.TransferEncoding
 	Method           method.Method
 	Upgrade          proto.Proto
 	Proto            proto.Proto
@@ -178,7 +174,7 @@ func (r *Request) Clear() (err error) {
 	}
 
 	r.ContentLength = 0
-	r.TransferEncoding = TransferEncoding{}
+	r.TransferEncoding = headers.TransferEncoding{}
 	r.Upgrade = proto.Unknown
 
 	if r.clearParamsMap && len(r.Path.Params) > 0 {
