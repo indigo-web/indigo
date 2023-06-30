@@ -58,9 +58,11 @@ func TestHeaders(t *testing.T) {
 			"Some":  {"multiple", "values"},
 		})
 
-		headers.Add("SomeHeader", "SomeValue1", "SomeValue2")
-		values := headers.Values("SomeHeader")
-		require.Equal(t, []string{"SomeValue1", "SomeValue2"}, values)
+		headers.Add("SomeHeader", "SomeValue")
+		headers.Add("Hello", "Pavlo")
+		require.Equal(t, []string{"SomeValue"}, headers.Values("SomeHeader"))
+		require.Equal(t, []string{"multiple", "values"}, headers.Values("Some"))
+		require.Equal(t, []string{"world", "Pavlo"}, headers.Values("Hello"))
 	})
 
 	t.Run("KeysIter", func(t *testing.T) {
