@@ -386,70 +386,65 @@ proto:
 		return parser.Pending, nil, nil
 	}
 
-	switch data[0] {
-	case 'H', 'h':
+	if data[0]|0x20 == 'h' {
 		data = data[1:]
 		p.state = eH
 		goto protoH
-	case '\r', '\n':
-		return parser.Error, nil, status.ErrBadRequest
 	}
+
+	return parser.Error, nil, status.ErrBadRequest
 
 protoH:
 	if len(data) == 0 {
 		return parser.Pending, nil, nil
 	}
 
-	switch data[0] {
-	case 'T', 't':
+	if data[0]|0x20 == 't' {
 		data = data[1:]
 		p.state = eHT
 		goto protoHT
-	default:
-		return parser.Error, nil, status.ErrUnsupportedProtocol
 	}
+
+	return parser.Error, nil, status.ErrUnsupportedProtocol
 
 protoHT:
 	if len(data) == 0 {
 		return parser.Pending, nil, nil
 	}
 
-	switch data[0] {
-	case 'T', 't':
+	if data[0]|0x20 == 't' {
 		data = data[1:]
 		p.state = eHTT
 		goto protoHTT
-	default:
-		return parser.Error, nil, status.ErrUnsupportedProtocol
 	}
+
+	return parser.Error, nil, status.ErrUnsupportedProtocol
 
 protoHTT:
 	if len(data) == 0 {
 		return parser.Pending, nil, nil
 	}
 
-	switch data[0] {
-	case 'P', 'p':
+	if data[0]|0x20 == 'p' {
 		data = data[1:]
 		p.state = eHTTP
 		goto protoHTTP
-	default:
-		return parser.Error, nil, status.ErrUnsupportedProtocol
 	}
+
+	return parser.Error, nil, status.ErrUnsupportedProtocol
 
 protoHTTP:
 	if len(data) == 0 {
 		return parser.Pending, nil, nil
 	}
 
-	switch data[0] {
-	case '/':
+	if data[0] == '/' {
 		data = data[1:]
 		p.state = eProtoMajor
 		goto protoMajor
-	default:
-		return parser.Error, nil, status.ErrUnsupportedProtocol
 	}
+
+	return parser.Error, nil, status.ErrUnsupportedProtocol
 
 protoMajor:
 	if len(data) == 0 {
@@ -470,14 +465,13 @@ protoDot:
 		return parser.Pending, nil, nil
 	}
 
-	switch data[0] {
-	case '.':
+	if data[0] == '.' {
 		data = data[1:]
 		p.state = eProtoMinor
 		goto protoMinor
-	default:
-		return parser.Error, nil, status.ErrUnsupportedProtocol
 	}
+
+	return parser.Error, nil, status.ErrUnsupportedProtocol
 
 protoMinor:
 	if len(data) == 0 {
@@ -554,12 +548,11 @@ protoCRLFCR:
 		return parser.Pending, nil, nil
 	}
 
-	switch data[0] {
-	case '\n':
+	if data[0] == '\n' {
 		return parser.HeadersCompleted, data[1:], nil
-	default:
-		return parser.Error, nil, status.ErrBadRequest
 	}
+
+	return parser.Error, nil, status.ErrBadRequest
 
 headerKey:
 	for i := range data {
@@ -641,14 +634,13 @@ contentLengthCR:
 		return parser.Pending, nil, nil
 	}
 
-	switch data[0] {
-	case '\n':
+	if data[0] == '\n' {
 		data = data[1:]
 		p.state = eContentLengthCRLF
 		goto contentLengthCRLF
-	default:
-		return parser.Error, nil, status.ErrBadRequest
 	}
+
+	return parser.Error, nil, status.ErrBadRequest
 
 contentLengthCRLF:
 	if len(data) == 0 {
@@ -675,12 +667,11 @@ contentLengthCRLFCR:
 		return parser.Pending, nil, nil
 	}
 
-	switch data[0] {
-	case '\n':
+	if data[0] == '\n' {
 		return parser.HeadersCompleted, data[1:], nil
-	default:
-		return parser.Error, nil, status.ErrBadRequest
 	}
+
+	return parser.Error, nil, status.ErrBadRequest
 
 headerValue:
 	for i := range data {
@@ -731,14 +722,13 @@ headerValueCR:
 		return parser.Pending, nil, nil
 	}
 
-	switch data[0] {
-	case '\n':
+	if data[0] == '\n' {
 		data = data[1:]
 		p.state = eHeaderValueCRLF
 		goto headerValueCRLF
-	default:
-		return parser.Error, nil, status.ErrBadRequest
 	}
+
+	return parser.Error, nil, status.ErrBadRequest
 
 headerValueCRLF:
 	if len(data) == 0 {
@@ -777,12 +767,11 @@ headerValueCRLFCR:
 		return parser.Pending, nil, nil
 	}
 
-	switch data[0] {
-	case '\n':
+	if data[0] == '\n' {
 		return parser.HeadersCompleted, data[1:], nil
-	default:
-		return parser.Error, nil, status.ErrBadRequest
 	}
+
+	return parser.Error, nil, status.ErrBadRequest
 }
 
 func (p *httpRequestsParser) Release() {
@@ -799,23 +788,16 @@ func (p *httpRequestsParser) Release() {
 }
 
 func parseTransferEncoding(value string) (te headers.TransferEncoding) {
-	for len(value) > 0 {
-		for i := range value {
-			switch value[i] {
-			case ' ':
-			case ',':
-				te = processTEToken(value[:i], te)
-				value = value[i+1:]
-				goto nextToken
-			}
+	var offset int
+
+	for i := range value {
+		if value[i] == ',' {
+			te = processTEToken(value[offset:i], te)
+			offset = i + 1
 		}
-
-		return processTEToken(value, te)
-
-	nextToken:
 	}
 
-	return te
+	return processTEToken(value[offset:], te)
 }
 
 func processTEToken(rawToken string, te headers.TransferEncoding) headers.TransferEncoding {
