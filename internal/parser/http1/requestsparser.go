@@ -9,11 +9,11 @@ import (
 	"github.com/indigo-web/indigo/http/method"
 	"github.com/indigo-web/indigo/http/proto"
 	"github.com/indigo-web/indigo/http/status"
-	"github.com/indigo-web/indigo/internal"
 	"github.com/indigo-web/indigo/internal/parser"
 	"github.com/indigo-web/indigo/settings"
 	"github.com/indigo-web/utils/arena"
 	"github.com/indigo-web/utils/pool"
+	"github.com/indigo-web/utils/uf"
 )
 
 const maxMethodLength = len("CONNECT")
@@ -146,7 +146,7 @@ method:
 				return parser.Error, nil, status.ErrBadRequest
 			}
 
-			p.request.Method = method.Parse(internal.B2S(p.startLineBuff[:p.pointer]))
+			p.request.Method = method.Parse(uf.B2S(p.startLineBuff[:p.pointer]))
 
 			if p.request.Method == method.Unknown {
 				return parser.Error, nil, status.ErrMethodNotImplemented
@@ -176,7 +176,7 @@ path:
 				return parser.Error, nil, status.ErrBadRequest
 			}
 
-			p.request.Path.String = internal.B2S(p.startLineBuff[p.begin:p.pointer])
+			p.request.Path.String = uf.B2S(p.startLineBuff[p.begin:p.pointer])
 			data = data[i+1:]
 			p.state = eProto
 			goto proto
@@ -185,7 +185,7 @@ path:
 			p.state = ePathDecode1Char
 			goto pathDecode1Char
 		case '?':
-			p.request.Path.String = internal.B2S(p.startLineBuff[p.begin:p.pointer])
+			p.request.Path.String = uf.B2S(p.startLineBuff[p.begin:p.pointer])
 			if len(p.request.Path.String) == 0 {
 				p.request.Path.String = "/"
 			}
@@ -195,7 +195,7 @@ path:
 			p.state = eQuery
 			goto query
 		case '#':
-			p.request.Path.String = internal.B2S(p.startLineBuff[p.begin:p.pointer])
+			p.request.Path.String = uf.B2S(p.startLineBuff[p.begin:p.pointer])
 			if len(p.request.Path.String) == 0 {
 				p.request.Path.String = "/"
 			}
@@ -327,7 +327,7 @@ fragment:
 	for i := range data {
 		switch data[i] {
 		case ' ':
-			p.request.Path.Fragment = internal.B2S(p.startLineBuff[p.begin:p.pointer])
+			p.request.Path.Fragment = uf.B2S(p.startLineBuff[p.begin:p.pointer])
 			data = data[i+1:]
 			p.state = eProto
 			goto proto
@@ -568,7 +568,7 @@ headerKey:
 				return parser.Error, nil, status.ErrHeaderFieldsTooLarge
 			}
 
-			p.headerKey = internal.B2S(p.headerKeyArena.Finish())
+			p.headerKey = uf.B2S(p.headerKeyArena.Finish())
 			data = data[i+1:]
 
 			if p.headerKey == "content-length" {
@@ -735,7 +735,7 @@ headerValueCRLF:
 		return parser.Pending, nil, nil
 	}
 
-	value = internal.B2S(p.headerValueArena.Finish())
+	value = uf.B2S(p.headerValueArena.Finish())
 	requestHeaders.Add(p.headerKey, value)
 
 	switch p.headerKey {

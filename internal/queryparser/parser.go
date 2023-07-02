@@ -2,7 +2,7 @@ package queryparser
 
 import (
 	"github.com/indigo-web/indigo/http/status"
-	"github.com/indigo-web/indigo/internal"
+	"github.com/indigo-web/utils/uf"
 )
 
 func Parse(data []byte, queryMapFactory func() map[string]string) (queries map[string]string, err error) {
@@ -24,7 +24,7 @@ func Parse(data []byte, queryMapFactory func() map[string]string) (queries map[s
 		switch state {
 		case eKey:
 			if data[i] == '=' {
-				key = internal.B2S(data[offset:i])
+				key = uf.B2S(data[offset:i])
 				if len(key) == 0 {
 					return nil, status.ErrBadQuery
 				}
@@ -34,7 +34,7 @@ func Parse(data []byte, queryMapFactory func() map[string]string) (queries map[s
 			}
 		case eValue:
 			if data[i] == '&' {
-				queries[key] = internal.B2S(data[offset:i])
+				queries[key] = uf.B2S(data[offset:i])
 				offset = i + 1
 				state = eKey
 			}
@@ -45,7 +45,7 @@ func Parse(data []byte, queryMapFactory func() map[string]string) (queries map[s
 		return nil, status.ErrBadQuery
 	}
 
-	queries[key] = internal.B2S(data[offset:])
+	queries[key] = uf.B2S(data[offset:])
 
 	return queries, nil
 }
