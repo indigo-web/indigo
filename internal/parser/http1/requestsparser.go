@@ -10,10 +10,10 @@ import (
 	"github.com/indigo-web/indigo/http/proto"
 	"github.com/indigo-web/indigo/http/status"
 	"github.com/indigo-web/indigo/internal"
-	"github.com/indigo-web/indigo/internal/arena"
 	"github.com/indigo-web/indigo/internal/parser"
-	"github.com/indigo-web/indigo/internal/pool"
 	"github.com/indigo-web/indigo/settings"
+	"github.com/indigo-web/utils/arena"
+	"github.com/indigo-web/utils/pool"
 )
 
 const maxMethodLength = len("CONNECT")

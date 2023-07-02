@@ -2,7 +2,7 @@ package decode
 
 import (
 	"github.com/indigo-web/indigo/http/status"
-	"github.com/indigo-web/indigo/internal/mapconv"
+	"github.com/indigo-web/utils/mapconv"
 )
 
 const identity = "identity"

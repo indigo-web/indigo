@@ -5,9 +5,9 @@ import (
 	"net"
 	"strings"
 
-	"github.com/indigo-web/indigo/internal/mapconv"
 	httpserver "github.com/indigo-web/indigo/internal/server/http"
 	"github.com/indigo-web/indigo/internal/server/tcp"
+	"github.com/indigo-web/utils/mapconv"
 
 	"github.com/indigo-web/indigo/http/decode"
 	"github.com/indigo-web/indigo/internal/parser/http1"

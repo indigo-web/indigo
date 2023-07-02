@@ -5,13 +5,13 @@ import (
 	"github.com/indigo-web/indigo/http/decode"
 	"github.com/indigo-web/indigo/http/headers"
 	"github.com/indigo-web/indigo/http/query"
-	"github.com/indigo-web/indigo/internal/arena"
 	httpparser "github.com/indigo-web/indigo/internal/parser"
 	"github.com/indigo-web/indigo/internal/parser/http1"
-	"github.com/indigo-web/indigo/internal/pool"
 	"github.com/indigo-web/indigo/internal/render"
 	"github.com/indigo-web/indigo/internal/server/tcp"
 	"github.com/indigo-web/indigo/settings"
+	"github.com/indigo-web/utils/arena"
+	"github.com/indigo-web/utils/pool"
 	"net"
 )
 

@@ -2,8 +2,8 @@ package render
 
 import (
 	"github.com/indigo-web/indigo/http/status"
-	"github.com/indigo-web/indigo/internal/functools"
 	"github.com/indigo-web/indigo/internal/render/types"
+	"github.com/indigo-web/utils/ft"
 	"io"
 	"strconv"
 	"strings"
@@ -52,7 +52,7 @@ func newEngine(buff, fileBuff []byte, defaultHeaders map[string][]string) *engin
 	return &engine{
 		buff:                  buff,
 		fileBuff:              fileBuff,
-		defaultHeadersReserve: functools.Map(functools.Nop[string], parsedDefaultHeaders),
+		defaultHeadersReserve: ft.Map(ft.Nop[string], parsedDefaultHeaders),
 		defaultHeaders:        parsedDefaultHeaders,
 	}
 }
