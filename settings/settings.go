@@ -48,10 +48,10 @@ type (
 	TCPReadBuffSize int
 	TCPReadTimeout  = time.Duration
 
-	MaxBodySize      int
-	MaxBodyChunkSize = int
+	MaxBodySize      int64
+	MaxBodyChunkSize = int64
 
-	ResponseBuffSize int
+	ResponseBuffSize int64
 )
 
 type (

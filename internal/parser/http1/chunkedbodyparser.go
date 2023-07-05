@@ -19,7 +19,7 @@ type chunkedBodyParser struct {
 	state chunkedBodyParserState
 
 	settings    settings.Body
-	chunkLength int
+	chunkLength int64
 }
 
 func NewChunkedBodyParser(settings settings.Body) ChunkedBodyParser {
@@ -38,7 +38,7 @@ func newChunkedBodyParser(settings settings.Body) chunkedBodyParser {
 // Parse a stream of chunked body parts. When fully parsed, nil-chunk is returned, but non-nil
 // extra and io.EOF error
 func (c *chunkedBodyParser) Parse(data []byte, trailer bool) (chunk, extra []byte, err error) {
-	var offset int
+	var offset int64
 
 	switch c.state {
 	case eChunkLength1Char:
@@ -76,13 +76,13 @@ chunkLength1Char:
 		return nil, nil, status.ErrBadRequest
 	}
 
-	c.chunkLength = int(unHex(data[offset]))
+	c.chunkLength = int64(unHex(data[offset]))
 	offset++
 	c.state = eChunkLength
 	goto chunkLength
 
 chunkLength:
-	for ; offset < len(data); offset++ {
+	for ; offset < int64(len(data)); offset++ {
 		switch data[offset] {
 		case '\r':
 			offset++
@@ -97,7 +97,7 @@ chunkLength:
 				return nil, nil, status.ErrBadRequest
 			}
 
-			c.chunkLength = (c.chunkLength << 4) | int(unHex(data[offset]))
+			c.chunkLength = (c.chunkLength << 4) | int64(unHex(data[offset]))
 			if c.chunkLength > c.settings.MaxChunkSize {
 				return nil, nil, status.ErrTooLarge
 			}
@@ -107,7 +107,7 @@ chunkLength:
 	return nil, nil, nil
 
 chunkLengthCR:
-	if offset >= len(data) {
+	if offset >= int64(len(data)) {
 		return nil, nil, nil
 	}
 
@@ -121,7 +121,7 @@ chunkLengthCR:
 	}
 
 chunkLengthCRLF:
-	if offset >= len(data) {
+	if offset >= int64(len(data)) {
 		return nil, nil, nil
 	}
 
@@ -151,22 +151,22 @@ chunkLengthCRLF:
 	}
 
 chunkBody:
-	if offset >= len(data) {
+	if offset >= int64(len(data)) {
 		return nil, nil, nil
 	}
 
-	if len(data[offset:]) > c.chunkLength {
+	if int64(len(data[offset:])) > c.chunkLength {
 		c.state = eChunkBodyEnd
 
 		return data[offset : offset+c.chunkLength], data[offset+c.chunkLength:], nil
 	}
 
-	c.chunkLength -= len(data[offset:])
+	c.chunkLength -= int64(len(data[offset:]))
 
 	return data[offset:], nil, nil
 
 chunkBodyEnd:
-	if offset >= len(data) {
+	if offset >= int64(len(data)) {
 		return nil, nil, nil
 	}
 
@@ -184,7 +184,7 @@ chunkBodyEnd:
 	}
 
 chunkBodyCR:
-	if offset >= len(data) {
+	if offset >= int64(len(data)) {
 		return nil, nil, nil
 	}
 
@@ -198,7 +198,7 @@ chunkBodyCR:
 	}
 
 chunkBodyCRLF:
-	if offset >= len(data) {
+	if offset >= int64(len(data)) {
 		return nil, nil, nil
 	}
 
@@ -218,7 +218,7 @@ chunkBodyCRLF:
 		c.state = eFooter
 		goto footer
 	default:
-		c.chunkLength = int(unHex(data[offset]))
+		c.chunkLength = int64(unHex(data[offset]))
 		if c.chunkLength > c.settings.MaxChunkSize {
 			return nil, nil, status.ErrTooLarge
 		}
@@ -229,7 +229,7 @@ chunkBodyCRLF:
 	}
 
 lastChunkCR:
-	if offset >= len(data) {
+	if offset >= int64(len(data)) {
 		return nil, nil, nil
 	}
 
@@ -249,7 +249,7 @@ lastChunkCR:
 	}
 
 footer:
-	for ; offset < len(data); offset++ {
+	for ; offset < int64(len(data)); offset++ {
 		switch data[offset] {
 		case '\r':
 			offset++
@@ -265,7 +265,7 @@ footer:
 	return nil, nil, nil
 
 footerCR:
-	if offset >= len(data) {
+	if offset >= int64(len(data)) {
 		return nil, nil, nil
 	}
 
@@ -279,7 +279,7 @@ footerCR:
 	}
 
 footerCRLF:
-	if offset >= len(data) {
+	if offset >= int64(len(data)) {
 		return nil, nil, nil
 	}
 
@@ -299,7 +299,7 @@ footerCRLF:
 	}
 
 footerCRLFCR:
-	if offset >= len(data) {
+	if offset >= int64(len(data)) {
 		return nil, nil, nil
 	}
 
