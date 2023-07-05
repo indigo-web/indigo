@@ -21,7 +21,7 @@ func newClient(tcpSettings settings.TCP, conn net.Conn) tcp.Client {
 	return tcp.NewClient(conn, tcpSettings.ReadTimeout, readBuff)
 }
 
-func newKeyValueArenas(s settings.Headers) (arena.Arena, arena.Arena) {
+func newKeyValueArenas(s settings.Headers) (*arena.Arena, *arena.Arena) {
 	keyArena := arena.NewArena(
 		s.MaxKeyLength*s.Number.Default,
 		s.MaxKeyLength*s.Number.Maximal,
@@ -61,6 +61,6 @@ func newHTTPParser(s settings.Settings, req *http.Request) httpparser.HTTPReques
 	startLineBuff := make([]byte, s.URL.MaxLength)
 
 	return http1.NewHTTPRequestsParser(
-		req, keyAlloc, valAlloc, objPool, startLineBuff, s.Headers,
+		req, *keyAlloc, *valAlloc, *objPool, startLineBuff, s.Headers,
 	)
 }

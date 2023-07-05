@@ -135,7 +135,7 @@ func Benchmark_Get(b *testing.B) {
 	objPool := pool.NewObjectPool[[]string](20)
 	startLineBuff := make([]byte, s.URL.MaxLength)
 	parser := http1.NewHTTPRequestsParser(
-		request, keyArena, valArena, objPool, startLineBuff, s.Headers,
+		request, *keyArena, *valArena, *objPool, startLineBuff, s.Headers,
 	)
 	render := render2.NewEngine(make([]byte, 0, 1024), nil, defaultHeaders)
 	server := NewHTTPServer(r).(*httpServer)
@@ -205,7 +205,7 @@ func Benchmark_Post(b *testing.B) {
 	objPool := pool.NewObjectPool[[]string](20)
 	startLineBuff := make([]byte, s.URL.MaxLength)
 	parser := http1.NewHTTPRequestsParser(
-		request, keyArena, valArena, objPool, startLineBuff, s.Headers,
+		request, *keyArena, *valArena, *objPool, startLineBuff, s.Headers,
 	)
 	render := render2.NewEngine(make([]byte, 0, 1024), nil, defaultHeaders)
 	server := NewHTTPServer(r).(*httpServer)

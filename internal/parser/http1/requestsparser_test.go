@@ -57,7 +57,7 @@ func getParser() (httpparser.HTTPRequestsParser, *http.Request) {
 	startLineBuff := make([]byte, s.URL.MaxLength)
 
 	return NewHTTPRequestsParser(
-		request, keyArena, valArena, objPool, startLineBuff, s.Headers,
+		request, *keyArena, *valArena, *objPool, startLineBuff, s.Headers,
 	), request
 }
 
