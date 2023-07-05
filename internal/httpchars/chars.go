@@ -10,5 +10,4 @@ var (
 	SP      = " "
 	COLON   = ":"
 	COLONSP = COLON + SP
-	COMMA   = ","
 )

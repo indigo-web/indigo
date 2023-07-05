@@ -3,9 +3,9 @@ package obtainer
 import (
 	"github.com/indigo-web/indigo/http"
 
-	"github.com/indigo-web/indigo/internal/mapconv"
 	"github.com/indigo-web/indigo/router/inbuilt/radix"
 	"github.com/indigo-web/indigo/router/inbuilt/types"
+	"github.com/indigo-web/utils/mapconv"
 )
 
 type (

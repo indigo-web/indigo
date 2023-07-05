@@ -1,19 +1,18 @@
 package http1
 
 import (
-	"github.com/indigo-web/indigo/http/decode"
 	"io"
 	"strconv"
 	"strings"
 	"testing"
 
-	"github.com/indigo-web/indigo/internal/server/tcp/dummy"
-
 	"github.com/indigo-web/indigo/http"
+	"github.com/indigo-web/indigo/http/decode"
 	"github.com/indigo-web/indigo/http/headers"
 	"github.com/indigo-web/indigo/http/query"
-	"github.com/indigo-web/indigo/internal/functools"
+	"github.com/indigo-web/indigo/internal/server/tcp/dummy"
 	"github.com/indigo-web/indigo/settings"
+	"github.com/indigo-web/utils/ft"
 	"github.com/stretchr/testify/require"
 )
 
@@ -36,7 +35,7 @@ func getRequestWithReader(chunked bool, body ...[]byte) (*http.Request, http.Bod
 		length := func(b []byte) int {
 			return len(b)
 		}
-		contentLength = functools.Sum(functools.Map(length, body))
+		contentLength = ft.Sum(ft.Map(length, body))
 		hdrs = headers.NewHeaders(map[string][]string{
 			"Content-Length": {strconv.Itoa(contentLength)},
 		})
@@ -86,7 +85,7 @@ func TestBodyReader_Plain(t *testing.T) {
 		toString := func(b []byte) string {
 			return string(b)
 		}
-		bodyString := functools.Sum(functools.Map(toString, body))
+		bodyString := ft.Sum(ft.Map(toString, body))
 
 		request, reader := getRequestWithReader(false, body...)
 		reader.Init(request)

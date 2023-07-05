@@ -7,7 +7,7 @@ import (
 	"strings"
 
 	"github.com/indigo-web/indigo/http/status"
-	"github.com/indigo-web/indigo/internal"
+	"github.com/indigo-web/utils/uf"
 )
 
 type ResponseWriter func(b []byte) error
@@ -107,7 +107,7 @@ func (r Response) DiscardHeaders() Response {
 // WithBody sets a string as a response body. This will override already-existing
 // body if it was set
 func (r Response) WithBody(body string) Response {
-	return r.WithBodyByte(internal.S2B(body))
+	return r.WithBodyByte(uf.S2B(body))
 }
 
 // WithBodyByte does all the same as Body does, but for byte slices

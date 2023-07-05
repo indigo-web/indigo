@@ -10,16 +10,16 @@ import (
 	"github.com/indigo-web/indigo/internal/server/tcp/dummy"
 
 	"github.com/indigo-web/indigo/http/status"
-	"github.com/indigo-web/indigo/internal/pool"
+	"github.com/indigo-web/utils/pool"
 
 	"github.com/indigo-web/indigo/http"
 	"github.com/indigo-web/indigo/http/headers"
 	"github.com/indigo-web/indigo/http/method"
 	"github.com/indigo-web/indigo/http/proto"
 	"github.com/indigo-web/indigo/http/query"
-	"github.com/indigo-web/indigo/internal/arena"
 	httpparser "github.com/indigo-web/indigo/internal/parser"
 	settings2 "github.com/indigo-web/indigo/settings"
+	"github.com/indigo-web/utils/arena"
 	"github.com/stretchr/testify/require"
 )
 
@@ -57,7 +57,7 @@ func getParser() (httpparser.HTTPRequestsParser, *http.Request) {
 	startLineBuff := make([]byte, s.URL.MaxLength)
 
 	return NewHTTPRequestsParser(
-		request, keyArena, valArena, objPool, startLineBuff, s.Headers,
+		request, *keyArena, *valArena, *objPool, startLineBuff, s.Headers,
 	), request
 }
 

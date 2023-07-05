@@ -7,11 +7,11 @@ import (
 
 	"github.com/indigo-web/indigo/http"
 	"github.com/indigo-web/indigo/http/method"
-	"github.com/indigo-web/indigo/internal/functools"
-	"github.com/indigo-web/indigo/internal/mapconv"
 	"github.com/indigo-web/indigo/router/inbuilt/radix"
 	"github.com/indigo-web/indigo/router/inbuilt/types"
 	"github.com/indigo-web/indigo/valuectx"
+	"github.com/indigo-web/utils/ft"
+	"github.com/indigo-web/utils/mapconv"
 )
 
 func DynamicObtainer(routes types.RoutesMap) Obtainer {
@@ -40,7 +40,7 @@ func getTree(routes types.RoutesMap) radix.Tree {
 	for k, v := range routes {
 		tree.MustInsert(radix.MustParse(k), radix.Payload{
 			MethodsMap: v,
-			Allow:      strings.Join(functools.Map(method.ToString, mapconv.Keys(v)), ","),
+			Allow:      strings.Join(ft.Map(method.ToString, mapconv.Keys(v)), ","),
 		})
 	}
 

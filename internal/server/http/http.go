@@ -7,11 +7,11 @@ import (
 	"github.com/indigo-web/indigo/http"
 	"github.com/indigo-web/indigo/http/proto"
 	"github.com/indigo-web/indigo/http/status"
-	"github.com/indigo-web/indigo/internal"
 	"github.com/indigo-web/indigo/internal/parser"
 	"github.com/indigo-web/indigo/internal/render"
 	"github.com/indigo-web/indigo/internal/server/tcp"
 	"github.com/indigo-web/indigo/router"
+	"github.com/indigo-web/utils/uf"
 	"os"
 )
 
@@ -73,7 +73,7 @@ func (h *httpServer) RunOnce(
 		protocol := req.Proto
 
 		if req.Upgrade != proto.Unknown && proto.HTTP1&req.Upgrade == req.Upgrade {
-			protoToken := internal.B2S(bytes.TrimSpace(proto.ToBytes(req.Upgrade)))
+			protoToken := uf.B2S(bytes.TrimSpace(proto.ToBytes(req.Upgrade)))
 			renderer.PreWrite(req.Proto, upgrading.WithHeader("Upgrade", protoToken))
 			protocol = req.Upgrade
 		}

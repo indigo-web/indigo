@@ -28,7 +28,9 @@ func BenchmarkRequestRouting(b *testing.B) {
 	router.Get(longURIRequest.Path.String, nopHandler)
 	router.Get(shortURIRequest.Path.String, nopHandler)
 
-	router.OnStart()
+	if err := router.OnStart(); err != nil {
+		panic(err)
+	}
 
 	b.Run("LongURI", func(b *testing.B) {
 		for i := 0; i < b.N; i++ {

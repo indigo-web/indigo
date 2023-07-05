@@ -11,14 +11,14 @@ import (
 	"testing"
 
 	"github.com/indigo-web/indigo/http"
-	"github.com/indigo-web/indigo/internal/pool"
+	"github.com/indigo-web/utils/pool"
 
 	"github.com/indigo-web/indigo/http/headers"
 	"github.com/indigo-web/indigo/http/query"
-	"github.com/indigo-web/indigo/internal/arena"
 	"github.com/indigo-web/indigo/internal/parser/http1"
 	render2 "github.com/indigo-web/indigo/internal/render"
 	"github.com/indigo-web/indigo/settings"
+	"github.com/indigo-web/utils/arena"
 )
 
 var (
@@ -73,7 +73,10 @@ func getInbuiltRouter() router.Router {
 	r.Get("/with-header", func(request *http.Request) http.Response {
 		return http.RespondTo(request).WithHeader("Hello", "World")
 	})
-	r.OnStart()
+
+	if err := r.OnStart(); err != nil {
+		panic(err)
+	}
 
 	return r
 }
@@ -132,7 +135,7 @@ func Benchmark_Get(b *testing.B) {
 	objPool := pool.NewObjectPool[[]string](20)
 	startLineBuff := make([]byte, s.URL.MaxLength)
 	parser := http1.NewHTTPRequestsParser(
-		request, keyArena, valArena, objPool, startLineBuff, s.Headers,
+		request, *keyArena, *valArena, *objPool, startLineBuff, s.Headers,
 	)
 	render := render2.NewEngine(make([]byte, 0, 1024), nil, defaultHeaders)
 	server := NewHTTPServer(r).(*httpServer)
@@ -202,7 +205,7 @@ func Benchmark_Post(b *testing.B) {
 	objPool := pool.NewObjectPool[[]string](20)
 	startLineBuff := make([]byte, s.URL.MaxLength)
 	parser := http1.NewHTTPRequestsParser(
-		request, keyArena, valArena, objPool, startLineBuff, s.Headers,
+		request, *keyArena, *valArena, *objPool, startLineBuff, s.Headers,
 	)
 	render := render2.NewEngine(make([]byte, 0, 1024), nil, defaultHeaders)
 	server := NewHTTPServer(r).(*httpServer)

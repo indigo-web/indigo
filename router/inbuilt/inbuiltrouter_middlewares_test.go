@@ -145,7 +145,7 @@ func TestMiddlewares(t *testing.T) {
 	v2.Get("/world", nopHandler, pointApplied2mware)
 	v2.Use(local3mware)
 
-	r.OnStart()
+	require.NoError(t, r.OnStart())
 
 	t.Run("/", func(t *testing.T) {
 		request := getRequest()

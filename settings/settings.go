@@ -4,7 +4,7 @@ import (
 	"math"
 	"time"
 
-	"github.com/indigo-web/indigo/internal/constraints"
+	"github.com/indigo-web/utils/constraint"
 )
 
 type (
@@ -199,7 +199,7 @@ func Fill(original Settings) (modified Settings) {
 	return original
 }
 
-func customOrDefault[T constraints.Number](custom, defaultVal T) T {
+func customOrDefault[T constraint.Number](custom, defaultVal T) T {
 	if custom == 0 {
 		return defaultVal
 	}

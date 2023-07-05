@@ -90,10 +90,8 @@ func (h *Headers) Unwrap() []string {
 }
 
 // Add values to the key. In case did not exist, it'll be created
-func (h *Headers) Add(key string, newValues ...string) {
-	for i := range newValues {
-		h.headers = append(h.headers, key, newValues[i])
-	}
+func (h *Headers) Add(key, value string) {
+	h.headers = append(h.headers, key, value)
 }
 
 // Has returns true or false depending on whether such a key exists

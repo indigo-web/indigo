@@ -15,29 +15,32 @@ const (
 	PATCH
 )
 
-func Parse(method string) Method {
-	switch method {
-	case "GET":
-		return GET
-	case "HEAD":
-		return HEAD
-	case "POST":
-		return POST
-	case "PUT":
-		return PUT
-	case "DELETE":
-		return DELETE
-	case "CONNECT":
-		return CONNECT
-	case "OPTIONS":
-		return OPTIONS
-	case "TRACE":
-		return TRACE
-	case "PATCH":
-		return PATCH
+type entry struct {
+	Method Method
+	Origin string
+}
+
+func newMethodsMap(methods ...Method) (mmap [256][256]entry) {
+	for _, method := range methods {
+		str := ToString(method)
+		mmap[str[0]][str[1]] = entry{
+			Method: method,
+			Origin: str,
+		}
 	}
 
-	return Unknown
+	return mmap
+}
+
+var methodsMap = newMethodsMap(GET, HEAD, POST, PUT, DELETE, CONNECT, OPTIONS, TRACE, PATCH)
+
+func Parse(str string) Method {
+	method := methodsMap[str[0]][str[1]]
+	if method.Origin != str {
+		return Unknown
+	}
+
+	return method.Method
 }
 
 func ToString(method Method) string {

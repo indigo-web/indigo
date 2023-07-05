@@ -6,10 +6,10 @@ import (
 	"github.com/indigo-web/indigo/http"
 	"github.com/indigo-web/indigo/http/method"
 	"github.com/indigo-web/indigo/http/status"
-	"github.com/indigo-web/indigo/internal/functools"
-	"github.com/indigo-web/indigo/internal/mapconv"
 	"github.com/indigo-web/indigo/router/inbuilt/types"
 	"github.com/indigo-web/indigo/valuectx"
+	"github.com/indigo-web/utils/ft"
+	"github.com/indigo-web/utils/mapconv"
 )
 
 func StaticObtainer(routes types.RoutesMap) Obtainer {
@@ -35,7 +35,7 @@ func getAllowedMethodsMap(routes types.RoutesMap) map[string]string {
 	allowedMethods := make(map[string]string, len(routes))
 
 	for resource, methodsMap := range routes {
-		keys := functools.Map(method.ToString, mapconv.Keys(methodsMap))
+		keys := ft.Map(method.ToString, mapconv.Keys(methodsMap))
 		allowedMethods[resource] = strings.Join(keys, ",")
 	}
 

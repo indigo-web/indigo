@@ -21,7 +21,7 @@ func nopHandler(request *http.Request) http.Response {
 
 func TestRoute(t *testing.T) {
 	r := NewRouter()
-	r.OnStart()
+	require.NoError(t, r.OnStart())
 
 	t.Run("NewRoute", func(t *testing.T) {
 		r.Route(method.GET, "/", nopHandler)
@@ -122,7 +122,7 @@ func TestGroups(t *testing.T) {
 	v2 := api.Group("/v2")
 	v2.Get("/world", nopHandler)
 
-	r.OnStart()
+	require.NoError(t, r.OnStart())
 
 	require.Contains(t, r.routes, "/")
 	require.Contains(t, r.routes, "/api/v1/hello")
@@ -141,7 +141,7 @@ func TestResource(t *testing.T) {
 	stat.Get(nopHandler)
 	stat.Post(nopHandler)
 
-	r.OnStart()
+	require.NoError(t, r.OnStart())
 
 	t.Run("Root", func(t *testing.T) {
 		require.Contains(t, r.routes, "/")
@@ -178,7 +178,7 @@ func TestResource_Methods(t *testing.T) {
 	root.Options(nopHandler)
 	root.Trace(nopHandler)
 	root.Patch(nopHandler)
-	r.OnStart()
+	require.NoError(t, r.OnStart())
 
 	require.Contains(t, r.routes, "/")
 	// too lazy to check all of them. But lazy means smart, so we can
