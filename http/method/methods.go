@@ -13,6 +13,10 @@ const (
 	OPTIONS
 	TRACE
 	PATCH
+
+	// Count is the last one enum, so contains the greatest integer value of all the
+	// methods. So real number of methods is lower by 1
+	Count
 )
 
 type entry struct {

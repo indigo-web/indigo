@@ -1,17 +1,12 @@
 package obtainer
 
 import (
-	"strings"
-
 	"github.com/indigo-web/indigo/http/status"
 
 	"github.com/indigo-web/indigo/http"
-	"github.com/indigo-web/indigo/http/method"
 	"github.com/indigo-web/indigo/router/inbuilt/radix"
 	"github.com/indigo-web/indigo/router/inbuilt/types"
 	"github.com/indigo-web/indigo/valuectx"
-	"github.com/indigo-web/utils/ft"
-	"github.com/indigo-web/utils/mapconv"
 )
 
 func DynamicObtainer(routes types.RoutesMap) Obtainer {
@@ -37,10 +32,10 @@ func DynamicObtainer(routes types.RoutesMap) Obtainer {
 func getTree(routes types.RoutesMap) radix.Tree {
 	tree := radix.NewTree()
 
-	for k, v := range routes {
-		tree.MustInsert(radix.MustParse(k), radix.Payload{
-			MethodsMap: v,
-			Allow:      strings.Join(ft.Map(method.ToString, mapconv.Keys(v)), ","),
+	for resource, methods := range routes {
+		tree.MustInsert(radix.MustParse(resource), radix.Payload{
+			MethodsMap: methods,
+			Allow:      getAllowedMethodsString(methods),
 		})
 	}
 

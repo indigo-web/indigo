@@ -16,7 +16,7 @@ type (
 )
 
 type (
-	MethodsMap map[method.Method]*HandlerObject
+	MethodsMap [method.Count]*HandlerObject
 	RoutesMap  map[string]MethodsMap
 
 	HandlerObject struct {
