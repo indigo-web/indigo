@@ -2,15 +2,17 @@ package http
 
 import (
 	"context"
-	"github.com/indigo-web/indigo/internal/unreader"
+	"github.com/indigo-web/indigo/http/status"
 	"io"
 	"net"
 
 	"github.com/indigo-web/indigo/http/headers"
-	// I don't know why, but otherwise GoLand cries about unused import, even if it's used
 	"github.com/indigo-web/indigo/http/method"
 	"github.com/indigo-web/indigo/http/proto"
 	"github.com/indigo-web/indigo/http/query"
+	"github.com/indigo-web/indigo/internal/unreader"
+
+	json "github.com/json-iterator/go"
 )
 
 type (
@@ -39,6 +41,7 @@ type Request struct {
 	Path             Path
 	ContentLength    int
 	TransferEncoding headers.TransferEncoding
+	ContentType      string
 	Method           method.Method
 	Upgrade          proto.Proto
 	Proto            proto.Proto
@@ -71,6 +74,28 @@ func NewRequest(
 	}
 
 	return request
+}
+
+// JSON takes a model and returns an error if occurred. Model must be a pointer to a structure.
+// If Content-Type header is given, but is not "application/json", then status.ErrUnsupportedMediaType
+// will be returned. If JSON is malformed, or it doesn't match the model, then custom jsoniter error
+// will be returned
+func (r *Request) JSON(model any) error {
+	if len(r.ContentType) > 0 && r.ContentType != "application/json" {
+		return status.ErrUnsupportedMediaType
+	}
+
+	data, err := r.Body().Value()
+	if err != nil {
+		return err
+	}
+
+	iterator := json.ConfigDefault.BorrowIterator(data)
+	iterator.ReadVal(model)
+	err = iterator.Error
+	json.ConfigDefault.ReturnIterator(iterator)
+
+	return err
 }
 
 // Body returns an entity representing a request's body
@@ -110,6 +135,7 @@ func (r *Request) Clear() (err error) {
 
 	r.ContentLength = 0
 	r.TransferEncoding = headers.TransferEncoding{}
+	r.ContentType = ""
 	r.Upgrade = proto.Unknown
 
 	if r.clearParamsMap && len(r.Path.Params) > 0 {
