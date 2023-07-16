@@ -2,6 +2,7 @@ package http
 
 import (
 	"github.com/indigo-web/indigo/internal/render/types"
+	json "github.com/json-iterator/go"
 	"io"
 	"os"
 	"strings"
@@ -116,15 +117,13 @@ func (r Response) WithBodyByte(body []byte) Response {
 	return r
 }
 
-// WithWriter takes a function that takes an io.Writer, which allows us to stream data
-// directly into the response body.
-// Note: this method causes an allocation
+// WithWriter takes a function with io.Writer receiver. This writer is the actual writer to the response
+// body. The code accessing the writer must be wrapped into the function, as the Response builder is
+// pretty limited in such a things. It pretends to be clear (all the methods has by-value receivers)
+// in order to enable calls chaining, so it's pretty difficult to handle with being io.Writer-compatible
 //
-// TODO: This is not the best design solution. I would like to make this method just like
-//
-//	all others, so returning only Response object itself. The problem is that it is
-//	impossible because io.Writer is a procedure-style thing that does not work with
-//	our builder that pretends to be clear. Hope in future this issue will be solved
+// Note: returned error is ALWAYS the error returned by callback. So it may be ignored in cases, when
+// callback constantly returns nil
 func (r Response) WithWriter(cb func(io.Writer) error) (Response, error) {
 	writer := newBodyIOWriter(r)
 	err := cb(writer)
@@ -155,6 +154,27 @@ func (r Response) WithFile(path string) (Response, error) {
 func (r Response) WithAttachment(reader io.Reader, size int) Response {
 	r.attachment = types.NewAttachment(reader, size)
 	return r
+}
+
+// WithJSON receives a model (must be a pointer to the structure) and returns a new Response
+// object and an error
+func (r Response) WithJSON(model any) (Response, error) {
+	r.Body = r.Body[:0]
+
+	resp, err := r.WithWriter(func(w io.Writer) error {
+		stream := json.ConfigDefault.BorrowStream(w)
+		stream.WriteVal(model)
+		err := stream.Flush()
+		json.ConfigDefault.ReturnStream(stream)
+
+		return err
+	})
+
+	if err != nil {
+		return r, err
+	}
+
+	return resp.WithContentType("application/json"), nil
 }
 
 // WithError checks, whether the passed error is a HTTPError instance. In this case,

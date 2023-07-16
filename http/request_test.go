@@ -1,6 +1,9 @@
 package http
 
 import (
+	"github.com/indigo-web/indigo/http/decode"
+	"github.com/indigo-web/indigo/http/headers"
+	"github.com/indigo-web/indigo/http/query"
 	"github.com/indigo-web/indigo/internal/server/tcp"
 	"github.com/indigo-web/indigo/internal/server/tcp/dummy"
 	"github.com/stretchr/testify/require"
@@ -78,5 +81,26 @@ func TestRequest_Reader(t *testing.T) {
 		n, err = reader.Read(buff)
 		require.Equal(t, 0, n)
 		require.EqualError(t, err, io.EOF.Error())
+	})
+
+	t.Run("JSON", func(t *testing.T) {
+		type Model struct {
+			Name  string `json:"name"`
+			Email string `json:"email"`
+		}
+
+		body := []byte(`{"name": "John", "email": "john@smith.com"}`)
+		client := dummy.NewCircularClient(body)
+		client.OneTime()
+		reader := newDummyReader(client)
+
+		request := NewRequest(
+			headers.NewHeaders(nil), query.Query{}, NewResponse(), dummy.NewNopConn(),
+			NewBody(reader, decode.NewDecoder()), nil, true)
+
+		model := new(Model)
+		require.NoError(t, request.JSON(model))
+		require.Equal(t, "John", model.Name)
+		require.Equal(t, "john@smith.com", model.Email)
 	})
 }

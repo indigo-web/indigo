@@ -15,18 +15,14 @@ func (r *Router) Route(
 	middlewares ...types.Middleware,
 ) {
 	urlPath := r.prefix + path
-	methodsMap, found := r.routes[urlPath]
-	if !found {
-		methodsMap = make(types.MethodsMap)
-		r.routes[urlPath] = methodsMap
-	}
-
+	methodsMap := r.routes[urlPath]
 	handlerStruct := &types.HandlerObject{
 		Fun:         handlerFunc,
 		Middlewares: append(middlewares, r.middlewares...),
 	}
 
 	methodsMap[method] = handlerStruct
+	r.routes[urlPath] = methodsMap
 }
 
 // RouteError adds an error handler. You can handle next errors:

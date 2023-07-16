@@ -1,6 +1,7 @@
 package inbuilt
 
 import (
+	"github.com/stretchr/testify/assert"
 	"testing"
 
 	"github.com/indigo-web/indigo/http"
@@ -28,8 +29,6 @@ func TestRoute(t *testing.T) {
 
 		require.Contains(t, r.routes, "/")
 		require.Equal(t, 1, len(r.routes))
-		require.Equal(t, 1, len(r.routes["/"]))
-		require.Contains(t, r.routes["/"], method.GET)
 		require.NotNil(t, r.routes["/"][method.GET])
 	})
 
@@ -38,8 +37,6 @@ func TestRoute(t *testing.T) {
 
 		require.Contains(t, r.routes, "/")
 		require.Equal(t, 1, len(r.routes))
-		require.Equal(t, 2, len(r.routes["/"]))
-		require.Contains(t, r.routes["/"], method.POST)
 		require.NotNil(t, r.routes["/"][method.POST])
 	})
 
@@ -48,8 +45,6 @@ func TestRoute(t *testing.T) {
 
 		require.Contains(t, r.routes, "/hello")
 		require.Equal(t, 2, len(r.routes))
-		require.Equal(t, 1, len(r.routes["/hello"]))
-		require.Contains(t, r.routes["/hello"], method.POST)
 		require.NotNil(t, r.routes["/hello"][method.POST])
 	})
 
@@ -73,7 +68,6 @@ func testMethodShorthand(
 ) {
 	route("/", nopHandler)
 	require.Contains(t, router.routes, "/")
-	require.Contains(t, router.routes["/"], method)
 	require.NotNil(t, router.routes["/"][method])
 }
 
@@ -146,23 +140,15 @@ func TestResource(t *testing.T) {
 	t.Run("Root", func(t *testing.T) {
 		require.Contains(t, r.routes, "/")
 		rootMethods := r.routes["/"]
-		require.Contains(t, rootMethods, method.GET)
-		require.Contains(t, rootMethods, method.POST)
-		require.Equal(
-			t, 2, len(rootMethods),
-			"only GET and POST methods are expected to be presented",
-		)
+		require.NotNil(t, rootMethods[method.GET])
+		require.NotNil(t, rootMethods[method.POST])
 	})
 
 	t.Run("Group", func(t *testing.T) {
 		require.Contains(t, r.routes, "/api/stat")
 		apiMethods := r.routes["/api/stat"]
-		require.Contains(t, apiMethods, method.GET)
-		require.Contains(t, apiMethods, method.POST)
-		require.Equal(
-			t, 2, len(apiMethods),
-			"only GET and POST methods are expected to be presented",
-		)
+		require.NotNil(t, apiMethods[method.GET])
+		require.NotNil(t, apiMethods[method.POST])
 	})
 }
 
@@ -181,8 +167,9 @@ func TestResource_Methods(t *testing.T) {
 	require.NoError(t, r.OnStart())
 
 	require.Contains(t, r.routes, "/")
-	// too lazy to check all of them. But lazy means smart, so we can
-	// just check whether there are 9 different methods are registered.
-	// So if they do, everything works correctly
-	require.Equal(t, 9, len(r.routes["/"]))
+	methods := r.routes["/"]
+
+	for _, handlerObject := range methods[1:method.Count] {
+		assert.NotNil(t, handlerObject)
+	}
 }

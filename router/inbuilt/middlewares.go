@@ -15,6 +15,10 @@ This file is responsible for middlewares
 func (r *Router) Use(middlewares ...types.Middleware) {
 	for _, methods := range r.routes {
 		for _, handler := range methods {
+			if handler == nil {
+				continue
+			}
+
 			handler.Middlewares = append(handler.Middlewares, middlewares...)
 		}
 	}
@@ -25,6 +29,10 @@ func (r *Router) Use(middlewares ...types.Middleware) {
 func (r *Router) applyMiddlewares() {
 	for _, methods := range r.routes {
 		for _, handler := range methods {
+			if handler == nil {
+				continue
+			}
+
 			handler.Fun = compose(handler.Fun, handler.Middlewares)
 		}
 	}

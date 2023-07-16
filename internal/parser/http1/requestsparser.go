@@ -739,6 +739,8 @@ headerValueCRLF:
 	requestHeaders.Add(p.headerKey, value)
 
 	switch p.headerKey {
+	case "content-type":
+		p.request.ContentType = value
 	case "upgrade":
 		p.request.Upgrade = proto.ChooseUpgrade(value)
 	case "transfer-encoding":

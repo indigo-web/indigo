@@ -1,15 +1,11 @@
 package obtainer
 
 import (
-	"strings"
-
 	"github.com/indigo-web/indigo/http"
 	"github.com/indigo-web/indigo/http/method"
 	"github.com/indigo-web/indigo/http/status"
 	"github.com/indigo-web/indigo/router/inbuilt/types"
 	"github.com/indigo-web/indigo/valuectx"
-	"github.com/indigo-web/utils/ft"
-	"github.com/indigo-web/utils/mapconv"
 )
 
 func StaticObtainer(routes types.RoutesMap) Obtainer {
@@ -34,17 +30,33 @@ func StaticObtainer(routes types.RoutesMap) Obtainer {
 func getAllowedMethodsMap(routes types.RoutesMap) map[string]string {
 	allowedMethods := make(map[string]string, len(routes))
 
-	for resource, methodsMap := range routes {
-		keys := ft.Map(method.ToString, mapconv.Keys(methodsMap))
-		allowedMethods[resource] = strings.Join(keys, ",")
+	for resource, methods := range routes {
+		allowedMethods[resource] = getAllowedMethodsString(methods)
 	}
 
 	return allowedMethods
 }
 
+func getAllowedMethodsString(methods types.MethodsMap) (str string) {
+	for i := range methods {
+		if methods[i] == nil {
+			continue
+		}
+
+		str += method.ToString(method.Method(i)) + ","
+	}
+
+	if len(str) > 0 {
+		// remove trailing comma
+		str = str[:len(str)-1]
+	}
+
+	return str
+}
+
 func getHandler(reqMethod method.Method, methodsMap types.MethodsMap) types.HandlerFunc {
-	handler, found := methodsMap[reqMethod]
-	if !found {
+	handler := methodsMap[reqMethod]
+	if handler == nil {
 		if reqMethod == method.HEAD {
 			return getHandler(method.GET, methodsMap)
 		}
