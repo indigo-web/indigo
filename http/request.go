@@ -170,3 +170,8 @@ func (b bodyIOReader) WriteTo(w io.Writer) (n int64, err error) {
 func (b bodyIOReader) Reset() {
 	b.unreader.Unread(nil)
 }
+
+func (b bodyIOReader) Reassign(reader BodyReader) {
+	b.Reset()
+	b.reader = reader
+}
