@@ -129,10 +129,11 @@ func Default() Settings {
 			MaxKeyLength:   100,  // 100 bytes
 			MaxValueLength: 8192, // 8 kilobytes (just like nginx)
 			ValueSpace: HeadersValuesSpace{
-				// for simple requests without many header values this will be enough, I hope
-				Default: 1024,
-				// 128kb as a limit of amount of memory for header values storing
-				Maximal: 128 * 1024,
+				// for simple requests without many heavy-weighted headers must be enough
+				// to avoid a relatively big amount of re-allocations
+				Default: 2048,
+				// 64kb as a limit of amount of memory for header values storing
+				Maximal: 64 * 1024,
 			},
 		},
 		URL: URL{
