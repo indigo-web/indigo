@@ -1,7 +1,9 @@
 package http1
 
 import (
+	"bytes"
 	"fmt"
+	"github.com/indigo-web/indigo/internal/strcomp"
 	"strings"
 
 	"github.com/indigo-web/indigo/http"
@@ -29,8 +31,8 @@ type httpRequestsParser struct {
 	headerKey         string
 	startLineBuff     []byte
 	headersValuesPool pool.ObjectPool[[]string]
-	headerKeyArena    arena.Arena
-	headerValueArena  arena.Arena
+	headerKeyArena    arena.Arena[byte]
+	headerValueArena  arena.Arena[byte]
 	headersSettings   settings.Headers
 	begin             int
 	pointer           int
@@ -44,7 +46,7 @@ type httpRequestsParser struct {
 }
 
 func NewHTTPRequestsParser(
-	request *http.Request, keyArena, valArena arena.Arena,
+	request *http.Request, keyArena, valArena arena.Arena[byte],
 	valuesPool pool.ObjectPool[[]string], startLineBuff []byte, headersSettings settings.Headers,
 ) parser.HTTPRequestsParser {
 	return &httpRequestsParser{
@@ -61,7 +63,6 @@ func NewHTTPRequestsParser(
 }
 
 func (p *httpRequestsParser) Parse(data []byte) (state parser.RequestState, extra []byte, err error) {
-	var value string
 	_ = *p.request
 	requestHeaders := p.request.Headers
 
@@ -82,10 +83,6 @@ func (p *httpRequestsParser) Parse(data []byte) (state parser.RequestState, extr
 		goto queryDecode2Char
 	case eFragment:
 		goto fragment
-	case eFragmentDecode1Char:
-		goto fragmentDecode1Char
-	case eFragmentDecode2Char:
-		goto fragmentDecode2Char
 	case eProto:
 		goto proto
 	case eH:
@@ -112,22 +109,14 @@ func (p *httpRequestsParser) Parse(data []byte) (state parser.RequestState, extr
 		goto protoCRLFCR
 	case eHeaderKey:
 		goto headerKey
-	case eHeaderColon:
-		goto headerColon
 	case eContentLength:
 		goto contentLength
 	case eContentLengthCR:
 		goto contentLengthCR
-	case eContentLengthCRLF:
-		goto contentLengthCRLF
 	case eContentLengthCRLFCR:
 		goto contentLengthCRLFCR
 	case eHeaderValue:
 		goto headerValue
-	case eHeaderValueCR:
-		goto headerValueCR
-	case eHeaderValueCRLF:
-		goto headerValueCRLF
 	case eHeaderValueCRLFCR:
 		goto headerValueCRLFCR
 	default:
@@ -324,62 +313,16 @@ queryDecode2Char:
 	goto query
 
 fragment:
-	for i := range data {
-		switch data[i] {
-		case ' ':
-			p.request.Path.Fragment = uf.B2S(p.startLineBuff[p.begin:p.pointer])
-			data = data[i+1:]
-			p.state = eProto
-			goto proto
-		case '%':
-			data = data[i+1:]
-			p.state = eFragmentDecode1Char
-			goto fragmentDecode1Char
-		case '\x00', '\n', '\r', '\t', '\b', '\a', '\v', '\f':
-			return parser.Error, nil, status.ErrBadRequest
-		default:
-			if p.pointer >= len(p.startLineBuff) {
-				return parser.Error, nil, status.ErrURITooLong
-			}
-
-			p.startLineBuff[p.pointer] = data[i]
-			p.pointer++
+	{
+		sp := bytes.IndexByte(data, ' ')
+		if sp == -1 {
+			return parser.Pending, nil, nil
 		}
+
+		data = data[sp+1:]
+		p.state = eProto
+		goto proto
 	}
-
-	return parser.Pending, nil, nil
-
-fragmentDecode1Char:
-	if len(data) == 0 {
-		return parser.Pending, nil, nil
-	}
-
-	if !isHex(data[0]) {
-		return parser.Error, nil, status.ErrURIDecoding
-	}
-
-	p.urlEncodedChar = unHex(data[0]) << 4
-	data = data[1:]
-	p.state = eFragmentDecode2Char
-	goto fragmentDecode2Char
-
-fragmentDecode2Char:
-	if len(data) == 0 {
-		return parser.Pending, nil, nil
-	}
-
-	if !isHex(data[0]) {
-		return parser.Error, nil, status.ErrURIDecoding
-	}
-	if p.pointer >= len(p.startLineBuff) {
-		return parser.Error, nil, status.ErrURITooLong
-	}
-
-	p.startLineBuff[p.pointer] = p.urlEncodedChar | unHex(data[0])
-	p.pointer++
-	data = data[1:]
-	p.state = eFragment
-	goto fragment
 
 proto:
 	if len(data) == 0 {
@@ -538,7 +481,6 @@ protoCRLF:
 	default:
 		// headers are here. I have to have a buffer for header key, and after receiving it,
 		// get an appender from headers manager (and keep it in httpRequestsParser struct)
-		data[0] = data[0] | 0x20
 		p.state = eHeaderKey
 		goto headerKey
 	}
@@ -555,112 +497,98 @@ protoCRLFCR:
 	return parser.Error, nil, status.ErrBadRequest
 
 headerKey:
-	for i := range data {
-		switch data[i] {
-		case ':':
-			p.headersNumber++
+	if len(data) == 0 {
+		return parser.Pending, nil, err
+	}
 
-			if p.headersNumber > p.headersSettings.Number.Maximal {
-				return parser.Error, nil, status.ErrTooManyHeaders
-			}
+	switch data[0] {
+	case '\n':
+		return parser.HeadersCompleted, data[1:], nil
+	case '\r':
+		data = data[1:]
+		p.state = eHeaderValueCRLFCR
+		goto headerValueCRLFCR
+	}
 
-			if !p.headerKeyArena.Append(data[:i]) {
+	{
+		colon := bytes.IndexByte(data, ':')
+		if colon == -1 {
+			if !p.headerKeyArena.Append(data...) {
 				return parser.Error, nil, status.ErrHeaderFieldsTooLarge
 			}
 
-			p.headerKey = uf.B2S(p.headerKeyArena.Finish())
-			data = data[i+1:]
-
-			if p.headerKey == "content-length" {
-				p.state = eContentLength
-				goto contentLength
-			}
-
-			p.state = eHeaderColon
-			goto headerColon
-		case '\r', '\n':
-			return parser.Error, nil, status.ErrBadRequest
-		default:
-			data[i] = data[i] | 0x20
+			return parser.Pending, nil, nil
 		}
-	}
 
-	if !p.headerKeyArena.Append(data) {
-		return parser.Error, nil, status.ErrHeaderFieldsTooLarge
-	}
-
-	return parser.Pending, nil, nil
-
-headerColon:
-	for i := range data {
-		switch data[i] {
-		case '\r', '\n':
-			return parser.Error, nil, status.ErrBadRequest
-		case ' ':
-		default:
-			data = data[i:]
-			p.state = eHeaderValue
-			goto headerValue
+		if !p.headerKeyArena.Append(data[:colon]...) {
+			return parser.Error, nil, status.ErrHeaderFieldsTooLarge
 		}
-	}
 
-	return parser.Pending, nil, nil
+		p.headerKey = uf.B2S(p.headerKeyArena.Finish())
+		data = data[colon+1:]
+
+		if p.headersNumber++; p.headersNumber > p.headersSettings.Number.Maximal {
+			return parser.Error, nil, status.ErrTooManyHeaders
+		}
+
+		if strcomp.EqualFold(p.headerKey, "content-length") {
+			p.state = eContentLength
+			goto contentLength
+		}
+
+		p.state = eHeaderValue
+		goto headerValue
+	}
 
 contentLength:
-	for i := range data {
-		switch char := data[i]; char {
-		case ' ':
-		case '\r':
-			data = data[i+1:]
-			p.state = eContentLengthCR
-			goto contentLengthCR
-		case '\n':
-			data = data[i+1:]
-			p.state = eContentLengthCRLF
-			goto contentLengthCRLF
-		default:
-			if char < '0' || char > '9' {
-				return parser.Error, nil, status.ErrBadRequest
-			}
-
-			p.contentLength = p.contentLength*10 + int(char-'0')
+	for i, char := range data {
+		if char == ' ' {
+			continue
 		}
+
+		if char < '0' || char > '9' {
+			data = data[i:]
+			goto contentLengthEnd
+		}
+
+		p.contentLength = p.contentLength*10 + int(char-'0')
 	}
 
 	return parser.Pending, nil, nil
+
+contentLengthEnd:
+	// guaranteed, that data at this point contains AT LEAST 1 byte.
+	// The proof is, that this code is reachable ONLY if loop has reached a non-digit
+	// ascii symbol. In case loop has finished peacefully, as no more data left, but also no
+	// character found to satisfy the exit condition, this code will never be reached
+	p.request.ContentLength = p.contentLength
+
+	switch data[0] {
+	case ' ':
+	case '\r':
+		data = data[1:]
+		p.state = eContentLengthCR
+		goto contentLengthCR
+	case '\n':
+		data = data[1:]
+		p.state = eHeaderKey
+		goto headerKey
+	default:
+		return parser.Error, nil, status.ErrBadRequest
+	}
 
 contentLengthCR:
 	if len(data) == 0 {
 		return parser.Pending, nil, nil
 	}
 
-	if data[0] == '\n' {
-		data = data[1:]
-		p.state = eContentLengthCRLF
-		goto contentLengthCRLF
+	if data[0] != '\n' {
+		return parser.Error, nil, status.ErrBadRequest
 	}
 
-	return parser.Error, nil, status.ErrBadRequest
-
-contentLengthCRLF:
-	if len(data) == 0 {
-		return parser.Pending, nil, nil
-	}
-
-	p.request.ContentLength = p.contentLength
-
-	switch data[0] {
-	case '\r':
-		data = data[1:]
-		p.state = eContentLengthCRLFCR
-		goto contentLengthCRLFCR
-	case '\n':
-		return parser.HeadersCompleted, data[1:], nil
-	default:
-		data[0] = data[0] | 0x20
-		p.state = eHeaderKey
-		goto headerKey
-	}
+	data = data[1:]
+	p.state = eHeaderKey
+	goto headerKey
 
 contentLengthCRLFCR:
 	if len(data) == 0 {
@@ -674,92 +602,49 @@ contentLengthCRLFCR:
 	return parser.Error, nil, status.ErrBadRequest
 
 headerValue:
-	for i := range data {
-		switch data[i] {
-		case '\r':
-			if len(data[:i])+p.headerValueSize > p.headersSettings.MaxValueLength {
+	{
+		lf := bytes.IndexByte(data, '\n')
+		if lf == -1 {
+			if !p.headerValueArena.Append(data...) {
 				return parser.Error, nil, status.ErrHeaderFieldsTooLarge
 			}
 
-			if !p.headerValueArena.Append(data[:i]) {
+			if p.headerValueArena.SegmentLength() > p.headersSettings.MaxValueLength {
 				return parser.Error, nil, status.ErrHeaderFieldsTooLarge
 			}
 
-			p.headerValueSize = 0
-			data = data[i+1:]
-			p.state = eHeaderValueCR
-			goto headerValueCR
-		case '\n':
-			if len(data[:i])+p.headerValueSize > p.headersSettings.MaxValueLength {
-				return parser.Error, nil, status.ErrHeaderFieldsTooLarge
-			}
-
-			if !p.headerValueArena.Append(data[:i]) {
-				return parser.Error, nil, status.ErrHeaderFieldsTooLarge
-			}
-
-			p.headerValueSize = 0
-			data = data[i+1:]
-			p.state = eHeaderValueCRLF
-			goto headerValueCRLF
+			return parser.Pending, nil, nil
 		}
-	}
 
-	p.headerValueSize += len(data)
+		if !p.headerValueArena.Append(data[:lf]...) {
+			return parser.Error, nil, status.ErrHeaderFieldsTooLarge
+		}
 
-	if p.headerValueSize >= p.headersSettings.MaxValueLength {
-		return parser.Error, nil, status.ErrHeaderFieldsTooLarge
-	}
+		if p.headerValueArena.SegmentLength() > p.headersSettings.MaxValueLength {
+			return parser.Error, nil, status.ErrHeaderFieldsTooLarge
+		}
 
-	if !p.headerValueArena.Append(data) {
-		return parser.Error, nil, status.ErrHeaderFieldsTooLarge
-	}
+		data = data[lf+1:]
+		value := uf.B2S(trimPrefixSpaces(p.headerValueArena.Finish()))
+		if value[len(value)-1] == '\r' {
+			value = value[:len(value)-1]
+		}
 
-	return parser.Pending, nil, nil
+		requestHeaders.Add(p.headerKey, value)
 
-headerValueCR:
-	if len(data) == 0 {
-		return parser.Pending, nil, nil
-	}
+		switch {
+		case strcomp.EqualFold(p.headerKey, "content-type"):
+			p.request.ContentType = value
+		case strcomp.EqualFold(p.headerKey, "upgrade"):
+			p.request.Upgrade = proto.ChooseUpgrade(value)
+		case strcomp.EqualFold(p.headerKey, "transfer-encoding"):
+			te := parseTransferEncoding(value)
+			te.HasTrailer = p.request.TransferEncoding.HasTrailer
+			p.request.TransferEncoding = te
+		case strcomp.EqualFold(p.headerKey, "trailer"):
+			p.request.TransferEncoding.HasTrailer = true
+		}
 
-	if data[0] == '\n' {
-		data = data[1:]
-		p.state = eHeaderValueCRLF
-		goto headerValueCRLF
-	}
-
-	return parser.Error, nil, status.ErrBadRequest
-
-headerValueCRLF:
-	if len(data) == 0 {
-		return parser.Pending, nil, nil
-	}
-
-	value = uf.B2S(p.headerValueArena.Finish())
-	requestHeaders.Add(p.headerKey, value)
-
-	switch p.headerKey {
-	case "content-type":
-		p.request.ContentType = value
-	case "upgrade":
-		p.request.Upgrade = proto.ChooseUpgrade(value)
-	case "transfer-encoding":
-		te := parseTransferEncoding(value)
-		te.HasTrailer = p.request.TransferEncoding.HasTrailer
-		p.request.TransferEncoding = te
-	case "trailer":
-		p.request.TransferEncoding.HasTrailer = true
-	}
-
-	switch data[0] {
-	case '\n':
-		return parser.HeadersCompleted, data[1:], nil
-	case '\r':
-		data = data[1:]
-		p.state = eHeaderValueCRLFCR
-		goto headerValueCRLFCR
-	default:
-		data[0] = data[0] | 0x20
 		p.state = eHeaderKey
 		goto headerKey
 	}
@@ -812,4 +697,14 @@ func processTEToken(rawToken string, te headers.TransferEncoding) headers.Transf
 	}
 
 	return te
+}
+
+func trimPrefixSpaces(b []byte) []byte {
+	for i, char := range b {
+		if char != ' ' {
+			return b[i:]
+		}
+	}
+
+	return b[:0]
 }

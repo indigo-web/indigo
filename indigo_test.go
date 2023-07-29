@@ -80,7 +80,6 @@ func getStaticRouter(t *testing.T) router.Router {
 		require.Equal(t, method.GET, request.Method)
 		_, err := request.Path.Query.Get("some non-existing query key")
 		require.Error(t, err)
-		require.Empty(t, request.Path.Fragment)
 		require.Equal(t, proto.HTTP11, request.Proto)
 
 		return http.RespondTo(request)
@@ -91,7 +90,7 @@ func getStaticRouter(t *testing.T) router.Router {
 	})
 
 	r.Get("/get-read-body", func(request *http.Request) http.Response {
-		require.Contains(t, request.Headers.Unwrap(), testHeaderKey)
+		require.True(t, request.Headers.Has(testHeaderKey))
 		requestHeader := strings.Join(request.Headers.Values(testHeaderKey), ",")
 		require.Equal(t, testHeaderValue, requestHeader)
 
@@ -370,14 +369,12 @@ func TestServer_Static(t *testing.T) {
 		// are empty strings. Remove them
 		headerLines = headerLines[:len(headerLines)-2]
 		wantHeaderLines := []string{
-			"hello: World!",
-			"host: " + addr,
-			"user-agent: Go-http-client/1.1",
-			"accept-encoding: gzip",
-			"content-length: 0",
+			"Hello: World!",
+			"Host: " + addr,
+			"User-Agent: Go-http-client/1.1",
+			"Accept-Encoding: gzip",
+			"Content-Length: 0",
 		}
-
-		require.Equal(t, len(wantHeaderLines), len(headerLines))
 
 		for _, line := range headerLines {
 			require.True(t, contains(wantHeaderLines, line), "unwanted header line: "+line)

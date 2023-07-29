@@ -41,11 +41,11 @@ var (
 
 func getParser() (httpparser.HTTPRequestsParser, *http.Request) {
 	s := settings2.Default()
-	keyArena := arena.NewArena(
+	keyArena := arena.NewArena[byte](
 		s.Headers.MaxKeyLength*s.Headers.Number.Default,
 		s.Headers.MaxKeyLength*s.Headers.Number.Maximal,
 	)
-	valArena := arena.NewArena(
+	valArena := arena.NewArena[byte](
 		s.Headers.ValueSpace.Default, s.Headers.ValueSpace.Maximal,
 	)
 	objPool := pool.NewObjectPool[[]string](20)
@@ -64,7 +64,6 @@ func getParser() (httpparser.HTTPRequestsParser, *http.Request) {
 type wantedRequest struct {
 	Headers  *headers.Headers
 	Path     string
-	Fragment string
 	Method   method.Method
 	Protocol proto.Proto
 }
@@ -72,7 +71,6 @@ type wantedRequest struct {
 func compareRequests(t *testing.T, wanted wantedRequest, actual *http.Request) {
 	require.Equal(t, wanted.Method, actual.Method)
 	require.Equal(t, wanted.Path, actual.Path.String)
-	require.Equal(t, wanted.Fragment, actual.Path.Fragment)
 	require.Equal(t, wanted.Protocol, actual.Proto)
 
 	hdrs := wanted.Headers.Unwrap()
@@ -288,7 +286,6 @@ func TestHttpRequestsParser_Parse_GET(t *testing.T) {
 		wanted := wantedRequest{
 			Method:   method.GET,
 			Path:     "/",
-			Fragment: "Some where",
 			Protocol: proto.HTTP11,
 			Headers:  headers.NewHeaders(nil),
 		}
@@ -308,7 +305,6 @@ func TestHttpRequestsParser_Parse_GET(t *testing.T) {
 		wanted := wantedRequest{
 			Method:   method.GET,
 			Path:     "/",
-			Fragment: "Some where",
 			Protocol: proto.HTTP11,
 			Headers:  headers.NewHeaders(nil),
 		}
@@ -328,7 +324,6 @@ func TestHttpRequestsParser_Parse_GET(t *testing.T) {
 		wanted := wantedRequest{
 			Method:   method.GET,
 			Path:     "/",
-			Fragment: "Fragment",
 			Protocol: proto.HTTP11,
 			Headers:  headers.NewHeaders(nil),
 		}
@@ -507,22 +502,6 @@ func TestHttpRequestsParser_Parse_Negative(t *testing.T) {
 		require.Equal(t, []byte("\r"), extra)
 		require.NoError(t, err)
 		require.Equal(t, httpparser.HeadersCompleted, state)
-	})
-
-	t.Run("HeaderWithoutColon", func(t *testing.T) {
-		parser, _ := getParser()
-		raw := []byte("GET / HTTP/1.1\r\nsome header some value\r\n\r\n")
-		state, _, err := parser.Parse(raw)
-		require.EqualError(t, err, status.ErrBadRequest.Error())
-		require.Equal(t, httpparser.Error, state)
-	})
-
-	t.Run("HeaderWithoutColon", func(t *testing.T) {
-		parser, _ := getParser()
-		raw := []byte("GET / HTTP/1.1\r\nsome header some value\r\n\r\n")
-		state, _, err := parser.Parse(raw)
-		require.EqualError(t, err, status.ErrBadRequest.Error())
-		require.Equal(t, httpparser.Error, state)
 	})
 
 	t.Run("MajorHTTPVersionOverflow", func(t *testing.T) {

@@ -27,9 +27,9 @@ func renderHTTPRequest(request *http.Request, buff []byte) []byte {
 	buff = append(buff, bytes.TrimSpace(proto.ToBytes(request.Proto))...)
 	buff = append(buff, httpchars.CRLF...)
 	buff = requestHeaders(request, buff)
-	buff = append(buff, "content-length: 0\r\n"...)
+	buff = append(buff, "Content-Length: 0\r\n\r\n"...)
 
-	return append(buff, httpchars.CRLF...)
+	return buff
 }
 
 func requestURI(request *http.Request, buff []byte) []byte {
@@ -38,11 +38,6 @@ func requestURI(request *http.Request, buff []byte) []byte {
 	if query := request.Path.Query.Raw(); len(query) > 0 {
 		buff = append(buff, '?')
 		buff = append(buff, query...)
-	}
-
-	if len(request.Path.Fragment) > 0 {
-		buff = append(buff, '#')
-		buff = append(buff, request.Path.Fragment...)
 	}
 
 	return buff

@@ -125,11 +125,11 @@ func Benchmark_Get(b *testing.B) {
 		hdrs, q, http.NewResponse(), dummy.NewNopConn(), http.NewBody(bodyReader, decode.NewDecoder()),
 		nil, false,
 	)
-	keyArena := arena.NewArena(
+	keyArena := arena.NewArena[byte](
 		s.Headers.MaxKeyLength*s.Headers.Number.Default,
 		s.Headers.MaxKeyLength*s.Headers.Number.Maximal,
 	)
-	valArena := arena.NewArena(
+	valArena := arena.NewArena[byte](
 		s.Headers.ValueSpace.Default, s.Headers.ValueSpace.Maximal,
 	)
 	objPool := pool.NewObjectPool[[]string](20)
@@ -195,11 +195,11 @@ func Benchmark_Post(b *testing.B) {
 		hdrs, q, http.NewResponse(), dummy.NewNopConn(), http.NewBody(reader, decode.NewDecoder()),
 		nil, false,
 	)
-	keyArena := arena.NewArena(
+	keyArena := arena.NewArena[byte](
 		s.Headers.MaxKeyLength*s.Headers.Number.Default,
 		s.Headers.MaxKeyLength*s.Headers.Number.Maximal,
 	)
-	valArena := arena.NewArena(
+	valArena := arena.NewArena[byte](
 		s.Headers.ValueSpace.Default, s.Headers.ValueSpace.Maximal,
 	)
 	objPool := pool.NewObjectPool[[]string](20)

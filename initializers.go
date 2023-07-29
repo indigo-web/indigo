@@ -21,12 +21,12 @@ func newClient(tcpSettings settings.TCP, conn net.Conn) tcp.Client {
 	return tcp.NewClient(conn, tcpSettings.ReadTimeout, readBuff)
 }
 
-func newKeyValueArenas(s settings.Headers) (*arena.Arena, *arena.Arena) {
-	keyArena := arena.NewArena(
+func newKeyValueArenas(s settings.Headers) (*arena.Arena[byte], *arena.Arena[byte]) {
+	keyArena := arena.NewArena[byte](
 		s.MaxKeyLength*s.Number.Default,
 		s.MaxKeyLength*s.Number.Maximal,
 	)
-	valArena := arena.NewArena(
+	valArena := arena.NewArena[byte](
 		s.ValueSpace.Default,
 		s.ValueSpace.Maximal,
 	)
