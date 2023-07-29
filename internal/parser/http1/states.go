@@ -11,8 +11,6 @@ const (
 	eQueryDecode1Char
 	eQueryDecode2Char
 	eFragment
-	eFragmentDecode1Char
-	eFragmentDecode2Char
 	eProto
 	eH
 	eHT
@@ -26,14 +24,10 @@ const (
 	eProtoCRLF
 	eProtoCRLFCR
 	eHeaderKey
-	eHeaderColon
 	eContentLength
 	eContentLengthCR
-	eContentLengthCRLF
 	eContentLengthCRLFCR
 	eHeaderValue
-	eHeaderValueCR
-	eHeaderValueCRLF
 	eHeaderValueCRLFCR
 )
 
