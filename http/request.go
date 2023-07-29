@@ -19,13 +19,10 @@ type (
 	Params = map[string]string
 
 	Path struct {
-		String   string
-		Params   Params
-		Query    query.Query
-		Fragment Fragment
+		String string
+		Params Params
+		Query  query.Query
 	}
-
-	Fragment = string
 )
 
 // Request struct represents http request
@@ -124,7 +121,6 @@ func (r *Request) WasHijacked() bool {
 // Clear resets request headers and reads body into nowhere until completed.
 // It is implemented to clear the request object between requests
 func (r *Request) Clear() (err error) {
-	r.Path.Fragment = ""
 	r.Path.Query.Set(nil)
 	r.Ctx = context.Background()
 	r.response = r.response.Clear()
