@@ -1,5 +1,7 @@
 package headers
 
+import "github.com/indigo-web/indigo/internal/strcomp"
+
 type Iterator[T any] func() (element T, continue_ bool)
 
 // Headers is a struct that encapsulates headers map from user, allowing only
@@ -48,7 +50,7 @@ func (h *Headers) Value(key string) string {
 // ValueOr returns a header value
 func (h *Headers) ValueOr(key, or string) string {
 	for i := 0; i < len(h.headers); i += 2 {
-		if h.headers[i] == key {
+		if strcomp.EqualFold(h.headers[i], key) {
 			return h.headers[i+1]
 		}
 	}
@@ -65,7 +67,7 @@ func (h *Headers) ValuesIter(key string) Iterator[string] {
 		}
 
 		for ; offset < len(h.headers); offset += 2 {
-			if h.headers[offset] == key {
+			if strcomp.EqualFold(h.headers[offset], key) {
 				value := h.headers[offset+1]
 				offset += 2
 
@@ -97,7 +99,7 @@ func (h *Headers) Add(key, value string) {
 // Has returns true or false depending on whether such a key exists
 func (h *Headers) Has(key string) bool {
 	for i := 0; i < len(h.headers); i += 2 {
-		if h.headers[i] == key {
+		if strcomp.EqualFold(h.headers[i], key) {
 			return true
 		}
 	}
@@ -137,7 +139,7 @@ func collectIterator(iter Iterator[string]) (values []string) {
 
 func contains(elements []string, key string) bool {
 	for i := range elements {
-		if elements[i] == key {
+		if strcomp.EqualFold(elements[i], key) {
 			return true
 		}
 	}
