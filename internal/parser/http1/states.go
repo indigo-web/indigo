@@ -26,7 +26,6 @@ const (
 	eHeaderKey
 	eContentLength
 	eContentLengthCR
-	eContentLengthCRLFCR
 	eHeaderValue
 	eHeaderValueCRLFCR
 )

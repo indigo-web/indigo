@@ -113,8 +113,6 @@ func (p *httpRequestsParser) Parse(data []byte) (state parser.RequestState, extr
 		goto contentLength
 	case eContentLengthCR:
 		goto contentLengthCR
-	case eContentLengthCRLFCR:
-		goto contentLengthCRLFCR
 	case eHeaderValue:
 		goto headerValue
 	case eHeaderValueCRLFCR:
@@ -589,17 +587,6 @@ contentLengthCR:
 	data = data[1:]
 	p.state = eHeaderKey
 	goto headerKey
-
-contentLengthCRLFCR:
-	if len(data) == 0 {
-		return parser.Pending, nil, nil
-	}
-
-	if data[0] == '\n' {
-		return parser.HeadersCompleted, data[1:], nil
-	}
-
-	return parser.Error, nil, status.ErrBadRequest
 
 headerValue:
 	{
