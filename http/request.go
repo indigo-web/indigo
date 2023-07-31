@@ -25,6 +25,8 @@ type (
 	}
 )
 
+var defaultCtx = context.Background()
+
 // Request struct represents http request
 // About headers manager see at http/headers/headers.go:Manager
 // Headers attribute references at that one that lays in manager
@@ -65,7 +67,7 @@ func NewRequest(
 		Remote:         conn.RemoteAddr(),
 		conn:           conn,
 		body:           body,
-		Ctx:            context.Background(),
+		Ctx:            defaultCtx,
 		response:       response,
 		clearParamsMap: !disableParamsMapClearing,
 	}
@@ -122,7 +124,7 @@ func (r *Request) WasHijacked() bool {
 // It is implemented to clear the request object between requests
 func (r *Request) Clear() (err error) {
 	r.Path.Query.Set(nil)
-	r.Ctx = context.Background()
+	r.Ctx = defaultCtx
 	r.response = r.response.Clear()
 
 	if err = r.body.Reset(); err != nil {
