@@ -102,6 +102,11 @@ func (r *Request) Body() *Body {
 	return r.body
 }
 
+// Respond returns Response builder, associated with the request
+func (r *Request) Respond() Response {
+	return r.response
+}
+
 // Hijack the connection. Request body will be implicitly read (so if you need it you
 // should read it before) all the body left. After handler exits, the connection will
 // be closed, so the connection can be hijacked only once
