@@ -1,12 +1,11 @@
 package http1
 
 import (
-	"github.com/indigo-web/indigo/http/headers"
-	"io"
-
 	"github.com/indigo-web/indigo/http"
+	"github.com/indigo-web/indigo/http/headers"
 	"github.com/indigo-web/indigo/internal/server/tcp"
 	"github.com/indigo-web/indigo/settings"
+	"io"
 )
 
 type bodyReader struct {
@@ -49,7 +48,6 @@ func (b *bodyReader) Read() ([]byte, error) {
 
 func (b *bodyReader) plainBodyReader() ([]byte, error) {
 	data, err := b.client.Read()
-
 	b.bodyBytesLeft -= len(data)
 	if b.bodyBytesLeft < 0 {
 		b.client.Unread(data[len(data)+b.bodyBytesLeft:])

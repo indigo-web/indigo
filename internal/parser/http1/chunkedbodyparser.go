@@ -72,11 +72,11 @@ func (c *chunkedBodyParser) Parse(data []byte, trailer bool) (chunk, extra []byt
 	}
 
 chunkLength1Char:
-	if !isHex(data[offset]) {
+	if !ishex(data[offset]) {
 		return nil, nil, status.ErrBadRequest
 	}
 
-	c.chunkLength = int64(unHex(data[offset]))
+	c.chunkLength = int64(unhex(data[offset]))
 	offset++
 	c.state = eChunkLength
 	goto chunkLength
@@ -93,11 +93,11 @@ chunkLength:
 			c.state = eChunkLengthCRLF
 			goto chunkLengthCRLF
 		default:
-			if !isHex(data[offset]) {
+			if !ishex(data[offset]) {
 				return nil, nil, status.ErrBadRequest
 			}
 
-			c.chunkLength = (c.chunkLength << 4) | int64(unHex(data[offset]))
+			c.chunkLength = (c.chunkLength << 4) | int64(unhex(data[offset]))
 			if c.chunkLength > c.settings.MaxChunkSize {
 				return nil, nil, status.ErrTooLarge
 			}
@@ -218,7 +218,7 @@ chunkBodyCRLF:
 		c.state = eFooter
 		goto footer
 	default:
-		c.chunkLength = int64(unHex(data[offset]))
+		c.chunkLength = int64(unhex(data[offset]))
 		if c.chunkLength > c.settings.MaxChunkSize {
 			return nil, nil, status.ErrTooLarge
 		}

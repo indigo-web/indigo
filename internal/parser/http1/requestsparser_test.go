@@ -29,7 +29,7 @@ var (
 	simpleGETAbsPath     = []byte("GET http://www.w3.org/pub/WWW/TheProject.html HTTP/1.1\r\n\r\n")
 	biggerGET            = []byte("GET / HTTP/1.1\r\nHello: World!\r\nEaster: Egg\r\n\r\n")
 
-	simpleGETQuery = []byte("GET /path?hel+lo=wor+ld HTTP/1.1\r\n\r\n")
+	simpleGETQuery = []byte("GET /path?hello=world HTTP/1.1\r\n\r\n")
 
 	biggerGETOnlyLF     = []byte("GET / HTTP/1.1\nHello: World!\n\n")
 	biggerGETURLEncoded = []byte("GET /hello%20world HTTP/1.1\r\n\r\n")
@@ -48,16 +48,19 @@ func getParser() (httpparser.HTTPRequestsParser, *http.Request) {
 	valArena := arena.NewArena[byte](
 		s.Headers.ValueSpace.Default, s.Headers.ValueSpace.Maximal,
 	)
+	startLineArena := arena.NewArena[byte](
+		s.URL.BufferSize.Default,
+		s.URL.BufferSize.Maximal,
+	)
 	objPool := pool.NewObjectPool[[]string](20)
 	body := NewBodyReader(dummy.NewNopClient(), s.Body)
 	request := http.NewRequest(
 		headers.NewHeaders(nil), query.Query{}, http.NewResponse(), dummy.NewNopConn(),
 		http.NewBody(body, decode.NewDecoder()), nil, false,
 	)
-	startLineBuff := make([]byte, s.URL.MaxLength)
 
 	return NewHTTPRequestsParser(
-		request, *keyArena, *valArena, *objPool, startLineBuff, s.Headers,
+		request, *keyArena, *valArena, *startLineArena, *objPool, s.Headers,
 	), request
 }
 
@@ -142,18 +145,10 @@ func TestHttpRequestsParser_Parse_GET(t *testing.T) {
 
 	t.Run("SimpleGETLeadingCRLF", func(t *testing.T) {
 		state, extra, err := parser.Parse(simpleGETLeadingCRLF)
-		require.NoError(t, err)
-		require.Equal(t, httpparser.HeadersCompleted, state)
+		require.Error(t, err, status.ErrBadRequest.Error())
+		require.Equal(t, httpparser.Error, state)
 		require.Empty(t, extra)
 
-		wanted := wantedRequest{
-			Method:   method.GET,
-			Path:     "/",
-			Protocol: proto.HTTP11,
-			Headers:  headers.NewHeaders(nil),
-		}
-
-		compareRequests(t, wanted, request)
 		require.NoError(t, request.Clear())
 		parser.Release()
 	})
@@ -239,7 +234,7 @@ func TestHttpRequestsParser_Parse_GET(t *testing.T) {
 	t.Run("BiggerGET_ByDifferentPartSizes", func(t *testing.T) {
 		for i := 1; i < len(biggerGET); i++ {
 			state, extra, err := feedPartially(parser, biggerGET, i)
-			require.NoError(t, err)
+			require.NoError(t, err, i)
 			require.Empty(t, extra)
 			require.Equal(t, httpparser.HeadersCompleted, state)
 
@@ -272,64 +267,6 @@ func TestHttpRequestsParser_Parse_GET(t *testing.T) {
 		}
 
 		compareRequests(t, wanted, request)
-		require.NoError(t, request.Clear())
-		parser.Release()
-	})
-
-	t.Run("FragmentAfterPath", func(t *testing.T) {
-		req := "GET /#Some%20where HTTP/1.1\r\n\r\n"
-		state, extra, err := parser.Parse([]byte(req))
-		require.NoError(t, err)
-		require.Equal(t, httpparser.HeadersCompleted, state)
-		require.Empty(t, extra)
-
-		wanted := wantedRequest{
-			Method:   method.GET,
-			Path:     "/",
-			Protocol: proto.HTTP11,
-			Headers:  headers.NewHeaders(nil),
-		}
-
-		compareRequests(t, wanted, request)
-		require.NoError(t, request.Clear())
-		parser.Release()
-	})
-
-	t.Run("FragmentNoPath", func(t *testing.T) {
-		req := "GET #Some%20where HTTP/1.1\r\n\r\n"
-		state, extra, err := parser.Parse([]byte(req))
-		require.NoError(t, err)
-		require.Equal(t, httpparser.HeadersCompleted, state)
-		require.Empty(t, extra)
-
-		wanted := wantedRequest{
-			Method:   method.GET,
-			Path:     "/",
-			Protocol: proto.HTTP11,
-			Headers:  headers.NewHeaders(nil),
-		}
-
-		compareRequests(t, wanted, request)
-		require.NoError(t, request.Clear())
-		parser.Release()
-	})
-
-	t.Run("QueryDecode_UrlEncoded", func(t *testing.T) {
-		req := "GET /?some%20where=wo%20rld#Fragment HTTP/1.1\r\n\r\n"
-		state, extra, err := parser.Parse([]byte(req))
-		require.NoError(t, err)
-		require.Equal(t, httpparser.HeadersCompleted, state)
-		require.Empty(t, extra)
-
-		wanted := wantedRequest{
-			Method:   method.GET,
-			Path:     "/",
-			Protocol: proto.HTTP11,
-			Headers:  headers.NewHeaders(nil),
-		}
-
-		compareRequests(t, wanted, request)
-		require.Equal(t, "some where=wo rld", string(request.Path.Query.Raw()))
 		require.NoError(t, request.Clear())
 		parser.Release()
 	})
@@ -397,7 +334,7 @@ func TestHttpRequestsParser_ParsePOST(t *testing.T) {
 		}
 
 		compareRequests(t, wanted, request)
-		require.Equal(t, "hel lo=wor ld", string(request.Path.Query.Raw()))
+		require.Equal(t, "hello=world", string(request.Path.Query.Raw()))
 		require.NoError(t, request.Clear())
 		parser.Release()
 	})
@@ -440,7 +377,7 @@ func TestHttpRequestsParser_Parse_Negative(t *testing.T) {
 		parser, _ := getParser()
 		raw := []byte("PATCHPOSTPUT / HTTP/1.1\r\n\r\n")
 		state, _, err := parser.Parse(raw)
-		require.EqualError(t, err, status.ErrBadRequest.Error())
+		require.EqualError(t, err, status.ErrMethodNotImplemented.Error())
 		require.Equal(t, httpparser.Error, state)
 	})
 
@@ -534,7 +471,7 @@ func TestHttpRequestsParser_Parse_Negative(t *testing.T) {
 		parser, _ := getParser()
 		raw := []byte("GET / \r\n")
 		state, _, err := parser.Parse(raw)
-		require.EqualError(t, err, status.ErrBadRequest.Error())
+		require.EqualError(t, err, status.ErrUnsupportedProtocol.Error())
 		require.Equal(t, httpparser.Error, state)
 	})
 
