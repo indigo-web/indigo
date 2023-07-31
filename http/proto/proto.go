@@ -1,5 +1,10 @@
 package proto
 
+import (
+	"github.com/indigo-web/indigo/internal/strcomp"
+	"github.com/indigo-web/utils/uf"
+)
+
 type Proto uint8
 
 const (
@@ -20,20 +25,30 @@ var (
 	http11 = []byte("HTTP/1.1 ")
 )
 
+const (
+	minimalProtoStringVersion = len("HTTP/x.x")
+	httpProtoPrefix           = "HTTP/"
+	majorVersionOffset        = len("HTTP/x") - 1
+	minorVersionOffset        = len("HTTP/x.x") - 1
+)
+
+func FromBytes(raw []byte) Proto {
+	if len(raw) != minimalProtoStringVersion ||
+		!strcomp.EqualFold(uf.B2S(raw[:len(httpProtoPrefix)]), httpProtoPrefix) {
+		return Unknown
+	}
+
+	return Parse(raw[majorVersionOffset]-'0', raw[minorVersionOffset]-'0')
+}
+
 func Parse(major, minor uint8) Proto {
-	switch major {
-	case 0:
-		switch minor {
-		case 9:
-			return HTTP09
-		}
-	case 1:
-		switch minor {
-		case 0:
-			return HTTP10
-		case 1:
-			return HTTP11
-		}
+	switch {
+	case major == 1 && minor == 1:
+		return HTTP11
+	case major == 1 && minor == 0:
+		return HTTP10
+	case major == 0 && minor == 9:
+		return HTTP09
 	}
 
 	return Unknown
