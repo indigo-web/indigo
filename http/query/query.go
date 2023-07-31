@@ -2,29 +2,24 @@ package query
 
 import (
 	"errors"
+	"github.com/indigo-web/indigo/http/headers"
 
 	"github.com/indigo-web/indigo/internal/queryparser"
 )
 
-var ErrNoSuchKey = errors.New("desired key does not exists")
-
-type (
-	rawQuery   []byte
-	Map        = map[string]string
-	mapFactory func() Map
-)
+var ErrNoSuchKey = errors.New("no such key")
 
 // Query is optional, it may contain rawQuery, but it will not be parsed until
 // needed
 type Query struct {
-	parsedQuery  Map
-	queryFactory mapFactory
-	rawQuery     rawQuery
+	parsed bool
+	query  *headers.Headers
+	raw    []byte
 }
 
-func NewQuery(queryFactory mapFactory) Query {
+func NewQuery(query *headers.Headers) Query {
 	return Query{
-		queryFactory: queryFactory,
+		query: query,
 	}
 }
 
@@ -32,8 +27,13 @@ func NewQuery(queryFactory mapFactory) Query {
 // resets parsedQuery value to nil (query bytearray must be parsed
 // again)
 func (q *Query) Set(raw []byte) {
-	q.rawQuery = raw
-	q.parsedQuery = nil
+	q.raw = raw
+
+	if q.parsed {
+		q.query.Clear()
+	}
+
+	q.parsed = false
 }
 
 // Get is responsible for getting a key from query. In case this
@@ -42,14 +42,16 @@ func (q *Query) Set(raw []byte) {
 // (or ErrNoSuchKey instead). In case of invalid query bytearray,
 // ErrBadQuery will be returned
 func (q *Query) Get(key string) (value string, err error) {
-	if q.parsedQuery == nil {
-		q.parsedQuery, err = queryparser.Parse(q.rawQuery, q.queryFactory)
+	if !q.parsed {
+		err = queryparser.Parse(q.raw, q.query)
 		if err != nil {
 			return "", err
 		}
+
+		q.parsed = true
 	}
 
-	value, found := q.parsedQuery[key]
+	value, found := q.query.Get(key)
 	if !found {
 		err = ErrNoSuchKey
 	}
@@ -59,5 +61,5 @@ func (q *Query) Get(key string) (value string, err error) {
 
 // Raw just returns a raw value of query as it is
 func (q *Query) Raw() []byte {
-	return q.rawQuery
+	return q.raw
 }
