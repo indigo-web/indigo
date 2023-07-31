@@ -1,14 +1,13 @@
 package http
 
 import (
+	"github.com/indigo-web/indigo/http/status"
 	"github.com/indigo-web/indigo/internal/render/types"
+	"github.com/indigo-web/indigo/internal/strcomp"
+	"github.com/indigo-web/utils/uf"
 	json "github.com/json-iterator/go"
 	"io"
 	"os"
-	"strings"
-
-	"github.com/indigo-web/indigo/http/status"
-	"github.com/indigo-web/utils/uf"
 )
 
 type ResponseWriter func(b []byte) error
@@ -69,9 +68,9 @@ func (r Response) WithTransferEncoding(value string) Response {
 // be appended.
 func (r Response) WithHeader(key string, values ...string) Response {
 	switch {
-	case strings.EqualFold(key, "content-type"):
+	case strcomp.EqualFold(key, "content-type"):
 		return r.WithContentType(values[0])
-	case strings.EqualFold(key, "transfer-encoding"):
+	case strcomp.EqualFold(key, "transfer-encoding"):
 		return r.WithTransferEncoding(values[0])
 	}
 
