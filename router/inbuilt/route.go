@@ -13,7 +13,7 @@ This file is responsible for registering both ordinary and error handlers
 func (r *Router) Route(
 	method method.Method, path string, handlerFunc types.HandlerFunc,
 	middlewares ...types.Middleware,
-) {
+) *Router {
 	urlPath := r.prefix + path
 	methodsMap := r.routes[urlPath]
 	handlerStruct := &types.HandlerObject{
@@ -23,6 +23,8 @@ func (r *Router) Route(
 
 	methodsMap[method] = handlerStruct
 	r.routes[urlPath] = methodsMap
+
+	return r
 }
 
 // RouteError adds an error handler. You can handle next errors:

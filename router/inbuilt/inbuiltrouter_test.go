@@ -63,7 +63,7 @@ func TestRoute(t *testing.T) {
 
 func testMethodShorthand(
 	t *testing.T, router *Router,
-	route func(string, types.HandlerFunc, ...types.Middleware),
+	route func(string, types.HandlerFunc, ...types.Middleware) *Router,
 	method method.Method,
 ) {
 	route("/", nopHandler)

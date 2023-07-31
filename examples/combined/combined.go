@@ -81,13 +81,13 @@ func main() {
 
 	r.Get("/stress", Stressful, middleware.Recover)
 
-	root := r.Resource("/")
-	root.Get(Index)
-	root.Post(IndexSay)
+	r.Resource("/").
+		Get(Index).
+		Post(IndexSay)
 
-	hello := r.Group("/hello")
-	hello.Get("/world", World)
-	hello.Get("/easter", Easter)
+	r.Group("/hello").
+		Get("/world", World).
+		Get("/easter", Easter)
 
 	s := settings.Default()
 	s.TCP.ReadTimeout = time.Hour

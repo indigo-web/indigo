@@ -12,7 +12,7 @@ This file is responsible for middlewares
 
 // Use adds middlewares into the global list of a group's middlewares. But they will
 // be applied only after server will be started
-func (r *Router) Use(middlewares ...types.Middleware) {
+func (r *Router) Use(middlewares ...types.Middleware) *Router {
 	for _, methods := range r.routes {
 		for _, handler := range methods {
 			if handler == nil {
@@ -24,6 +24,8 @@ func (r *Router) Use(middlewares ...types.Middleware) {
 	}
 
 	r.middlewares = append(r.middlewares, middlewares...)
+
+	return r
 }
 
 func (r *Router) applyMiddlewares() {
