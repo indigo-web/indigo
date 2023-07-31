@@ -51,20 +51,24 @@ var defaultHeaders = map[string][]string{
 	"Accept-Encodings": nil,
 }
 
-func getInbuiltRouter() router.Router {
-	r := inbuilt.NewRouter()
-	root := r.Resource("/")
-	root.Get(http.RespondTo)
-	root.Post(func(request *http.Request) http.Response {
-		_ = request.Body().Callback(func([]byte) error {
-			return nil
-		})
+var longPath = strings.Repeat("a", 500)
 
-		return http.RespondTo(request)
-	})
-	r.Get("/with-header", func(request *http.Request) http.Response {
-		return http.RespondTo(request).WithHeader("Hello", "World")
-	})
+func getInbuiltRouter() router.Router {
+	r := inbuilt.NewRouter().
+		Get("/with-header", func(request *http.Request) http.Response {
+			return http.RespondTo(request).WithHeader("Hello", "World")
+		}).
+		Get("/"+longPath, http.RespondTo)
+
+	r.Resource("/").
+		Get(http.RespondTo).
+		Post(func(request *http.Request) http.Response {
+			_ = request.Body().Callback(func([]byte) error {
+				return nil
+			})
+
+			return http.RespondTo(request)
+		})
 
 	if err := r.OnStart(); err != nil {
 		panic(err)
@@ -74,6 +78,8 @@ func getInbuiltRouter() router.Router {
 }
 
 func getSimpleRouter() router.Router {
+	longpath := "/" + longPath
+
 	r := simple.NewRouter(func(request *http.Request) http.Response {
 		switch request.Path.String {
 		case "/":
@@ -91,6 +97,8 @@ func getSimpleRouter() router.Router {
 			}
 		case "/with-header":
 			return http.RespondTo(request).WithHeader("Hello", "World")
+		case longpath:
+			return http.RespondTo(request)
 		default:
 			return http.RespondTo(request).
 				WithError(status.ErrNotFound)
@@ -156,7 +164,7 @@ func Benchmark_Get(b *testing.B) {
 	})
 
 	b.Run("5 headers", func(b *testing.B) {
-		data := requestgen.Generate(strings.Repeat("a", 500), 5)
+		data := requestgen.Generate(longPath, 5)
 		client := dummy.NewCircularClient(data)
 		b.SetBytes(int64(len(data)))
 		b.ReportAllocs()
@@ -168,7 +176,7 @@ func Benchmark_Get(b *testing.B) {
 	})
 
 	b.Run("10 headers", func(b *testing.B) {
-		data := requestgen.Generate(strings.Repeat("a", 500), 10)
+		data := requestgen.Generate(longPath, 10)
 		client := dummy.NewCircularClient(data)
 		b.SetBytes(int64(len(data)))
 		b.ReportAllocs()
@@ -180,7 +188,7 @@ func Benchmark_Get(b *testing.B) {
 	})
 
 	b.Run("50 headers", func(b *testing.B) {
-		data := requestgen.Generate(strings.Repeat("a", 500), 50)
+		data := requestgen.Generate(longPath, 50)
 		client := dummy.NewCircularClient(data)
 		b.SetBytes(int64(len(data)))
 		b.ReportAllocs()
