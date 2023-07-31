@@ -1,21 +1,22 @@
 package render
 
 import (
-	"github.com/indigo-web/indigo/http/status"
-	"github.com/indigo-web/indigo/internal/render/types"
-	"github.com/indigo-web/utils/ft"
-	"io"
-	"strconv"
-	"strings"
-
 	"github.com/indigo-web/indigo/http"
 	"github.com/indigo-web/indigo/http/method"
 	"github.com/indigo-web/indigo/http/proto"
+	"github.com/indigo-web/indigo/http/status"
 	"github.com/indigo-web/indigo/internal/httpchars"
+	"github.com/indigo-web/indigo/internal/render/types"
+	"github.com/indigo-web/indigo/internal/strcomp"
+	"github.com/indigo-web/utils/ft"
+	"io"
+	"strconv"
 )
 
 var (
-	contentLength = []byte("Content-Length: ")
+	contentLength    = []byte("Content-Length: ")
+	contentType      = []byte("Content-Type: ")
+	transferEncoding = []byte("Transfer-Encoding: ")
 
 	emptyChunkedPart = []byte("0\r\n\r\n")
 )
@@ -123,11 +124,9 @@ func (e *engine) renderHeaders(response http.Response) {
 	}
 
 	// Content-Type is compulsory. Transfer-Encoding is not
-	// TODO: maybe, we can make similar to renderContentLength() functions for
-	//       these well-known headers? This may a bit improve performance
-	e.renderHeader("Content-Type", response.ContentType)
+	e.renderContentType(response.ContentType)
 	if len(response.TransferEncoding) > 0 {
-		e.renderHeader("Transfer-Encoding", response.TransferEncoding)
+		e.renderTransferEncoding(response.TransferEncoding)
 	}
 }
 
@@ -245,6 +244,18 @@ func (e *engine) renderContentLength(value int64) {
 	e.crlf()
 }
 
+func (e *engine) renderContentType(value string) {
+	e.buff = append(e.buff, contentType...)
+	e.buff = append(e.buff, value...)
+	e.crlf()
+}
+
+func (e *engine) renderTransferEncoding(value string) {
+	e.buff = append(e.buff, transferEncoding...)
+	e.buff = append(e.buff, value...)
+	e.crlf()
+}
+
 func (e *engine) renderProtocol(protocol proto.Proto) {
 	e.buff = append(e.buff, proto.ToBytes(protocol)...)
 }
@@ -263,10 +274,10 @@ func isKeepAlive(protocol proto.Proto, req *http.Request) bool {
 	case proto.HTTP09, proto.HTTP10:
 		// actually, HTTP/0.9 doesn't even have a Connection: keep-alive header,
 		// but who knows - let it be
-		return strings.EqualFold(req.Headers.Value("connection"), "keep-alive")
+		return strcomp.EqualFold(req.Headers.Value("connection"), "keep-alive")
 	case proto.HTTP11:
 		// in case of HTTP/1.1, keep-alive may be only disabled
-		return !strings.EqualFold(req.Headers.Value("connection"), "close")
+		return !strcomp.EqualFold(req.Headers.Value("connection"), "close")
 	case proto.HTTP2:
 		// TODO: are there cases when HTTP/2 connection may not be keep-alived?
 		return true
