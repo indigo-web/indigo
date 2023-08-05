@@ -53,44 +53,6 @@ func (c *callstack) Clear() {
 }
 
 func getMiddleware(mware middleware, stack *callstack) types.Middleware {
-	switch mware {
-	case m1:
-		return func(next types.Handler, request *http.Request) http.Response {
-			stack.Push(m1)
-			return next(request)
-		}
-	case m2:
-		return func(next types.Handler, request *http.Request) http.Response {
-			stack.Push(m2)
-			return next(request)
-		}
-	case m3:
-		return func(next types.Handler, request *http.Request) http.Response {
-			stack.Push(m3)
-			return next(request)
-		}
-	case m4:
-		return func(next types.Handler, request *http.Request) http.Response {
-			stack.Push(m4)
-			return next(request)
-		}
-	case m5:
-		return func(next types.Handler, request *http.Request) http.Response {
-			stack.Push(m5)
-			return next(request)
-		}
-	case m6:
-		return func(next types.Handler, request *http.Request) http.Response {
-			stack.Push(m6)
-			return next(request)
-		}
-	case m7:
-		return func(next types.Handler, request *http.Request) http.Response {
-			stack.Push(m7)
-			return next(request)
-		}
-	}
-
 	return func(next types.Handler, request *http.Request) http.Response {
 		stack.Push(mware)
 
