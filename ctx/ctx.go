@@ -1,9 +1,18 @@
-package valuectx
+package ctx
 
 import (
 	"context"
 	"fmt"
 )
+
+type ReusableContext[K comparable, V any] interface {
+	context.Context
+	Set(parent context.Context, value V)
+}
+
+func NewReusable[K comparable, V any]() ReusableContext[K, V] {
+	return &ValueCtx[K, V]{}
+}
 
 // Copyright 2014 The Go Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style
@@ -14,9 +23,9 @@ import (
 // instead of any and reflection. This increases performance a
 // lot
 
-// valueCtx carries a key-value pair. It implements Value for that key and
+// ValueCtx carries a key-value pair. It implements Value for that key and
 // delegates all other calls to the embedded Context.
-type valueCtx[K comparable, V any] struct {
+type ValueCtx[K comparable, V any] struct {
 	context.Context
 	key K
 	val V
@@ -35,24 +44,29 @@ type valueCtx[K comparable, V any] struct {
 // interface{}, context keys often have concrete type
 // struct{}. Alternatively, exported context key variables' static
 // type should be a pointer or interface.
-func WithValue[K comparable, V any](parent context.Context, key K, val V) context.Context {
+func WithValue[K comparable, V any](parent context.Context, key K, val V) ReusableContext[K, V] {
 	if parent == nil {
 		panic("cannot create context from nil parent")
 	}
 
-	return valueCtx[K, V]{parent, key, val}
+	return &ValueCtx[K, V]{parent, key, val}
 }
 
-func (c valueCtx[K, V]) Value(key any) any {
-	if c.key == key {
-		return c.val
+func (v *ValueCtx[K, V]) Value(key any) any {
+	if v.key == key {
+		return v.val
 	}
-	return c.Context.Value(key)
+	return v.Context.Value(key)
 }
 
-func (c valueCtx[K, V]) String() string {
+func (v *ValueCtx[K, V]) Set(parent context.Context, value V) {
+	v.Context = parent
+	v.val = value
+}
+
+func (v *ValueCtx[K, V]) String() string {
 	return fmt.Sprintf(
-		"github.com/indigo-web/indigo/valuectx/patched.go:valueCtx{key: %s, value: %s}",
-		fmt.Sprint(c.key), fmt.Sprint(c.val),
+		"ctx.ValueCtx{key: %s, value: %s}",
+		fmt.Sprint(v.key), fmt.Sprint(v.val),
 	)
 }
