@@ -150,8 +150,8 @@ func (r *Request) Clear() (err error) {
 	return nil
 }
 
-// RespondTo returns a response object of request
-func RespondTo(request *Request) Response {
+// Respond returns a response object of request
+func Respond(request *Request) Response {
 	return request.response
 }
 

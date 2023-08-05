@@ -18,7 +18,7 @@ func MyHandler(request *http.Request) http.Response {
 	if err != nil {
 		// in case error occurred, it may be only an error with a network, so
 		// no response may be sent anyway
-		return http.RespondTo(request)
+		return request.Respond()
 	}
 
 	readBuff := make([]byte, 1024)
@@ -30,7 +30,7 @@ func MyHandler(request *http.Request) http.Response {
 
 			// no matter what we return here as after handler exits, even if connection was
 			// not explicitly closed, server will do it implicitly
-			return http.RespondTo(request)
+			return request.Respond()
 		}
 
 		fmt.Println("somebody says:", strconv.Quote(string(readBuff[:n])))
@@ -38,7 +38,7 @@ func MyHandler(request *http.Request) http.Response {
 }
 
 func main() {
-	r := inbuilt.NewRouter()
+	r := inbuilt.New()
 	r.Get("/", MyHandler)
 
 	app := indigo.NewApp(addr)

@@ -13,14 +13,14 @@ import (
 var addr = "localhost:9090"
 
 func MyHandler(request *http.Request) http.Response {
-	return http.RespondTo(request).
+	return request.Respond().
 		WithCode(status.OK).
 		WithHeader("Hello", "world").
 		WithBody("<h1>How are you doing?</h1>")
 }
 
 func main() {
-	myRouter := inbuilt.NewRouter()
+	myRouter := inbuilt.New()
 	myRouter.Get("/", MyHandler)
 
 	fmt.Println("Listening on", addr)

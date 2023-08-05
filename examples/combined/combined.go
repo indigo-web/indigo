@@ -22,9 +22,9 @@ var (
 )
 
 func Index(request *http.Request) http.Response {
-	resp, err := http.RespondTo(request).WithFile(index)
+	resp, err := request.Respond().WithFile(index)
 	if err != nil {
-		return http.RespondTo(request).
+		return request.Respond().
 			WithCode(status.NotFound).
 			WithBody(
 				index + ": not found; try running this example directly from examples/combined folder",
@@ -36,38 +36,38 @@ func Index(request *http.Request) http.Response {
 
 func IndexSay(request *http.Request) http.Response {
 	if talking := request.Headers.Value("talking"); talking != "allowed" {
-		return http.RespondTo(request).WithCode(status.UnavailableForLegalReasons)
+		return request.Respond().WithCode(status.UnavailableForLegalReasons)
 	}
 
 	body, err := request.Body().Value()
 	if err != nil {
-		return http.RespondTo(request).WithError(err)
+		return request.Respond().WithError(err)
 	}
 
 	fmt.Println("Somebody said:", strconv.Quote(string(body)))
 
-	return http.RespondTo(request)
+	return request.Respond()
 }
 
 func World(request *http.Request) http.Response {
-	return http.RespondTo(request).WithBody(
+	return request.Respond().WithBody(
 		`<h1>Hello, world!</h1>`,
 	)
 }
 
 func Easter(request *http.Request) http.Response {
 	if request.Headers.Has("easter") {
-		return http.RespondTo(request).
+		return request.Respond().
 			WithCode(status.Teapot).
 			WithHeader("Easter", "Egg").
 			WithBody("You have discovered an easter egg! Congratulations!")
 	}
 
-	return http.RespondTo(request).WithBody("Pretty ordinary page, isn't it?")
+	return request.Respond().WithBody("Pretty ordinary page, isn't it?")
 }
 
 func Stressful(request *http.Request) http.Response {
-	resp := http.RespondTo(request).
+	resp := request.Respond().
 		WithHeader("Should", "never be seen").
 		WithBody("Hello, world!")
 
@@ -77,9 +77,8 @@ func Stressful(request *http.Request) http.Response {
 }
 
 func main() {
-	r := inbuilt.NewRouter()
-
-	r.Get("/stress", Stressful, middleware.Recover)
+	r := inbuilt.New().
+		Get("/stress", Stressful, middleware.Recover)
 
 	r.Resource("/").
 		Get(Index).
