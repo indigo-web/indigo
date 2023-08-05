@@ -30,7 +30,7 @@ func MyHandler(request *http.Request) http.Response {
 }
 
 func main() {
-  router := inbuilt.NewRouter()
+  router := inbuilt.New()
   router.Get("/", MyHandler)
 
   app := indigo.NewApp(addr)
