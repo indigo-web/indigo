@@ -74,7 +74,7 @@ func readN(conn net.Conn, n int) ([]byte, error) {
 }
 
 func getStaticRouter(t *testing.T) router.Router {
-	r := inbuilt.NewRouter()
+	r := inbuilt.New()
 
 	r.Get("/simple-get", func(request *http.Request) http.Response {
 		require.Equal(t, method.GET, request.Method)
@@ -82,11 +82,11 @@ func getStaticRouter(t *testing.T) router.Router {
 		require.Error(t, err)
 		require.Equal(t, proto.HTTP11, request.Proto)
 
-		return http.RespondTo(request)
+		return request.Respond()
 	})
 
 	r.Get("/get-resp-body", func(request *http.Request) http.Response {
-		return http.RespondTo(request).WithBody(testRequestBody)
+		return request.Respond().WithBody(testRequestBody)
 	})
 
 	r.Get("/get-read-body", func(request *http.Request) http.Response {
@@ -98,7 +98,7 @@ func getStaticRouter(t *testing.T) router.Router {
 		require.NoError(t, err)
 		require.Empty(t, body)
 
-		return http.RespondTo(request)
+		return request.Respond()
 	})
 
 	with := r.Group("/with-")
@@ -108,20 +108,20 @@ func getStaticRouter(t *testing.T) router.Router {
 		require.NoError(t, err)
 		require.Equal(t, testQueryValue, value)
 
-		return http.RespondTo(request)
+		return request.Respond()
 	})
 
 	with.Get("file", func(request *http.Request) http.Response {
-		resp, err := http.RespondTo(request).WithFile(testFilename)
+		resp, err := request.Respond().WithFile(testFilename)
 		require.NoError(t, err)
 		return resp
 	})
 
 	with.Get("file-notfound", func(request *http.Request) http.Response {
-		_, err := http.RespondTo(request).WithFile(testFilename + "non-existing")
+		_, err := request.Respond().WithFile(testFilename + "non-existing")
 		require.Error(t, err)
 
-		return http.RespondTo(request).WithBody(testFileIfNotFound)
+		return request.Respond().WithBody(testFileIfNotFound)
 	})
 
 	// request.OnBody() is not tested because request.Body() (wrapper for OnBody)
@@ -132,7 +132,7 @@ func getStaticRouter(t *testing.T) router.Router {
 		require.NoError(t, err)
 		require.Equal(t, testRequestBody, string(body))
 
-		return http.RespondTo(request)
+		return request.Respond()
 	})
 
 	r.Post("/body-reader", func(request *http.Request) http.Response {
@@ -140,10 +140,10 @@ func getStaticRouter(t *testing.T) router.Router {
 		require.NoError(t, err)
 		require.Equal(t, testRequestBody, string(body))
 
-		return http.RespondTo(request)
+		return request.Respond()
 	})
 
-	r.Post("/do-not-read-body", http.RespondTo)
+	r.Post("/do-not-read-body", http.Respond)
 
 	r.Get("/hijack-conn-no-body-read", func(request *http.Request) http.Response {
 		conn, err := request.Hijack()
@@ -158,7 +158,7 @@ func getStaticRouter(t *testing.T) router.Router {
 
 		_ = conn.Close()
 
-		return http.RespondTo(request)
+		return request.Respond()
 	})
 
 	r.Get("/hijack-conn-with-body-read", func(request *http.Request) http.Response {
@@ -175,7 +175,7 @@ func getStaticRouter(t *testing.T) router.Router {
 
 		_ = conn.Close()
 
-		return http.RespondTo(request)
+		return request.Respond()
 	})
 
 	return r
