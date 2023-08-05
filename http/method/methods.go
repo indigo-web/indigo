@@ -19,6 +19,10 @@ const (
 	Count
 )
 
+func (m Method) String() string {
+	return ToString(m)
+}
+
 type entry struct {
 	Method Method
 	Origin string
