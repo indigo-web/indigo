@@ -22,7 +22,7 @@ func newErrorHandlers() types.ErrHandlers {
 }
 
 func defaultMethodNotAllowedHandler(request *http.Request) http.Response {
-	response := http.RespondTo(request).WithError(status.ErrMethodNotAllowed)
+	response := request.Respond().WithError(status.ErrMethodNotAllowed)
 
 	if allow, ok := request.Ctx.Value("allow").(string); ok {
 		response = response.WithHeader("Allow", allow)
