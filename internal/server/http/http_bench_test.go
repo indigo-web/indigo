@@ -54,20 +54,20 @@ var defaultHeaders = map[string][]string{
 var longPath = strings.Repeat("a", 500)
 
 func getInbuiltRouter() router.Router {
-	r := inbuilt.NewRouter().
+	r := inbuilt.New().
 		Get("/with-header", func(request *http.Request) http.Response {
-			return http.RespondTo(request).WithHeader("Hello", "World")
+			return request.Respond().WithHeader("Hello", "World")
 		}).
-		Get("/"+longPath, http.RespondTo)
+		Get("/"+longPath, http.Respond)
 
 	r.Resource("/").
-		Get(http.RespondTo).
+		Get(http.Respond).
 		Post(func(request *http.Request) http.Response {
 			_ = request.Body().Callback(func([]byte) error {
 				return nil
 			})
 
-			return http.RespondTo(request)
+			return request.Respond()
 		})
 
 	if err := r.OnStart(); err != nil {
@@ -85,26 +85,26 @@ func getSimpleRouter() router.Router {
 		case "/":
 			switch request.Method {
 			case method.GET:
-				return http.RespondTo(request)
+				return request.Respond()
 			case method.POST:
 				_ = request.Body().Callback(func([]byte) error {
 					return nil
 				})
 
-				return http.RespondTo(request)
+				return request.Respond()
 			default:
-				return http.RespondTo(request).WithError(status.ErrMethodNotAllowed)
+				return request.Respond().WithError(status.ErrMethodNotAllowed)
 			}
 		case "/with-header":
-			return http.RespondTo(request).WithHeader("Hello", "World")
+			return request.Respond().WithHeader("Hello", "World")
 		case longpath:
-			return http.RespondTo(request)
+			return request.Respond()
 		default:
-			return http.RespondTo(request).
+			return request.Respond().
 				WithError(status.ErrNotFound)
 		}
 	}, func(request *http.Request, err error) http.Response {
-		return http.RespondTo(request).WithError(err)
+		return request.Respond().WithError(err)
 	})
 
 	return r
