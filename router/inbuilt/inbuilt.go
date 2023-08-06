@@ -72,7 +72,7 @@ func (r *Router) OnRequest(request *http.Request) http.Response {
 
 		handler := getHandler(request.Method, methodsMap)
 		if handler == nil {
-			r.reusableAllowCtx.Set(request.Ctx, allow)
+			r.reusableAllowCtx.Set(request.Ctx, "allow", allow)
 			request.Ctx = r.reusableAllowCtx
 
 			return r.OnError(request, status.ErrMethodNotAllowed)
@@ -88,7 +88,7 @@ func (r *Router) OnRequest(request *http.Request) http.Response {
 
 	handler := getHandler(request.Method, payload.MethodsMap)
 	if handler == nil {
-		r.reusableAllowCtx.Set(request.Ctx, payload.Allow)
+		r.reusableAllowCtx.Set(request.Ctx, "allow", payload.Allow)
 		request.Ctx = r.reusableAllowCtx
 
 		return r.OnError(request, status.ErrMethodNotAllowed)
@@ -111,7 +111,7 @@ func (r *Router) OnError(request *http.Request, err error) http.Response {
 		return request.Respond().WithError(err)
 	}
 
-	r.reusableErrCtx.Set(request.Ctx, err)
+	r.reusableErrCtx.Set(request.Ctx, "error", err)
 	request.Ctx = r.reusableErrCtx
 
 	return handler(request)

@@ -7,7 +7,7 @@ import (
 
 type ReusableContext[K comparable, V any] interface {
 	context.Context
-	Set(parent context.Context, value V)
+	Set(parent context.Context, key K, value V)
 }
 
 func NewReusable[K comparable, V any]() ReusableContext[K, V] {
@@ -59,8 +59,9 @@ func (v *ValueCtx[K, V]) Value(key any) any {
 	return v.Context.Value(key)
 }
 
-func (v *ValueCtx[K, V]) Set(parent context.Context, value V) {
+func (v *ValueCtx[K, V]) Set(parent context.Context, key K, value V) {
 	v.Context = parent
+	v.key = key
 	v.val = value
 }
 
