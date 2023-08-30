@@ -100,8 +100,7 @@ func (h *httpServer) RunOnce(
 		if err = req.Clear(); err != nil {
 			// abusing the fact, that req.Clear() will return an error ONLY if socket error
 			// occurred while reading.
-			// TODO: what's if decoding is in charge here? We anyway will close the connection,
-			//       but client is still has to be notified about the error
+			// TODO: what's if the error lays in decoding? This should somehow be processed
 			h.router.OnError(req, status.ErrCloseConnection)
 			return false
 		}

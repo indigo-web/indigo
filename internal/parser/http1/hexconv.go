@@ -1,6 +1,6 @@
 package http1
 
-func isHex(char byte) bool {
+func ishex(char byte) bool {
 	switch {
 	case '0' <= char && char <= '9':
 		return true
@@ -12,7 +12,7 @@ func isHex(char byte) bool {
 	return false
 }
 
-func unHex(char byte) byte {
+func unhex(char byte) byte {
 	switch {
 	case '0' <= char && char <= '9':
 		return char - '0'

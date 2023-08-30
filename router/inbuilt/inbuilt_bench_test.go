@@ -1,65 +1,78 @@
 package inbuilt
 
 import (
+	"context"
 	"github.com/indigo-web/indigo/http"
-	"github.com/indigo-web/indigo/http/decode"
-	"github.com/indigo-web/indigo/http/headers"
-	"github.com/indigo-web/indigo/http/method"
-	"github.com/indigo-web/indigo/http/query"
-	"github.com/indigo-web/indigo/internal/parser/http1"
-	"github.com/indigo-web/indigo/internal/server/tcp/dummy"
-	"github.com/indigo-web/indigo/settings"
+	"strings"
 	"testing"
+
+	"github.com/indigo-web/indigo/http/method"
 )
 
 func BenchmarkRouter_OnRequest_Static(b *testing.B) {
-	r := NewRouter()
-	r.Get("/", http.RespondTo)
-	r.Post("/", http.RespondTo)
-	r.Get(
-		"/some/very/long/path/that/is/not/gonna/end/somewhere/in/close/future/or/no/haha/I/lied",
-		http.RespondTo,
-	)
+	r := New()
 
-	_ = r.OnStart()
+	GETRootRequest := getRequest()
+	GETRootRequest.Path.String = "/"
+	GETRootRequest.Method = method.GET
+	r.Get(GETRootRequest.Path.String, http.Respond)
 
-	body := http1.NewBodyReader(dummy.NewNopClient(), settings.Default().Body)
-	GETShortReq := http.NewRequest(
-		headers.NewHeaders(nil), query.Query{}, http.NewResponse(), dummy.NewNopConn(),
-		http.NewBody(body, decode.NewDecoder()), nil, false,
-	)
-	GETShortReq.Path.String = "/"
-	GETShortReq.Method = method.GET
+	longURIRequest := getRequest()
+	longURIRequest.Method = method.GET
+	longURIRequest.Path.String = "/" + strings.Repeat("a", 65534)
+	r.Get(longURIRequest.Path.String, http.Respond)
 
-	POSTShortReq := http.NewRequest(
-		headers.NewHeaders(nil), query.Query{}, http.NewResponse(), dummy.NewNopConn(),
-		http.NewBody(body, decode.NewDecoder()), nil, false,
-	)
-	POSTShortReq.Path.String = "/"
-	POSTShortReq.Method = method.POST
+	mediumURIRequest := getRequest()
+	mediumURIRequest.Method = method.GET
+	mediumURIRequest.Path.String = "/" + strings.Repeat("a", 50)
+	r.Get(mediumURIRequest.Path.String, http.Respond)
 
-	GETLongReq := http.NewRequest(
-		headers.NewHeaders(nil), query.Query{}, http.NewResponse(), dummy.NewNopConn(),
-		http.NewBody(body, decode.NewDecoder()), nil, false,
-	)
-	GETLongReq.Path.String = "/some/very/long/path/that/is/not/gonna/end/somewhere/in/close/future/or/no/haha/I/lied"
-	GETLongReq.Method = method.GET
+	unknownURIRequest := getRequest()
+	unknownURIRequest.Method = method.GET
+	unknownURIRequest.Path.String = "/" + strings.Repeat("b", 65534)
 
-	b.Run("GET_Static_Short", func(b *testing.B) {
+	unknownMethodRequest := getRequest()
+	unknownMethodRequest.Method = method.POST
+	unknownMethodRequest.Path.String = longURIRequest.Path.String
+
+	emptyCtx := context.Background()
+
+	if err := r.OnStart(); err != nil {
+		panic(err)
+	}
+
+	b.Run("GET root", func(b *testing.B) {
 		for i := 0; i < b.N; i++ {
-			r.OnRequest(GETShortReq)
+			r.OnRequest(GETRootRequest)
+			GETRootRequest.Ctx = emptyCtx
 		}
 	})
 
-	b.Run("POST_Static_Short", func(b *testing.B) {
+	b.Run("GET long uri", func(b *testing.B) {
 		for i := 0; i < b.N; i++ {
-			r.OnRequest(POSTShortReq)
+			r.OnRequest(longURIRequest)
+			longURIRequest.Ctx = emptyCtx
 		}
 	})
 
-	b.Run("GET_Static_Long", func(b *testing.B) {
+	b.Run("GET medium uri", func(b *testing.B) {
 		for i := 0; i < b.N; i++ {
-			r.OnRequest(GETLongReq)
+			r.OnRequest(mediumURIRequest)
+			mediumURIRequest.Ctx = emptyCtx
+		}
+	})
+
+	b.Run("unknown uri", func(b *testing.B) {
+		for i := 0; i < b.N; i++ {
+			r.OnRequest(unknownURIRequest)
+			unknownURIRequest.Ctx = emptyCtx
+		}
+	})
+
+	b.Run("unknown method", func(b *testing.B) {
+		for i := 0; i < b.N; i++ {
+			r.OnRequest(unknownMethodRequest)
+			unknownMethodRequest.Ctx = emptyCtx
 		}
 	})
 }

@@ -58,6 +58,17 @@ func (h *Headers) ValueOr(key, or string) string {
 	return or
 }
 
+// Get behaves just as map lookup. It returns both desired string and bool flag meaning the success
+// of the operation (false=no such key, true=found)
+func (h *Headers) Get(key string) (string, bool) {
+	value := h.Value(key)
+	if len(value) == 0 {
+		return "", false
+	}
+
+	return value, true
+}
+
 func (h *Headers) ValuesIter(key string) Iterator[string] {
 	var offset int
 

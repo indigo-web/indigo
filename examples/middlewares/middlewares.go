@@ -14,7 +14,7 @@ import (
 
 var addr = "localhost:9090"
 
-func HelloWorldMiddleware(next types.HandlerFunc, request *http.Request) http.Response {
+func HelloWorldMiddleware(next types.Handler, request *http.Request) http.Response {
 	fmt.Println("running middleware before handler")
 	response := next(request)
 	fmt.Println("running middleware after handler")
@@ -22,7 +22,7 @@ func HelloWorldMiddleware(next types.HandlerFunc, request *http.Request) http.Re
 	return response
 }
 
-func SecondMiddleware(next types.HandlerFunc, request *http.Request) http.Response {
+func SecondMiddleware(next types.Handler, request *http.Request) http.Response {
 	fmt.Println("running second middleware before first one")
 	response := next(request)
 	fmt.Println("running second middleware after first one")
@@ -33,11 +33,11 @@ func SecondMiddleware(next types.HandlerFunc, request *http.Request) http.Respon
 func MyBeautifulHandler(request *http.Request) http.Response {
 	fmt.Println("running handler")
 
-	return http.RespondTo(request)
+	return request.Respond()
 }
 
 func main() {
-	r := inbuilt.NewRouter()
+	r := inbuilt.New()
 
 	api := r.Group("/api")
 	api.Use(HelloWorldMiddleware)

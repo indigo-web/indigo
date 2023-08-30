@@ -15,11 +15,11 @@ var addr = "localhost:9090"
 func MyDynamicHandler(request *http.Request) http.Response {
 	worldName := request.Path.Params["world-name"]
 
-	return http.RespondTo(request).WithBody("your world-name is " + worldName)
+	return request.Respond().WithBody("your world-name is " + worldName)
 }
 
 func main() {
-	r := inbuilt.NewRouter()
+	r := inbuilt.New()
 
 	r.Get("/hello/{world-name}", MyDynamicHandler)
 

@@ -1,41 +1,38 @@
 package inbuilt
 
-import (
-	"github.com/indigo-web/indigo/router/inbuilt/types"
-)
-
 /*
 This file is responsible for endpoint groups
 */
 
-// Group creates a new instance of InbuiltRouter, but inherited from current one
-// Middlewares has to be inherited from a parent, but adding new middlewares
-// in a child group MUST NOT affect parent ones, so parent middlewares
-// are copied into child ones. Everything else is inherited from parent as it is
+// Group creates a new router with pre-defined prefix for all paths. It'll automatically be
+// merged into the head router on server start. Middlewares, applied on this router, will not
+// affect the head router, but initially head router's middlewares will be inherited and will
+// be called in the first order. Registering new error handlers will result in affecting error
+// handlers among ALL the existing groups, including head router
 func (r *Router) Group(prefix string) *Router {
-	var newMiddlewares []types.Middleware
-
-	group := &Router{
-		root:        r.root,
+	router := &Router{
 		prefix:      r.prefix + prefix,
-		middlewares: append(newMiddlewares, r.middlewares...),
-		routes:      make(types.RoutesMap),
+		registrar:   newRegistrar(),
 		errHandlers: r.errHandlers,
 	}
 
-	r.root.groups = append(r.root.groups, *group)
+	r.children = append(r.children, router)
 
-	return group
+	return router
 }
 
-func (r *Router) applyGroups() {
-	for _, group := range r.groups {
-		mergeRoutes(r.routes, group.routes)
-	}
-}
+func (r *Router) prepare() error {
+	for _, child := range r.children {
+		if err := child.prepare(); err != nil {
+			return err
+		}
 
-func mergeRoutes(into, values types.RoutesMap) {
-	for key, value := range values {
-		into[key] = value
+		if err := r.registrar.Merge(child.registrar); err != nil {
+			return err
+		}
 	}
+
+	r.applyMiddlewares()
+
+	return nil
 }

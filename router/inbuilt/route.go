@@ -11,18 +11,15 @@ This file is responsible for registering both ordinary and error handlers
 
 // Route is a base method for registering handlers
 func (r *Router) Route(
-	method method.Method, path string, handlerFunc types.HandlerFunc,
+	method method.Method, path string, handlerFunc types.Handler,
 	middlewares ...types.Middleware,
-) {
-	urlPath := r.prefix + path
-	methodsMap := r.routes[urlPath]
-	handlerStruct := &types.HandlerObject{
-		Fun:         handlerFunc,
-		Middlewares: append(middlewares, r.middlewares...),
+) *Router {
+	err := r.registrar.Add(r.prefix+path, method, combine(handlerFunc, middlewares))
+	if err != nil {
+		panic(err)
 	}
 
-	methodsMap[method] = handlerStruct
-	r.routes[urlPath] = methodsMap
+	return r
 }
 
 // RouteError adds an error handler. You can handle next errors:
@@ -40,6 +37,7 @@ func (r *Router) Route(
 // - status.ErrConnectionTimeout
 //
 // You can set your own handler and override default response
-func (r *Router) RouteError(err error, handler types.HandlerFunc) {
-	r.root.errHandlers[err] = handler
+// WARNING: calling this method from groups will affect ALL routers, including root
+func (r *Router) RouteError(err error, handler types.Handler) {
+	r.errHandlers[err] = handler
 }

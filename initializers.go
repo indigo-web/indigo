@@ -37,9 +37,7 @@ func newKeyValueArenas(s settings.Headers) (*arena.Arena[byte], *arena.Arena[byt
 func newRequest(
 	s settings.Settings, conn net.Conn, r http.BodyReader, decoder *decode.Decoder,
 ) *http.Request {
-	q := query.NewQuery(func() query.Map {
-		return make(query.Map, s.URL.Query.DefaultMapSize)
-	})
+	q := query.NewQuery(headers.NewHeaders(nil))
 	hdrs := headers.NewHeaders(make(map[string][]string, s.Headers.Number.Default))
 	response := http.NewResponse()
 	params := make(http.Params)
@@ -55,12 +53,15 @@ func newRenderer(httpSettings settings.HTTP, a *Application) render.Engine {
 }
 
 func newHTTPParser(s settings.Settings, req *http.Request) httpparser.HTTPRequestsParser {
-	keyAlloc, valAlloc := newKeyValueArenas(s.Headers)
+	keyArena, valArena := newKeyValueArenas(s.Headers)
 	objPool := pool.NewObjectPool[[]string](s.Headers.MaxValuesObjectPoolSize)
 
-	startLineBuff := make([]byte, s.URL.MaxLength)
+	startLineArena := arena.NewArena[byte](
+		s.URL.BufferSize.Default,
+		s.URL.BufferSize.Maximal,
+	)
 
 	return http1.NewHTTPRequestsParser(
-		req, *keyAlloc, *valAlloc, *objPool, startLineBuff, s.Headers,
+		req, *keyArena, *valArena, *startLineArena, *objPool, s.Headers,
 	)
 }

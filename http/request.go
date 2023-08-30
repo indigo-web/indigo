@@ -25,6 +25,8 @@ type (
 	}
 )
 
+var defaultCtx = context.Background()
+
 // Request struct represents http request
 // About headers manager see at http/headers/headers.go:Manager
 // Headers attribute references at that one that lays in manager
@@ -65,7 +67,7 @@ func NewRequest(
 		Remote:         conn.RemoteAddr(),
 		conn:           conn,
 		body:           body,
-		Ctx:            context.Background(),
+		Ctx:            defaultCtx,
 		response:       response,
 		clearParamsMap: !disableParamsMapClearing,
 	}
@@ -100,6 +102,11 @@ func (r *Request) Body() *Body {
 	return r.body
 }
 
+// Respond returns Response builder, associated with the request
+func (r *Request) Respond() Response {
+	return r.response
+}
+
 // Hijack the connection. Request body will be implicitly read (so if you need it you
 // should read it before) all the body left. After handler exits, the connection will
 // be closed, so the connection can be hijacked only once
@@ -122,7 +129,7 @@ func (r *Request) WasHijacked() bool {
 // It is implemented to clear the request object between requests
 func (r *Request) Clear() (err error) {
 	r.Path.Query.Set(nil)
-	r.Ctx = context.Background()
+	r.Ctx = defaultCtx
 	r.response = r.response.Clear()
 
 	if err = r.body.Reset(); err != nil {
@@ -143,8 +150,8 @@ func (r *Request) Clear() (err error) {
 	return nil
 }
 
-// RespondTo returns a response object of request
-func RespondTo(request *Request) Response {
+// Respond returns a response object of request
+func Respond(request *Request) Response {
 	return request.response
 }
 

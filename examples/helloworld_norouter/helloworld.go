@@ -13,7 +13,7 @@ import (
 var addr = "localhost:9090"
 
 func MyHandler(request *http.Request) http.Response {
-	return http.RespondTo(request).
+	return request.Respond().
 		WithCode(status.OK).
 		WithHeader("Hello", "world").
 		WithBody("<h1>How are you doing?</h1>")
@@ -21,7 +21,7 @@ func MyHandler(request *http.Request) http.Response {
 
 func main() {
 	myRouter := simple.NewRouter(MyHandler, func(request *http.Request, err error) http.Response {
-		return http.RespondTo(request).WithError(err)
+		return request.Respond().WithError(err)
 	})
 
 	fmt.Println("Listening on", addr)

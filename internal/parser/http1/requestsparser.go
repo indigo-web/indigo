@@ -18,8 +18,6 @@ import (
 	"github.com/indigo-web/utils/uf"
 )
 
-const maxMethodLength = len("CONNECT")
-
 // httpRequestsParser is a stream-based http requests parser. It modifies
 // request object by pointer in performance purposes. Decodes query-encoded
 // values by its own, you can see that by presented states ePathDecode1Char,
@@ -28,34 +26,29 @@ const maxMethodLength = len("CONNECT")
 // the pending data as an extra. Body must be processed separately
 type httpRequestsParser struct {
 	request           *http.Request
+	startLineArena    arena.Arena[byte]
 	headerKey         string
-	startLineBuff     []byte
 	headersValuesPool pool.ObjectPool[[]string]
 	headerKeyArena    arena.Arena[byte]
 	headerValueArena  arena.Arena[byte]
 	headersSettings   settings.Headers
-	begin             int
-	pointer           int
 	headersNumber     int
 	contentLength     int
-	headerValueSize   int
-	urlEncodedChar    uint8
 	protoMajor        uint8
 	protoMinor        uint8
+	urlEncodedChar    uint8
 	state             parserState
 }
 
 func NewHTTPRequestsParser(
-	request *http.Request, keyArena, valArena arena.Arena[byte],
-	valuesPool pool.ObjectPool[[]string], startLineBuff []byte, headersSettings settings.Headers,
+	request *http.Request, keyArena, valArena, startLineArena arena.Arena[byte],
+	valuesPool pool.ObjectPool[[]string], headersSettings settings.Headers,
 ) parser.HTTPRequestsParser {
 	return &httpRequestsParser{
-		state:           eMethod,
-		request:         request,
-		headersSettings: headersSettings,
-
-		startLineBuff: startLineBuff,
-
+		state:             eMethod,
+		request:           request,
+		headersSettings:   headersSettings,
+		startLineArena:    startLineArena,
 		headerKeyArena:    keyArena,
 		headerValueArena:  valArena,
 		headersValuesPool: valuesPool,
@@ -71,50 +64,12 @@ func (p *httpRequestsParser) Parse(data []byte) (state parser.RequestState, extr
 		goto method
 	case ePath:
 		goto path
-	case ePathDecode1Char:
-		goto pathDecode1Char
-	case ePathDecode2Char:
-		goto pathDecode2Char
-	case eQuery:
-		goto query
-	case eQueryDecode1Char:
-		goto queryDecode1Char
-	case eQueryDecode2Char:
-		goto queryDecode2Char
-	case eFragment:
-		goto fragment
-	case eProto:
-		goto proto
-	case eH:
-		goto protoH
-	case eHT:
-		goto protoHT
-	case eHTT:
-		goto protoHTT
-	case eHTTP:
-		goto protoHTTP
-	case eProtoMajor:
-		goto protoMajor
-	case eProtoDot:
-		goto protoDot
-	case eProtoMinor:
-		goto protoMinor
-	case eProtoEnd:
-		goto protoEnd
-	case eProtoCR:
-		goto protoCR
-	case eProtoCRLF:
-		goto protoCRLF
-	case eProtoCRLFCR:
-		goto protoCRLFCR
 	case eHeaderKey:
 		goto headerKey
 	case eContentLength:
 		goto contentLength
 	case eContentLengthCR:
 		goto contentLengthCR
-	case eContentLengthCRLFCR:
-		goto contentLengthCRLFCR
 	case eHeaderValue:
 		goto headerValue
 	case eHeaderValueCRLFCR:
@@ -124,377 +79,94 @@ func (p *httpRequestsParser) Parse(data []byte) (state parser.RequestState, extr
 	}
 
 method:
-	for i := range data {
-		switch data[i] {
-		case '\r', '\n': // rfc2068, 4.1
-			if p.pointer > 0 {
-				return parser.Error, nil, status.ErrMethodNotImplemented
-			}
-		case ' ':
-			if p.pointer == 0 {
-				return parser.Error, nil, status.ErrBadRequest
-			}
-
-			p.request.Method = method.Parse(uf.B2S(p.startLineBuff[:p.pointer]))
-
-			if p.request.Method == method.Unknown {
-				return parser.Error, nil, status.ErrMethodNotImplemented
-			}
-
-			p.begin = p.pointer
-			data = data[i+1:]
-			p.state = ePath
-			goto path
-		default:
-			if p.pointer > maxMethodLength {
-				return parser.Error, nil, status.ErrBadRequest
-			}
-
-			p.startLineBuff[p.pointer] = data[i]
-			p.pointer++
-		}
-	}
-
-	return parser.Pending, nil, nil
-
-path:
-	for i := range data {
-		switch data[i] {
-		case ' ':
-			if p.begin == p.pointer {
-				return parser.Error, nil, status.ErrBadRequest
-			}
-
-			p.request.Path.String = uf.B2S(p.startLineBuff[p.begin:p.pointer])
-			data = data[i+1:]
-			p.state = eProto
-			goto proto
-		case '%':
-			data = data[i+1:]
-			p.state = ePathDecode1Char
-			goto pathDecode1Char
-		case '?':
-			p.request.Path.String = uf.B2S(p.startLineBuff[p.begin:p.pointer])
-			if len(p.request.Path.String) == 0 {
-				p.request.Path.String = "/"
-			}
-
-			p.begin = p.pointer
-			data = data[i+1:]
-			p.state = eQuery
-			goto query
-		case '#':
-			p.request.Path.String = uf.B2S(p.startLineBuff[p.begin:p.pointer])
-			if len(p.request.Path.String) == 0 {
-				p.request.Path.String = "/"
-			}
-
-			p.begin = p.pointer
-			data = data[i+1:]
-			p.state = eFragment
-			goto fragment
-		case '\x00', '\n', '\r', '\t', '\b', '\a', '\v', '\f':
-			// request path MUST NOT include any non-printable characters
-			return parser.Error, nil, status.ErrBadRequest
-		default:
-			if p.pointer >= len(p.startLineBuff) {
-				return parser.Error, nil, status.ErrURITooLong
-			}
-
-			p.startLineBuff[p.pointer] = data[i]
-			p.pointer++
-		}
-	}
-
-	return parser.Pending, nil, nil
-
-pathDecode1Char:
-	if len(data) == 0 {
-		return parser.Pending, nil, nil
-	}
-
-	if !isHex(data[0]) {
-		return parser.Error, nil, status.ErrURIDecoding
-	}
-
-	p.urlEncodedChar = unHex(data[0]) << 4
-	data = data[1:]
-	p.state = ePathDecode2Char
-	goto pathDecode2Char
-
-pathDecode2Char:
-	if len(data) == 0 {
-		return parser.Pending, nil, nil
-	}
-
-	if !isHex(data[0]) {
-		return parser.Error, nil, status.ErrURIDecoding
-	}
-
-	if p.pointer >= len(p.startLineBuff) {
-		return parser.Error, nil, status.ErrURITooLong
-	}
-
-	p.startLineBuff[p.pointer] = p.urlEncodedChar | unHex(data[0])
-	p.pointer++
-	data = data[1:]
-	p.state = ePath
-	goto path
-
-query:
-	for i := range data {
-		switch data[i] {
-		case ' ':
-			p.request.Path.Query.Set(p.startLineBuff[p.begin:p.pointer])
-			data = data[i+1:]
-			p.state = eProto
-			goto proto
-		case '#':
-			p.request.Path.Query.Set(p.startLineBuff[p.begin:p.pointer])
-			p.begin = p.pointer
-			data = data[i+1:]
-			p.state = eFragment
-			goto fragment
-		case '%':
-			data = data[i+1:]
-			p.state = eQueryDecode1Char
-			goto queryDecode1Char
-		case '+':
-			if p.pointer >= len(p.startLineBuff) {
-				return parser.Error, nil, status.ErrURITooLong
-			}
-
-			p.startLineBuff[p.pointer] = ' '
-			p.pointer++
-		case '\x00', '\n', '\r', '\t', '\b', '\a', '\v', '\f':
-			return parser.Error, nil, status.ErrBadRequest
-		default:
-			if p.pointer >= len(p.startLineBuff) {
-				return parser.Error, nil, status.ErrURITooLong
-			}
-
-			p.startLineBuff[p.pointer] = data[i]
-			p.pointer++
-		}
-	}
-
-	return parser.Pending, nil, nil
-
-queryDecode1Char:
-	if len(data) == 0 {
-		return parser.Pending, nil, nil
-	}
-
-	if !isHex(data[0]) {
-		return parser.Error, nil, status.ErrURIDecoding
-	}
-
-	p.urlEncodedChar = unHex(data[0]) << 4
-	data = data[1:]
-	p.state = eQueryDecode2Char
-	goto queryDecode2Char
-
-queryDecode2Char:
-	if len(data) == 0 {
-		return parser.Pending, nil, nil
-	}
-
-	if !isHex(data[0]) {
-		return parser.Error, nil, status.ErrURIDecoding
-	}
-	if p.pointer >= len(p.startLineBuff) {
-		return parser.Error, nil, status.ErrURITooLong
-	}
-
-	p.startLineBuff[p.pointer] = p.urlEncodedChar | unHex(data[0])
-	p.pointer++
-	data = data[1:]
-	p.state = eQuery
-	goto query
-
-fragment:
 	{
 		sp := bytes.IndexByte(data, ' ')
 		if sp == -1 {
+			if !p.startLineArena.Append(data...) {
+				return parser.Error, nil, status.ErrBadRequest
+			}
+
 			return parser.Pending, nil, nil
 		}
 
+		var methodValue []byte
+		if p.startLineArena.SegmentLength() == 0 {
+			methodValue = data[:sp]
+		} else {
+			if !p.startLineArena.Append(data[:sp]...) {
+				return parser.Error, nil, status.ErrBadRequest
+			}
+
+			methodValue = p.startLineArena.Finish()
+		}
+
+		if len(methodValue) == 0 {
+			return parser.Error, nil, status.ErrBadRequest
+		}
+
+		p.request.Method = method.Parse(uf.B2S(methodValue))
+
+		if p.request.Method == method.Unknown {
+			return parser.Error, nil, status.ErrMethodNotImplemented
+		}
+
 		data = data[sp+1:]
-		p.state = eProto
-		goto proto
+		p.state = ePath
+		goto path
 	}
 
-proto:
-	if len(data) == 0 {
-		return parser.Pending, nil, nil
-	}
+path:
+	{
+		lf := bytes.IndexByte(data, '\n')
+		if lf == -1 {
+			if !p.startLineArena.Append(data...) {
+				return parser.Error, nil, status.ErrURITooLong
+			}
+			return parser.Pending, nil, nil
+		}
 
-	if data[0]|0x20 == 'h' {
-		data = data[1:]
-		p.state = eH
-		goto protoH
-	}
+		if !p.startLineArena.Append(data[:lf]...) {
+			return parser.Error, nil, status.ErrURITooLong
+		}
 
-	return parser.Error, nil, status.ErrBadRequest
+		pathAndProto := p.startLineArena.Finish()
+		sp := bytes.LastIndexByte(pathAndProto, ' ')
+		if sp == -1 {
+			return parser.Error, nil, status.ErrBadRequest
+		}
 
-protoH:
-	if len(data) == 0 {
-		return parser.Pending, nil, nil
-	}
+		reqPath, reqProto := pathAndProto[:sp], pathAndProto[sp+1:]
+		if reqProto[len(reqProto)-1] == '\r' {
+			reqProto = reqProto[:len(reqProto)-1]
+		}
 
-	if data[0]|0x20 == 't' {
-		data = data[1:]
-		p.state = eHT
-		goto protoHT
-	}
+		query := bytes.IndexByte(reqPath, '?')
+		if query != -1 {
+			p.request.Path.Query.Set(reqPath[query+1:])
+			reqPath = reqPath[:query]
+		}
 
-	return parser.Error, nil, status.ErrUnsupportedProtocol
+		if len(reqPath) == 0 {
+			return parser.Error, nil, status.ErrBadRequest
+		}
 
-protoHT:
-	if len(data) == 0 {
-		return parser.Pending, nil, nil
-	}
+		reqPath, err = uriDecode(reqPath, reqPath[:0])
+		if err != nil {
+			return parser.Error, nil, err
+		}
 
-	if data[0]|0x20 == 't' {
-		data = data[1:]
-		p.state = eHTT
-		goto protoHTT
-	}
+		p.request.Path.String = uf.B2S(reqPath)
+		p.request.Proto = proto.FromBytes(reqProto)
+		if p.request.Proto == proto.Unknown {
+			return parser.Error, nil, status.ErrUnsupportedProtocol
+		}
 
-	return parser.Error, nil, status.ErrUnsupportedProtocol
-
-protoHTT:
-	if len(data) == 0 {
-		return parser.Pending, nil, nil
-	}
-
-	if data[0]|0x20 == 'p' {
-		data = data[1:]
-		p.state = eHTTP
-		goto protoHTTP
-	}
-
-	return parser.Error, nil, status.ErrUnsupportedProtocol
-
-protoHTTP:
-	if len(data) == 0 {
-		return parser.Pending, nil, nil
-	}
-
-	if data[0] == '/' {
-		data = data[1:]
-		p.state = eProtoMajor
-		goto protoMajor
-	}
-
-	return parser.Error, nil, status.ErrUnsupportedProtocol
-
-protoMajor:
-	if len(data) == 0 {
-		return parser.Pending, nil, nil
-	}
-
-	if data[0]-'0' > 9 {
-		return parser.Error, nil, status.ErrUnsupportedProtocol
-	}
-
-	p.protoMajor = data[0] - '0'
-	data = data[1:]
-	p.state = eProtoDot
-	goto protoDot
-
-protoDot:
-	if len(data) == 0 {
-		return parser.Pending, nil, nil
-	}
-
-	if data[0] == '.' {
-		data = data[1:]
-		p.state = eProtoMinor
-		goto protoMinor
-	}
-
-	return parser.Error, nil, status.ErrUnsupportedProtocol
-
-protoMinor:
-	if len(data) == 0 {
-		return parser.Pending, nil, nil
-	}
-
-	if data[0]-'0' > 9 {
-		return parser.Error, nil, status.ErrUnsupportedProtocol
-	}
-
-	p.protoMinor = data[0] - '0'
-	data = data[1:]
-	p.state = eProtoEnd
-	goto protoEnd
-
-protoEnd:
-	if len(data) == 0 {
-		return parser.Pending, nil, nil
-	}
-
-	switch data[0] {
-	case '\r':
-		data = data[1:]
-		p.state = eProtoCR
-		goto protoCR
-	case '\n':
-		data = data[1:]
-		p.state = eProtoCRLF
-		goto protoCRLF
-	default:
-		return parser.Error, nil, status.ErrUnsupportedProtocol
-	}
-
-protoCR:
-	if len(data) == 0 {
-		return parser.Pending, nil, nil
-	}
-
-	if data[0] != '\n' {
-		return parser.Error, nil, status.ErrBadRequest
-	}
-
-	data = data[1:]
-	p.state = eProtoCRLF
-	goto protoCRLF
-
-protoCRLF:
-	if len(data) == 0 {
-		return parser.Pending, nil, nil
-	}
-
-	p.request.Proto = proto.Parse(p.protoMajor, p.protoMinor)
-	if p.request.Proto == proto.Unknown {
-		return parser.Error, nil, status.ErrUnsupportedProtocol
-	}
-
-	switch data[0] {
-	case '\r':
-		data = data[1:]
-		p.state = eProtoCRLFCR
-		goto protoCRLFCR
-	case '\n':
-		return parser.HeadersCompleted, data[1:], nil
-	default:
-		// headers are here. I have to have a buffer for header key, and after receiving it,
-		// get an appender from headers manager (and keep it in httpRequestsParser struct)
+		data = data[lf+1:]
 		p.state = eHeaderKey
 		goto headerKey
 	}
 
-protoCRLFCR:
-	if len(data) == 0 {
-		return parser.Pending, nil, nil
-	}
-
-	if data[0] == '\n' {
-		return parser.HeadersCompleted, data[1:], nil
-	}
-
-	return parser.Error, nil, status.ErrBadRequest
+	return parser.Pending, nil, nil
 
 headerKey:
 	if len(data) == 0 {
@@ -590,17 +262,6 @@ contentLengthCR:
 	p.state = eHeaderKey
 	goto headerKey
 
-contentLengthCRLFCR:
-	if len(data) == 0 {
-		return parser.Pending, nil, nil
-	}
-
-	if data[0] == '\n' {
-		return parser.HeadersCompleted, data[1:], nil
-	}
-
-	return parser.Error, nil, status.ErrBadRequest
-
 headerValue:
 	{
 		lf := bytes.IndexByte(data, '\n')
@@ -666,10 +327,9 @@ func (p *httpRequestsParser) Release() {
 	p.protoMajor = 0
 	p.protoMinor = 0
 	p.headersNumber = 0
-	p.begin = 0
-	p.pointer = 0
 	p.headerKeyArena.Clear()
 	p.headerValueArena.Clear()
+	p.startLineArena.Clear()
 	p.contentLength = 0
 	p.state = eMethod
 }
@@ -707,4 +367,25 @@ func trimPrefixSpaces(b []byte) []byte {
 	}
 
 	return b[:0]
+}
+
+func uriDecode(src, buff []byte) ([]byte, error) {
+	for {
+		separator := bytes.IndexByte(src, '%')
+		if separator == -1 {
+			if len(buff) == 0 {
+				return src, nil
+			}
+
+			return append(buff, src...), nil
+		}
+
+		if len(src[separator+1:]) < 2 || !ishex(src[separator+1]) || !ishex(src[separator+2]) {
+			return nil, status.ErrURIDecoding
+		}
+
+		buff = append(buff, src[:separator]...)
+		buff = append(buff, (unhex(src[separator+1])<<4)|unhex(src[separator+2]))
+		src = src[separator+3:]
+	}
 }

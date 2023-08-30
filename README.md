@@ -23,17 +23,22 @@ import (
   "github.com/indigo-web/indigo/router/inbuilt"
 )
 
-var addr = "localhost:9090"
+const addr = "0.0.0.0:9090"
 
 func MyHandler(request *http.Request) http.Response {
-  return http.RespondTo(request).WithBody("Hello, world!")
+  return request.Respond().WithBody("Hello, world!")
 }
 
 func main() {
-  router := inbuilt.NewRouter()
-  router.Get("/", MyHandler)
+  router := inbuilt.New()
+  router.Resource("/").
+    Get(MyHandler).
+    Post(MyHandler)
 
   app := indigo.NewApp(addr)
+  if err := app.Serve(router); err != nil {
+    log.Fatal(err)
+  }
   log.Fatal(app.Serve(router))
 }
 ```

@@ -2,7 +2,6 @@ package inbuilt
 
 import (
 	"github.com/indigo-web/indigo/http"
-
 	"github.com/indigo-web/indigo/router/inbuilt/types"
 )
 
@@ -11,45 +10,28 @@ This file is responsible for middlewares
 */
 
 // Use adds middlewares into the global list of a group's middlewares. But they will
-// be applied only after server will be started
-func (r *Router) Use(middlewares ...types.Middleware) {
-	for _, methods := range r.routes {
-		for _, handler := range methods {
-			if handler == nil {
-				continue
-			}
-
-			handler.Middlewares = append(handler.Middlewares, middlewares...)
-		}
-	}
-
+// be applied only after the server will be started
+func (r *Router) Use(middlewares ...types.Middleware) *Router {
 	r.middlewares = append(r.middlewares, middlewares...)
+
+	return r
 }
 
 func (r *Router) applyMiddlewares() {
-	for _, methods := range r.routes {
-		for _, handler := range methods {
-			if handler == nil {
-				continue
-			}
-
-			handler.Fun = compose(handler.Fun, handler.Middlewares)
-		}
-	}
+	r.registrar.Apply(func(handler types.Handler) types.Handler {
+		return combine(handler, r.middlewares)
+	})
 }
 
-// compose just makes a single HandlerFunc from a chain of middlewares
-// and handler in the end using anonymous functions for partials and
-// recursion for building a chain (iteration algorithm did not work
-// IDK why it was causing a recursion)
-func compose(handler types.HandlerFunc, middlewares []types.Middleware) types.HandlerFunc {
-	if len(middlewares) == 0 {
-		return handler
+// combine produces an array of middlewares into the chain, represented by types.Handle
+func combine(handler types.Handler, middlewares []types.Middleware) types.Handler {
+	for i := len(middlewares) - 1; i >= 0; i-- {
+		handler = func(handler types.Handler, middleware types.Middleware) types.Handler {
+			return func(request *http.Request) http.Response {
+				return middleware(handler, request)
+			}
+		}(handler, middlewares[i])
 	}
 
-	return func(request *http.Request) http.Response {
-		return middlewares[0](
-			compose(handler, middlewares[1:]), request,
-		)
-	}
+	return handler
 }

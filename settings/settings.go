@@ -11,14 +11,16 @@ type (
 	HeadersNumber struct {
 		Default, Maximal int
 	}
-	MaxHeaderKeyLength   = int
-	MaxHeaderValueLength = int
-	HeadersValuesSpace   struct {
+
+	HeadersValuesSpace struct {
 		Default, Maximal int
 	}
-	HeadersValuesObjectPoolSize = int
-	MaxURLLength                int
-	URLParams                   struct {
+
+	URLBufferSize struct {
+		Default, Maximal int
+	}
+
+	URLParams struct {
 		// This option allows user to disable the automatic path params map clearing.
 		// May be useful in cases where params keys are being accessed directly only,
 		// and nothing tries to get all the map values
@@ -44,14 +46,6 @@ type (
 		//   (hope he is lucky enough to find out how to handle with my hand-made DI)
 		DefaultMapSize int
 	}
-
-	TCPReadBuffSize int
-	TCPReadTimeout  = time.Duration
-
-	MaxBodySize      int64
-	MaxBodyChunkSize = int64
-
-	ResponseBuffSize int64
 )
 
 type (
@@ -61,9 +55,9 @@ type (
 		// Maximal value is maximum number of headers allowed to be presented
 		Number HeadersNumber
 		// MaxKeyLength is responsible for maximal header key length restriction.
-		MaxKeyLength MaxHeaderKeyLength
+		MaxKeyLength int
 		// MaxValueLength is responsible for maximal header value length restriction.
-		MaxValueLength MaxHeaderValueLength
+		MaxValueLength int
 		// HeadersValuesSpace is responsible for a maximal space in bytes available for
 		// keeping header values in memory.
 		// Default value is initial space allocated when client connects.
@@ -72,39 +66,39 @@ type (
 		ValueSpace HeadersValuesSpace
 		// MaxValuesObjectPoolSize is responsible for a maximal size of string slices object
 		// pool
-		MaxValuesObjectPoolSize HeadersValuesObjectPoolSize
+		MaxValuesObjectPoolSize int
 	}
 
 	URL struct {
 		// MaxLength is a size for buffer that'll be allocated once and will be kept
 		// until client disconnect
-		MaxLength MaxURLLength
-		Query     Query
-		Params    URLParams
+		BufferSize URLBufferSize
+		Query      Query
+		Params     URLParams
 	}
 
 	TCP struct {
 		// ReadBufferSize is a size of buffer in bytes which will be used to read from
 		// socket
-		ReadBufferSize TCPReadBuffSize
+		ReadBufferSize int
 		// ReadTimeout is a duration after which client will be automatically disconnected
-		ReadTimeout TCPReadTimeout
+		ReadTimeout time.Duration
 	}
 
 	Body struct {
 		// MaxSize is responsible for a maximal body size in case it is being transferred
 		// using ordinary Content-Length header, otherwise (e.g. chunked TE) this limit,
 		// unfortunately, doesn't work
-		MaxSize MaxBodySize
+		MaxSize int64
 		// MaxChunkSize is responsible for a maximal size of a single chunk being transferred
 		// via chunked TE
-		MaxChunkSize MaxBodyChunkSize
+		MaxChunkSize int64
 	}
 
 	HTTP struct {
 		// ResponseBuffSize is responsible for a response buffer that is being allocated when
 		// client connects and is used for rendering the response into it
-		ResponseBuffSize ResponseBuffSize
+		ResponseBuffSize int64
 	}
 )
 
@@ -137,7 +131,10 @@ func Default() Settings {
 			},
 		},
 		URL: URL{
-			MaxLength: math.MaxUint16,
+			BufferSize: URLBufferSize{
+				Default: 4 * 1024, // 4kb
+				Maximal: math.MaxUint16,
+			},
 			Query: Query{
 				MaxLength:      math.MaxUint16,
 				DefaultMapSize: 20,
@@ -179,8 +176,10 @@ func Fill(original Settings) (modified Settings) {
 		original.Headers.ValueSpace.Maximal, defaultSettings.Headers.ValueSpace.Maximal)
 	original.Headers.MaxValuesObjectPoolSize = customOrDefault(
 		original.Headers.MaxValuesObjectPoolSize, defaultSettings.Headers.MaxValuesObjectPoolSize)
-	original.URL.MaxLength = customOrDefault(
-		original.URL.MaxLength, defaultSettings.URL.MaxLength)
+	original.URL.BufferSize.Default = customOrDefault(
+		original.URL.BufferSize.Default, defaultSettings.URL.BufferSize.Default)
+	original.URL.BufferSize.Maximal = customOrDefault(
+		original.URL.BufferSize.Maximal, defaultSettings.URL.BufferSize.Maximal)
 	original.URL.Query.MaxLength = customOrDefault(
 		original.URL.Query.MaxLength, defaultSettings.URL.Query.MaxLength)
 	original.URL.Query.DefaultMapSize = customOrDefault(
