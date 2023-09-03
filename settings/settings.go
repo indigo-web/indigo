@@ -67,6 +67,9 @@ type (
 		// MaxValuesObjectPoolSize is responsible for a maximal size of string slices object
 		// pool
 		MaxValuesObjectPoolSize int
+		// MaxEncodingTokens is a limit of how many encodings can be applied at the body
+		// for a single request
+		MaxEncodingTokens int
 	}
 
 	URL struct {
@@ -93,6 +96,8 @@ type (
 		// MaxChunkSize is responsible for a maximal size of a single chunk being transferred
 		// via chunked TE
 		MaxChunkSize int64
+		// DecodedBufferSize is a size of a buffer, used to store decompressed request body
+		DecodedBufferSize int64
 	}
 
 	HTTP struct {
@@ -120,15 +125,15 @@ func Default() Settings {
 				Default: 10,
 				Maximal: 50,
 			},
-			MaxKeyLength:   100,  // 100 bytes
-			MaxValueLength: 8192, // 8 kilobytes (just like nginx)
+			MaxKeyLength:   100,      // 100 bytes
+			MaxValueLength: 8 * 1024, // 8 kilobytes (just like nginx)
 			ValueSpace: HeadersValuesSpace{
 				// for simple requests without many heavy-weighted headers must be enough
 				// to avoid a relatively big amount of re-allocations
-				Default: 2048,
-				// 64kb as a limit of amount of memory for header values storing
-				Maximal: 64 * 1024,
+				Default: 2 * 1024,  // 2kb
+				Maximal: 64 * 1024, // 64kb as a limit of amount of memory for header values storing
 			},
+			MaxEncodingTokens: 10,
 		},
 		URL: URL{
 			BufferSize: URLBufferSize{
@@ -144,12 +149,15 @@ func Default() Settings {
 			},
 		},
 		TCP: TCP{
-			ReadBufferSize: 2048,
+			ReadBufferSize: 4 * 1024,
 			ReadTimeout:    90 * time.Second,
 		},
 		Body: Body{
 			MaxSize:      math.MaxUint32,
 			MaxChunkSize: math.MaxUint32,
+			// 8 kilobytes is by default twice more than TCPs read buffer, so must
+			// be enough to avoid multiple reads per single TCP chunk
+			DecodedBufferSize: 8 * 1024,
 		},
 		HTTP: HTTP{
 			ResponseBuffSize: 1024,
@@ -176,6 +184,8 @@ func Fill(original Settings) (modified Settings) {
 		original.Headers.ValueSpace.Maximal, defaultSettings.Headers.ValueSpace.Maximal)
 	original.Headers.MaxValuesObjectPoolSize = customOrDefault(
 		original.Headers.MaxValuesObjectPoolSize, defaultSettings.Headers.MaxValuesObjectPoolSize)
+	original.Headers.MaxEncodingTokens = customOrDefault(
+		original.Headers.MaxEncodingTokens, defaultSettings.Headers.MaxEncodingTokens)
 	original.URL.BufferSize.Default = customOrDefault(
 		original.URL.BufferSize.Default, defaultSettings.URL.BufferSize.Default)
 	original.URL.BufferSize.Maximal = customOrDefault(
@@ -193,6 +203,8 @@ func Fill(original Settings) (modified Settings) {
 		original.Body.MaxSize, defaultSettings.Body.MaxSize)
 	original.Body.MaxChunkSize = customOrDefault(
 		original.Body.MaxChunkSize, defaultSettings.Body.MaxChunkSize)
+	original.Body.DecodedBufferSize = customOrDefault(
+		original.Body.DecodedBufferSize, defaultSettings.Body.DecodedBufferSize)
 	original.HTTP.ResponseBuffSize = customOrDefault(
 		original.HTTP.ResponseBuffSize, defaultSettings.HTTP.ResponseBuffSize)
 
