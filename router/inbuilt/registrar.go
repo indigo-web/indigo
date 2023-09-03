@@ -21,6 +21,7 @@ func newRegistrar() *registrar {
 }
 
 func (r *registrar) Add(path string, m method.Method, handler types.Handler) error {
+	path = stripTrailingSlash(path)
 	methodsMap := r.routes[path]
 	if methodsMap == nil {
 		methodsMap = make(map[method.Method]types.Handler)
