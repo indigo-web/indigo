@@ -13,27 +13,27 @@ func BenchmarkRouter_OnRequest_Static(b *testing.B) {
 	r := New()
 
 	GETRootRequest := getRequest()
-	GETRootRequest.Path.String = "/"
+	GETRootRequest.Path = "/"
 	GETRootRequest.Method = method.GET
-	r.Get(GETRootRequest.Path.String, http.Respond)
+	r.Get(GETRootRequest.Path, http.Respond)
 
 	longURIRequest := getRequest()
 	longURIRequest.Method = method.GET
-	longURIRequest.Path.String = "/" + strings.Repeat("a", 65534)
-	r.Get(longURIRequest.Path.String, http.Respond)
+	longURIRequest.Path = "/" + strings.Repeat("a", 65534)
+	r.Get(longURIRequest.Path, http.Respond)
 
 	mediumURIRequest := getRequest()
 	mediumURIRequest.Method = method.GET
-	mediumURIRequest.Path.String = "/" + strings.Repeat("a", 50)
-	r.Get(mediumURIRequest.Path.String, http.Respond)
+	mediumURIRequest.Path = "/" + strings.Repeat("a", 50)
+	r.Get(mediumURIRequest.Path, http.Respond)
 
 	unknownURIRequest := getRequest()
 	unknownURIRequest.Method = method.GET
-	unknownURIRequest.Path.String = "/" + strings.Repeat("b", 65534)
+	unknownURIRequest.Path = "/" + strings.Repeat("b", 65534)
 
 	unknownMethodRequest := getRequest()
 	unknownMethodRequest.Method = method.POST
-	unknownMethodRequest.Path.String = longURIRequest.Path.String
+	unknownMethodRequest.Path = longURIRequest.Path
 
 	emptyCtx := context.Background()
 

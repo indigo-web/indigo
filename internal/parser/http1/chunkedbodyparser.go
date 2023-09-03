@@ -8,28 +8,18 @@ import (
 	"github.com/indigo-web/indigo/settings"
 )
 
-type ChunkedBodyParser interface {
-	Parse(data []byte, trailer bool) (chunk, extra []byte, err error)
-}
-
-// chunkedBodyParser is a parser for chunked encoded request bodies
+// ChunkedBodyParser is a parser for chunked encoded request bodies
 // used to encapsulate process of parsing because it's more convenient
 // to leave the process here and let main parser parse only http requests
-type chunkedBodyParser struct {
+type ChunkedBodyParser struct {
 	state chunkedBodyParserState
 
 	settings    settings.Body
 	chunkLength int64
 }
 
-func NewChunkedBodyParser(settings settings.Body) ChunkedBodyParser {
-	parser := newChunkedBodyParser(settings)
-
-	return &parser
-}
-
-func newChunkedBodyParser(settings settings.Body) chunkedBodyParser {
-	return chunkedBodyParser{
+func NewChunkedBodyParser(settings settings.Body) *ChunkedBodyParser {
+	return &ChunkedBodyParser{
 		state:    eChunkLength1Char,
 		settings: settings,
 	}
@@ -37,7 +27,7 @@ func newChunkedBodyParser(settings settings.Body) chunkedBodyParser {
 
 // Parse a stream of chunked body parts. When fully parsed, nil-chunk is returned, but non-nil
 // extra and io.EOF error
-func (c *chunkedBodyParser) Parse(data []byte, trailer bool) (chunk, extra []byte, err error) {
+func (c *ChunkedBodyParser) Parse(data []byte, trailer bool) (chunk, extra []byte, err error) {
 	var offset int64
 
 	switch c.state {

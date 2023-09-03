@@ -1,7 +1,7 @@
 package http
 
 import (
-	"github.com/indigo-web/indigo/http/decode"
+	"github.com/indigo-web/indigo/http/decoder"
 	"github.com/indigo-web/indigo/http/method"
 	"github.com/indigo-web/indigo/http/status"
 	"github.com/indigo-web/indigo/internal/requestgen"
@@ -81,7 +81,7 @@ func getSimpleRouter() router.Router {
 	longpath := "/" + longPath
 
 	r := simple.NewRouter(func(request *http.Request) http.Response {
-		switch request.Path.String {
+		switch request.Path {
 		case "/":
 			switch request.Method {
 			case method.GET:
@@ -116,11 +116,13 @@ func Benchmark_Get(b *testing.B) {
 	r := getInbuiltRouter()
 	s := settings.Default()
 	q := query.NewQuery(headers.NewHeaders(nil))
-	bodyReader := http1.NewBodyReader(dummy.NewNopClient(), s.Body)
-	body := http.NewBody(bodyReader, decode.NewDecoder())
+	bodyReader := http1.NewBodyReader(
+		dummy.NewNopClient(), http1.NewChunkedBodyParser(settings.Default().Body), decoder.NewManager(0),
+	)
+	body := http.NewBody(bodyReader)
 	hdrs := headers.NewHeaders(make(map[string][]string, 10))
 	request := http.NewRequest(
-		hdrs, q, http.NewResponse(), dummy.NewNopConn(), http.NewBody(bodyReader, decode.NewDecoder()),
+		hdrs, q, http.NewResponse(), dummy.NewNopConn(), http.NewBody(bodyReader),
 		nil, false,
 	)
 	keyArena := arena.NewArena[byte](
@@ -218,10 +220,12 @@ func Benchmark_Post(b *testing.B) {
 	q := query.NewQuery(headers.NewHeaders(nil))
 	hdrs := headers.NewHeaders(make(map[string][]string, 10))
 	withBodyClient := dummy.NewCircularClient(simplePOST)
-	reader := http1.NewBodyReader(withBodyClient, settings.Default().Body)
-	body := http.NewBody(reader, decode.NewDecoder())
+	reader := http1.NewBodyReader(
+		withBodyClient, http1.NewChunkedBodyParser(settings.Default().Body), decoder.NewManager(0),
+	)
+	body := http.NewBody(reader)
 	request := http.NewRequest(
-		hdrs, q, http.NewResponse(), dummy.NewNopConn(), http.NewBody(reader, decode.NewDecoder()),
+		hdrs, q, http.NewResponse(), dummy.NewNopConn(), http.NewBody(reader),
 		nil, false,
 	)
 	keyArena := arena.NewArena[byte](
@@ -242,7 +246,7 @@ func Benchmark_Post(b *testing.B) {
 	render := render2.NewEngine(make([]byte, 0, 1024), nil, defaultHeaders)
 	server := NewHTTPServer(r).(*httpServer)
 
-	b.Run("SimplePOST", func(b *testing.B) {
+	b.Run("simple POST", func(b *testing.B) {
 		b.SetBytes(int64(len(simplePOST)))
 		b.ReportAllocs()
 		b.ResetTimer()

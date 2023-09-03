@@ -3,7 +3,7 @@ package http1
 import (
 	"fmt"
 	"github.com/dchest/uniuri"
-	"github.com/indigo-web/indigo/http/decode"
+	"github.com/indigo-web/indigo/http/decoder"
 	"strings"
 	"testing"
 
@@ -53,10 +53,10 @@ func getParser() (httpparser.HTTPRequestsParser, *http.Request) {
 		s.URL.BufferSize.Maximal,
 	)
 	objPool := pool.NewObjectPool[[]string](20)
-	body := NewBodyReader(dummy.NewNopClient(), s.Body)
+	body := NewBodyReader(dummy.NewNopClient(), NewChunkedBodyParser(s.Body), decoder.NewManager(0))
 	request := http.NewRequest(
 		headers.NewHeaders(nil), query.Query{}, http.NewResponse(), dummy.NewNopConn(),
-		http.NewBody(body, decode.NewDecoder()), nil, false,
+		http.NewBody(body), nil, false,
 	)
 
 	return NewHTTPRequestsParser(
@@ -73,7 +73,7 @@ type wantedRequest struct {
 
 func compareRequests(t *testing.T, wanted wantedRequest, actual *http.Request) {
 	require.Equal(t, wanted.Method, actual.Method)
-	require.Equal(t, wanted.Path, actual.Path.String)
+	require.Equal(t, wanted.Path, actual.Path)
 	require.Equal(t, wanted.Protocol, actual.Proto)
 
 	hdrs := wanted.Headers.Unwrap()
@@ -125,7 +125,7 @@ func feedPartially(
 func TestHttpRequestsParser_Parse_GET(t *testing.T) {
 	parser, request := getParser()
 
-	t.Run("SimpleGET", func(t *testing.T) {
+	t.Run("simple GET", func(t *testing.T) {
 		state, extra, err := parser.Parse(simpleGET)
 		require.NoError(t, err)
 		require.Equal(t, httpparser.HeadersCompleted, state)
@@ -143,7 +143,7 @@ func TestHttpRequestsParser_Parse_GET(t *testing.T) {
 		parser.Release()
 	})
 
-	t.Run("SimpleGETLeadingCRLF", func(t *testing.T) {
+	t.Run("simple GET with leading CRLF", func(t *testing.T) {
 		state, extra, err := parser.Parse(simpleGETLeadingCRLF)
 		require.Error(t, err, status.ErrBadRequest.Error())
 		require.Equal(t, httpparser.Error, state)
@@ -153,7 +153,7 @@ func TestHttpRequestsParser_Parse_GET(t *testing.T) {
 		parser.Release()
 	})
 
-	t.Run("BiggerGET", func(t *testing.T) {
+	t.Run("normal GET", func(t *testing.T) {
 		state, extra, err := parser.Parse(biggerGET)
 		require.NoError(t, err)
 		require.Equal(t, httpparser.HeadersCompleted, state)
@@ -173,7 +173,7 @@ func TestHttpRequestsParser_Parse_GET(t *testing.T) {
 		parser.Release()
 	})
 
-	t.Run("MultipleHeaderValues", func(t *testing.T) {
+	t.Run("multiple header values", func(t *testing.T) {
 		state, extra, err := parser.Parse(multipleHeaders)
 		require.NoError(t, err)
 		require.Equal(t, httpparser.HeadersCompleted, state)
@@ -193,7 +193,7 @@ func TestHttpRequestsParser_Parse_GET(t *testing.T) {
 		parser.Release()
 	})
 
-	t.Run("BiggerGETOnlyLF", func(t *testing.T) {
+	t.Run("only lf", func(t *testing.T) {
 		state, extra, err := parser.Parse(biggerGETOnlyLF)
 		require.NoError(t, err)
 		require.Equal(t, httpparser.HeadersCompleted, state)
@@ -213,7 +213,7 @@ func TestHttpRequestsParser_Parse_GET(t *testing.T) {
 		parser.Release()
 	})
 
-	t.Run("BiggerGET_URLEncoded", func(t *testing.T) {
+	t.Run("with urlencoded", func(t *testing.T) {
 		state, extra, err := parser.Parse(biggerGETURLEncoded)
 		require.NoError(t, err)
 		require.Equal(t, httpparser.HeadersCompleted, state)
@@ -231,7 +231,7 @@ func TestHttpRequestsParser_Parse_GET(t *testing.T) {
 		parser.Release()
 	})
 
-	t.Run("BiggerGET_ByDifferentPartSizes", func(t *testing.T) {
+	t.Run("fuzz GET by different chunk sizes", func(t *testing.T) {
 		for i := 1; i < len(biggerGET); i++ {
 			state, extra, err := feedPartially(parser, biggerGET, i)
 			require.NoError(t, err, i)
@@ -253,7 +253,7 @@ func TestHttpRequestsParser_Parse_GET(t *testing.T) {
 		}
 	})
 
-	t.Run("SimpleGETWithAbsolutePath", func(t *testing.T) {
+	t.Run("absolute path", func(t *testing.T) {
 		state, extra, err := parser.Parse(simpleGETAbsPath)
 		require.NoError(t, err)
 		require.Equal(t, httpparser.HeadersCompleted, state)
@@ -271,7 +271,7 @@ func TestHttpRequestsParser_Parse_GET(t *testing.T) {
 		parser.Release()
 	})
 
-	t.Run("TheOnlyContentLength", func(t *testing.T) {
+	t.Run("single content-length", func(t *testing.T) {
 		raw := "GET / HTTP/1.1\r\nContent-Length: 13\n\r\nHello, world!"
 		state, extra, err := parser.Parse([]byte(raw))
 		require.NoError(t, err)
@@ -282,7 +282,7 @@ func TestHttpRequestsParser_Parse_GET(t *testing.T) {
 		parser.Release()
 	})
 
-	t.Run("ContentLength", func(t *testing.T) {
+	t.Run("content-length in the beginning", func(t *testing.T) {
 		raw := "GET / HTTP/1.1\r\nContent-Length: 13\r\nHi-Hi: ha-ha\r\n\r\nHello, world!"
 		state, extra, err := parser.Parse([]byte(raw))
 		require.NoError(t, err)
@@ -299,7 +299,7 @@ func TestHttpRequestsParser_Parse_GET(t *testing.T) {
 func TestHttpRequestsParser_ParsePOST(t *testing.T) {
 	parser, request := getParser()
 
-	t.Run("SomePOST_ByDifferentPartSizes", func(t *testing.T) {
+	t.Run("fuzz POST by different chunk sizes", func(t *testing.T) {
 		for i := 1; i < len(somePOST); i++ {
 			state, _, err := feedPartially(parser, somePOST, i)
 			require.NoError(t, err)
@@ -320,7 +320,7 @@ func TestHttpRequestsParser_ParsePOST(t *testing.T) {
 		}
 	})
 
-	t.Run("SimpleGETWithQuery", func(t *testing.T) {
+	t.Run("query in a path", func(t *testing.T) {
 		state, extra, err := parser.Parse(simpleGETQuery)
 		require.NoError(t, err)
 		require.Equal(t, httpparser.HeadersCompleted, state)
@@ -334,14 +334,14 @@ func TestHttpRequestsParser_ParsePOST(t *testing.T) {
 		}
 
 		compareRequests(t, wanted, request)
-		require.Equal(t, "hello=world", string(request.Path.Query.Raw()))
+		require.Equal(t, "hello=world", string(request.Query.Raw()))
 		require.NoError(t, request.Clear())
 		parser.Release()
 	})
 }
 
 func TestHttpRequestsParser_Parse_Negative(t *testing.T) {
-	t.Run("NoMethod", func(t *testing.T) {
+	t.Run("no method", func(t *testing.T) {
 		parser, _ := getParser()
 		raw := []byte(" / HTTP/1.1\r\n\r\n")
 		state, _, err := parser.Parse(raw)
@@ -349,7 +349,7 @@ func TestHttpRequestsParser_Parse_Negative(t *testing.T) {
 		require.Equal(t, httpparser.Error, state)
 	})
 
-	t.Run("NoPath", func(t *testing.T) {
+	t.Run("no path", func(t *testing.T) {
 		parser, _ := getParser()
 		raw := []byte("GET HTTP/1.1\r\n\r\n")
 		state, _, err := parser.Parse(raw)
@@ -357,7 +357,7 @@ func TestHttpRequestsParser_Parse_Negative(t *testing.T) {
 		require.Equal(t, httpparser.Error, state)
 	})
 
-	t.Run("PathWhitespace", func(t *testing.T) {
+	t.Run("whitespace as a path", func(t *testing.T) {
 		parser, _ := getParser()
 		raw := []byte("GET  HTTP/1.1\r\n\r\n")
 		state, _, err := parser.Parse(raw)
@@ -365,7 +365,7 @@ func TestHttpRequestsParser_Parse_Negative(t *testing.T) {
 		require.Equal(t, httpparser.Error, state)
 	})
 
-	t.Run("ShortInvalidMethod", func(t *testing.T) {
+	t.Run("short invalid method", func(t *testing.T) {
 		parser, _ := getParser()
 		raw := []byte("GE / HTTP/1.1\r\n\r\n")
 		state, _, err := parser.Parse(raw)
@@ -373,7 +373,7 @@ func TestHttpRequestsParser_Parse_Negative(t *testing.T) {
 		require.Equal(t, httpparser.Error, state)
 	})
 
-	t.Run("LongInvalidMethod", func(t *testing.T) {
+	t.Run("long invalid method", func(t *testing.T) {
 		parser, _ := getParser()
 		raw := []byte("PATCHPOSTPUT / HTTP/1.1\r\n\r\n")
 		state, _, err := parser.Parse(raw)
@@ -381,7 +381,7 @@ func TestHttpRequestsParser_Parse_Negative(t *testing.T) {
 		require.Equal(t, httpparser.Error, state)
 	})
 
-	t.Run("ShortInvalidProtocolString", func(t *testing.T) {
+	t.Run("short invalid protocol", func(t *testing.T) {
 		parser, _ := getParser()
 		raw := []byte("GET / HTT\r\n\r\n")
 		state, _, err := parser.Parse(raw)
@@ -389,7 +389,7 @@ func TestHttpRequestsParser_Parse_Negative(t *testing.T) {
 		require.Equal(t, httpparser.Error, state)
 	})
 
-	t.Run("LongInvalidProtocolString", func(t *testing.T) {
+	t.Run("long invalid protocol", func(t *testing.T) {
 		parser, _ := getParser()
 		raw := []byte("GET / HTTPS/1.1\r\n\r\n")
 		state, _, err := parser.Parse(raw)
@@ -397,7 +397,7 @@ func TestHttpRequestsParser_Parse_Negative(t *testing.T) {
 		require.Equal(t, httpparser.Error, state)
 	})
 
-	t.Run("UnsupportedProtocolVersion", func(t *testing.T) {
+	t.Run("unsupported minor version", func(t *testing.T) {
 		parser, _ := getParser()
 		raw := []byte("GET / HTTP/1.2\r\n\r\n")
 		state, _, err := parser.Parse(raw)
@@ -405,7 +405,15 @@ func TestHttpRequestsParser_Parse_Negative(t *testing.T) {
 		require.Equal(t, httpparser.Error, state)
 	})
 
-	t.Run("InvalidProtocolVersion_Minor", func(t *testing.T) {
+	t.Run("unsupported major version", func(t *testing.T) {
+		parser, _ := getParser()
+		raw := []byte("GET / HTTP/42.1\r\n\r\n")
+		state, _, err := parser.Parse(raw)
+		require.EqualError(t, err, status.ErrUnsupportedProtocol.Error())
+		require.Equal(t, httpparser.Error, state)
+	})
+
+	t.Run("invalid minor version", func(t *testing.T) {
 		parser, _ := getParser()
 		raw := []byte("GET / HTTP/1.x\r\n\r\n")
 		state, _, err := parser.Parse(raw)
@@ -413,7 +421,7 @@ func TestHttpRequestsParser_Parse_Negative(t *testing.T) {
 		require.Equal(t, httpparser.Error, state)
 	})
 
-	t.Run("InvalidProtocolVersion_Major", func(t *testing.T) {
+	t.Run("invalid major version", func(t *testing.T) {
 		parser, _ := getParser()
 		raw := []byte("GET / HTTP/x.1\r\n\r\n")
 		state, _, err := parser.Parse(raw)
@@ -421,7 +429,7 @@ func TestHttpRequestsParser_Parse_Negative(t *testing.T) {
 		require.Equal(t, httpparser.Error, state)
 	})
 
-	t.Run("LFCR_CRLF", func(t *testing.T) {
+	t.Run("lfcr crlf break sequence", func(t *testing.T) {
 		parser, _ := getParser()
 		raw := []byte("GET / HTTP/1.1\n\r\r\n")
 		state, _, err := parser.Parse(raw)
@@ -429,7 +437,7 @@ func TestHttpRequestsParser_Parse_Negative(t *testing.T) {
 		require.Equal(t, httpparser.Error, state)
 	})
 
-	t.Run("LFCR_LFCR", func(t *testing.T) {
+	t.Run("lfcr lfcr break sequence", func(t *testing.T) {
 		// our parser is able to parse both crlf and lf splitters
 		// so in example below he sees LF CRLF CR
 		// the last one CR will be returned as extra-bytes
@@ -441,30 +449,14 @@ func TestHttpRequestsParser_Parse_Negative(t *testing.T) {
 		require.Equal(t, httpparser.HeadersCompleted, state)
 	})
 
-	t.Run("MajorHTTPVersionOverflow", func(t *testing.T) {
-		parser, _ := getParser()
-		raw := []byte("GET / HTTP/335.1\r\n\r\n")
-		state, _, err := parser.Parse(raw)
-		require.EqualError(t, err, status.ErrUnsupportedProtocol.Error())
-		require.Equal(t, httpparser.Error, state)
-	})
-
-	t.Run("MinorHTTPVersionOverflow", func(t *testing.T) {
-		parser, _ := getParser()
-		raw := []byte("GET / HTTP/1.335\r\n\r\n")
-		state, _, err := parser.Parse(raw)
-		require.EqualError(t, err, status.ErrUnsupportedProtocol.Error())
-		require.Equal(t, httpparser.Error, state)
-	})
-
-	t.Run("HeadersInvalidContentLength", func(t *testing.T) {
+	t.Run("invalid content length", func(t *testing.T) {
 		parser, _ := getParser()
 		raw := []byte("GET / HTTP/1.1\r\nContent-Length: 1f5\r\n\r\n")
 		_, _, err := parser.Parse(raw)
 		require.EqualError(t, err, status.ErrBadRequest.Error())
 	})
 
-	t.Run("SimpleRequest", func(t *testing.T) {
+	t.Run("simple request", func(t *testing.T) {
 		// Simple Requests are not supported, because our server is
 		// HTTP/1.1-oriented, and in 1.1 simple request/response is
 		// something like a deprecated mechanism
@@ -475,7 +467,7 @@ func TestHttpRequestsParser_Parse_Negative(t *testing.T) {
 		require.Equal(t, httpparser.Error, state)
 	})
 
-	t.Run("TooLongHeaderKey", func(t *testing.T) {
+	t.Run("too long header key", func(t *testing.T) {
 		parser, _ := getParser()
 		s := settings2.Default().Headers
 		raw := fmt.Sprintf(
@@ -486,7 +478,7 @@ func TestHttpRequestsParser_Parse_Negative(t *testing.T) {
 		require.EqualError(t, err, status.ErrHeaderFieldsTooLarge.Error())
 	})
 
-	t.Run("TooLongHeaderValue", func(t *testing.T) {
+	t.Run("too long header value", func(t *testing.T) {
 		parser, _ := getParser()
 		raw := fmt.Sprintf(
 			"GET / HTTP/1.1\r\nSome-Header: %s\r\n\r\n",
@@ -496,7 +488,7 @@ func TestHttpRequestsParser_Parse_Negative(t *testing.T) {
 		require.EqualError(t, err, status.ErrHeaderFieldsTooLarge.Error())
 	})
 
-	t.Run("TooManyHeaders", func(t *testing.T) {
+	t.Run("too many headers", func(t *testing.T) {
 		parser, _ := getParser()
 		hdrs := genHeaders(settings2.Default().Headers.Number.Maximal + 1)
 		raw := fmt.Sprintf(
@@ -508,52 +500,71 @@ func TestHttpRequestsParser_Parse_Negative(t *testing.T) {
 	})
 }
 
-func TestParseTransferEncoding(t *testing.T) {
-	t.Run("EmptyString", func(t *testing.T) {
-		te := parseTransferEncoding("")
+func TestParseEncoding(t *testing.T) {
+	t.Run("empty string", func(t *testing.T) {
+		te, err := parseEncoding(make([]string, 0, 10), "")
+		require.NoError(t, err)
 		require.False(t, te.Chunked)
-		require.Empty(t, te.Token)
+		require.Empty(t, te.Tokens)
 	})
 
-	t.Run("JustChunked", func(t *testing.T) {
-		te := parseTransferEncoding("chunked")
+	t.Run("only chunked", func(t *testing.T) {
+		te, err := parseEncoding(make([]string, 0, 10), "chunked")
+		require.NoError(t, err)
+
 		require.True(t, te.Chunked)
-		require.Empty(t, te.Token)
+		require.Empty(t, te.Tokens)
 	})
 
-	t.Run("JustToken", func(t *testing.T) {
-		te := parseTransferEncoding("gzip")
+	t.Run("only gzip", func(t *testing.T) {
+		te, err := parseEncoding(make([]string, 0, 10), "gzip")
+		require.NoError(t, err)
+
 		require.False(t, te.Chunked)
-		require.Equal(t, "gzip", te.Token)
+		require.Equal(t, []string{"gzip"}, te.Tokens)
 	})
 
-	t.Run("ChunkedAndToken NoSpace", func(t *testing.T) {
-		te := parseTransferEncoding("chunked,gzip")
-		require.True(t, te.Chunked)
-		require.Equal(t, "gzip", te.Token)
+	t.Run("chunked,gzip without space", func(t *testing.T) {
+		te, err := parseEncoding(make([]string, 0, 10), "chunked,gzip")
+		require.NoError(t, err)
 
-		te = parseTransferEncoding("gzip,chunked")
 		require.True(t, te.Chunked)
-		require.Equal(t, "gzip", te.Token)
+		require.Equal(t, []string{"gzip"}, te.Tokens)
+
+		te, err = parseEncoding(make([]string, 0, 10), "gzip,chunked")
+		require.NoError(t, err)
+		require.True(t, te.Chunked)
+		require.Equal(t, []string{"gzip"}, te.Tokens)
 	})
 
-	t.Run("ChunkedAndToken WithSpace", func(t *testing.T) {
-		te := parseTransferEncoding("chunked,  gzip")
-		require.True(t, te.Chunked)
-		require.Equal(t, "gzip", te.Token)
+	t.Run("chunked,gzip with space", func(t *testing.T) {
+		te, err := parseEncoding(make([]string, 0, 10), "chunked,  gzip")
+		require.NoError(t, err)
 
-		te = parseTransferEncoding("gzip,  chunked")
 		require.True(t, te.Chunked)
-		require.Equal(t, "gzip", te.Token)
+		require.Equal(t, []string{"gzip"}, te.Tokens)
+
+		te, err = parseEncoding(make([]string, 0, 10), "gzip,  chunked")
+		require.NoError(t, err)
+		require.True(t, te.Chunked)
+		require.Equal(t, []string{"gzip"}, te.Tokens)
 	})
 
-	t.Run("ExtraCommas", func(t *testing.T) {
-		te := parseTransferEncoding(" , chunked, gzip, ")
-		require.True(t, te.Chunked)
-		require.Equal(t, "gzip", te.Token)
+	t.Run("extra commas", func(t *testing.T) {
+		te, err := parseEncoding(make([]string, 0, 10), " , chunked, gzip, ")
+		require.NoError(t, err)
 
-		te = parseTransferEncoding(" , chunked")
 		require.True(t, te.Chunked)
+		require.Equal(t, []string{"gzip"}, te.Tokens)
+
+		te, err = parseEncoding(make([]string, 0, 10), " , chunked")
+		require.NoError(t, err)
+		require.True(t, te.Chunked)
+	})
+
+	t.Run("overflow tokens limit", func(t *testing.T) {
+		_, err := parseEncoding(make([]string, 0, 1), "gzip,flate,chunked")
+		require.EqualError(t, err, status.ErrUnsupportedEncoding.Error())
 	})
 }
 

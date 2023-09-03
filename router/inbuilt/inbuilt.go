@@ -7,7 +7,6 @@ import (
 	"github.com/indigo-web/indigo/http/status"
 	"github.com/indigo-web/indigo/router"
 	"github.com/indigo-web/indigo/router/inbuilt/radix"
-	"github.com/indigo-web/indigo/router/inbuilt/rmap"
 	"github.com/indigo-web/indigo/router/inbuilt/types"
 )
 
@@ -21,7 +20,7 @@ type Router struct {
 	prefix           string
 	middlewares      []types.Middleware
 	registrar        *registrar
-	routesMap        *rmap.Map
+	routesMap        types.RoutesMap
 	tree             radix.Tree
 	isStatic         bool
 	errHandlers      types.ErrHandlers
@@ -53,7 +52,7 @@ func (r *Router) OnStart() error {
 	if r.registrar.IsDynamic() {
 		r.tree = r.registrar.AsRadixTree()
 	} else {
-		r.routesMap = r.registrar.AsRMap()
+		r.routesMap = r.registrar.AsMap()
 		r.isStatic = true
 	}
 
@@ -62,10 +61,10 @@ func (r *Router) OnStart() error {
 
 // OnRequest routes the request
 func (r *Router) OnRequest(request *http.Request) http.Response {
-	request.Path.String = stripTrailingSlash(request.Path.String)
+	request.Path = stripTrailingSlash(request.Path)
 
 	if r.isStatic {
-		methodsMap, allow, ok := r.routesMap.Get(request.Path.String)
+		methodsMap, allow, ok := r.routesMap.Get(request.Path)
 		if !ok {
 			return r.OnError(request, status.ErrNotFound)
 		}
@@ -81,7 +80,7 @@ func (r *Router) OnRequest(request *http.Request) http.Response {
 		return handler(request)
 	}
 
-	payload := r.tree.Match(request.Path.Params, request.Path.String)
+	payload := r.tree.Match(request.Params, request.Path)
 	if payload == nil {
 		return r.OnError(request, status.ErrNotFound)
 	}

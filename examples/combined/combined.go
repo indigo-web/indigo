@@ -2,7 +2,7 @@ package main
 
 import (
 	"fmt"
-	"github.com/indigo-web/indigo/http/decode"
+	"github.com/indigo-web/indigo/http/decoder"
 	"github.com/indigo-web/indigo/router/inbuilt/middleware"
 	"github.com/indigo-web/indigo/settings"
 	"log"
@@ -39,7 +39,7 @@ func IndexSay(request *http.Request) http.Response {
 		return request.Respond().WithCode(status.UnavailableForLegalReasons)
 	}
 
-	body, err := request.Body().Value()
+	body, err := request.Body().Full()
 	if err != nil {
 		return request.Respond().WithError(err)
 	}
@@ -92,7 +92,7 @@ func main() {
 	s.TCP.ReadTimeout = time.Hour
 
 	app := indigo.NewApp(addr)
-	app.AddContentDecoder("gzip", decode.NewGZIPDecoder())
+	app.AddContentDecoder("gzip", decoder.NewGZIPDecoder)
 	fmt.Println("Listening on", addr)
 
 	if err := app.Serve(r, s); err != nil {

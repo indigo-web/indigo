@@ -16,3 +16,7 @@ func (u *Unreader) PendingOr(or func() ([]byte, error)) (data []byte, err error)
 func (u *Unreader) Unread(b []byte) {
 	u.pending = b
 }
+
+func (u *Unreader) Reset() {
+	u.pending = nil
+}

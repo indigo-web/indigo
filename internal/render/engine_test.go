@@ -4,7 +4,7 @@ import (
 	"bufio"
 	"bytes"
 	"github.com/indigo-web/indigo/http"
-	"github.com/indigo-web/indigo/http/decode"
+	"github.com/indigo-web/indigo/http/decoder"
 	"github.com/indigo-web/indigo/http/headers"
 	"github.com/indigo-web/indigo/http/method"
 	"github.com/indigo-web/indigo/http/proto"
@@ -30,8 +30,9 @@ func newRequest() *http.Request {
 		headers.NewHeaders(nil), query.Query{}, http.NewResponse(), dummy.NewNopConn(),
 		http.NewBody(http1.NewBodyReader(
 			dummy.NewNopClient(),
-			settings.Default().Body,
-		), decode.NewDecoder()),
+			http1.NewChunkedBodyParser(settings.Default().Body),
+			decoder.NewManager(0),
+		)),
 		nil, false,
 	)
 }

@@ -9,8 +9,7 @@ import (
 	"github.com/indigo-web/indigo/internal/server/tcp"
 	"github.com/indigo-web/utils/mapconv"
 
-	"github.com/indigo-web/indigo/http/decode"
-	"github.com/indigo-web/indigo/internal/parser/http1"
+	"github.com/indigo-web/indigo/http/decoder"
 	"github.com/indigo-web/indigo/router"
 	"github.com/indigo-web/indigo/settings"
 )
@@ -28,7 +27,7 @@ var DefaultHeaders = map[string][]string{
 // Application is just a struct with addr and shutdown channel that is currently
 // not used. Planning to replace it with context.WithCancel()
 type Application struct {
-	decoder        *decode.Decoder
+	decoders       map[string]decoder.Constructor
 	defaultHeaders map[string][]string
 	shutdown       chan struct{}
 	addr           string
@@ -38,15 +37,15 @@ type Application struct {
 func NewApp(addr string) *Application {
 	return &Application{
 		addr:           addr,
-		decoder:        decode.NewDecoder(),
+		decoders:       map[string]decoder.Constructor{},
 		defaultHeaders: mapconv.Copy(DefaultHeaders),
 		shutdown:       make(chan struct{}, 1),
 	}
 }
 
 // AddContentDecoder simply adds a new content decoder
-func (a *Application) AddContentDecoder(token string, decoder decode.DecoderFactory) {
-	a.decoder.Add(token, decoder)
+func (a *Application) AddContentDecoder(token string, decoder decoder.Constructor) {
+	a.decoders[token] = decoder
 }
 
 // SetDefaultHeaders overrides default headers to a passed ones.
@@ -71,7 +70,7 @@ func (a *Application) Serve(r router.Router, optionalSettings ...settings.Settin
 		// because of the special treatment of default headers by rendering engine, better to
 		// join these values manually. Otherwise, each value will be rendered individually, that
 		// still follows the standard, but brings some unnecessary networking overhead
-		a.defaultHeaders["Accept-Encodings"] = []string{strings.Join(a.decoder.Acceptable(), ",")}
+		a.defaultHeaders["Accept-Encodings"] = []string{strings.Join(mapconv.Keys(a.decoders), ",")}
 	}
 
 	if err := r.OnStart(); err != nil {
@@ -90,8 +89,8 @@ func (a *Application) Serve(r router.Router, optionalSettings ...settings.Settin
 
 	return tcp.RunTCPServer(sock, func(conn net.Conn) {
 		client := newClient(s.TCP, conn)
-		bodyReader := http1.NewBodyReader(client, s.Body)
-		request := newRequest(s, conn, bodyReader, a.decoder)
+		bodyReader := newBodyReader(client, s.Body, a.decoders)
+		request := newRequest(s, conn, bodyReader)
 		renderer := newRenderer(s.HTTP, a)
 		httpParser := newHTTPParser(s, request)
 

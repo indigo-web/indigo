@@ -7,7 +7,7 @@ import (
 	"testing"
 
 	"github.com/indigo-web/indigo/http"
-	"github.com/indigo-web/indigo/http/decode"
+	"github.com/indigo-web/indigo/http/decoder"
 	"github.com/indigo-web/indigo/http/headers"
 	"github.com/indigo-web/indigo/http/query"
 	"github.com/indigo-web/indigo/internal/server/tcp/dummy"
@@ -18,8 +18,8 @@ import (
 
 func getRequestWithReader(chunked bool, body ...[]byte) (*http.Request, http.BodyReader) {
 	client := dummy.NewCircularClient(body...)
-	reader := NewBodyReader(client, settings.Default().Body)
-	reqBody := http.NewBody(reader, decode.NewDecoder())
+	reader := NewBodyReader(client, NewChunkedBodyParser(settings.Default().Body), decoder.NewManager(0))
+	reqBody := http.NewBody(reader)
 
 	var (
 		contentLength int
@@ -45,7 +45,7 @@ func getRequestWithReader(chunked bool, body ...[]byte) (*http.Request, http.Bod
 		hdrs, query.Query{}, http.NewResponse(), dummy.NewNopConn(), reqBody, nil, false,
 	)
 	request.ContentLength = contentLength
-	request.TransferEncoding.Chunked = chunked
+	request.Encoding.Chunked = chunked
 
 	return request, reader
 }
@@ -109,7 +109,7 @@ func TestBodyReader_Plain(t *testing.T) {
 			hdrs, query.Query{}, http.NewResponse(), dummy.NewNopConn(), nil, nil, false,
 		)
 		request.ContentLength = buffSize
-		reader := NewBodyReader(client, settings.Default().Body)
+		reader := NewBodyReader(client, NewChunkedBodyParser(settings.Default().Body), decoder.NewManager(0))
 		reader.Init(request)
 
 		data, err := reader.Read()

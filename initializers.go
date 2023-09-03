@@ -2,7 +2,7 @@ package indigo
 
 import (
 	"github.com/indigo-web/indigo/http"
-	"github.com/indigo-web/indigo/http/decode"
+	"github.com/indigo-web/indigo/http/decoder"
 	"github.com/indigo-web/indigo/http/headers"
 	"github.com/indigo-web/indigo/http/query"
 	httpparser "github.com/indigo-web/indigo/internal/parser"
@@ -34,14 +34,24 @@ func newKeyValueArenas(s settings.Headers) (*arena.Arena[byte], *arena.Arena[byt
 	return keyArena, valArena
 }
 
+func newBodyReader(client tcp.Client, body settings.Body, decoders map[string]decoder.Constructor) http.BodyReader {
+	manager := decoder.NewManager(body.DecodedBufferSize)
+
+	for token, constructor := range decoders {
+		manager.Add(token, constructor)
+	}
+
+	return http1.NewBodyReader(client, http1.NewChunkedBodyParser(body), manager)
+}
+
 func newRequest(
-	s settings.Settings, conn net.Conn, r http.BodyReader, decoder *decode.Decoder,
+	s settings.Settings, conn net.Conn, r http.BodyReader,
 ) *http.Request {
 	q := query.NewQuery(headers.NewHeaders(nil))
 	hdrs := headers.NewHeaders(make(map[string][]string, s.Headers.Number.Default))
 	response := http.NewResponse()
 	params := make(http.Params)
-	body := http.NewBody(r, decoder)
+	body := http.NewBody(r)
 
 	return http.NewRequest(hdrs, q, response, conn, body, params, s.URL.Params.DisableMapClear)
 }

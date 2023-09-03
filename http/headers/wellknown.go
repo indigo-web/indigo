@@ -1,6 +1,6 @@
 package headers
 
-type TransferEncoding struct {
+type Encoding struct {
 	Chunked, HasTrailer bool
-	Token               string
+	Tokens              []string
 }
