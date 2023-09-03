@@ -3,49 +3,45 @@ package http
 import (
 	"context"
 	"github.com/indigo-web/indigo/http/status"
-	"io"
 	"net"
 
 	"github.com/indigo-web/indigo/http/headers"
 	"github.com/indigo-web/indigo/http/method"
 	"github.com/indigo-web/indigo/http/proto"
 	"github.com/indigo-web/indigo/http/query"
-	"github.com/indigo-web/indigo/internal/unreader"
-
 	json "github.com/json-iterator/go"
 )
 
-type (
-	Params = map[string]string
-
-	Path struct {
-		String string
-		Params Params
-		Query  query.Query
-	}
-)
+type Params = map[string]string
 
 var defaultCtx = context.Background()
 
-// Request struct represents http request
-// About headers manager see at http/headers/headers.go:Manager
-// Headers attribute references at that one that lays in manager
+// Request represents HTTP request
 type Request struct {
-	body             *Body
-	conn             net.Conn
-	Remote           net.Addr
-	Ctx              context.Context
-	Headers          *headers.Headers
-	response         Response
-	Path             Path
-	ContentLength    int
-	TransferEncoding headers.TransferEncoding
-	ContentType      string
-	Method           method.Method
-	Upgrade          proto.Proto
-	Proto            proto.Proto
-	wasHijacked      bool
-	clearParamsMap   bool
+	Method method.Method
+	Path   string
+	// Query is a key-value part of the Path
+	Query query.Query
+	// Params are dynamic segments, in case dynamic routing is enabled
+	Params        Params
+	Proto         proto.Proto
+	Headers       *headers.Headers
+	Encoding      headers.Encoding
+	ContentLength int
+	ContentType   string
+	// Upgrade is the protocol token, which is set by default to proto.Unknown. In
+	// case it is anything else, then Upgrade header was received
+	Upgrade proto.Proto
+	// Remote represents remote net.Addr
+	Remote net.Addr
+	// Ctx is a request context. It may be filled with arbitrary data across middlewares
+	// and handler by itself.
+	Ctx            context.Context
+	body           *Body
+	conn           net.Conn
+	wasHijacked    bool
+	clearParamsMap bool
+	response       Response
 }
 
 // NewRequest returns a new instance of request object and body gateway
@@ -58,18 +54,16 @@ func NewRequest(
 	paramsMap Params, disableParamsMapClearing bool,
 ) *Request {
 	request := &Request{
-		Path: Path{
-			Params: paramsMap,
-			Query:  query,
-		},
+		Query:          query,
+		Params:         paramsMap,
 		Proto:          proto.HTTP11,
 		Headers:        hdrs,
 		Remote:         conn.RemoteAddr(),
-		conn:           conn,
-		body:           body,
 		Ctx:            defaultCtx,
-		response:       response,
+		body:           body,
+		conn:           conn,
 		clearParamsMap: !disableParamsMapClearing,
+		response:       response,
 	}
 
 	return request
@@ -84,7 +78,7 @@ func (r *Request) JSON(model any) error {
 		return status.ErrUnsupportedMediaType
 	}
 
-	data, err := r.Body().Value()
+	data, err := r.Body().Full()
 	if err != nil {
 		return err
 	}
@@ -128,7 +122,7 @@ func (r *Request) WasHijacked() bool {
 // Clear resets request headers and reads body into nowhere until completed.
 // It is implemented to clear the request object between requests
 func (r *Request) Clear() (err error) {
-	r.Path.Query.Set(nil)
+	r.Query.Set(nil)
 	r.Ctx = defaultCtx
 	r.response = r.response.Clear()
 
@@ -137,13 +131,13 @@ func (r *Request) Clear() (err error) {
 	}
 
 	r.ContentLength = 0
-	r.TransferEncoding = headers.TransferEncoding{}
+	r.Encoding = headers.Encoding{}
 	r.ContentType = ""
 	r.Upgrade = proto.Unknown
 
-	if r.clearParamsMap && len(r.Path.Params) > 0 {
-		for k := range r.Path.Params {
-			delete(r.Path.Params, k)
+	if r.clearParamsMap && len(r.Params) > 0 {
+		for k := range r.Params {
+			delete(r.Params, k)
 		}
 	}
 
@@ -153,54 +147,4 @@ func (r *Request) Clear() (err error) {
 // Respond returns a response object of request
 func Respond(request *Request) Response {
 	return request.response
-}
-
-// bodyIOReader is an implementation of io.Reader for request body
-type bodyIOReader struct {
-	unreader *unreader.Unreader
-	reader   BodyReader
-}
-
-func newBodyIOReader() bodyIOReader {
-	return bodyIOReader{
-		unreader: new(unreader.Unreader),
-	}
-}
-
-func (b bodyIOReader) Read(buff []byte) (n int, err error) {
-	data, err := b.unreader.PendingOr(b.reader.Read)
-	copy(buff, data)
-	n = len(data)
-
-	if len(buff) < len(data) {
-		b.unreader.Unread(data[len(buff):])
-		n = len(buff)
-	}
-
-	return n, err
-}
-
-func (b bodyIOReader) WriteTo(w io.Writer) (n int64, err error) {
-	for {
-		data, err := b.reader.Read()
-		switch err {
-		case nil:
-		case io.EOF:
-			return n, nil
-		default:
-			return 0, err
-		}
-
-		n1, err := w.Write(data)
-		n += int64(n1)
-	}
-}
-
-func (b bodyIOReader) Reset() {
-	b.unreader.Unread(nil)
-}
-
-func (b bodyIOReader) Reassign(reader BodyReader) {
-	b.Reset()
-	b.reader = reader
 }
