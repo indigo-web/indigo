@@ -27,6 +27,7 @@ import (
 type httpRequestsParser struct {
 	request           *http.Request
 	startLineArena    arena.Arena[byte]
+	encToksBuff       []string
 	headerKey         string
 	headersValuesPool pool.ObjectPool[[]string]
 	headerKeyArena    arena.Arena[byte]
@@ -34,8 +35,6 @@ type httpRequestsParser struct {
 	headersSettings   settings.Headers
 	headersNumber     int
 	contentLength     int
-	protoMajor        uint8
-	protoMinor        uint8
 	urlEncodedChar    uint8
 	state             parserState
 }
@@ -49,6 +48,7 @@ func NewHTTPRequestsParser(
 		request:           request,
 		headersSettings:   headersSettings,
 		startLineArena:    startLineArena,
+		encToksBuff:       make([]string, 0, headersSettings.MaxEncodingTokens),
 		headerKeyArena:    keyArena,
 		headerValueArena:  valArena,
 		headersValuesPool: valuesPool,
@@ -142,7 +142,7 @@ path:
 
 		query := bytes.IndexByte(reqPath, '?')
 		if query != -1 {
-			p.request.Path.Query.Set(reqPath[query+1:])
+			p.request.Query.Set(reqPath[query+1:])
 			reqPath = reqPath[:query]
 		}
 
@@ -155,7 +155,7 @@ path:
 			return parser.Error, nil, err
 		}
 
-		p.request.Path.String = uf.B2S(reqPath)
+		p.request.Path = uf.B2S(reqPath)
 		p.request.Proto = proto.FromBytes(reqProto)
 		if p.request.Proto == proto.Unknown {
 			return parser.Error, nil, status.ErrUnsupportedProtocol
@@ -298,12 +298,19 @@ headerValue:
 			p.request.ContentType = value
 		case strcomp.EqualFold(p.headerKey, "upgrade"):
 			p.request.Upgrade = proto.ChooseUpgrade(value)
-		case strcomp.EqualFold(p.headerKey, "transfer-encoding"):
-			te := parseTransferEncoding(value)
-			te.HasTrailer = p.request.TransferEncoding.HasTrailer
-			p.request.TransferEncoding = te
+		case strcomp.EqualFold(p.headerKey, "transfer-encoding") ||
+			strcomp.EqualFold(p.headerKey, "content-encoding"):
+			// TODO: parse both Content-Encoding and Transfer-Encoding as it was a single header.
+			//  Hint: store encoding entity in the parser
+			enc, err := parseEncoding(p.encToksBuff[:0], value)
+			if err != nil {
+				return parser.Error, nil, err
+			}
+
+			enc.HasTrailer = p.request.Encoding.HasTrailer
+			p.request.Encoding = enc
 		case strcomp.EqualFold(p.headerKey, "trailer"):
-			p.request.TransferEncoding.HasTrailer = true
+			p.request.Encoding.HasTrailer = true
 		}
 
 		p.state = eHeaderKey
@@ -324,8 +331,6 @@ headerValueCRLFCR:
 
 func (p *httpRequestsParser) Release() {
 	p.request.Headers.Clear()
-	p.protoMajor = 0
-	p.protoMinor = 0
 	p.headersNumber = 0
 	p.headerKeyArena.Clear()
 	p.headerValueArena.Clear()
@@ -334,29 +339,40 @@ func (p *httpRequestsParser) Release() {
 	p.state = eMethod
 }
 
-func parseTransferEncoding(value string) (te headers.TransferEncoding) {
+func parseEncoding(buff []string, value string) (te headers.Encoding, err error) {
 	var offset int
+	te.Tokens = buff
 
 	for i := range value {
 		if value[i] == ',' {
-			te = processTEToken(value[offset:i], te)
+			te, err = processEncodingToken(value[offset:i], te)
+			if err != nil {
+				return te, err
+			}
+
 			offset = i + 1
 		}
 	}
 
-	return processTEToken(value[offset:], te)
+	return processEncodingToken(value[offset:], te)
 }
 
-func processTEToken(rawToken string, te headers.TransferEncoding) headers.TransferEncoding {
+func processEncodingToken(
+	rawToken string, te headers.Encoding,
+) (headers.Encoding, error) {
 	switch token := strings.TrimSpace(rawToken); token {
 	case "":
 	case "chunked":
 		te.Chunked = true
 	default:
-		te.Token = token
+		if len(te.Tokens)+1 >= cap(te.Tokens) {
+			return te, status.ErrUnsupportedEncoding
+		}
+
+		te.Tokens = append(te.Tokens, token)
 	}
 
-	return te
+	return te, nil
 }
 
 func trimPrefixSpaces(b []byte) []byte {
