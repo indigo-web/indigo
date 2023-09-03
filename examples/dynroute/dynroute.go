@@ -13,7 +13,7 @@ import (
 var addr = "localhost:9090"
 
 func MyDynamicHandler(request *http.Request) http.Response {
-	worldName := request.Path.Params["world-name"]
+	worldName := request.Params["world-name"]
 
 	return request.Respond().WithBody("your world-name is " + worldName)
 }
