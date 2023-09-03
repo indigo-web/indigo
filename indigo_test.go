@@ -2,13 +2,17 @@ package indigo
 
 import (
 	"bytes"
+	"compress/gzip"
 	"errors"
 	"fmt"
+	"github.com/indigo-web/indigo/http/decoder"
+	"github.com/stretchr/testify/require"
 	"io"
 	"net"
 	stdhttp "net/http"
 	"net/url"
 	"os"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -23,7 +27,6 @@ import (
 	"github.com/indigo-web/indigo/http/proto"
 	"github.com/indigo-web/indigo/router"
 	"github.com/indigo-web/indigo/router/inbuilt"
-	"github.com/stretchr/testify/require"
 )
 
 const (
@@ -78,7 +81,7 @@ func getStaticRouter(t *testing.T) router.Router {
 
 	r.Get("/simple-get", func(request *http.Request) http.Response {
 		require.Equal(t, method.GET, request.Method)
-		_, err := request.Path.Query.Get("some non-existing query key")
+		_, err := request.Query.Get("some non-existing query key")
 		require.Error(t, err)
 		require.Equal(t, proto.HTTP11, request.Proto)
 
@@ -94,41 +97,46 @@ func getStaticRouter(t *testing.T) router.Router {
 		requestHeader := strings.Join(request.Headers.Values(testHeaderKey), ",")
 		require.Equal(t, testHeaderValue, requestHeader)
 
-		body, err := request.Body().Value()
+		body, err := request.Body().Full()
 		require.NoError(t, err)
 		require.Empty(t, body)
 
 		return request.Respond()
 	})
 
-	with := r.Group("/with-")
+	r.Group("/with-").
+		Get("query", func(request *http.Request) http.Response {
+			value, err := request.Query.Get(testQueryKey)
+			require.NoError(t, err)
+			require.Equal(t, testQueryValue, value)
 
-	with.Get("query", func(request *http.Request) http.Response {
-		value, err := request.Path.Query.Get(testQueryKey)
-		require.NoError(t, err)
-		require.Equal(t, testQueryValue, value)
+			return request.Respond()
+		}).
+		Get("file", func(request *http.Request) http.Response {
+			resp, err := request.Respond().WithFile(testFilename)
+			require.NoError(t, err)
+			return resp
+		}).
+		Get("file-notfound", func(request *http.Request) http.Response {
+			_, err := request.Respond().WithFile(testFilename + "non-existing")
+			require.Error(t, err)
 
-		return request.Respond()
-	})
-
-	with.Get("file", func(request *http.Request) http.Response {
-		resp, err := request.Respond().WithFile(testFilename)
-		require.NoError(t, err)
-		return resp
-	})
-
-	with.Get("file-notfound", func(request *http.Request) http.Response {
-		_, err := request.Respond().WithFile(testFilename + "non-existing")
-		require.Error(t, err)
-
-		return request.Respond().WithBody(testFileIfNotFound)
-	})
+			return request.Respond().WithBody(testFileIfNotFound)
+		})
 
 	// request.OnBody() is not tested because request.Body() (wrapper for OnBody)
 	// is tested, that is enough to make sure that requestbody works correct
 
 	r.Post("/read-body", func(request *http.Request) http.Response {
-		body, err := request.Body().Value()
+		body, err := request.Body().Full()
+		require.NoError(t, err)
+		require.Equal(t, testRequestBody, string(body))
+
+		return request.Respond()
+	})
+
+	r.Post("/read-body-gzipped", func(request *http.Request) http.Response {
+		body, err := request.Body().Full()
 		require.NoError(t, err)
 		require.Equal(t, testRequestBody, string(body))
 
@@ -162,7 +170,7 @@ func getStaticRouter(t *testing.T) router.Router {
 	})
 
 	r.Get("/hijack-conn-with-body-read", func(request *http.Request) http.Response {
-		_, _ = request.Body().Value()
+		_, _ = request.Body().Full()
 
 		conn, err := request.Hijack()
 		require.NoError(t, err)
@@ -182,14 +190,11 @@ func getStaticRouter(t *testing.T) router.Router {
 }
 
 func TestServer_Static(t *testing.T) {
-	// testing everything in one function only because we do not wanna
-	// run server multiple times (each time takes a bit time, in sum it
-	// is a lot of time)
-
 	r := getStaticRouter(t)
 	s := settings.Default()
 	s.TCP.ReadTimeout = 1 * time.Second
 	app := NewApp(addr)
+	app.AddContentDecoder("gzip", decoder.NewGZIPDecoder)
 
 	runningServer := newServer(app)
 	go runningServer.Start(t, r, s)
@@ -271,14 +276,35 @@ func TestServer_Static(t *testing.T) {
 	})
 
 	t.Run("/read-body", func(t *testing.T) {
-		body := new(bytes.Buffer)
-		body.Write([]byte(testRequestBody))
+		body := strings.NewReader(testRequestBody)
 		resp, err := stdhttp.DefaultClient.Post(URL+"/read-body", "text/html", body)
 		require.NoError(t, err)
 		defer func() {
 			_ = resp.Body.Close()
 		}()
 		require.Equal(t, stdhttp.StatusOK, resp.StatusCode)
+	})
+
+	t.Run("/read-body-gzipped", func(t *testing.T) {
+		compressed, err := compressGZIP([]byte(testRequestBody))
+		require.NoError(t, err)
+		request := fmt.Sprintf(
+			"POST /read-body-gzipped HTTP/1.1\r\n"+
+				"Transfer-Encoding: gzip\r\n"+
+				"Content-Length: %d\r\n"+
+				"Connection: close\r\n\r\n%s",
+			len(compressed), string(compressed),
+		)
+
+		conn, err := net.Dial("tcp4", addr)
+		require.NoError(t, err)
+		_, err = conn.Write([]byte(request))
+		require.NoError(t, err)
+		buff := make([]byte, 1024)
+		n, err := conn.Read(buff)
+		code, err := checkResponseStatus(buff[:n])
+		require.NoError(t, err)
+		require.Equal(t, status.OK, code)
 	})
 
 	t.Run("/body-reader", func(t *testing.T) {
@@ -406,8 +432,6 @@ func TestServer_Static(t *testing.T) {
 
 	// this test must ALWAYS be on the bottom as it is the longest-duration test
 	t.Run("/test-idle-disconnect", func(t *testing.T) {
-		// t.Parallel()
-
 		conn, err := net.Dial("tcp4", addr)
 		require.NoError(t, err)
 
@@ -477,4 +501,31 @@ func (s serverWrap) Wait(t *testing.T, duration time.Duration) {
 	case <-time.After(duration):
 		require.Fail(t, "server is not shutting down for too long")
 	}
+}
+
+func checkResponseStatus(resp []byte) (status.Code, error) {
+	lines := bytes.Split(resp, []byte{'\r', '\n'})
+	members := bytes.Split(lines[0], []byte{' '})
+	if len(members) != 3 {
+		return 0, errors.New("response line contains too many members")
+	}
+
+	code, err := strconv.Atoi(string(members[1]))
+	if err != nil {
+		return 0, errors.New("bad status code")
+	}
+
+	return status.Code(code), nil
+}
+
+func compressGZIP(data []byte) ([]byte, error) {
+	r, w := io.Pipe()
+	go func() {
+		writer := gzip.NewWriter(w)
+		_, _ = writer.Write(data)
+		_ = writer.Close()
+		_ = w.Close()
+	}()
+
+	return io.ReadAll(r)
 }
