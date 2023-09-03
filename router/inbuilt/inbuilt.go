@@ -121,11 +121,17 @@ func (r *Router) OnError(request *http.Request, err error) http.Response {
 // Note: this removes only one trailing slash. In case 2 or more are presented they'll be treated
 // as an ordinary part of the path so won't be stripped
 func stripTrailingSlash(path string) string {
-	if path[len(path)-1] == '/' && len(path) > 1 {
-		return path[:len(path)-1]
+	if len(path) == 1 {
+		return path
 	}
 
-	return path
+	for i := len(path) - 1; i > 1; i-- {
+		if path[i] != '/' {
+			return path[:i+1]
+		}
+	}
+
+	return path[0:1]
 }
 
 // getHandler looks for a handler in the methodsMap. In case not found, it checks whether
