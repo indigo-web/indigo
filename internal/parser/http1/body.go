@@ -2,52 +2,74 @@ package http1
 
 import (
 	"github.com/indigo-web/indigo/http"
+	"github.com/indigo-web/indigo/http/decoder"
 	"github.com/indigo-web/indigo/http/headers"
 	"github.com/indigo-web/indigo/internal/server/tcp"
-	"github.com/indigo-web/indigo/settings"
 	"io"
 )
 
 type bodyReader struct {
-	client           tcp.Client
-	bodyBytesLeft    int
-	chunkedParser    chunkedBodyParser
-	transferEncoding headers.TransferEncoding
+	client        tcp.Client
+	bodyBytesLeft int
+	chunkedParser *ChunkedBodyParser
+	encoding      headers.Encoding
+	manager       *decoder.Manager
 }
 
-func NewBodyReader(client tcp.Client, bodySettings settings.Body) http.BodyReader {
+func NewBodyReader(client tcp.Client, chunkedParser *ChunkedBodyParser, manager *decoder.Manager) http.BodyReader {
 	return &bodyReader{
 		client:        client,
-		chunkedParser: newChunkedBodyParser(bodySettings),
+		chunkedParser: chunkedParser,
+		manager:       manager,
 	}
 }
 
-func (b *bodyReader) Init(request *http.Request) {
-	b.transferEncoding = request.TransferEncoding
+const chunkedMode = -1
 
-	if !request.TransferEncoding.Chunked {
+func (b *bodyReader) Init(request *http.Request) {
+	b.encoding = request.Encoding
+
+	if !request.Encoding.Chunked {
 		b.bodyBytesLeft = request.ContentLength
 		return
 	}
 
-	b.bodyBytesLeft = -1
+	b.bodyBytesLeft = chunkedMode
 }
 
 func (b *bodyReader) Read() ([]byte, error) {
-	const chunkedBody = -1
-
-	switch b.bodyBytesLeft {
-	case 0:
+	if b.bodyBytesLeft == 0 {
 		return nil, io.EOF
-	case chunkedBody:
-		return b.chunkedBodyReader()
-	default:
-		return b.plainBodyReader()
 	}
+
+	data, err := b.client.Read()
+	if err != nil {
+		return nil, err
+	}
+
+	if len(b.encoding.Tokens) != 0 {
+		data = b.plainBodyReader(data)
+
+		for _, token := range b.encoding.Tokens {
+			data, err = b.manager.Decode(token, data)
+			if err != nil {
+				return nil, err
+			}
+		}
+
+		if !b.encoding.Chunked {
+			return data, nil
+		}
+	}
+
+	if b.encoding.Chunked {
+		return b.chunkedBodyReader(data)
+	}
+
+	return b.plainBodyReader(data), nil
 }
 
-func (b *bodyReader) plainBodyReader() ([]byte, error) {
-	data, err := b.client.Read()
+func (b *bodyReader) plainBodyReader(data []byte) []byte {
 	b.bodyBytesLeft -= len(data)
 	if b.bodyBytesLeft < 0 {
 		b.client.Unread(data[len(data)+b.bodyBytesLeft:])
@@ -55,16 +77,11 @@ func (b *bodyReader) plainBodyReader() ([]byte, error) {
 		b.bodyBytesLeft = 0
 	}
 
-	return data, err
+	return data
 }
 
-func (b *bodyReader) chunkedBodyReader() ([]byte, error) {
-	data, err := b.client.Read()
-	if err != nil {
-		return nil, err
-	}
-
-	chunk, extra, err := b.chunkedParser.Parse(data, b.transferEncoding.HasTrailer)
+func (b *bodyReader) chunkedBodyReader(data []byte) ([]byte, error) {
+	chunk, extra, err := b.chunkedParser.Parse(data, b.encoding.HasTrailer)
 	switch err {
 	case nil:
 	case io.EOF:
