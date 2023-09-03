@@ -1,7 +1,7 @@
 package inbuilt
 
 import (
-	"github.com/indigo-web/indigo/http/decode"
+	"github.com/indigo-web/indigo/http/decoder"
 	"github.com/indigo-web/indigo/http/method"
 	"github.com/indigo-web/indigo/http/status"
 	"github.com/indigo-web/indigo/internal/server/tcp/dummy"
@@ -62,11 +62,13 @@ func getMiddleware(mware middleware, stack *callstack) types.Middleware {
 
 func getRequest() *http.Request {
 	q := query.NewQuery(nil)
-	bodyReader := http1.NewBodyReader(dummy.NewNopClient(), settings.Default().Body)
+	bodyReader := http1.NewBodyReader(
+		dummy.NewNopClient(), http1.NewChunkedBodyParser(settings.Default().Body), decoder.NewManager(0),
+	)
 
 	return http.NewRequest(
 		headers.NewHeaders(nil), q, http.NewResponse(), dummy.NewNopConn(),
-		http.NewBody(bodyReader, decode.NewDecoder()), nil, false,
+		http.NewBody(bodyReader), nil, false,
 	)
 }
 
@@ -92,7 +94,7 @@ func TestMiddlewares(t *testing.T) {
 	t.Run("/", func(t *testing.T) {
 		request := getRequest()
 		request.Method = method.GET
-		request.Path.String = "/"
+		request.Path = "/"
 
 		response := r.OnRequest(request)
 		require.Equal(t, status.OK, response.Code)
@@ -103,7 +105,7 @@ func TestMiddlewares(t *testing.T) {
 	t.Run("/api/v1/hello", func(t *testing.T) {
 		request := getRequest()
 		request.Method = method.GET
-		request.Path.String = "/api/v1/hello"
+		request.Path = "/api/v1/hello"
 
 		response := r.OnRequest(request)
 		require.Equal(t, status.OK, response.Code)
@@ -114,7 +116,7 @@ func TestMiddlewares(t *testing.T) {
 	t.Run("/api/v2/world", func(t *testing.T) {
 		request := getRequest()
 		request.Method = method.GET
-		request.Path.String = "/api/v2/world"
+		request.Path = "/api/v2/world"
 
 		response := r.OnRequest(request)
 		require.Equal(t, status.OK, response.Code)

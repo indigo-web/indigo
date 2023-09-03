@@ -26,7 +26,7 @@ func TestRoute(t *testing.T) {
 		require.NotNil(t, r.registrar.routes["/"][method.GET])
 		request := getRequest()
 		request.Method = method.GET
-		request.Path.String = "/"
+		request.Path = "/"
 		resp := r.OnRequest(request)
 		require.Equal(t, status.OK, resp.Code)
 	})
@@ -36,7 +36,7 @@ func TestRoute(t *testing.T) {
 		require.NotNil(t, r.registrar.routes["/"][method.POST])
 		request := getRequest()
 		request.Method = method.POST
-		request.Path.String = "/"
+		request.Path = "/"
 		resp := r.OnRequest(request)
 		require.Equal(t, status.OK, resp.Code)
 	})
@@ -46,7 +46,7 @@ func TestRoute(t *testing.T) {
 		require.NotNil(t, r.registrar.routes["/hello"][method.POST])
 		request := getRequest()
 		request.Method = method.POST
-		request.Path.String = "/hello"
+		request.Path = "/hello"
 		resp := r.OnRequest(request)
 		require.Equal(t, status.OK, resp.Code)
 	})
@@ -54,7 +54,7 @@ func TestRoute(t *testing.T) {
 	t.Run("HEAD /", func(t *testing.T) {
 		request := getRequest()
 		request.Method = method.HEAD
-		request.Path.String = "/"
+		request.Path = "/"
 
 		resp := r.OnRequest(request)
 		// we have not registered any HEAD-method handler yet, so GET method
@@ -180,7 +180,7 @@ func TestRouter_MethodNotAllowed(t *testing.T) {
 	require.NoError(t, r.OnStart())
 
 	request := getRequest()
-	request.Path.String = "/"
+	request.Path = "/"
 	request.Method = method.POST
 	response := r.OnRequest(request)
 	require.Equal(t, status.MethodNotAllowed, response.Code)

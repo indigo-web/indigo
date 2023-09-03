@@ -19,7 +19,7 @@ func BenchmarkChunkedBodyParser(b *testing.B) {
 		strings.Repeat("1a\r\nBut what's wrong with you?\r\n", 100) + chunkedEnd,
 	)
 
-	parser := newChunkedBodyParser(settings.Default().Body)
+	parser := NewChunkedBodyParser(settings.Default().Body)
 
 	b.Run("Small_Example", func(b *testing.B) {
 		for i := 0; i < b.N; i++ {

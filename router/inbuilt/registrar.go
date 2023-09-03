@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"github.com/indigo-web/indigo/http/method"
 	"github.com/indigo-web/indigo/router/inbuilt/radix"
-	"github.com/indigo-web/indigo/router/inbuilt/rmap"
 	"github.com/indigo-web/indigo/router/inbuilt/types"
 	"strings"
 )
@@ -70,8 +69,8 @@ func (r *registrar) IsDynamic() bool {
 	return r.isDynamic
 }
 
-func (r *registrar) AsRMap() *rmap.Map {
-	routesMap := rmap.New()
+func (r *registrar) AsMap() types.RoutesMap {
+	routesMap := types.NewRoutesMap()
 
 	for path, v := range r.routes {
 		for method_, handler := range v {

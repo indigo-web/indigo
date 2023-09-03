@@ -10,8 +10,8 @@ import (
 )
 
 func feedParserWithPart(
-	parser chunkedBodyParser, part []byte, trailer bool,
-) (p chunkedBodyParser, result []byte, err error) {
+	parser *ChunkedBodyParser, part []byte, trailer bool,
+) (p *ChunkedBodyParser, result []byte, err error) {
 	var bodyPart []byte
 
 	for len(part) > 0 {
@@ -28,7 +28,7 @@ func feedParserWithPart(
 
 func testDifferentPartSizes(t *testing.T, request []byte, wantBody string, trailer bool) {
 	for i := 1; i < len(request); i += 1 {
-		parser := newChunkedBodyParser(settings.Default().Body)
+		parser := NewChunkedBodyParser(settings.Default().Body)
 		parts := splitIntoParts(request, i)
 		var (
 			content []byte
@@ -78,7 +78,7 @@ func TestChunkedBodyParser_Parse(t *testing.T) {
 			wantExtra = "bcd"
 		)
 
-		parser := newChunkedBodyParser(settings.Default().Body)
+		parser := NewChunkedBodyParser(settings.Default().Body)
 		chunk, extra, err := parser.Parse([]byte(chunked), false)
 		require.NoError(t, err)
 		require.Equal(t, wantChunk, string(chunk))
@@ -88,7 +88,7 @@ func TestChunkedBodyParser_Parse(t *testing.T) {
 
 func TestChunkedBodyParser_Parse_Negative(t *testing.T) {
 	check := func(t *testing.T, s string) {
-		parser := newChunkedBodyParser(settings.Default().Body)
+		parser := NewChunkedBodyParser(settings.Default().Body)
 		piece, extra, err := parser.Parse([]byte(s), false)
 		require.Empty(t, piece)
 		require.Empty(t, extra)
@@ -115,7 +115,7 @@ func TestChunkedBodyParser_Parse_Negative(t *testing.T) {
 		first := "000"
 		payload := "Hello, world!"
 		second := "d\r\n" + payload + "\r\n0\r\n\r\n"
-		parser := newChunkedBodyParser(settings.Default().Body)
+		parser := NewChunkedBodyParser(settings.Default().Body)
 		piece, extra, err := parser.Parse([]byte(first), false)
 		require.NoError(t, err)
 		require.Empty(t, piece)
