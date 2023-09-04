@@ -7,7 +7,6 @@ import (
 	"strings"
 
 	"github.com/indigo-web/indigo/http"
-	"github.com/indigo-web/indigo/http/headers"
 	"github.com/indigo-web/indigo/http/method"
 	"github.com/indigo-web/indigo/http/proto"
 	"github.com/indigo-web/indigo/http/status"
@@ -298,17 +297,20 @@ headerValue:
 			p.request.ContentType = value
 		case strcomp.EqualFold(p.headerKey, "upgrade"):
 			p.request.Upgrade = proto.ChooseUpgrade(value)
-		case strcomp.EqualFold(p.headerKey, "transfer-encoding") ||
-			strcomp.EqualFold(p.headerKey, "content-encoding"):
-			// TODO: parse both Content-Encoding and Transfer-Encoding as it was a single header.
-			//  Hint: store encoding entity in the parser
-			enc, err := parseEncoding(p.encToksBuff[:0], value)
+		case strcomp.EqualFold(p.headerKey, "transfer-encoding"):
+			tokens, err := p.fillEncoding(value)
 			if err != nil {
 				return parser.Error, nil, err
 			}
 
-			enc.HasTrailer = p.request.Encoding.HasTrailer
-			p.request.Encoding = enc
+			p.request.Encoding.Transfer = tokens
+		case strcomp.EqualFold(p.headerKey, "content-encoding"):
+			tokens, err := p.fillEncoding(value)
+			if err != nil {
+				return parser.Error, nil, err
+			}
+
+			p.request.Encoding.Content = tokens
 		case strcomp.EqualFold(p.headerKey, "trailer"):
 			p.request.Encoding.HasTrailer = true
 		}
@@ -329,6 +331,13 @@ headerValueCRLFCR:
 	return parser.Error, nil, status.ErrBadRequest
 }
 
+func (p *httpRequestsParser) fillEncoding(value string) (tokens []string, err error) {
+	tokens, chunked, err := parseEncodingString(p.encToksBuff[:0], value)
+	p.request.Encoding.Chunked = p.request.Encoding.Chunked || chunked
+
+	return tokens, err
+}
+
 func (p *httpRequestsParser) Release() {
 	p.request.Headers.Clear()
 	p.headersNumber = 0
@@ -339,40 +348,44 @@ func (p *httpRequestsParser) Release() {
 	p.state = eMethod
 }
 
-func parseEncoding(buff []string, value string) (te headers.Encoding, err error) {
+func parseEncodingString(buff []string, value string) (toks []string, chunked bool, err error) {
 	var offset int
-	te.Tokens = buff
 
 	for i := range value {
 		if value[i] == ',' {
-			te, err = processEncodingToken(value[offset:i], te)
+			var isChunked bool
+			buff, isChunked, err = processEncodingToken(buff, value[offset:i])
 			if err != nil {
-				return te, err
+				return nil, false, err
 			}
 
+			chunked = chunked || isChunked
 			offset = i + 1
 		}
 	}
 
-	return processEncodingToken(value[offset:], te)
+	var isChunked bool
+	buff, isChunked, err = processEncodingToken(buff, value[offset:])
+
+	return buff, chunked || isChunked, err
 }
 
 func processEncodingToken(
-	rawToken string, te headers.Encoding,
-) (headers.Encoding, error) {
+	buff []string, rawToken string,
+) ([]string, bool, error) {
 	switch token := strings.TrimSpace(rawToken); token {
 	case "":
 	case "chunked":
-		te.Chunked = true
+		return buff, true, nil
 	default:
-		if len(te.Tokens)+1 >= cap(te.Tokens) {
-			return te, status.ErrUnsupportedEncoding
+		if len(buff)+1 >= cap(buff) {
+			return nil, false, status.ErrUnsupportedEncoding
 		}
 
-		te.Tokens = append(te.Tokens, token)
+		buff = append(buff, token)
 	}
 
-	return te, nil
+	return buff, false, nil
 }
 
 func trimPrefixSpaces(b []byte) []byte {
