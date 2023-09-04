@@ -39,7 +39,6 @@ func main() {
   if err := app.Serve(router); err != nil {
     log.Fatal(err)
   }
-  log.Fatal(app.Serve(router))
 }
 ```
 

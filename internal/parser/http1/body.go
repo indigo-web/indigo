@@ -47,29 +47,14 @@ func (b *bodyReader) Read() ([]byte, error) {
 		return nil, err
 	}
 
-	if len(b.encoding.Tokens) != 0 {
-		data = b.plainBodyReader(data)
-
-		for _, token := range b.encoding.Tokens {
-			data, err = b.manager.Decode(token, data)
-			if err != nil {
-				return nil, err
-			}
-		}
-
-		if !b.encoding.Chunked {
-			return data, nil
-		}
-	}
-
 	if b.encoding.Chunked {
 		return b.chunkedBodyReader(data)
 	}
 
-	return b.plainBodyReader(data), nil
+	return b.plainBodyReader(data)
 }
 
-func (b *bodyReader) plainBodyReader(data []byte) []byte {
+func (b *bodyReader) plainBodyReader(data []byte) (body []byte, err error) {
 	b.bodyBytesLeft -= len(data)
 	if b.bodyBytesLeft < 0 {
 		b.client.Unread(data[len(data)+b.bodyBytesLeft:])
@@ -77,10 +62,31 @@ func (b *bodyReader) plainBodyReader(data []byte) []byte {
 		b.bodyBytesLeft = 0
 	}
 
-	return data
+	for _, token := range b.encoding.Transfer {
+		data, err = b.manager.Decode(token, data)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	for _, token := range b.encoding.Content {
+		data, err = b.manager.Decode(token, data)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	return data, nil
 }
 
-func (b *bodyReader) chunkedBodyReader(data []byte) ([]byte, error) {
+func (b *bodyReader) chunkedBodyReader(data []byte) (body []byte, err error) {
+	for _, token := range b.encoding.Transfer {
+		data, err = b.manager.Decode(token, data)
+		if err != nil {
+			return nil, err
+		}
+	}
+
 	chunk, extra, err := b.chunkedParser.Parse(data, b.encoding.HasTrailer)
 	switch err {
 	case nil:
@@ -91,6 +97,13 @@ func (b *bodyReader) chunkedBodyReader(data []byte) ([]byte, error) {
 	}
 
 	b.client.Unread(extra)
+
+	for _, token := range b.encoding.Content {
+		chunk, err = b.manager.Decode(token, chunk)
+		if err != nil {
+			return nil, err
+		}
+	}
 
 	return chunk, nil
 }
