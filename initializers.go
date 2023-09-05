@@ -10,7 +10,7 @@ import (
 	"github.com/indigo-web/indigo/internal/render"
 	"github.com/indigo-web/indigo/internal/server/tcp"
 	"github.com/indigo-web/indigo/settings"
-	"github.com/indigo-web/utils/arena"
+	"github.com/indigo-web/utils/buffer"
 	"github.com/indigo-web/utils/pool"
 	"net"
 )
@@ -21,12 +21,12 @@ func newClient(tcpSettings settings.TCP, conn net.Conn) tcp.Client {
 	return tcp.NewClient(conn, tcpSettings.ReadTimeout, readBuff)
 }
 
-func newKeyValueArenas(s settings.Headers) (*arena.Arena[byte], *arena.Arena[byte]) {
-	keyArena := arena.NewArena[byte](
+func newKeyValueArenas(s settings.Headers) (*buffer.Buffer[byte], *buffer.Buffer[byte]) {
+	keyArena := buffer.NewBuffer[byte](
 		s.MaxKeyLength*s.Number.Default,
 		s.MaxKeyLength*s.Number.Maximal,
 	)
-	valArena := arena.NewArena[byte](
+	valArena := buffer.NewBuffer[byte](
 		s.ValueSpace.Default,
 		s.ValueSpace.Maximal,
 	)
@@ -66,7 +66,7 @@ func newHTTPParser(s settings.Settings, req *http.Request) httpparser.HTTPReques
 	keyArena, valArena := newKeyValueArenas(s.Headers)
 	objPool := pool.NewObjectPool[[]string](s.Headers.MaxValuesObjectPoolSize)
 
-	startLineArena := arena.NewArena[byte](
+	startLineArena := buffer.NewBuffer[byte](
 		s.URL.BufferSize.Default,
 		s.URL.BufferSize.Maximal,
 	)

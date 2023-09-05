@@ -12,7 +12,7 @@ import (
 	"github.com/indigo-web/indigo/http/status"
 	"github.com/indigo-web/indigo/internal/parser"
 	"github.com/indigo-web/indigo/settings"
-	"github.com/indigo-web/utils/arena"
+	"github.com/indigo-web/utils/buffer"
 	"github.com/indigo-web/utils/pool"
 	"github.com/indigo-web/utils/uf"
 )
@@ -25,12 +25,12 @@ import (
 // the pending data as an extra. Body must be processed separately
 type httpRequestsParser struct {
 	request           *http.Request
-	startLineArena    arena.Arena[byte]
+	startLineArena    buffer.Buffer[byte]
 	encToksBuff       []string
 	headerKey         string
 	headersValuesPool pool.ObjectPool[[]string]
-	headerKeyArena    arena.Arena[byte]
-	headerValueArena  arena.Arena[byte]
+	headerKeyArena    buffer.Buffer[byte]
+	headerValueArena  buffer.Buffer[byte]
 	headersSettings   settings.Headers
 	headersNumber     int
 	contentLength     int
@@ -39,7 +39,7 @@ type httpRequestsParser struct {
 }
 
 func NewHTTPRequestsParser(
-	request *http.Request, keyArena, valArena, startLineArena arena.Arena[byte],
+	request *http.Request, keyArena, valArena, startLineArena buffer.Buffer[byte],
 	valuesPool pool.ObjectPool[[]string], headersSettings settings.Headers,
 ) parser.HTTPRequestsParser {
 	return &httpRequestsParser{

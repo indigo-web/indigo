@@ -18,9 +18,9 @@ import (
 	"github.com/indigo-web/indigo/http/headers"
 	"github.com/indigo-web/indigo/http/query"
 	"github.com/indigo-web/indigo/internal/parser/http1"
-	render2 "github.com/indigo-web/indigo/internal/render"
+	"github.com/indigo-web/indigo/internal/render"
 	"github.com/indigo-web/indigo/settings"
-	"github.com/indigo-web/utils/arena"
+	"github.com/indigo-web/utils/buffer"
 )
 
 var (
@@ -125,22 +125,22 @@ func Benchmark_Get(b *testing.B) {
 		hdrs, q, http.NewResponse(), dummy.NewNopConn(), http.NewBody(bodyReader),
 		nil, false,
 	)
-	keyArena := arena.NewArena[byte](
+	keyArena := buffer.NewBuffer[byte](
 		s.Headers.MaxKeyLength*s.Headers.Number.Default,
 		s.Headers.MaxKeyLength*s.Headers.Number.Maximal,
 	)
-	valArena := arena.NewArena[byte](
+	valArena := buffer.NewBuffer[byte](
 		s.Headers.ValueSpace.Default, s.Headers.ValueSpace.Maximal,
 	)
 	objPool := pool.NewObjectPool[[]string](20)
-	startLineArena := arena.NewArena[byte](
+	startLineArena := buffer.NewBuffer[byte](
 		s.URL.BufferSize.Default,
 		s.URL.BufferSize.Maximal,
 	)
 	parser := http1.NewHTTPRequestsParser(
 		request, *keyArena, *valArena, *startLineArena, *objPool, s.Headers,
 	)
-	render := render2.NewEngine(make([]byte, 0, 1024), nil, defaultHeaders)
+	renderer := render.NewEngine(make([]byte, 0, 1024), nil, defaultHeaders)
 	server := NewHTTPServer(r).(*httpServer)
 
 	b.Run("simple get", func(b *testing.B) {
@@ -150,7 +150,7 @@ func Benchmark_Get(b *testing.B) {
 		b.ResetTimer()
 
 		for i := 0; i < b.N; i++ {
-			server.RunOnce(tenHeadersGETClient, request, body, render, parser)
+			server.RunOnce(tenHeadersGETClient, request, body, renderer, parser)
 		}
 	})
 
@@ -161,7 +161,7 @@ func Benchmark_Get(b *testing.B) {
 		b.ResetTimer()
 
 		for i := 0; i < b.N; i++ {
-			server.RunOnce(withRespHeadersGETClient, request, body, render, parser)
+			server.RunOnce(withRespHeadersGETClient, request, body, renderer, parser)
 		}
 	})
 
@@ -173,7 +173,7 @@ func Benchmark_Get(b *testing.B) {
 		b.ResetTimer()
 
 		for i := 0; i < b.N; i++ {
-			server.RunOnce(client, request, body, render, parser)
+			server.RunOnce(client, request, body, renderer, parser)
 		}
 	})
 
@@ -185,7 +185,7 @@ func Benchmark_Get(b *testing.B) {
 		b.ResetTimer()
 
 		for i := 0; i < b.N; i++ {
-			server.RunOnce(client, request, body, render, parser)
+			server.RunOnce(client, request, body, renderer, parser)
 		}
 	})
 
@@ -197,7 +197,7 @@ func Benchmark_Get(b *testing.B) {
 		b.ResetTimer()
 
 		for i := 0; i < b.N; i++ {
-			server.RunOnce(client, request, body, render, parser)
+			server.RunOnce(client, request, body, renderer, parser)
 		}
 	})
 
@@ -209,7 +209,7 @@ func Benchmark_Get(b *testing.B) {
 		b.ResetTimer()
 
 		for i := 0; i < b.N; i++ {
-			server.RunOnce(client, request, body, render, parser)
+			server.RunOnce(client, request, body, renderer, parser)
 		}
 	})
 }
@@ -228,22 +228,22 @@ func Benchmark_Post(b *testing.B) {
 		hdrs, q, http.NewResponse(), dummy.NewNopConn(), http.NewBody(reader),
 		nil, false,
 	)
-	keyArena := arena.NewArena[byte](
+	keyArena := buffer.NewBuffer[byte](
 		s.Headers.MaxKeyLength*s.Headers.Number.Default,
 		s.Headers.MaxKeyLength*s.Headers.Number.Maximal,
 	)
-	valArena := arena.NewArena[byte](
+	valArena := buffer.NewBuffer[byte](
 		s.Headers.ValueSpace.Default, s.Headers.ValueSpace.Maximal,
 	)
 	objPool := pool.NewObjectPool[[]string](20)
-	startLineArena := arena.NewArena[byte](
+	startLineArena := buffer.NewBuffer[byte](
 		s.URL.BufferSize.Default,
 		s.URL.BufferSize.Maximal,
 	)
 	parser := http1.NewHTTPRequestsParser(
 		request, *keyArena, *valArena, *startLineArena, *objPool, s.Headers,
 	)
-	render := render2.NewEngine(make([]byte, 0, 1024), nil, defaultHeaders)
+	renderer := render.NewEngine(make([]byte, 0, 1024), nil, defaultHeaders)
 	server := NewHTTPServer(r).(*httpServer)
 
 	b.Run("simple POST", func(b *testing.B) {
@@ -252,7 +252,7 @@ func Benchmark_Post(b *testing.B) {
 		b.ResetTimer()
 
 		for i := 0; i < b.N; i++ {
-			server.RunOnce(withBodyClient, request, body, render, parser)
+			server.RunOnce(withBodyClient, request, body, renderer, parser)
 		}
 	})
 }
