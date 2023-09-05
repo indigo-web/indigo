@@ -2,14 +2,13 @@ package http
 
 import (
 	"context"
-	"github.com/indigo-web/indigo/http/status"
-	"net"
-
 	"github.com/indigo-web/indigo/http/headers"
 	"github.com/indigo-web/indigo/http/method"
 	"github.com/indigo-web/indigo/http/proto"
 	"github.com/indigo-web/indigo/http/query"
+	"github.com/indigo-web/indigo/http/status"
 	json "github.com/json-iterator/go"
+	"net"
 )
 
 type Params = map[string]string
@@ -143,6 +142,8 @@ func (r *Request) Clear() (err error) {
 
 	return nil
 }
+
+// TODO: implement FormData parsing
 
 // Respond returns a response object of request
 func Respond(request *Request) Response {

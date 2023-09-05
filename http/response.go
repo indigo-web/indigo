@@ -19,9 +19,11 @@ const (
 )
 
 type Response struct {
-	attachment       types.Attachment
-	Status           status.Status
-	ContentType      string
+	attachment  types.Attachment
+	Status      status.Status
+	ContentType string
+	// TODO: add corresponding Content-Encoding field
+	// TODO: automatically apply the encoding on a body when specified
 	TransferEncoding string
 	headers          []string
 	Body             []byte
