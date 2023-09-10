@@ -56,7 +56,7 @@ func (h *Headers) ValueOr(key, or string) string {
 // ValuesIter returns an iterator over all the values of a key
 func (h *Headers) ValuesIter(key string) iter.Iterator[string] {
 	valuesPairs := iter.Filter[[]string](h.Iter(), func(el []string) bool {
-		return el[0] == key
+		return strcomp.EqualFold(el[0], key)
 	})
 
 	return iter.Map[[]string, string](valuesPairs, func(el []string) string {
