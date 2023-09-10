@@ -67,7 +67,7 @@ const (
 	UpgradeRequired              Code = 426 // RFC 9110, 15.5.22
 	PreconditionRequired         Code = 428 // RFC 6585, 3
 	TooManyRequests              Code = 429 // RFC 6585, 4
-	RequestHeaderFieldsTooLarge  Code = 431 // RFC 6585, 5
+	HeaderFieldsTooLarge         Code = 431 // RFC 6585, 5
 	CloseConnection              Code = 439
 	UnavailableForLegalReasons   Code = 451 // RFC 7725, 3
 
@@ -186,7 +186,7 @@ func Text(code Code) Status {
 		return "Precondition Required"
 	case TooManyRequests:
 		return "Too Many Requests"
-	case RequestHeaderFieldsTooLarge:
+	case HeaderFieldsTooLarge:
 		return "Request Header Fields Too Large"
 	case UnavailableForLegalReasons:
 		return "Unavailable For Legal Reasons"
@@ -320,7 +320,7 @@ func CodeStatus(code Code) string {
 		return "428 Precondition Required\r\n"
 	case TooManyRequests:
 		return "429 Too Many Requests\r\n"
-	case RequestHeaderFieldsTooLarge:
+	case HeaderFieldsTooLarge:
 		return "431 Request Header Fields Too Large\r\n"
 	case UnavailableForLegalReasons:
 		return "451 Unavailable For Legal Reasons\r\n"
