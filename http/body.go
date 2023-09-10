@@ -32,6 +32,8 @@ func NewBody(reader BodyReader) *Body {
 
 const chunkedTE = -1
 
+// Init is a system method, that MUST not be called, otherwise connection may get
+// stuck, leading to hanging connection (until read-timeout won't be exceeded)
 func (b *Body) Init(req *Request) {
 	b.reader.Init(req)
 	b.unreader.Reset()
@@ -45,9 +47,8 @@ func (b *Body) Init(req *Request) {
 
 // Full returns the whole body at once
 //
-// WARNING: returned slice is an underlying buffer, that may be rewritten in a next request.
-// If you want to save a content somewhere, you have to make sure that it'll be copied into
-// another memory location
+// WARNING: returned slice is an underlying buffer, that will be re-written during the
+// next call of this method.
 func (b *Body) Full() ([]byte, error) {
 	// in case transfer-encoding is chunked, this condition won't be satisfied. In this case,
 	// the buffer may still be nil, that'll cause many re-allocations. The problem is, that
@@ -87,6 +88,10 @@ func (b *Body) Callback(onBody onBodyCallback) error {
 	return b.callback(onBody)
 }
 
+// Reset resets the body.
+//
+// NOTE: this is a system method, that SHOULD NOT be called by user manually. However,
+// this won't affect anything anyhow, except impossibility to restore the body data
 func (b *Body) Reset() error {
 	for {
 		_, err := b.reader.Read()

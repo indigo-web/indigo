@@ -1,6 +1,7 @@
 package inbuilt
 
 import (
+	"errors"
 	"github.com/stretchr/testify/assert"
 	"testing"
 
@@ -184,4 +185,57 @@ func TestRouter_MethodNotAllowed(t *testing.T) {
 	request.Method = method.POST
 	response := r.OnRequest(request)
 	require.Equal(t, status.MethodNotAllowed, response.Code)
+}
+
+func TestRouter_RouteError(t *testing.T) {
+	r := New()
+	r.RouteError(func(req *http.Request) http.Response {
+		return req.Respond().
+			WithCode(status.Teapot).
+			WithBody(req.Ctx.Value("error").(error).Error())
+	}, status.BadRequest)
+
+	t.Run("status.ErrBadRequest", func(t *testing.T) {
+		request := getRequest()
+		resp := r.OnError(request, status.ErrBadRequest)
+		require.Equal(t, status.Teapot, resp.Code)
+		require.Equal(t, status.ErrBadRequest.Error(), string(resp.Body))
+	})
+
+	t.Run("status.ErrURIDecoding (also bad request)", func(t *testing.T) {
+		request := getRequest()
+		resp := r.OnError(request, status.ErrURIDecoding)
+		require.Equal(t, status.Teapot, resp.Code)
+		require.Equal(t, status.ErrURIDecoding.Error(), string(resp.Body))
+	})
+
+	t.Run("unregistered http error", func(t *testing.T) {
+		request := getRequest()
+		resp := r.OnError(request, status.ErrNotImplemented)
+		require.Equal(t, status.NotImplemented, resp.Code)
+		require.Equal(t, status.ErrNotImplemented.Error(), string(resp.Body))
+	})
+
+	t.Run("unregistered ordinary error", func(t *testing.T) {
+		request := getRequest()
+		resp := r.OnError(request, errors.New("any error text here"))
+		require.Equal(t, status.InternalServerError, resp.Code)
+		require.Empty(t, string(resp.Body))
+	})
+
+	t.Run("universal handler", func(t *testing.T) {
+		const fromUniversal = "from universal handler with love"
+
+		r := New()
+		r.RouteError(func(req *http.Request) http.Response {
+			return req.Respond().
+				WithCode(status.Teapot).
+				WithBody(fromUniversal)
+		}, AllErrors)
+
+		request := getRequest()
+		resp := r.OnError(request, status.ErrNotImplemented)
+		require.Equal(t, int(status.Teapot), int(resp.Code))
+		require.Equal(t, fromUniversal, string(resp.Body))
+	})
 }
