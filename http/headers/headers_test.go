@@ -65,18 +65,16 @@ func TestHeaders(t *testing.T) {
 		require.Equal(t, []string{"world", "Pavlo"}, headers.Values("Hello"))
 	})
 
-	t.Run("KeysIter", func(t *testing.T) {
+	t.Run("Keys", func(t *testing.T) {
 		// using direct slice, as determined positions of keys are required
 		headers := Headers{
 			headers: []string{"Hello", "World", "Some", "multiple", "Some", "values"},
 		}
 		headers.Add("Hello", "nether")
-
-		iter := headers.KeysIter()
-		require.Equal(t, []string{"Hello", "Some"}, collectIterator(iter))
+		require.Equal(t, []string{"Hello", "Some"}, headers.Keys())
 	})
 
-	t.Run("ValuesIter", func(t *testing.T) {
+	t.Run("Values", func(t *testing.T) {
 		headers := NewHeaders(map[string][]string{
 			"Hello": {"world"},
 			"Some":  {"multiple", "values"},
@@ -84,8 +82,6 @@ func TestHeaders(t *testing.T) {
 
 		headers.Add("Hello", "nether")
 		headers.Add("Some", "injustice")
-
-		iter := headers.ValuesIter("Some")
-		require.Equal(t, []string{"multiple", "values", "injustice"}, collectIterator(iter))
+		require.Equal(t, []string{"multiple", "values", "injustice"}, headers.Values("some"))
 	})
 }
