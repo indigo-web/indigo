@@ -35,13 +35,13 @@ func (e *ErrHandlers) SetUniversal(universal Handler) {
 	e.universal = universal
 }
 
-func (e *ErrHandlers) Get(err error) Handler {
-	httpErr, ok := err.(status.HTTPError)
-	if !ok {
-		return e.universal
+func (e *ErrHandlers) Get(err status.HTTPError) Handler {
+	handler := e.handlers[err.Code]
+	if handler == nil {
+		handler = e.universal
 	}
 
-	return e.handlers[httpErr.Code]
+	return handler
 }
 
 type routesMapEntry struct {

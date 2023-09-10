@@ -110,7 +110,7 @@ func (r *Router) OnError(request *http.Request, err error) http.Response {
 		return request.Respond().WithCode(status.InternalServerError)
 	}
 
-	handler := r.errHandlers.Get(err)
+	handler := r.errHandlers.Get(httpErr)
 	if handler == nil {
 		return request.Respond().
 			WithCode(httpErr.Code).
