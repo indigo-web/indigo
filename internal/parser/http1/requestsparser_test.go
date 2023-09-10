@@ -126,6 +126,7 @@ func TestHttpRequestsParser_Parse_GET(t *testing.T) {
 	parser, request := getParser()
 
 	t.Run("simple GET", func(t *testing.T) {
+		defer parser.Release()
 		state, extra, err := parser.Parse(simpleGET)
 		require.NoError(t, err)
 		require.Equal(t, httpparser.HeadersCompleted, state)
@@ -140,20 +141,20 @@ func TestHttpRequestsParser_Parse_GET(t *testing.T) {
 
 		compareRequests(t, wanted, request)
 		require.NoError(t, request.Clear())
-		parser.Release()
 	})
 
 	t.Run("simple GET with leading CRLF", func(t *testing.T) {
+		defer parser.Release()
 		state, extra, err := parser.Parse(simpleGETLeadingCRLF)
 		require.Error(t, err, status.ErrBadRequest.Error())
 		require.Equal(t, httpparser.Error, state)
 		require.Empty(t, extra)
 
 		require.NoError(t, request.Clear())
-		parser.Release()
 	})
 
 	t.Run("normal GET", func(t *testing.T) {
+		defer parser.Release()
 		state, extra, err := parser.Parse(biggerGET)
 		require.NoError(t, err)
 		require.Equal(t, httpparser.HeadersCompleted, state)
@@ -170,10 +171,10 @@ func TestHttpRequestsParser_Parse_GET(t *testing.T) {
 
 		compareRequests(t, wanted, request)
 		require.NoError(t, request.Clear())
-		parser.Release()
 	})
 
 	t.Run("multiple header values", func(t *testing.T) {
+		defer parser.Release()
 		state, extra, err := parser.Parse(multipleHeaders)
 		require.NoError(t, err)
 		require.Equal(t, httpparser.HeadersCompleted, state)
@@ -190,10 +191,10 @@ func TestHttpRequestsParser_Parse_GET(t *testing.T) {
 
 		compareRequests(t, wanted, request)
 		require.NoError(t, request.Clear())
-		parser.Release()
 	})
 
 	t.Run("only lf", func(t *testing.T) {
+		defer parser.Release()
 		state, extra, err := parser.Parse(biggerGETOnlyLF)
 		require.NoError(t, err)
 		require.Equal(t, httpparser.HeadersCompleted, state)
@@ -210,10 +211,10 @@ func TestHttpRequestsParser_Parse_GET(t *testing.T) {
 
 		compareRequests(t, wanted, request)
 		require.NoError(t, request.Clear())
-		parser.Release()
 	})
 
 	t.Run("with urlencoded", func(t *testing.T) {
+		defer parser.Release()
 		state, extra, err := parser.Parse(biggerGETURLEncoded)
 		require.NoError(t, err)
 		require.Equal(t, httpparser.HeadersCompleted, state)
@@ -228,10 +229,11 @@ func TestHttpRequestsParser_Parse_GET(t *testing.T) {
 
 		compareRequests(t, wanted, request)
 		require.NoError(t, request.Clear())
-		parser.Release()
 	})
 
 	t.Run("fuzz GET by different chunk sizes", func(t *testing.T) {
+		defer parser.Release()
+
 		for i := 1; i < len(biggerGET); i++ {
 			state, extra, err := feedPartially(parser, biggerGET, i)
 			require.NoError(t, err, i)
@@ -254,6 +256,7 @@ func TestHttpRequestsParser_Parse_GET(t *testing.T) {
 	})
 
 	t.Run("absolute path", func(t *testing.T) {
+		defer parser.Release()
 		state, extra, err := parser.Parse(simpleGETAbsPath)
 		require.NoError(t, err)
 		require.Equal(t, httpparser.HeadersCompleted, state)
@@ -268,10 +271,10 @@ func TestHttpRequestsParser_Parse_GET(t *testing.T) {
 
 		compareRequests(t, wanted, request)
 		require.NoError(t, request.Clear())
-		parser.Release()
 	})
 
 	t.Run("single content-length", func(t *testing.T) {
+		defer parser.Release()
 		raw := "GET / HTTP/1.1\r\nContent-Length: 13\n\r\nHello, world!"
 		state, extra, err := parser.Parse([]byte(raw))
 		require.NoError(t, err)
@@ -279,10 +282,10 @@ func TestHttpRequestsParser_Parse_GET(t *testing.T) {
 		require.Equal(t, "Hello, world!", string(extra))
 		require.Equal(t, 13, request.ContentLength)
 		require.NoError(t, request.Clear())
-		parser.Release()
 	})
 
 	t.Run("content-length in the beginning", func(t *testing.T) {
+		defer parser.Release()
 		raw := "GET / HTTP/1.1\r\nContent-Length: 13\r\nHi-Hi: ha-ha\r\n\r\nHello, world!"
 		state, extra, err := parser.Parse([]byte(raw))
 		require.NoError(t, err)
