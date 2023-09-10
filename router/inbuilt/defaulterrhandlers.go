@@ -15,10 +15,11 @@ is 405 Method Not Allowed, because http requires Allow header, that is why
 we have to customize a behaviour of response with such a code
 */
 
-func newErrorHandlers() types.ErrHandlers {
-	return types.ErrHandlers{
-		status.ErrMethodNotAllowed: defaultMethodNotAllowedHandler,
-	}
+func newErrorHandlers() *types.ErrHandlers {
+	errHandlers := types.NewErrHandlers()
+	errHandlers.Set(status.MethodNotAllowed, defaultMethodNotAllowedHandler)
+
+	return errHandlers
 }
 
 func defaultMethodNotAllowedHandler(request *http.Request) http.Response {

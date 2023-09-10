@@ -70,7 +70,7 @@ func (r *registrar) IsDynamic() bool {
 }
 
 func (r *registrar) AsMap() types.RoutesMap {
-	routesMap := types.NewRoutesMap()
+	routesMap := make(types.RoutesMap)
 
 	for path, v := range r.routes {
 		for method_, handler := range v {

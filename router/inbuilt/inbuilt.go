@@ -23,7 +23,7 @@ type Router struct {
 	routesMap        types.RoutesMap
 	tree             radix.Tree
 	isStatic         bool
-	errHandlers      types.ErrHandlers
+	errHandlers      *types.ErrHandlers
 	reusableErrCtx   ctx.ReusableContext[string, error]
 	reusableAllowCtx ctx.ReusableContext[string, string]
 
@@ -105,9 +105,16 @@ func (r *Router) OnError(request *http.Request, err error) http.Response {
 		return traceResponse(request.Respond(), r.traceBuff)
 	}
 
-	handler, found := r.errHandlers[err]
-	if !found {
-		return request.Respond().WithError(err)
+	httpErr, ok := err.(status.HTTPError)
+	if !ok {
+		return request.Respond().WithCode(status.InternalServerError)
+	}
+
+	handler := r.errHandlers.Get(err)
+	if handler == nil {
+		return request.Respond().
+			WithCode(httpErr.Code).
+			WithBody(httpErr.Message)
 	}
 
 	r.reusableErrCtx.Set(request.Ctx, "error", err)
