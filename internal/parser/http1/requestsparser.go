@@ -82,7 +82,7 @@ method:
 		sp := bytes.IndexByte(data, ' ')
 		if sp == -1 {
 			if !p.startLineArena.Append(data...) {
-				return parser.Error, nil, status.ErrBadRequest
+				return parser.Error, nil, status.ErrTooLongRequestLine
 			}
 
 			return parser.Pending, nil, nil
@@ -93,7 +93,7 @@ method:
 			methodValue = data[:sp]
 		} else {
 			if !p.startLineArena.Append(data[:sp]...) {
-				return parser.Error, nil, status.ErrBadRequest
+				return parser.Error, nil, status.ErrTooLongRequestLine
 			}
 
 			methodValue = p.startLineArena.Finish()
@@ -121,6 +121,7 @@ path:
 			if !p.startLineArena.Append(data...) {
 				return parser.Error, nil, status.ErrURITooLong
 			}
+
 			return parser.Pending, nil, nil
 		}
 
@@ -345,6 +346,7 @@ func (p *httpRequestsParser) Release() {
 	p.headerValueArena.Clear()
 	p.startLineArena.Clear()
 	p.contentLength = 0
+	p.encToksBuff = p.encToksBuff[:0]
 	p.state = eMethod
 }
 
