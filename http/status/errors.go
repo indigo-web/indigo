@@ -34,6 +34,8 @@ var (
 	ErrTooLarge                      = NewError(RequestEntityTooLarge, "too large")
 	ErrRequestEntityTooLarge         = NewError(RequestEntityTooLarge, "request entity too large")
 	ErrHeaderFieldsTooLarge          = NewError(HeaderFieldsTooLarge, "too large headers section")
+	ErrHeaderKeyTooLarge             = NewError(HeaderFieldsTooLarge, "too large header key")
+	ErrHeaderValueTooLarge           = NewError(HeaderFieldsTooLarge, "too large header value")
 	ErrTooManyHeaders                = NewError(HeaderFieldsTooLarge, "too many headers")
 	ErrRequestHeaderFieldsTooLarge   = NewError(HeaderFieldsTooLarge, "request header fields too large")
 	ErrURITooLong                    = NewError(RequestURITooLong, "request URI too long")

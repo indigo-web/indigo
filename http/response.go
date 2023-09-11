@@ -126,6 +126,9 @@ func (r Response) WithBodyByte(body []byte) Response {
 // Note: returned error is ALWAYS the error returned by callback. So it may be ignored in cases, when
 // callback constantly returns nil
 func (r Response) WithWriter(cb func(io.Writer) error) (Response, error) {
+	// TODO: nobody is interested, whether response builder pure or not. It is already
+	//  not, by the way. So just forget about this stupid approach without
+	//  reference-receivers, and implement full io.Reader support.
 	writer := newBodyIOWriter(r)
 	err := cb(writer)
 
