@@ -6,7 +6,7 @@ import (
 )
 
 func TestHeaders(t *testing.T) {
-	headers := NewHeaders(map[string][]string{
+	headers := FromMap(map[string][]string{
 		"Hello": {"world"},
 		"Some":  {"multiple", "values"},
 	})
@@ -27,7 +27,7 @@ func TestHeaders(t *testing.T) {
 	})
 
 	t.Run("Values_Existing", func(t *testing.T) {
-		headers := NewHeaders(map[string][]string{
+		headers := FromMap(map[string][]string{
 			"Hello": {"world"},
 			"Some":  {"multiple", "values"},
 		})
@@ -53,7 +53,7 @@ func TestHeaders(t *testing.T) {
 	})
 
 	t.Run("Add", func(t *testing.T) {
-		headers := NewHeaders(map[string][]string{
+		headers := FromMap(map[string][]string{
 			"Hello": {"world"},
 			"Some":  {"multiple", "values"},
 		})
@@ -75,7 +75,7 @@ func TestHeaders(t *testing.T) {
 	})
 
 	t.Run("Values", func(t *testing.T) {
-		headers := NewHeaders(map[string][]string{
+		headers := FromMap(map[string][]string{
 			"Hello": {"world"},
 			"Some":  {"multiple", "values"},
 		})

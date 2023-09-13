@@ -27,7 +27,7 @@ func getEngine(defaultHeaders map[string][]string) *engine {
 
 func newRequest() *http.Request {
 	return http.NewRequest(
-		headers.NewHeaders(nil), query.Query{}, http.NewResponse(), dummy.NewNopConn(),
+		headers.NewHeaders(), query.Query{}, http.NewResponse(), dummy.NewNopConn(),
 		http.NewBody(http1.NewBodyReader(
 			dummy.NewNopClient(),
 			http1.NewChunkedBodyParser(settings.Default().Body),
