@@ -30,7 +30,7 @@ func TestResponseParser(t *testing.T) {
 
 	t.Run("simple response", func(t *testing.T) {
 		data := "HTTP/1.1 200 OK\r\n\r\n"
-		parser.Init(headers.NewHeaders(nil), nil)
+		parser.Init(headers.NewHeaders(), nil)
 		headersCompleted, rest, err := parser.Parse([]byte(data))
 		require.NoError(t, err)
 		require.True(t, headersCompleted)
@@ -39,13 +39,13 @@ func TestResponseParser(t *testing.T) {
 			Protocol: proto.HTTP11,
 			Code:     status.OK,
 			Status:   "OK",
-			Headers:  headers.NewHeaders(nil),
+			Headers:  headers.NewHeaders(),
 		}, parser.Response())
 	})
 
 	t.Run("response with headers", func(t *testing.T) {
 		data := "HTTP/1.1 200 OK\r\nHello: world\r\nhello: nether\r\n\r\n"
-		parser.Init(headers.NewHeaders(nil), nil)
+		parser.Init(headers.NewHeaders(), nil)
 		headersCompleted, rest, err := parser.Parse([]byte(data))
 		require.NoError(t, err)
 		require.True(t, headersCompleted)
@@ -54,7 +54,7 @@ func TestResponseParser(t *testing.T) {
 			Protocol: proto.HTTP11,
 			Code:     status.OK,
 			Status:   "OK",
-			Headers: headers.NewHeaders(map[string][]string{
+			Headers: headers.FromMap(map[string][]string{
 				"hello": {"world", "nether"},
 			}),
 		}, parser.Response())

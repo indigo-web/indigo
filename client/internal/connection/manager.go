@@ -5,8 +5,11 @@ import (
 	"net"
 )
 
-// Manager is basically a bit smarter connection pool. It receives a request,
-// and tries to find a free connection, that is able to send it.
-type Manager struct {
+type Manager interface {
+	Get()
+}
+
+// connManager is a basic connections manager, designed for HTTP/1.x mostly
+type connManager struct {
 	pool pool.ObjectPool[net.Conn]
 }
