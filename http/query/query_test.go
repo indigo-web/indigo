@@ -11,7 +11,7 @@ func TestQuery(t *testing.T) {
 	// here we test laziness of query
 
 	// just test that passed buffer's content will not be used
-	header := headers.NewHeaders(nil)
+	header := headers.NewHeaders()
 	query := NewQuery(header)
 	query.Set([]byte("hello=world"))
 	require.Equal(t, "hello=world", string(query.raw))

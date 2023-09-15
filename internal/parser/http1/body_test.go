@@ -27,7 +27,7 @@ func getRequestWithReader(chunked bool, body ...[]byte) (*http.Request, http.Bod
 	)
 
 	if chunked {
-		hdrs = headers.NewHeaders(map[string][]string{
+		hdrs = headers.FromMap(map[string][]string{
 			"Transfer-Encoding": {"chunked"},
 		})
 	} else {
@@ -36,7 +36,7 @@ func getRequestWithReader(chunked bool, body ...[]byte) (*http.Request, http.Bod
 			return len(b)
 		}
 		contentLength = ft.Sum(ft.Map(length, body))
-		hdrs = headers.NewHeaders(map[string][]string{
+		hdrs = headers.FromMap(map[string][]string{
 			"Content-Length": {strconv.Itoa(contentLength)},
 		})
 	}
@@ -104,7 +104,7 @@ func TestBodyReader_Plain(t *testing.T) {
 
 		client := dummy.NewCircularClient([]byte(first + second))
 
-		hdrs := headers.NewHeaders(nil)
+		hdrs := headers.NewHeaders()
 		request := http.NewRequest(
 			hdrs, query.Query{}, http.NewResponse(), dummy.NewNopConn(), nil, nil, false,
 		)

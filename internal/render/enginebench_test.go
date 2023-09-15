@@ -43,7 +43,7 @@ func BenchmarkRenderer_Response(b *testing.B) {
 		"Lorem":     {"ipsum", "doremi"},
 	}
 
-	hdrs := headers.NewHeaders(make(map[string][]string))
+	hdrs := headers.NewHeaders()
 	response := http.NewResponse()
 	bodyReader := http1.NewBodyReader(
 		dummy.NewNopClient(), http1.NewChunkedBodyParser(settings.Default().Body), decoder.NewManager(0),
