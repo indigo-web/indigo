@@ -181,11 +181,9 @@ func (r Response) WithJSON(model any) (Response, error) {
 	return resp.WithContentType("application/json"), nil
 }
 
-// WithError checks, whether the passed error is a HTTPError instance. In this case,
-// setting response code and body to HTTPError.Code and HTTPError.Message respectively.
-// If the check failed, simply setting the code to status.InternalServerError. Error
-// message won't be included in the response, as this possibly can spoil project internals,
-// creating security breaches
+// WithError returns response with corresponding HTTP error code, if passed error is
+// status.HTTPError. Otherwise, code is considered to be 500 Internal Server Error.
+// Note: revealing error text may be dangerous
 func (r Response) WithError(err error) Response {
 	if http, ok := err.(status.HTTPError); ok {
 		return r.
@@ -193,7 +191,9 @@ func (r Response) WithError(err error) Response {
 			WithBody(http.Message)
 	}
 
-	return r.WithCode(status.InternalServerError)
+	return r.
+		WithCode(status.InternalServerError).
+		WithBody(err.Error())
 }
 
 // Headers returns an underlying response headers
