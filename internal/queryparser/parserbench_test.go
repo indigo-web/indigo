@@ -6,7 +6,7 @@ import (
 )
 
 func BenchmarkParse(b *testing.B) {
-	hdrs := headers.NewHeaders(nil)
+	hdrs := headers.NewHeaders()
 
 	singlePair := []byte("something=somewhere")
 	manyPairs := []byte("something=somewhere&lorem=ipsum&good=bad&bad=good&paradox=life&dog=cat&cat=dog&life=bad")

@@ -15,10 +15,39 @@ type Headers struct {
 	keysIterBuff, valuesIterBuff, uniqueBuff []string
 }
 
-func NewHeaders(underlying map[string][]string) *Headers {
-	return &Headers{
-		headers: map2slice(underlying),
+// FromMap returns headers instance with already inserted values from given map.
+// Note: as maps are unordered, resulting Headers instance will also contain
+// unordered pairs (but guaranteed to be grouped together)
+func FromMap(m map[string][]string) *Headers {
+	// this actually doesn't always allocate exactly enough sized slice, as we don't
+	// count amount of _values_, only _keys_, where each key may contain more  (or less)
+	// than 1 value. But this doesn't actually matter, as this job is made just once
+	// per client, so considered not to be a hot path
+	headers := make([]string, 0, len(m))
+
+	for key, values := range m {
+		for _, value := range values {
+			headers = append(headers, key, value)
+		}
 	}
+
+	return &Headers{
+		headers: headers,
+	}
+}
+
+// NewPreallocHeaders returns empty Headers instance with pre-allocated storage for
+// exactly n pairs (two different values of a single header are also counted as two
+// pairs)
+func NewPreallocHeaders(n int) *Headers {
+	return &Headers{
+		headers: make([]string, n*2),
+	}
+}
+
+// NewHeaders returns new empty instance of Headers
+func NewHeaders() *Headers {
+	return new(Headers)
 }
 
 // Add values to the key. In case did not exist, it'll be created
@@ -135,18 +164,6 @@ func (h *Headers) ensureNotNil(buff []string) []string {
 	}
 
 	return buff
-}
-
-func map2slice(m map[string][]string) []string {
-	headers := make([]string, 0, len(m))
-
-	for key, values := range m {
-		for _, value := range values {
-			headers = append(headers, key, value)
-		}
-	}
-
-	return headers
 }
 
 func contains(elements []string, key string) bool {

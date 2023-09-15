@@ -47,8 +47,8 @@ func newBodyReader(client tcp.Client, body settings.Body, decoders map[string]de
 func newRequest(
 	s settings.Settings, conn net.Conn, r http.BodyReader,
 ) *http.Request {
-	q := query.NewQuery(headers.NewHeaders(nil))
-	hdrs := headers.NewHeaders(make(map[string][]string, s.Headers.Number.Default))
+	q := query.NewQuery(headers.NewHeaders())
+	hdrs := headers.NewPreallocHeaders(s.Headers.Number.Default)
 	response := http.NewResponse()
 	params := make(http.Params)
 	body := http.NewBody(r)

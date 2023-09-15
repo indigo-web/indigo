@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"fmt"
 	"github.com/indigo-web/indigo/internal/strcomp"
+	"github.com/indigo-web/indigo/internal/uridecode"
 	"strings"
 
 	"github.com/indigo-web/indigo/http"
@@ -150,7 +151,7 @@ path:
 			return parser.Error, nil, status.ErrBadRequest
 		}
 
-		reqPath, err = uriDecode(reqPath, reqPath[:0])
+		reqPath, err = uridecode.Decode(reqPath, reqPath[:0])
 		if err != nil {
 			return parser.Error, nil, err
 		}
@@ -398,25 +399,4 @@ func trimPrefixSpaces(b []byte) []byte {
 	}
 
 	return b[:0]
-}
-
-func uriDecode(src, buff []byte) ([]byte, error) {
-	for {
-		separator := bytes.IndexByte(src, '%')
-		if separator == -1 {
-			if len(buff) == 0 {
-				return src, nil
-			}
-
-			return append(buff, src...), nil
-		}
-
-		if len(src[separator+1:]) < 2 || !ishex(src[separator+1]) || !ishex(src[separator+2]) {
-			return nil, status.ErrURIDecoding
-		}
-
-		buff = append(buff, src[:separator]...)
-		buff = append(buff, (unhex(src[separator+1])<<4)|unhex(src[separator+2]))
-		src = src[separator+3:]
-	}
 }

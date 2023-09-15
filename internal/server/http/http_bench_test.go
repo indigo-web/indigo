@@ -115,12 +115,12 @@ func Benchmark_Get(b *testing.B) {
 	// getSimpleRouter() here. It is visibly faster
 	r := getInbuiltRouter()
 	s := settings.Default()
-	q := query.NewQuery(headers.NewHeaders(nil))
+	q := query.NewQuery(headers.NewHeaders())
 	bodyReader := http1.NewBodyReader(
 		dummy.NewNopClient(), http1.NewChunkedBodyParser(settings.Default().Body), decoder.NewManager(0),
 	)
 	body := http.NewBody(bodyReader)
-	hdrs := headers.NewHeaders(make(map[string][]string, 10))
+	hdrs := headers.FromMap(make(map[string][]string, 10))
 	request := http.NewRequest(
 		hdrs, q, http.NewResponse(), dummy.NewNopConn(), http.NewBody(bodyReader),
 		nil, false,
@@ -217,8 +217,8 @@ func Benchmark_Get(b *testing.B) {
 func Benchmark_Post(b *testing.B) {
 	r := getInbuiltRouter()
 	s := settings.Default()
-	q := query.NewQuery(headers.NewHeaders(nil))
-	hdrs := headers.NewHeaders(make(map[string][]string, 10))
+	q := query.NewQuery(headers.NewHeaders())
+	hdrs := headers.FromMap(make(map[string][]string, 10))
 	withBodyClient := dummy.NewCircularClient(simplePOST)
 	reader := http1.NewBodyReader(
 		withBodyClient, http1.NewChunkedBodyParser(settings.Default().Body), decoder.NewManager(0),

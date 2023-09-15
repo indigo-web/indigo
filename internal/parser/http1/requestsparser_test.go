@@ -55,7 +55,7 @@ func getParser() (httpparser.HTTPRequestsParser, *http.Request) {
 	objPool := pool.NewObjectPool[[]string](20)
 	body := NewBodyReader(dummy.NewNopClient(), NewChunkedBodyParser(s.Body), decoder.NewManager(0))
 	request := http.NewRequest(
-		headers.NewHeaders(nil), query.Query{}, http.NewResponse(), dummy.NewNopConn(),
+		headers.NewHeaders(), query.Query{}, http.NewResponse(), dummy.NewNopConn(),
 		http.NewBody(body), nil, false,
 	)
 
@@ -136,7 +136,7 @@ func TestHttpRequestsParser_Parse_GET(t *testing.T) {
 			Method:   method.GET,
 			Path:     "/",
 			Protocol: proto.HTTP11,
-			Headers:  headers.NewHeaders(nil),
+			Headers:  headers.NewHeaders(),
 		}
 
 		compareRequests(t, wanted, request)
@@ -164,7 +164,7 @@ func TestHttpRequestsParser_Parse_GET(t *testing.T) {
 			Method:   method.GET,
 			Path:     "/",
 			Protocol: proto.HTTP11,
-			Headers: headers.NewHeaders(map[string][]string{
+			Headers: headers.FromMap(map[string][]string{
 				"hello": {"World!"},
 			}),
 		}
@@ -184,7 +184,7 @@ func TestHttpRequestsParser_Parse_GET(t *testing.T) {
 			Method:   method.GET,
 			Path:     "/",
 			Protocol: proto.HTTP11,
-			Headers: headers.NewHeaders(map[string][]string{
+			Headers: headers.FromMap(map[string][]string{
 				"accept": {"one,two", "three"},
 			}),
 		}
@@ -204,7 +204,7 @@ func TestHttpRequestsParser_Parse_GET(t *testing.T) {
 			Method:   method.GET,
 			Path:     "/",
 			Protocol: proto.HTTP11,
-			Headers: headers.NewHeaders(map[string][]string{
+			Headers: headers.FromMap(map[string][]string{
 				"hello": {"World!"},
 			}),
 		}
@@ -224,7 +224,7 @@ func TestHttpRequestsParser_Parse_GET(t *testing.T) {
 			Method:   method.GET,
 			Path:     "/hello world",
 			Protocol: proto.HTTP11,
-			Headers:  headers.NewHeaders(nil),
+			Headers:  headers.NewHeaders(),
 		}
 
 		compareRequests(t, wanted, request)
@@ -244,7 +244,7 @@ func TestHttpRequestsParser_Parse_GET(t *testing.T) {
 				Method:   method.GET,
 				Path:     "/",
 				Protocol: proto.HTTP11,
-				Headers: headers.NewHeaders(map[string][]string{
+				Headers: headers.FromMap(map[string][]string{
 					"hello": {"World!"},
 				}),
 			}
@@ -266,7 +266,7 @@ func TestHttpRequestsParser_Parse_GET(t *testing.T) {
 			Method:   method.GET,
 			Path:     "http://www.w3.org/pub/WWW/TheProject.html",
 			Protocol: proto.HTTP11,
-			Headers:  headers.NewHeaders(nil),
+			Headers:  headers.NewHeaders(),
 		}
 
 		compareRequests(t, wanted, request)
@@ -312,7 +312,7 @@ func TestHttpRequestsParser_ParsePOST(t *testing.T) {
 				Method:   method.POST,
 				Path:     "/",
 				Protocol: proto.HTTP11,
-				Headers: headers.NewHeaders(map[string][]string{
+				Headers: headers.FromMap(map[string][]string{
 					"hello": {"World!"},
 				}),
 			}
@@ -333,7 +333,7 @@ func TestHttpRequestsParser_ParsePOST(t *testing.T) {
 			Method:   method.GET,
 			Path:     "/path",
 			Protocol: proto.HTTP11,
-			Headers:  headers.NewHeaders(nil),
+			Headers:  headers.NewHeaders(),
 		}
 
 		compareRequests(t, wanted, request)

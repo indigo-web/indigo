@@ -11,7 +11,7 @@ import (
 func TestParse_Positive(t *testing.T) {
 	t.Run("OnePair", func(t *testing.T) {
 		query := "hello=world"
-		result := headers.NewHeaders(nil)
+		result := headers.NewHeaders()
 		err := Parse([]byte(query), result)
 		require.NoError(t, err)
 		require.True(t, result.Has("hello"))
@@ -20,7 +20,7 @@ func TestParse_Positive(t *testing.T) {
 
 	t.Run("TwoPairs", func(t *testing.T) {
 		query := "hello=world&lorem=ipsum"
-		result := headers.NewHeaders(nil)
+		result := headers.NewHeaders()
 		err := Parse([]byte(query), result)
 		require.NoError(t, err)
 		require.True(t, result.Has("hello"))
@@ -33,7 +33,7 @@ func TestParse_Positive(t *testing.T) {
 func TestParse_Negative(t *testing.T) {
 	t.Run("EmptyValueBeforeAmpersand", func(t *testing.T) {
 		query := "hello=&another=pair"
-		result := headers.NewHeaders(nil)
+		result := headers.NewHeaders()
 		err := Parse([]byte(query), result)
 		require.NoError(t, err)
 		require.True(t, result.Has("hello"))
@@ -42,7 +42,7 @@ func TestParse_Negative(t *testing.T) {
 
 	t.Run("EmptyValueInTheEnd", func(t *testing.T) {
 		query := "hello="
-		result := headers.NewHeaders(nil)
+		result := headers.NewHeaders()
 		err := Parse([]byte(query), result)
 		require.NoError(t, err)
 		require.True(t, result.Has("hello"))
@@ -51,19 +51,19 @@ func TestParse_Negative(t *testing.T) {
 
 	t.Run("EmptyName", func(t *testing.T) {
 		query := "=world"
-		err := Parse([]byte(query), headers.NewHeaders(nil))
+		err := Parse([]byte(query), headers.NewHeaders())
 		require.ErrorIs(t, err, status.ErrBadQuery)
 	})
 
 	t.Run("AmpersandInTheEnd", func(t *testing.T) {
 		query := "hello=world&"
-		err := Parse([]byte(query), headers.NewHeaders(nil))
+		err := Parse([]byte(query), headers.NewHeaders())
 		require.ErrorIs(t, err, status.ErrBadQuery)
 	})
 
 	t.Run("OnlyKeyInTheEnd", func(t *testing.T) {
 		query := "hello=world&lorem"
-		err := Parse([]byte(query), headers.NewHeaders(nil))
+		err := Parse([]byte(query), headers.NewHeaders())
 		require.ErrorIs(t, err, status.ErrBadQuery)
 	})
 }
