@@ -3,19 +3,24 @@ package queryparser
 import (
 	"github.com/indigo-web/indigo/http/headers"
 	"github.com/indigo-web/indigo/http/status"
+	"github.com/indigo-web/indigo/internal/uridecode"
 	"github.com/indigo-web/utils/uf"
 )
 
 func Parse(data []byte, query *headers.Headers) (err error) {
+	if len(data) == 0 {
+		return nil
+	}
+
 	var (
 		offset int
 		key    string
 	)
 
 	state := eKey
-
-	if len(data) == 0 {
-		return nil
+	data, err = uridecode.Decode(data, data[:0])
+	if err != nil {
+		return err
 	}
 
 	for i := range data {
@@ -32,13 +37,6 @@ func Parse(data []byte, query *headers.Headers) (err error) {
 				state = eValue
 			case '+':
 				data[i] = ' '
-			case '%':
-				if len(data) <= i+2 {
-					return status.ErrBadQuery
-				}
-
-				// TODO: apply url decoding here, too
-				return status.ErrBadQuery
 			}
 		case eValue:
 			switch data[i] {
@@ -48,13 +46,6 @@ func Parse(data []byte, query *headers.Headers) (err error) {
 				state = eKey
 			case '+':
 				data[i] = ' '
-			case '%':
-				if len(data) <= i+2 {
-					return status.ErrBadQuery
-				}
-
-				// TODO: apply url decoding here, too
-				return status.ErrBadQuery
 			}
 		}
 	}
