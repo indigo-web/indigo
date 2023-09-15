@@ -2,6 +2,7 @@ package http1
 
 import (
 	"fmt"
+	"github.com/indigo-web/indigo/internal/hex"
 	"io"
 
 	"github.com/indigo-web/indigo/http/status"
@@ -62,11 +63,11 @@ func (c *ChunkedBodyParser) Parse(data []byte, trailer bool) (chunk, extra []byt
 	}
 
 chunkLength1Char:
-	if !ishex(data[offset]) {
+	if !hex.Is(data[offset]) {
 		return nil, nil, status.ErrBadRequest
 	}
 
-	c.chunkLength = int64(unhex(data[offset]))
+	c.chunkLength = int64(hex.Un(data[offset]))
 	offset++
 	c.state = eChunkLength
 	goto chunkLength
@@ -83,11 +84,11 @@ chunkLength:
 			c.state = eChunkLengthCRLF
 			goto chunkLengthCRLF
 		default:
-			if !ishex(data[offset]) {
+			if !hex.Is(data[offset]) {
 				return nil, nil, status.ErrBadRequest
 			}
 
-			c.chunkLength = (c.chunkLength << 4) | int64(unhex(data[offset]))
+			c.chunkLength = (c.chunkLength << 4) | int64(hex.Un(data[offset]))
 			if c.chunkLength > c.settings.MaxChunkSize {
 				return nil, nil, status.ErrTooLarge
 			}
@@ -208,7 +209,7 @@ chunkBodyCRLF:
 		c.state = eFooter
 		goto footer
 	default:
-		c.chunkLength = int64(unhex(data[offset]))
+		c.chunkLength = int64(hex.Un(data[offset]))
 		if c.chunkLength > c.settings.MaxChunkSize {
 			return nil, nil, status.ErrTooLarge
 		}
