@@ -3,8 +3,10 @@ package indigo
 import (
 	"bytes"
 	"compress/gzip"
+	"context"
 	"errors"
 	"fmt"
+	"github.com/indigo-web/indigo/ctx"
 	"github.com/indigo-web/indigo/http/decoder"
 	"github.com/stretchr/testify/require"
 	"io"
@@ -186,6 +188,12 @@ func getStaticRouter(t *testing.T) router.Router {
 		return request.Respond()
 	})
 
+	r.Get("/ctx-value", func(request *http.Request) http.Response {
+		require.Equal(t, "egg", request.Ctx.Value("easter").(string))
+
+		return request.Respond()
+	})
+
 	return r
 }
 
@@ -196,7 +204,7 @@ func TestServer_Static(t *testing.T) {
 	app := NewApp(addr)
 	app.AddContentDecoder("gzip", decoder.NewGZIPDecoder)
 
-	runningServer := newServer(app)
+	runningServer := newServer(ctx.WithValue(context.Background(), "easter", "egg"), app)
 	go runningServer.Start(t, r, s)
 
 	// wait a bit to guarantee that server is running
@@ -443,6 +451,15 @@ func TestServer_Static(t *testing.T) {
 		require.NoError(t, err)
 	})
 
+	t.Run("/ctx-value", func(t *testing.T) {
+		resp, err := stdhttp.DefaultClient.Get(URL + "/ctx-value")
+		require.NoError(t, err)
+		defer func() {
+			_ = resp.Body.Close()
+		}()
+		require.Equal(t, stdhttp.StatusOK, resp.StatusCode)
+	})
+
 	stdhttp.DefaultClient.CloseIdleConnections()
 	runningServer.Wait(t, 3*time.Second)
 }
@@ -478,16 +495,19 @@ func contains(strs []string, substr string) bool {
 type serverWrap struct {
 	app      *Application
 	shutdown chan struct{}
+	ctx      context.Context
 }
 
-func newServer(app *Application) serverWrap {
+func newServer(ctx context.Context, app *Application) serverWrap {
 	return serverWrap{
 		app:      app,
 		shutdown: make(chan struct{}),
+		ctx:      ctx,
 	}
 }
 
 func (s serverWrap) Start(t *testing.T, r router.Router, settings ...settings.Settings) {
+	s.app.SetContext(s.ctx)
 	require.Equal(t, status.ErrShutdown, s.app.Serve(r, settings...))
 	s.shutdown <- struct{}{}
 }

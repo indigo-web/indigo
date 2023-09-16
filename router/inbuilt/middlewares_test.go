@@ -1,6 +1,7 @@
 package inbuilt
 
 import (
+	"context"
 	"github.com/indigo-web/indigo/http/decoder"
 	"github.com/indigo-web/indigo/http/method"
 	"github.com/indigo-web/indigo/http/status"
@@ -67,7 +68,7 @@ func getRequest() *http.Request {
 	)
 
 	return http.NewRequest(
-		headers.NewHeaders(), q, http.NewResponse(), dummy.NewNopConn(),
+		context.Background(), headers.NewHeaders(), q, http.NewResponse(), dummy.NewNopConn(),
 		http.NewBody(bodyReader), nil, false,
 	)
 }

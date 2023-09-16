@@ -13,8 +13,6 @@ import (
 
 type Params = map[string]string
 
-var defaultCtx = context.Background()
-
 // Request represents HTTP request
 type Request struct {
 	Method method.Method
@@ -36,6 +34,7 @@ type Request struct {
 	// Ctx is a request context. It may be filled with arbitrary data across middlewares
 	// and handler by itself.
 	Ctx            context.Context
+	defaultCtx     context.Context
 	body           *Body
 	conn           net.Conn
 	wasHijacked    bool
@@ -49,8 +48,8 @@ type Request struct {
 // is invalid, we need to render a response using request method, but appears
 // that default method is a null-value (proto.Unknown)
 func NewRequest(
-	hdrs *headers.Headers, query query.Query, response Response, conn net.Conn, body *Body,
-	paramsMap Params, disableParamsMapClearing bool,
+	ctx context.Context, hdrs *headers.Headers, query query.Query, response Response,
+	conn net.Conn, body *Body, paramsMap Params, disableParamsMapClearing bool,
 ) *Request {
 	request := &Request{
 		Query:          query,
@@ -58,7 +57,8 @@ func NewRequest(
 		Proto:          proto.HTTP11,
 		Headers:        hdrs,
 		Remote:         conn.RemoteAddr(),
-		Ctx:            defaultCtx,
+		Ctx:            ctx,
+		defaultCtx:     ctx,
 		body:           body,
 		conn:           conn,
 		clearParamsMap: !disableParamsMapClearing,
@@ -122,7 +122,7 @@ func (r *Request) WasHijacked() bool {
 // It is implemented to clear the request object between requests
 func (r *Request) Clear() (err error) {
 	r.Query.Set(nil)
-	r.Ctx = defaultCtx
+	r.Ctx = r.defaultCtx
 	r.response = r.response.Clear()
 
 	if err = r.body.Reset(); err != nil {

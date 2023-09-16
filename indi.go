@@ -1,6 +1,7 @@
 package indigo
 
 import (
+	"context"
 	"errors"
 	"net"
 	"strings"
@@ -31,6 +32,7 @@ type Application struct {
 	defaultHeaders map[string][]string
 	shutdown       chan struct{}
 	addr           string
+	ctx            context.Context
 }
 
 // NewApp returns a new application object with initialized shutdown chan
@@ -62,6 +64,10 @@ func (a *Application) DeleteDefaultHeader(key string) {
 	delete(a.defaultHeaders, key)
 }
 
+func (a *Application) SetContext(ctx context.Context) {
+	a.ctx = ctx
+}
+
 // Serve takes a router and someSettings, that must be only 0 or 1 elements
 // otherwise, error is returned
 // Also, if specified, Accept-Encodings default header's value will be set here
@@ -90,7 +96,7 @@ func (a *Application) Serve(r router.Router, optionalSettings ...settings.Settin
 	return tcp.RunTCPServer(sock, func(conn net.Conn) {
 		client := newClient(s.TCP, conn)
 		bodyReader := newBodyReader(client, s.Body, a.decoders)
-		request := newRequest(s, conn, bodyReader)
+		request := newRequest(a.ctx, s, conn, bodyReader)
 		renderer := newRenderer(s.HTTP, a)
 		httpParser := newHTTPParser(s, request)
 
