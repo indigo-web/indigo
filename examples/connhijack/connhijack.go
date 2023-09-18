@@ -13,7 +13,7 @@ import (
 
 var addr = "localhost:9090"
 
-func MyHandler(request *http.Request) http.Response {
+func MyHandler(request *http.Request) *http.Response {
 	conn, err := request.Hijack()
 	if err != nil {
 		// in case error occurred, it may be only an error with a network, so

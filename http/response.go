@@ -30,45 +30,45 @@ type Response struct {
 	Code             status.Code
 }
 
-func NewResponse() Response {
-	return Response{
+func NewResponse() *Response {
+	return &Response{
 		Code:        status.OK,
 		headers:     make([]string, 0, defaultHeadersNumber*2),
 		ContentType: defaultContentType,
 	}
 }
 
-// WithCode sets a response code and a corresponding status.
+// WithCode sets a Response code and a corresponding status.
 // In case of unknown code, "Unknown Status Code" will be set as a status
 // code. In this case you should call Status explicitly
-func (r Response) WithCode(code status.Code) Response {
+func (r *Response) WithCode(code status.Code) *Response {
 	r.Code = code
 	return r
 }
 
 // WithStatus sets a custom status text. This text does not matter at all, and usually
 // totally ignored by client, so there is actually no reasons to use this except some
-// rare cases when you need to represent a response status text somewhere
-func (r Response) WithStatus(status status.Status) Response {
+// rare cases when you need to represent a Response status text somewhere
+func (r *Response) WithStatus(status status.Status) *Response {
 	r.Status = status
 	return r
 }
 
 // WithContentType sets a custom Content-Type header value.
-func (r Response) WithContentType(value string) Response {
+func (r *Response) WithContentType(value string) *Response {
 	r.ContentType = value
 	return r
 }
 
 // WithTransferEncoding sets a custom Transfer-Encoding header value.
-func (r Response) WithTransferEncoding(value string) Response {
+func (r *Response) WithTransferEncoding(value string) *Response {
 	r.TransferEncoding = value
 	return r
 }
 
 // WithHeader sets header values to a key. In case it already exists the value will
 // be appended.
-func (r Response) WithHeader(key string, values ...string) Response {
+func (r *Response) WithHeader(key string, values ...string) *Response {
 	switch {
 	case strcomp.EqualFold(key, "content-type"):
 		return r.WithContentType(values[0])
@@ -83,11 +83,11 @@ func (r Response) WithHeader(key string, values ...string) Response {
 	return r
 }
 
-// WithHeaders simply merges passed headers into response. Also, it is the only
+// WithHeaders simply merges passed headers into Response. Also, it is the only
 // way to specify a quality marker of value. In case headers were not initialized
-// before, response headers will be set to a passed map, so editing this map
-// will affect response
-func (r Response) WithHeaders(headers map[string][]string) Response {
+// before, Response headers will be set to a passed map, so editing this map
+// will affect Response
+func (r *Response) WithHeaders(headers map[string][]string) *Response {
 	resp := r
 
 	for k, v := range headers {
@@ -97,49 +97,29 @@ func (r Response) WithHeaders(headers map[string][]string) Response {
 	return resp
 }
 
-// DiscardHeaders returns response object with no any headers set.
-//
-// Warning: this action is not pure. Appending new headers will cause overriding
-// old ones
-func (r Response) DiscardHeaders() Response {
-	r.headers = r.headers[:0]
-	return r
-}
-
-// WithBody sets a string as a response body. This will override already-existing
+// WithBody sets a string as a Response body. This will override already-existing
 // body if it was set
-func (r Response) WithBody(body string) Response {
+func (r *Response) WithBody(body string) *Response {
 	return r.WithBodyByte(uf.S2B(body))
 }
 
 // WithBodyByte does all the same as Body does, but for byte slices
-func (r Response) WithBodyByte(body []byte) Response {
+func (r *Response) WithBodyByte(body []byte) *Response {
 	r.Body = body
 	return r
 }
 
-// WithWriter takes a function with io.Writer receiver. This writer is the actual writer to the response
-// body. The code accessing the writer must be wrapped into the function, as the Response builder is
-// pretty limited in such a things. It pretends to be clear (all the methods has by-value receivers)
-// in order to enable calls chaining, so it's pretty difficult to handle with being io.Writer-compatible
-//
-// Note: returned error is ALWAYS the error returned by callback. So it may be ignored in cases, when
-// callback constantly returns nil
-func (r Response) WithWriter(cb func(io.Writer) error) (Response, error) {
-	// TODO: nobody is interested, whether response builder pure or not. It is already
-	//  not, by the way. So just forget about this stupid approach without
-	//  reference-receivers, and implement full io.Reader support.
-	writer := newBodyIOWriter(r)
-	err := cb(writer)
-
-	return writer.response, err
+// Write implements io.Reader interface. It always returns n=len(b) and err=nil
+func (r *Response) Write(b []byte) (n int, err error) {
+	r.Body = append(r.Body, b...)
+	return len(b), nil
 }
 
-// WithFile opens a file for reading, and returns a new response with attachment corresponding
+// WithFile opens a file for reading, and returns a new Response with attachment corresponding
 // to the file FD. In case not found or any other error, it'll be directly returned.
-// In case error occurred while opening the file, response builder won't be affected and stay
+// In case error occurred while opening the file, Response builder won't be affected and stay
 // clean
-func (r Response) WithFile(path string) (Response, error) {
+func (r *Response) WithFile(path string) (*Response, error) {
 	file, err := os.Open(path)
 	if err != nil {
 		return r, err
@@ -153,38 +133,33 @@ func (r Response) WithFile(path string) (Response, error) {
 	return r.WithAttachment(file, int(stat.Size())), nil
 }
 
-// WithAttachment sets a response's attachment. In this case response body will be ignored.
+// WithAttachment sets a Response's attachment. In this case Response body will be ignored.
 // If size <= 0, then Transfer-Encoding: chunked will be used
-func (r Response) WithAttachment(reader io.Reader, size int) Response {
+func (r *Response) WithAttachment(reader io.Reader, size int) *Response {
 	r.attachment = types.NewAttachment(reader, size)
 	return r
 }
 
 // WithJSON receives a model (must be a pointer to the structure) and returns a new Response
 // object and an error
-func (r Response) WithJSON(model any) (Response, error) {
+func (r *Response) WithJSON(model any) (*Response, error) {
 	r.Body = r.Body[:0]
 
-	resp, err := r.WithWriter(func(w io.Writer) error {
-		stream := json.ConfigDefault.BorrowStream(w)
-		stream.WriteVal(model)
-		err := stream.Flush()
-		json.ConfigDefault.ReturnStream(stream)
-
-		return err
-	})
-
+	stream := json.ConfigDefault.BorrowStream(r)
+	stream.WriteVal(model)
+	err := stream.Flush()
+	json.ConfigDefault.ReturnStream(stream)
 	if err != nil {
 		return r, err
 	}
 
-	return resp.WithContentType("application/json"), nil
+	return r.WithContentType("application/json"), nil
 }
 
-// WithError returns response with corresponding HTTP error code, if passed error is
+// WithError returns Response with corresponding HTTP error code, if passed error is
 // status.HTTPError. Otherwise, code is considered to be 500 Internal Server Error.
 // Note: revealing error text may be dangerous
-func (r Response) WithError(err error) Response {
+func (r *Response) WithError(err error) *Response {
 	if http, ok := err.(status.HTTPError); ok {
 		return r.
 			WithCode(http.Code).
@@ -196,20 +171,20 @@ func (r Response) WithError(err error) Response {
 		WithBody(err.Error())
 }
 
-// Headers returns an underlying response headers
-func (r Response) Headers() []string {
+// Headers returns an underlying Response headers
+func (r *Response) Headers() []string {
 	return r.headers
 }
 
-// Attachment returns response's attachment.
+// Attachment returns Response's attachment.
 //
-// WARNING: do NEVER use this method in your code. It serves internal purposes ONLY
-func (r Response) Attachment() types.Attachment {
+// Note: it serves mostly internal purposes
+func (r *Response) Attachment() types.Attachment {
 	return r.attachment
 }
 
-// Clear discards everything was done with response object before
-func (r Response) Clear() Response {
+// Clear discards everything was done with Response object before
+func (r *Response) Clear() *Response {
 	r.Code = status.OK
 	r.Status = ""
 	r.ContentType = defaultContentType
@@ -218,44 +193,4 @@ func (r Response) Clear() Response {
 	r.Body = nil
 	r.attachment = types.Attachment{}
 	return r
-}
-
-// bodyIOWriter is an implementation of io.Writer for response body
-type bodyIOWriter struct {
-	response Response
-	readBuff []byte
-}
-
-func newBodyIOWriter(response Response) *bodyIOWriter {
-	return &bodyIOWriter{
-		response: response,
-	}
-}
-
-func (r *bodyIOWriter) Write(data []byte) (n int, err error) {
-	r.response.Body = append(r.response.Body, data...)
-
-	return len(data), nil
-}
-
-func (r *bodyIOWriter) ReadFrom(reader io.Reader) (n int64, err error) {
-	const readBuffSize = 2048
-
-	if len(r.readBuff) == 0 {
-		r.readBuff = make([]byte, readBuffSize)
-	}
-
-	for {
-		readN, readErr := reader.Read(r.readBuff)
-		_, _ = r.Write(r.readBuff[:n]) // bodyIOWriter.Write always returns n=len(data) and err=nil
-		n += int64(readN)
-
-		switch readErr {
-		case nil:
-		case io.EOF:
-			return n, nil
-		default:
-			return n, readErr
-		}
-	}
 }

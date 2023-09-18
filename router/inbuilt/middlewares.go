@@ -27,7 +27,7 @@ func (r *Router) applyMiddlewares() {
 func combine(handler types.Handler, middlewares []types.Middleware) types.Handler {
 	for i := len(middlewares) - 1; i >= 0; i-- {
 		handler = func(handler types.Handler, middleware types.Middleware) types.Handler {
-			return func(request *http.Request) http.Response {
+			return func(request *http.Request) *http.Response {
 				return middleware(handler, request)
 			}
 		}(handler, middlewares[i])

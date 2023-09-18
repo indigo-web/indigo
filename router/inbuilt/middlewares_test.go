@@ -54,7 +54,7 @@ func (c *callstack) Clear() {
 }
 
 func getMiddleware(mware middleware, stack *callstack) types.Middleware {
-	return func(next types.Handler, request *http.Request) http.Response {
+	return func(next types.Handler, request *http.Request) *http.Response {
 		stack.Push(mware)
 
 		return next(request)

@@ -21,7 +21,7 @@ var (
 	index = "index.html"
 )
 
-func Index(request *http.Request) http.Response {
+func Index(request *http.Request) *http.Response {
 	resp, err := request.Respond().WithFile(index)
 	if err != nil {
 		return request.Respond().
@@ -34,7 +34,7 @@ func Index(request *http.Request) http.Response {
 	return resp
 }
 
-func IndexSay(request *http.Request) http.Response {
+func IndexSay(request *http.Request) *http.Response {
 	if talking := request.Headers.Value("talking"); talking != "allowed" {
 		return request.Respond().WithCode(status.UnavailableForLegalReasons)
 	}
@@ -49,13 +49,13 @@ func IndexSay(request *http.Request) http.Response {
 	return request.Respond()
 }
 
-func World(request *http.Request) http.Response {
+func World(request *http.Request) *http.Response {
 	return request.Respond().WithBody(
 		`<h1>Hello, world!</h1>`,
 	)
 }
 
-func Easter(request *http.Request) http.Response {
+func Easter(request *http.Request) *http.Response {
 	if request.Headers.Has("easter") {
 		return request.Respond().
 			WithCode(status.Teapot).
@@ -66,7 +66,7 @@ func Easter(request *http.Request) http.Response {
 	return request.Respond().WithBody("Pretty ordinary page, isn't it?")
 }
 
-func Stressful(request *http.Request) http.Response {
+func Stressful(request *http.Request) *http.Response {
 	resp := request.Respond().
 		WithHeader("Should", "never be seen").
 		WithBody("Hello, world!")

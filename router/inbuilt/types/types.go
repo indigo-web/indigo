@@ -8,11 +8,11 @@ import (
 )
 
 type (
-	Handler func(*http.Request) http.Response
+	Handler func(*http.Request) *http.Response
 	// Middleware works like a chain of nested calls, next may be even directly
 	// handler. But if we are not a closing middleware, we will call next
 	// middleware that is simply a partial middleware with already provided next
-	Middleware func(next Handler, request *http.Request) http.Response
+	Middleware func(next Handler, request *http.Request) *http.Response
 	MethodsMap [method.Count]Handler
 )
 

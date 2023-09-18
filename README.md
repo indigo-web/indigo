@@ -2,13 +2,9 @@
 
 Indigo is non-idiomatic, but focusing on simplicity and performance web-server
 
-It provides such features:
-- Streaming-based body processing
-- Server-wide settings
-- Response object constructor
-- Middlewares
-- Endpoint groups
-- Connection hijacking
+# Documentation
+
+Documentation is available [here](https://floordiv.gitbook.io/indigo/). However, it isn't complete yet.
 
 # Hello, world!
 
@@ -23,9 +19,9 @@ import (
   "github.com/indigo-web/indigo/router/inbuilt"
 )
 
-const addr = "0.0.0.0:9090"
+const addr = "0.0.0.0:8080"
 
-func MyHandler(request *http.Request) http.Response {
+func MyHandler(request *http.Request) *http.Response {
   return request.Respond().WithBody("Hello, world!")
 }
 
@@ -43,5 +39,3 @@ func main() {
 ```
 
 More examples in [examples/](https://github.com/indigo-web/indigo/tree/master/examples) folder.
-
-Project workspace (TODO list included): trello.com/w/indigowebserver

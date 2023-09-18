@@ -81,7 +81,7 @@ func readN(conn net.Conn, n int) ([]byte, error) {
 func getStaticRouter(t *testing.T) router.Router {
 	r := inbuilt.New()
 
-	r.Get("/simple-get", func(request *http.Request) http.Response {
+	r.Get("/simple-get", func(request *http.Request) *http.Response {
 		require.Equal(t, method.GET, request.Method)
 		_, err := request.Query.Get("some non-existing query key")
 		require.Error(t, err)
@@ -90,11 +90,11 @@ func getStaticRouter(t *testing.T) router.Router {
 		return request.Respond()
 	})
 
-	r.Get("/get-resp-body", func(request *http.Request) http.Response {
+	r.Get("/get-resp-body", func(request *http.Request) *http.Response {
 		return request.Respond().WithBody(testRequestBody)
 	})
 
-	r.Get("/get-read-body", func(request *http.Request) http.Response {
+	r.Get("/get-read-body", func(request *http.Request) *http.Response {
 		require.True(t, request.Headers.Has(testHeaderKey))
 		requestHeader := strings.Join(request.Headers.Values(testHeaderKey), ",")
 		require.Equal(t, testHeaderValue, requestHeader)
@@ -107,19 +107,19 @@ func getStaticRouter(t *testing.T) router.Router {
 	})
 
 	r.Group("/with-").
-		Get("query", func(request *http.Request) http.Response {
+		Get("query", func(request *http.Request) *http.Response {
 			value, err := request.Query.Get(testQueryKey)
 			require.NoError(t, err)
 			require.Equal(t, testQueryValue, value)
 
 			return request.Respond()
 		}).
-		Get("file", func(request *http.Request) http.Response {
+		Get("file", func(request *http.Request) *http.Response {
 			resp, err := request.Respond().WithFile(testFilename)
 			require.NoError(t, err)
 			return resp
 		}).
-		Get("file-notfound", func(request *http.Request) http.Response {
+		Get("file-notfound", func(request *http.Request) *http.Response {
 			_, err := request.Respond().WithFile(testFilename + "non-existing")
 			require.Error(t, err)
 
@@ -129,7 +129,7 @@ func getStaticRouter(t *testing.T) router.Router {
 	// request.OnBody() is not tested because request.Body() (wrapper for OnBody)
 	// is tested, that is enough to make sure that requestbody works correct
 
-	r.Post("/read-body", func(request *http.Request) http.Response {
+	r.Post("/read-body", func(request *http.Request) *http.Response {
 		body, err := request.Body().Full()
 		require.NoError(t, err)
 		require.Equal(t, testRequestBody, string(body))
@@ -137,7 +137,7 @@ func getStaticRouter(t *testing.T) router.Router {
 		return request.Respond()
 	})
 
-	r.Post("/read-body-gzipped", func(request *http.Request) http.Response {
+	r.Post("/read-body-gzipped", func(request *http.Request) *http.Response {
 		body, err := request.Body().Full()
 		require.NoError(t, err)
 		require.Equal(t, testRequestBody, string(body))
@@ -145,7 +145,7 @@ func getStaticRouter(t *testing.T) router.Router {
 		return request.Respond()
 	})
 
-	r.Post("/body-reader", func(request *http.Request) http.Response {
+	r.Post("/body-reader", func(request *http.Request) *http.Response {
 		body, err := io.ReadAll(request.Body())
 		require.NoError(t, err)
 		require.Equal(t, testRequestBody, string(body))
@@ -155,7 +155,7 @@ func getStaticRouter(t *testing.T) router.Router {
 
 	r.Post("/do-not-read-body", http.Respond)
 
-	r.Get("/hijack-conn-no-body-read", func(request *http.Request) http.Response {
+	r.Get("/hijack-conn-no-body-read", func(request *http.Request) *http.Response {
 		conn, err := request.Hijack()
 		require.NoError(t, err)
 
@@ -171,7 +171,7 @@ func getStaticRouter(t *testing.T) router.Router {
 		return request.Respond()
 	})
 
-	r.Get("/hijack-conn-with-body-read", func(request *http.Request) http.Response {
+	r.Get("/hijack-conn-with-body-read", func(request *http.Request) *http.Response {
 		_, _ = request.Body().Full()
 
 		conn, err := request.Hijack()
@@ -188,7 +188,7 @@ func getStaticRouter(t *testing.T) router.Router {
 		return request.Respond()
 	})
 
-	r.Get("/ctx-value", func(request *http.Request) http.Response {
+	r.Get("/ctx-value", func(request *http.Request) *http.Response {
 		require.Equal(t, "egg", request.Ctx.Value("easter").(string))
 
 		return request.Respond()

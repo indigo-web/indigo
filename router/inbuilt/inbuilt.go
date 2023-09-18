@@ -60,7 +60,7 @@ func (r *Router) OnStart() error {
 }
 
 // OnRequest routes the request
-func (r *Router) OnRequest(request *http.Request) http.Response {
+func (r *Router) OnRequest(request *http.Request) *http.Response {
 	request.Path = stripTrailingSlash(request.Path)
 
 	if r.isStatic {
@@ -98,7 +98,7 @@ func (r *Router) OnRequest(request *http.Request) http.Response {
 
 // OnError tries to find a handler for the error, in case it can't - simply
 // request.Respond().WithError(...) will be returned
-func (r *Router) OnError(request *http.Request, err error) http.Response {
+func (r *Router) OnError(request *http.Request, err error) *http.Response {
 	if request.Method == method.TRACE && err == status.ErrMethodNotAllowed {
 		r.traceBuff = renderHTTPRequest(request, r.traceBuff)
 
