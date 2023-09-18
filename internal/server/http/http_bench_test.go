@@ -55,14 +55,14 @@ var longPath = strings.Repeat("a", 500)
 
 func getInbuiltRouter() router.Router {
 	r := inbuilt.New().
-		Get("/with-header", func(request *http.Request) http.Response {
+		Get("/with-header", func(request *http.Request) *http.Response {
 			return request.Respond().WithHeader("Hello", "World")
 		}).
 		Get("/"+longPath, http.Respond)
 
 	r.Resource("/").
 		Get(http.Respond).
-		Post(func(request *http.Request) http.Response {
+		Post(func(request *http.Request) *http.Response {
 			_ = request.Body().Callback(func([]byte) error {
 				return nil
 			})
@@ -80,7 +80,7 @@ func getInbuiltRouter() router.Router {
 func getSimpleRouter() router.Router {
 	longpath := "/" + longPath
 
-	r := simple.NewRouter(func(request *http.Request) http.Response {
+	r := simple.NewRouter(func(request *http.Request) *http.Response {
 		switch request.Path {
 		case "/":
 			switch request.Method {
@@ -103,7 +103,7 @@ func getSimpleRouter() router.Router {
 			return request.Respond().
 				WithError(status.ErrNotFound)
 		}
-	}, func(request *http.Request, err error) http.Response {
+	}, func(request *http.Request, err error) *http.Response {
 		return request.Respond().WithError(err)
 	})
 

@@ -13,7 +13,7 @@ This file is responsible for rendering http requests. Prime use case is renderin
 http requests back as a response to a trace request
 */
 
-func traceResponse(respond http.Response, messageBody []byte) http.Response {
+func traceResponse(respond *http.Response, messageBody []byte) *http.Response {
 	return respond.
 		WithHeader("Content-Type", "message/http").
 		WithBodyByte(messageBody)

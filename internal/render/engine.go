@@ -26,8 +26,8 @@ type ClientWriter interface {
 }
 
 type Engine interface {
-	PreWrite(proto.Proto, http.Response)
-	Write(proto.Proto, *http.Request, http.Response, ClientWriter) error
+	PreWrite(proto.Proto, *http.Response)
+	Write(proto.Proto, *http.Request, *http.Response, ClientWriter) error
 }
 
 // engine is a renderer engine for HTTP responses. The point of it is to render response
@@ -60,7 +60,7 @@ func newEngine(buff, fileBuff []byte, defaultHeaders map[string][]string) *engin
 
 // PreWrite writes the response into the buffer without actually sending it. Usually used
 // for informational responses
-func (e *engine) PreWrite(protocol proto.Proto, response http.Response) {
+func (e *engine) PreWrite(protocol proto.Proto, response *http.Response) {
 	e.renderProtocol(protocol)
 	e.renderHeaders(response)
 	e.crlf()
@@ -68,7 +68,7 @@ func (e *engine) PreWrite(protocol proto.Proto, response http.Response) {
 
 // Render the response, respectively to the protocol
 func (e *engine) Write(
-	protocol proto.Proto, request *http.Request, response http.Response, writer ClientWriter,
+	protocol proto.Proto, request *http.Request, response *http.Response, writer ClientWriter,
 ) (err error) {
 	defer e.clear()
 
@@ -97,7 +97,7 @@ func (e *engine) Write(
 	return err
 }
 
-func (e *engine) renderHeaders(response http.Response) {
+func (e *engine) renderHeaders(response *http.Response) {
 	codeStatus := status.CodeStatus(response.Code)
 
 	if response.Status == "" && codeStatus != "" {
@@ -133,7 +133,7 @@ func (e *engine) renderHeaders(response http.Response) {
 // sendAttachment simply encapsulates all the logic related to rendering arbitrary
 // io.Reader implementations
 func (e *engine) sendAttachment(
-	request *http.Request, response http.Response, writer ClientWriter,
+	request *http.Request, response *http.Response, writer ClientWriter,
 ) error {
 	attachment := response.Attachment()
 
@@ -178,7 +178,7 @@ func (e *engine) sendAttachment(
 func (e *engine) writePlainBody(r io.Reader, writer ClientWriter) error {
 	// TODO: implement checking whether r implements io.ReaderAt interface. In case it does
 	//       body may be transferred more efficiently. This requires implementing io.Writer
-	//       http.ResponseWriter
+	//       *http.ResponseWriter
 
 	for {
 		n, err := r.Read(e.fileBuff)

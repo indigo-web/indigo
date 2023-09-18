@@ -12,7 +12,7 @@ import (
 
 var addr = "localhost:9090"
 
-func MyHandler(request *http.Request) http.Response {
+func MyHandler(request *http.Request) *http.Response {
 	return request.Respond().
 		WithCode(status.OK).
 		WithHeader("Hello", "world").

@@ -8,8 +8,8 @@ import (
 var _ router.Router = Router{}
 
 type (
-	Handler      func(*http.Request) http.Response
-	ErrorHandler func(*http.Request, error) http.Response
+	Handler      func(*http.Request) *http.Response
+	ErrorHandler func(*http.Request, error) *http.Response
 )
 
 type Router struct {
@@ -28,10 +28,10 @@ func (r Router) OnStart() error {
 	return nil
 }
 
-func (r Router) OnRequest(request *http.Request) http.Response {
+func (r Router) OnRequest(request *http.Request) *http.Response {
 	return r.handler(request)
 }
 
-func (r Router) OnError(request *http.Request, err error) http.Response {
+func (r Router) OnError(request *http.Request, err error) *http.Response {
 	return r.errHandler(request, err)
 }

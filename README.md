@@ -25,7 +25,7 @@ import (
 
 const addr = "0.0.0.0:9090"
 
-func MyHandler(request *http.Request) http.Response {
+func MyHandler(request *http.Request) *http.Response {
   return request.Respond().WithBody("Hello, world!")
 }
 

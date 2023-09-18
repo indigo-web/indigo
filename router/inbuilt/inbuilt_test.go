@@ -189,7 +189,7 @@ func TestRouter_MethodNotAllowed(t *testing.T) {
 
 func TestRouter_RouteError(t *testing.T) {
 	r := New()
-	r.RouteError(func(req *http.Request) http.Response {
+	r.RouteError(func(req *http.Request) *http.Response {
 		return req.Respond().
 			WithCode(status.Teapot).
 			WithBody(req.Ctx.Value("error").(error).Error())
@@ -227,7 +227,7 @@ func TestRouter_RouteError(t *testing.T) {
 		const fromUniversal = "from universal handler with love"
 
 		r := New()
-		r.RouteError(func(req *http.Request) http.Response {
+		r.RouteError(func(req *http.Request) *http.Response {
 			return req.Respond().
 				WithCode(status.Teapot).
 				WithBody(fromUniversal)

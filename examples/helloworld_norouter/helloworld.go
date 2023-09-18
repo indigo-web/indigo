@@ -12,7 +12,7 @@ import (
 
 var addr = "localhost:9090"
 
-func MyHandler(request *http.Request) http.Response {
+func MyHandler(request *http.Request) *http.Response {
 	return request.Respond().
 		WithCode(status.OK).
 		WithHeader("Hello", "world").
@@ -20,7 +20,7 @@ func MyHandler(request *http.Request) http.Response {
 }
 
 func main() {
-	myRouter := simple.NewRouter(MyHandler, func(request *http.Request, err error) http.Response {
+	myRouter := simple.NewRouter(MyHandler, func(request *http.Request, err error) *http.Response {
 		return request.Respond().WithError(err)
 	})
 

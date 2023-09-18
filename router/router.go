@@ -12,6 +12,6 @@ import (
 // the connection (even if it's already closed from client side).
 type Router interface {
 	OnStart() error
-	OnRequest(request *http.Request) http.Response
-	OnError(request *http.Request, err error) http.Response
+	OnRequest(request *http.Request) *http.Response
+	OnError(request *http.Request, err error) *http.Response
 }
