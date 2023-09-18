@@ -1,6 +1,7 @@
 package http1
 
 import (
+	"context"
 	"fmt"
 	"github.com/dchest/uniuri"
 	"github.com/indigo-web/indigo/http/decoder"
@@ -55,8 +56,8 @@ func getParser() (httpparser.HTTPRequestsParser, *http.Request) {
 	objPool := pool.NewObjectPool[[]string](20)
 	body := NewBodyReader(dummy.NewNopClient(), NewChunkedBodyParser(s.Body), decoder.NewManager(0))
 	request := http.NewRequest(
-		headers.NewHeaders(), query.Query{}, http.NewResponse(), dummy.NewNopConn(),
-		http.NewBody(body), nil, false,
+		context.Background(), headers.NewHeaders(), query.Query{}, http.NewResponse(),
+		dummy.NewNopConn(), http.NewBody(body), nil, false,
 	)
 
 	return NewHTTPRequestsParser(

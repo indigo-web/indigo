@@ -3,6 +3,7 @@ package render
 import (
 	"bufio"
 	"bytes"
+	"context"
 	"github.com/indigo-web/indigo/http"
 	"github.com/indigo-web/indigo/http/decoder"
 	"github.com/indigo-web/indigo/http/headers"
@@ -27,7 +28,7 @@ func getEngine(defaultHeaders map[string][]string) *engine {
 
 func newRequest() *http.Request {
 	return http.NewRequest(
-		headers.NewHeaders(), query.Query{}, http.NewResponse(), dummy.NewNopConn(),
+		context.Background(), headers.NewHeaders(), query.Query{}, http.NewResponse(), dummy.NewNopConn(),
 		http.NewBody(http1.NewBodyReader(
 			dummy.NewNopClient(),
 			http1.NewChunkedBodyParser(settings.Default().Body),

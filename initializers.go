@@ -1,6 +1,7 @@
 package indigo
 
 import (
+	"context"
 	"github.com/indigo-web/indigo/http"
 	"github.com/indigo-web/indigo/http/decoder"
 	"github.com/indigo-web/indigo/http/headers"
@@ -45,7 +46,7 @@ func newBodyReader(client tcp.Client, body settings.Body, decoders map[string]de
 }
 
 func newRequest(
-	s settings.Settings, conn net.Conn, r http.BodyReader,
+	ctx context.Context, s settings.Settings, conn net.Conn, r http.BodyReader,
 ) *http.Request {
 	q := query.NewQuery(headers.NewHeaders())
 	hdrs := headers.NewPreallocHeaders(s.Headers.Number.Default)
@@ -53,7 +54,7 @@ func newRequest(
 	params := make(http.Params)
 	body := http.NewBody(r)
 
-	return http.NewRequest(hdrs, q, response, conn, body, params, s.URL.Params.DisableMapClear)
+	return http.NewRequest(ctx, hdrs, q, response, conn, body, params, s.URL.Params.DisableMapClear)
 }
 
 func newRenderer(httpSettings settings.HTTP, a *Application) render.Engine {

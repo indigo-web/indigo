@@ -1,6 +1,7 @@
 package http1
 
 import (
+	"context"
 	"io"
 	"strconv"
 	"strings"
@@ -42,7 +43,8 @@ func getRequestWithReader(chunked bool, body ...[]byte) (*http.Request, http.Bod
 	}
 
 	request := http.NewRequest(
-		hdrs, query.Query{}, http.NewResponse(), dummy.NewNopConn(), reqBody, nil, false,
+		context.Background(), hdrs, query.Query{}, http.NewResponse(),
+		dummy.NewNopConn(), reqBody, nil, false,
 	)
 	request.ContentLength = contentLength
 	request.Encoding.Chunked = chunked
@@ -106,7 +108,8 @@ func TestBodyReader_Plain(t *testing.T) {
 
 		hdrs := headers.NewHeaders()
 		request := http.NewRequest(
-			hdrs, query.Query{}, http.NewResponse(), dummy.NewNopConn(), nil, nil, false,
+			context.Background(), hdrs, query.Query{}, http.NewResponse(),
+			dummy.NewNopConn(), nil, nil, false,
 		)
 		request.ContentLength = buffSize
 		reader := NewBodyReader(client, NewChunkedBodyParser(settings.Default().Body), decoder.NewManager(0))
