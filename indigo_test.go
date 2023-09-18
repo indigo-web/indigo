@@ -188,7 +188,7 @@ func getStaticRouter(t *testing.T) router.Router {
 		return request.Respond()
 	})
 
-	r.Get("/ctx-value", func(request *http.Request) http.Response {
+	r.Get("/ctx-value", func(request *http.Request) *http.Response {
 		require.Equal(t, "egg", request.Ctx.Value("easter").(string))
 
 		return request.Respond()

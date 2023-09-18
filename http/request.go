@@ -49,7 +49,7 @@ type Request struct {
 // that default method is a null-value (proto.Unknown)
 func NewRequest(
 	ctx context.Context, hdrs *headers.Headers, query query.Query, response *Response,
-	hdrs *headers.Headers, query query.Query, response *Response, conn net.Conn, body *Body,
+	conn net.Conn, body *Body, paramsMap Params, disableParamsMapClearing bool,
 ) *Request {
 	request := &Request{
 		Query:          query,
