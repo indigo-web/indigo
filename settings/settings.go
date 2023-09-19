@@ -105,6 +105,23 @@ type (
 		// client connects and is used for rendering the response into it
 		ResponseBuffSize int64
 	}
+
+	TLS struct {
+		// Enable states, whether HTTPS will be running (on a separated port).
+		Enable bool
+		// Port considers, on which port HTTPS listener will be started. By default, it is 443
+		Port uint16
+		// Cert is a path to the .pem file with the actual certificate.
+		// When using certbot, it is usually stored at /etc/letsencrypt/live/<domain>/fullchain.pem
+		//
+		// By default, just looking for fullchain.pem in the current working directory.
+		Cert string
+		// Key is a path to the .pem file with the actual key.
+		// When using certbot, it is usually stored at /etc/letsencrypt/live/<domain>/privkey.pem
+		//
+		// By default, just looking for privkey.pem in the current working directory.
+		Key string
+	}
 )
 
 type Settings struct {
@@ -113,6 +130,7 @@ type Settings struct {
 	TCP     TCP
 	Body    Body
 	HTTP    HTTP
+	TLS     TLS
 }
 
 func Default() Settings {
@@ -162,11 +180,17 @@ func Default() Settings {
 		HTTP: HTTP{
 			ResponseBuffSize: 1024,
 		},
+		TLS: TLS{
+			Enable: false,
+			Port:   443,
+			Cert:   "fullchain.pem",
+			Key:    "privkey.pem",
+		},
 	}
 }
 
 // Fill takes some settings and fills it with default values
-// everywhere where it is not filled
+// everywhere where it is left uninitialized
 func Fill(original Settings) (modified Settings) {
 	defaultSettings := Default()
 
@@ -207,6 +231,15 @@ func Fill(original Settings) (modified Settings) {
 		original.Body.DecodedBufferSize, defaultSettings.Body.DecodedBufferSize)
 	original.HTTP.ResponseBuffSize = customOrDefault(
 		original.HTTP.ResponseBuffSize, defaultSettings.HTTP.ResponseBuffSize)
+	original.TLS.Enable = original.TLS.Enable || defaultSettings.TLS.Enable
+	original.TLS.Port = customOrDefault(
+		original.TLS.Port, defaultSettings.TLS.Port)
+	if len(original.TLS.Cert) == 0 {
+		original.TLS.Cert = defaultSettings.TLS.Cert
+	}
+	if len(original.TLS.Key) == 0 {
+		original.TLS.Key = defaultSettings.TLS.Key
+	}
 
 	return original
 }

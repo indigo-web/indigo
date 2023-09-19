@@ -12,7 +12,7 @@ import (
 	"github.com/indigo-web/indigo/router/inbuilt"
 )
 
-var addr = "localhost:9090"
+var addr = "localhost:8080"
 
 func HelloWorldMiddleware(next types.Handler, request *http.Request) *http.Response {
 	fmt.Println("running middleware before handler")

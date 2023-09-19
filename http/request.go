@@ -33,7 +33,9 @@ type Request struct {
 	Remote net.Addr
 	// Ctx is a request context. It may be filled with arbitrary data across middlewares
 	// and handler by itself.
-	Ctx            context.Context
+	Ctx context.Context
+	// IsTLS describes, whether request was made via https
+	IsTLS          bool
 	defaultCtx     context.Context
 	body           *Body
 	conn           net.Conn

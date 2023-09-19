@@ -10,7 +10,7 @@ import (
 	"github.com/indigo-web/indigo/router/inbuilt"
 )
 
-var addr = "localhost:9090"
+var addr = "localhost:8080"
 
 func MyDynamicHandler(request *http.Request) *http.Response {
 	worldName := request.Params["world-name"]

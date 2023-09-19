@@ -2,8 +2,11 @@ package indigo
 
 import (
 	"context"
+	"crypto/tls"
 	"errors"
+	"fmt"
 	"net"
+	"strconv"
 	"strings"
 
 	httpserver "github.com/indigo-web/indigo/internal/server/http"
@@ -28,11 +31,12 @@ var DefaultHeaders = map[string][]string{
 // Application is just a struct with addr and shutdown channel that is currently
 // not used. Planning to replace it with context.WithCancel()
 type Application struct {
-	decoders       map[string]decoder.Constructor
-	defaultHeaders map[string][]string
-	shutdown       chan struct{}
-	addr           string
-	ctx            context.Context
+	ctx              context.Context
+	decoders         map[string]decoder.Constructor
+	defaultHeaders   map[string][]string
+	addr             string
+	servers          []*tcp.Server
+	gracefulShutdown bool
 }
 
 // NewApp returns a new application object with initialized shutdown chan
@@ -41,7 +45,6 @@ func NewApp(addr string) *Application {
 		addr:           addr,
 		decoders:       map[string]decoder.Constructor{},
 		defaultHeaders: mapconv.Copy(DefaultHeaders),
-		shutdown:       make(chan struct{}, 1),
 	}
 }
 
@@ -88,12 +91,42 @@ func (a *Application) Serve(r router.Router, optionalSettings ...settings.Settin
 		return err
 	}
 
+	if s.TLS.Enable {
+		tlsAddr, err := replacePort(a.addr, s.TLS.Port)
+		if err != nil {
+			return err
+		}
+
+		cert, err := tls.LoadX509KeyPair(s.TLS.Cert, s.TLS.Key)
+		if err != nil {
+			return err
+		}
+
+		cfg := &tls.Config{Certificates: []tls.Certificate{cert}}
+		listener, err := tls.Listen("tcp", tlsAddr, cfg)
+		if err != nil {
+			return err
+		}
+
+		a.servers = append(a.servers, tcp.NewServer(listener, func(conn net.Conn) {
+			client := newClient(s.TCP, conn)
+			bodyReader := newBodyReader(client, s.Body, a.decoders)
+			request := newRequest(a.ctx, s, conn, bodyReader)
+			request.IsTLS = true
+			renderer := newRenderer(s.HTTP, a)
+			httpParser := newHTTPParser(s, request)
+
+			httpServer := httpserver.NewHTTPServer(r)
+			httpServer.Run(client, request, request.Body(), renderer, httpParser)
+		}))
+	}
+
 	sock, err := net.Listen("tcp", a.addr)
 	if err != nil {
 		return err
 	}
 
-	return tcp.RunTCPServer(sock, func(conn net.Conn) {
+	a.servers = append(a.servers, tcp.NewServer(sock, func(conn net.Conn) {
 		client := newClient(s.TCP, conn)
 		bodyReader := newBodyReader(client, s.Body, a.decoders)
 		request := newRequest(a.ctx, s, conn, bodyReader)
@@ -102,22 +135,56 @@ func (a *Application) Serve(r router.Router, optionalSettings ...settings.Settin
 
 		httpServer := httpserver.NewHTTPServer(r)
 		httpServer.Run(client, request, request.Body(), renderer, httpParser)
-	}, a.shutdown)
+	}))
+
+	err = a.startServers()
+
+	if a.gracefulShutdown {
+		return nil
+	}
+
+	a.stopServers()
+
+	return err
 }
 
-// Shutdown gracefully shutting down the server. It is not blocking,
-// server being shut down right after calling this method is not
-// guaranteed, because tcp server will wait for the next connection,
-// and only then he'll be able to receive a shutdown notify. Moreover,
-// tcp server will wait until all the existing connections will be
-// closed
-func (a *Application) Shutdown() {
-	a.shutdown <- struct{}{}
+func (a *Application) startServers() error {
+	// making the channel buffered isn't necessary, but in case something went wrong,
+	// no goroutines will leak, as each will write its error into the channel and die
+	// peacefully instead of being stuck for forever
+	errCh := make(chan error, len(a.servers))
+
+	for _, server := range a.servers {
+		go func(server *tcp.Server) {
+			errCh <- server.Start()
+		}(server)
+	}
+
+	return <-errCh
 }
 
-// Wait waits for tcp server to shut down
-func (a *Application) Wait() {
-	<-a.shutdown
+// GracefulShutdown stops the application peacefully. It stops a listener, so no more
+// clients will be able to connect, but all the already connected will be processed till
+// end (till the last one disconnects)
+func (a *Application) GracefulShutdown() {
+	a.gracefulShutdown = true
+	a.gracefulShutdownServers()
+}
+
+func (a *Application) Stop() {
+	a.stopServers()
+}
+
+func (a *Application) stopServers() {
+	for _, server := range a.servers {
+		_ = server.Stop()
+	}
+}
+
+func (a *Application) gracefulShutdownServers() {
+	for _, server := range a.servers {
+		_ = server.GracefulShutdown()
+	}
 }
 
 // concreteSettings converts optional settings to concrete ones
@@ -130,4 +197,22 @@ func concreteSettings(s ...settings.Settings) (settings.Settings, error) {
 	default:
 		return settings.Settings{}, errors.New("too many settings (none or single struct is expected)")
 	}
+}
+
+func replacePort(addr string, newPort uint16) (newAddr string, err error) {
+	host, err := hostFromAddr(addr)
+	if err != nil {
+		return "", err
+	}
+
+	return host + ":" + strconv.Itoa(int(newPort)), nil
+}
+
+func hostFromAddr(addr string) (host string, err error) {
+	semicolon := strings.IndexByte(addr, ':')
+	if semicolon == -1 {
+		return "", fmt.Errorf("bad address: %s", addr)
+	}
+
+	return addr[:semicolon], nil
 }
