@@ -11,7 +11,7 @@ import (
 	"github.com/indigo-web/indigo/router/inbuilt"
 )
 
-var addr = "localhost:9090"
+var addr = "localhost:8080"
 
 func MyHandler(request *http.Request) *http.Response {
 	conn, err := request.Hijack()

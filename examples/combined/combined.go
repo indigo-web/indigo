@@ -17,7 +17,7 @@ import (
 )
 
 var (
-	addr  = "localhost:9090"
+	addr  = "localhost:8080"
 	index = "index.html"
 )
 
