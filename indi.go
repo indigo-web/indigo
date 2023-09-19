@@ -4,7 +4,9 @@ import (
 	"context"
 	"crypto/tls"
 	"errors"
+	"fmt"
 	"net"
+	"strconv"
 	"strings"
 
 	httpserver "github.com/indigo-web/indigo/internal/server/http"
@@ -90,13 +92,18 @@ func (a *Application) Serve(r router.Router, optionalSettings ...settings.Settin
 	}
 
 	if s.TLS.Enable {
+		tlsAddr, err := replacePort(a.addr, s.TLS.Port)
+		if err != nil {
+			return err
+		}
+
 		cert, err := tls.LoadX509KeyPair(s.TLS.Cert, s.TLS.Key)
 		if err != nil {
 			return err
 		}
 
 		cfg := &tls.Config{Certificates: []tls.Certificate{cert}}
-		listener, err := tls.Listen("tcp", a.addr, cfg)
+		listener, err := tls.Listen("tcp", tlsAddr, cfg)
 		if err != nil {
 			return err
 		}
@@ -180,4 +187,22 @@ func concreteSettings(s ...settings.Settings) (settings.Settings, error) {
 	default:
 		return settings.Settings{}, errors.New("too many settings (none or single struct is expected)")
 	}
+}
+
+func replacePort(addr string, newPort uint16) (newAddr string, err error) {
+	host, err := hostFromAddr(addr)
+	if err != nil {
+		return "", err
+	}
+
+	return host + ":" + strconv.Itoa(int(newPort)), nil
+}
+
+func hostFromAddr(addr string) (host string, err error) {
+	semicolon := strings.IndexByte(addr, ':')
+	if semicolon == -1 {
+		return "", fmt.Errorf("bad address: %s", addr)
+	}
+
+	return addr[:semicolon], nil
 }
