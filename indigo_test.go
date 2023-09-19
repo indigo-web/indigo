@@ -49,15 +49,6 @@ const (
 	testFileIfNotFound = "404 not found"
 )
 
-func instantlyDisconnect() {
-	conn, err := net.Dial("tcp", addr)
-	if err != nil {
-		return
-	}
-
-	_ = conn.Close()
-}
-
 func readN(conn net.Conn, n int) ([]byte, error) {
 	receivedBuff := make([]byte, 0, n)
 	buff := make([]byte, n)
@@ -513,8 +504,7 @@ func (s serverWrap) Start(t *testing.T, r router.Router, settings ...settings.Se
 }
 
 func (s serverWrap) Wait(t *testing.T, duration time.Duration) {
-	s.app.Shutdown()
-	instantlyDisconnect()
+	s.app.Stop()
 
 	select {
 	case <-s.shutdown:
