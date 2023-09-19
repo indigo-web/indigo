@@ -10,18 +10,20 @@ type onConnection func(net.Conn)
 
 type Server struct {
 	sock     net.Listener
+	onConn   onConnection
 	conns    map[net.Conn]struct{}
 	shutdown bool
 }
 
-func NewServer(sock net.Listener) *Server {
+func NewServer(sock net.Listener, onConn onConnection) *Server {
 	return &Server{
-		sock:  sock,
-		conns: map[net.Conn]struct{}{},
+		sock:   sock,
+		onConn: onConn,
+		conns:  map[net.Conn]struct{}{},
 	}
 }
 
-func (t *Server) Start(onConn onConnection) error {
+func (t *Server) Start() error {
 	wg := new(sync.WaitGroup)
 
 	for {
@@ -38,7 +40,7 @@ func (t *Server) Start(onConn onConnection) error {
 
 		t.conns[conn] = struct{}{}
 		wg.Add(1)
-		go connHandler(wg, conn, onConn)
+		go connHandler(wg, conn, t.onConn)
 	}
 }
 

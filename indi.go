@@ -108,7 +108,17 @@ func (a *Application) Serve(r router.Router, optionalSettings ...settings.Settin
 			return err
 		}
 
-		a.servers = append(a.servers, tcp.NewServer(listener))
+		a.servers = append(a.servers, tcp.NewServer(listener, func(conn net.Conn) {
+			client := newClient(s.TCP, conn)
+			bodyReader := newBodyReader(client, s.Body, a.decoders)
+			request := newRequest(a.ctx, s, conn, bodyReader)
+			request.IsTLS = true
+			renderer := newRenderer(s.HTTP, a)
+			httpParser := newHTTPParser(s, request)
+
+			httpServer := httpserver.NewHTTPServer(r)
+			httpServer.Run(client, request, request.Body(), renderer, httpParser)
+		}))
 	}
 
 	sock, err := net.Listen("tcp", a.addr)
@@ -116,9 +126,7 @@ func (a *Application) Serve(r router.Router, optionalSettings ...settings.Settin
 		return err
 	}
 
-	a.servers = append(a.servers, tcp.NewServer(sock))
-
-	err = a.startServers(func(conn net.Conn) {
+	a.servers = append(a.servers, tcp.NewServer(sock, func(conn net.Conn) {
 		client := newClient(s.TCP, conn)
 		bodyReader := newBodyReader(client, s.Body, a.decoders)
 		request := newRequest(a.ctx, s, conn, bodyReader)
@@ -127,7 +135,9 @@ func (a *Application) Serve(r router.Router, optionalSettings ...settings.Settin
 
 		httpServer := httpserver.NewHTTPServer(r)
 		httpServer.Run(client, request, request.Body(), renderer, httpParser)
-	})
+	}))
+
+	err = a.startServers()
 
 	if a.gracefulShutdown {
 		return nil
@@ -138,7 +148,7 @@ func (a *Application) Serve(r router.Router, optionalSettings ...settings.Settin
 	return err
 }
 
-func (a *Application) startServers(onConn func(conn net.Conn)) error {
+func (a *Application) startServers() error {
 	// making the channel buffered isn't necessary, but in case something went wrong,
 	// no goroutines will leak, as each will write its error into the channel and die
 	// peacefully instead of being stuck for forever
@@ -146,7 +156,7 @@ func (a *Application) startServers(onConn func(conn net.Conn)) error {
 
 	for _, server := range a.servers {
 		go func(server *tcp.Server) {
-			errCh <- server.Start(onConn)
+			errCh <- server.Start()
 		}(server)
 	}
 
