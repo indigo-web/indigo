@@ -11,6 +11,7 @@ type onConnection func(net.Conn)
 type Server struct {
 	sock     net.Listener
 	onConn   onConnection
+	mu       sync.Mutex
 	conns    map[net.Conn]struct{}
 	shutdown bool
 }
@@ -38,7 +39,9 @@ func (s *Server) Start() error {
 			return err
 		}
 
+		s.mu.Lock()
 		s.conns[conn] = struct{}{}
+		s.mu.Unlock()
 		wg.Add(1)
 		go s.connHandler(wg, conn)
 	}
@@ -56,9 +59,13 @@ func (s *Server) Stop() error {
 		return err
 	}
 
+	s.mu.Lock()
+
 	for conn := range s.conns {
 		_ = conn.Close()
 	}
+
+	s.mu.Unlock()
 
 	return nil
 }
@@ -72,5 +79,7 @@ func (s *Server) GracefulShutdown() error {
 func (s *Server) connHandler(wg *sync.WaitGroup, conn net.Conn) {
 	s.onConn(conn)
 	wg.Done()
+	s.mu.Lock()
 	delete(s.conns, conn)
+	s.mu.Unlock()
 }
