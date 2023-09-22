@@ -1,23 +1,14 @@
 package proto
 
 import (
+	"github.com/indigo-web/indigo/internal/cutbyte"
 	"strings"
-
-	"github.com/indigo-web/indigo/internal/split"
 )
 
 func ChooseUpgrade(line string) Proto {
-	// TODO: idk why but this variant is the fastest one, even comparing to
-	//       the dumbest solution with inlined string iteration and hardcoded
-	//       constant (comma-delimiter). Maybe, I am wrong? Hope there are
-	//       better solutions
-	iter := split.StringIter(line, ',')
-
-	for {
-		token, err := iter()
-		if err != nil {
-			return Unknown
-		}
+	for len(line) > 0 {
+		var token string
+		token, line = cutbyte.Cut(line, ',')
 
 		if proto := parseUpgradeToken(strings.TrimSpace(token)); proto != Unknown {
 			// pick the first supported protocol, as they are placed in an order of
@@ -25,6 +16,8 @@ func ChooseUpgrade(line string) Proto {
 			return proto
 		}
 	}
+
+	return Unknown
 }
 
 // parseUpgradeToken simply parses an upgrade-token to the respective protocol enum
