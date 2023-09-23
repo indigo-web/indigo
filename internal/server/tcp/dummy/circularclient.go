@@ -1,7 +1,7 @@
 package dummy
 
 import (
-	"github.com/indigo-web/indigo/internal/unreader"
+	"github.com/indigo-web/utils/unreader"
 	"io"
 	"net"
 )

@@ -3,8 +3,6 @@ package http1
 import (
 	"bytes"
 	"fmt"
-	"github.com/indigo-web/indigo/internal/strcomp"
-	"github.com/indigo-web/indigo/internal/uridecode"
 	"strings"
 
 	"github.com/indigo-web/indigo/http"
@@ -12,9 +10,11 @@ import (
 	"github.com/indigo-web/indigo/http/proto"
 	"github.com/indigo-web/indigo/http/status"
 	"github.com/indigo-web/indigo/internal/parser"
+	"github.com/indigo-web/indigo/internal/uridecode"
 	"github.com/indigo-web/indigo/settings"
 	"github.com/indigo-web/utils/buffer"
 	"github.com/indigo-web/utils/pool"
+	"github.com/indigo-web/utils/strcomp"
 	"github.com/indigo-web/utils/uf"
 )
 

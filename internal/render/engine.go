@@ -7,8 +7,8 @@ import (
 	"github.com/indigo-web/indigo/http/status"
 	"github.com/indigo-web/indigo/internal/httpchars"
 	"github.com/indigo-web/indigo/internal/render/types"
-	"github.com/indigo-web/indigo/internal/strcomp"
 	"github.com/indigo-web/utils/ft"
+	"github.com/indigo-web/utils/strcomp"
 	"io"
 	"strconv"
 )

@@ -4,7 +4,7 @@ go 1.18
 
 require (
 	github.com/dchest/uniuri v1.2.0
-	github.com/indigo-web/utils v0.2.0
+	github.com/indigo-web/utils v0.3.0
 	github.com/stretchr/testify v1.8.4
 )
 
