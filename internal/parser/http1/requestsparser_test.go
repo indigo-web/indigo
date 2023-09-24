@@ -3,24 +3,23 @@ package http1
 import (
 	"context"
 	"fmt"
-	"github.com/dchest/uniuri"
-	"github.com/indigo-web/indigo/http/decoder"
 	"strings"
 	"testing"
 
-	"github.com/indigo-web/indigo/internal/server/tcp/dummy"
-
-	"github.com/indigo-web/indigo/http/status"
-	"github.com/indigo-web/utils/pool"
-
+	"github.com/dchest/uniuri"
+	"github.com/indigo-web/chunkedbody"
 	"github.com/indigo-web/indigo/http"
+	"github.com/indigo-web/indigo/http/decoder"
 	"github.com/indigo-web/indigo/http/headers"
 	"github.com/indigo-web/indigo/http/method"
 	"github.com/indigo-web/indigo/http/proto"
 	"github.com/indigo-web/indigo/http/query"
+	"github.com/indigo-web/indigo/http/status"
 	httpparser "github.com/indigo-web/indigo/internal/parser"
+	"github.com/indigo-web/indigo/internal/server/tcp/dummy"
 	"github.com/indigo-web/indigo/settings"
 	"github.com/indigo-web/utils/buffer"
+	"github.com/indigo-web/utils/pool"
 	"github.com/stretchr/testify/require"
 )
 
@@ -54,7 +53,11 @@ func getParser() (httpparser.HTTPRequestsParser, *http.Request) {
 		s.URL.BufferSize.Maximal,
 	)
 	objPool := pool.NewObjectPool[[]string](20)
-	body := NewBodyReader(dummy.NewNopClient(), NewChunkedBodyParser(s.Body), decoder.NewManager(0))
+	chunkedParserSettings := chunkedbody.DefaultSettings()
+	chunkedParserSettings.MaxChunkSize = s.Body.MaxChunkSize
+	chunkedParser := chunkedbody.NewParser(chunkedParserSettings)
+	body := NewBodyReader(
+		dummy.NewNopClient(), chunkedParser, decoder.NewManager(0))
 	request := http.NewRequest(
 		context.Background(), headers.NewHeaders(), query.Query{}, http.NewResponse(),
 		dummy.NewNopConn(), http.NewBody(body), nil, false,

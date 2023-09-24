@@ -2,6 +2,7 @@ package indigo
 
 import (
 	"context"
+	"github.com/indigo-web/chunkedbody"
 	"github.com/indigo-web/indigo/http"
 	"github.com/indigo-web/indigo/http/decoder"
 	"github.com/indigo-web/indigo/http/headers"
@@ -42,7 +43,10 @@ func newBodyReader(client tcp.Client, body settings.Body, decoders map[string]de
 		manager.Add(token, constructor)
 	}
 
-	return http1.NewBodyReader(client, http1.NewChunkedBodyParser(body), manager)
+	chunkedbodySettings := chunkedbody.DefaultSettings()
+	chunkedbodySettings.MaxChunkSize = body.MaxChunkSize
+
+	return http1.NewBodyReader(client, chunkedbody.NewParser(chunkedbodySettings), manager)
 }
 
 func newRequest(

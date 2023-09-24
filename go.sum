@@ -4,6 +4,10 @@ github.com/davecgh/go-spew v1.1.1/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSs
 github.com/dchest/uniuri v1.2.0 h1:koIcOUdrTIivZgSLhHQvKgqdWZq5d7KdMEWF1Ud6+5g=
 github.com/dchest/uniuri v1.2.0/go.mod h1:fSzm4SLHzNZvWLvWJew423PhAzkpNQYq+uNLq4kxhkY=
 github.com/google/gofuzz v1.0.0/go.mod h1:dBl0BpW6vV/+mYPU4Po3pmUjxk6FQPldtuIdl/M65Eg=
+github.com/indigo-web/chunkedbody v0.1.0 h1:fZerB4rS9aufemrNTPPKOMSWsgnImfuW4g1lxnWISHI=
+github.com/indigo-web/chunkedbody v0.1.0/go.mod h1:E3IVH0uH1ePqQO4n76M2EVPplGyqZTP88MpR3kRj/mE=
+github.com/indigo-web/chunkedbodyparser v0.0.1 h1:6xrcqOMx1imPQkQJMI2LcJ/Z8AYRzeD3x8Jv4w1m+Lk=
+github.com/indigo-web/chunkedbodyparser v0.0.1/go.mod h1:bH9tksj6u4hA+de2SJ23IXebC6v68HW2ACdANEO98UI=
 github.com/indigo-web/iter v0.0.1 h1:6Z9sUaAgkJ4GZ4Cx7foyztyDVj9y0YAmAm3D7IzMWAM=
 github.com/indigo-web/iter v0.0.1/go.mod h1:hftmhzfi4hpWc715PmXsfMjE1K0FLwznr+iyLxM7wyQ=
 github.com/indigo-web/iter v0.0.2 h1:3uQLrCz9N9k7TXlm5EPTD51QERHxYBzk3OeDz9M9LKk=

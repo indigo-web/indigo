@@ -9,7 +9,6 @@ import (
 	"github.com/indigo-web/indigo/http/status"
 	"github.com/indigo-web/indigo/internal/parser/http1"
 	"github.com/indigo-web/indigo/internal/server/tcp/dummy"
-	"github.com/indigo-web/indigo/settings"
 	"testing"
 )
 
@@ -47,7 +46,7 @@ func BenchmarkRenderer_Response(b *testing.B) {
 	hdrs := headers.NewHeaders()
 	response := http.NewResponse()
 	bodyReader := http1.NewBodyReader(
-		dummy.NewNopClient(), http1.NewChunkedBodyParser(settings.Default().Body), decoder.NewManager(0),
+		dummy.NewNopClient(), nil, decoder.NewManager(0),
 	)
 	request := http.NewRequest(
 		context.Background(), hdrs, query.NewQuery(nil), http.NewResponse(), dummy.NewNopConn(),
