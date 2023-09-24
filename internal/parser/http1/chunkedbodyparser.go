@@ -2,7 +2,7 @@ package http1
 
 import (
 	"fmt"
-	"github.com/indigo-web/indigo/internal/hex"
+	"github.com/indigo-web/utils/hex"
 	"io"
 
 	"github.com/indigo-web/indigo/http/status"
