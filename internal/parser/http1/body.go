@@ -58,6 +58,9 @@ func (b *bodyReader) Read() ([]byte, error) {
 }
 
 func (b *bodyReader) plainBodyReader(data []byte) (body []byte, err error) {
+	// TODO: we can avoid one extra indirect function call by returning io.EOF with
+	//  body at the same time
+
 	b.bodyBytesLeft -= len(data)
 	if b.bodyBytesLeft < 0 {
 		b.client.Unread(data[len(data)+b.bodyBytesLeft:])
