@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"bytes"
 	"context"
+	"github.com/indigo-web/chunkedbody"
 	"github.com/indigo-web/indigo/http"
 	"github.com/indigo-web/indigo/http/decoder"
 	"github.com/indigo-web/indigo/http/headers"
@@ -13,7 +14,6 @@ import (
 	"github.com/indigo-web/indigo/http/status"
 	"github.com/indigo-web/indigo/internal/parser/http1"
 	"github.com/indigo-web/indigo/internal/server/tcp/dummy"
-	"github.com/indigo-web/indigo/settings"
 	"github.com/stretchr/testify/require"
 	"io"
 	"math"
@@ -29,11 +29,7 @@ func getEngine(defaultHeaders map[string][]string) *engine {
 func newRequest() *http.Request {
 	return http.NewRequest(
 		context.Background(), headers.NewHeaders(), query.Query{}, http.NewResponse(), dummy.NewNopConn(),
-		http.NewBody(http1.NewBodyReader(
-			dummy.NewNopClient(),
-			http1.NewChunkedBodyParser(settings.Default().Body),
-			decoder.NewManager(0),
-		)),
+		http.NewBody(http1.NewBodyReader(dummy.NewNopClient(), nil, decoder.NewManager(0))),
 		nil, false,
 	)
 }
@@ -253,7 +249,7 @@ func TestEngine_PreWrite(t *testing.T) {
 }
 
 func TestEngine_ChunkedTransfer(t *testing.T) {
-	t.Run("Simple", func(t *testing.T) {
+	t.Run("simple", func(t *testing.T) {
 		reader := bytes.NewBuffer([]byte("Hello, world!"))
 		wantData := "d\r\nHello, world!\r\n0\r\n\r\n"
 		renderer := getEngine(nil)
@@ -265,9 +261,9 @@ func TestEngine_ChunkedTransfer(t *testing.T) {
 		require.Equal(t, wantData, string(writer.Data))
 	})
 
-	t.Run("Long", func(t *testing.T) {
+	t.Run("long", func(t *testing.T) {
 		const buffSize = 64
-		parser := http1.NewChunkedBodyParser(settings.Default().Body)
+		parser := chunkedbody.NewParser(chunkedbody.DefaultSettings())
 		payload := strings.Repeat("abcdefgh", 10*buffSize)
 		reader := bytes.NewBuffer([]byte(payload))
 		renderer := getEngine(nil)

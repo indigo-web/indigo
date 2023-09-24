@@ -79,7 +79,12 @@ func (a *Application) Serve(r router.Router, optionalSettings ...settings.Settin
 		// because of the special treatment of default headers by rendering engine, better to
 		// join these values manually. Otherwise, each value will be rendered individually, that
 		// still follows the standard, but brings some unnecessary networking overhead
-		a.defaultHeaders["Accept-Encodings"] = []string{strings.Join(mapconv.Keys(a.decoders), ",")}
+		acceptTokens := strings.Join(mapconv.Keys(a.decoders), ",")
+		if len(acceptTokens) == 0 {
+			acceptTokens = "identity"
+		}
+
+		a.defaultHeaders["Accept-Encodings"] = []string{acceptTokens}
 	}
 
 	if err := r.OnStart(); err != nil {

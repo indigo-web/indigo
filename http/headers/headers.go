@@ -1,8 +1,8 @@
 package headers
 
 import (
-	"github.com/indigo-web/indigo/internal/strcomp"
 	"github.com/indigo-web/iter"
+	"github.com/indigo-web/utils/strcomp"
 )
 
 // Headers is a struct that encapsulates headers map from user, allowing only
@@ -41,7 +41,7 @@ func FromMap(m map[string][]string) *Headers {
 // pairs)
 func NewPreallocHeaders(n int) *Headers {
 	return &Headers{
-		headers: make([]string, n*2),
+		headers: make([]string, 0, n*2),
 	}
 }
 

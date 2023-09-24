@@ -1,6 +1,7 @@
 package http1
 
 import (
+	"github.com/indigo-web/chunkedbody"
 	"github.com/indigo-web/indigo/http"
 	"github.com/indigo-web/indigo/http/decoder"
 	"github.com/indigo-web/indigo/http/headers"
@@ -11,12 +12,14 @@ import (
 type bodyReader struct {
 	client        tcp.Client
 	bodyBytesLeft int
-	chunkedParser *ChunkedBodyParser
+	chunkedParser *chunkedbody.Parser
 	encoding      headers.Encoding
 	manager       *decoder.Manager
 }
 
-func NewBodyReader(client tcp.Client, chunkedParser *ChunkedBodyParser, manager *decoder.Manager) http.BodyReader {
+func NewBodyReader(
+	client tcp.Client, chunkedParser *chunkedbody.Parser, manager *decoder.Manager,
+) http.BodyReader {
 	return &bodyReader{
 		client:        client,
 		chunkedParser: chunkedParser,
@@ -55,6 +58,9 @@ func (b *bodyReader) Read() ([]byte, error) {
 }
 
 func (b *bodyReader) plainBodyReader(data []byte) (body []byte, err error) {
+	// TODO: we can avoid one extra indirect function call by returning io.EOF with
+	//  body at the same time
+
 	b.bodyBytesLeft -= len(data)
 	if b.bodyBytesLeft < 0 {
 		b.client.Unread(data[len(data)+b.bodyBytesLeft:])

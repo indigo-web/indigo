@@ -11,8 +11,6 @@ import (
 
 	"github.com/indigo-web/indigo/http"
 	"github.com/indigo-web/indigo/internal/parser/http1"
-	"github.com/indigo-web/indigo/settings"
-
 	"github.com/indigo-web/indigo/router/inbuilt/types"
 
 	"github.com/indigo-web/indigo/http/headers"
@@ -64,7 +62,7 @@ func getMiddleware(mware middleware, stack *callstack) types.Middleware {
 func getRequest() *http.Request {
 	q := query.NewQuery(nil)
 	bodyReader := http1.NewBodyReader(
-		dummy.NewNopClient(), http1.NewChunkedBodyParser(settings.Default().Body), decoder.NewManager(0),
+		dummy.NewNopClient(), nil, decoder.NewManager(0),
 	)
 
 	return http.NewRequest(

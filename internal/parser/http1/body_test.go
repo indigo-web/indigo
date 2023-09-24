@@ -7,19 +7,20 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/indigo-web/chunkedbody"
 	"github.com/indigo-web/indigo/http"
 	"github.com/indigo-web/indigo/http/decoder"
 	"github.com/indigo-web/indigo/http/headers"
 	"github.com/indigo-web/indigo/http/query"
 	"github.com/indigo-web/indigo/internal/server/tcp/dummy"
-	"github.com/indigo-web/indigo/settings"
 	"github.com/indigo-web/utils/ft"
 	"github.com/stretchr/testify/require"
 )
 
 func getRequestWithReader(chunked bool, body ...[]byte) (*http.Request, http.BodyReader) {
 	client := dummy.NewCircularClient(body...)
-	reader := NewBodyReader(client, NewChunkedBodyParser(settings.Default().Body), decoder.NewManager(0))
+	chunkedParser := chunkedbody.NewParser(chunkedbody.DefaultSettings())
+	reader := NewBodyReader(client, chunkedParser, decoder.NewManager(0))
 	reqBody := http.NewBody(reader)
 
 	var (
@@ -112,7 +113,8 @@ func TestBodyReader_Plain(t *testing.T) {
 			dummy.NewNopConn(), nil, nil, false,
 		)
 		request.ContentLength = buffSize
-		reader := NewBodyReader(client, NewChunkedBodyParser(settings.Default().Body), decoder.NewManager(0))
+		chunkedParser := chunkedbody.NewParser(chunkedbody.DefaultSettings())
+		reader := NewBodyReader(client, chunkedParser, decoder.NewManager(0))
 		reader.Init(request)
 
 		data, err := reader.Read()

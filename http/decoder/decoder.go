@@ -32,9 +32,9 @@ func (m *Manager) Add(token string, constructor Constructor) {
 	// see https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/Content-Encoding#directives
 	switch token {
 	case "gzip":
-		m.decoders[token] = decoder
+		m.decoders["x-gzip"] = decoder
 	case "compress":
-		m.decoders[token] = decoder
+		m.decoders["x-compress"] = decoder
 	}
 }
 

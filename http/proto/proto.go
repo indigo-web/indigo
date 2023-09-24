@@ -1,7 +1,7 @@
 package proto
 
 import (
-	"github.com/indigo-web/indigo/internal/strcomp"
+	"github.com/indigo-web/utils/strcomp"
 	"github.com/indigo-web/utils/uf"
 )
 

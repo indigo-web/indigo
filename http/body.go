@@ -2,7 +2,7 @@ package http
 
 import (
 	"github.com/indigo-web/indigo/http/headers"
-	"github.com/indigo-web/indigo/internal/unreader"
+	"github.com/indigo-web/utils/unreader"
 	"io"
 )
 

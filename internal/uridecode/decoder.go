@@ -3,7 +3,7 @@ package uridecode
 import (
 	"bytes"
 	"github.com/indigo-web/indigo/http/status"
-	"github.com/indigo-web/indigo/internal/hex"
+	"github.com/indigo-web/utils/hex"
 )
 
 func Decode(src, buff []byte) ([]byte, error) {
