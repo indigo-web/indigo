@@ -41,7 +41,7 @@ func FromMap(m map[string][]string) *Headers {
 // pairs)
 func NewPreallocHeaders(n int) *Headers {
 	return &Headers{
-		headers: make([]string, n*2),
+		headers: make([]string, 0, n*2),
 	}
 }
 
