@@ -12,6 +12,8 @@ func BenchmarkGZIP_Encode1mb(b *testing.B) {
 	repeatedSequence := "qgkvasdf sdfjghsdjfas sjkdfhjksd"
 	data := []byte(strings.Repeat(repeatedSequence, megabyte/len(repeatedSequence)))
 	coder := NewGZIP(make([]byte, megabyte))
+
+	b.SetBytes(int64(len(data)))
 	b.ReportAllocs()
 	b.ResetTimer()
 
@@ -27,6 +29,7 @@ func BenchmarkGZIP_Decode1mb(b *testing.B) {
 	compressedData, err := coder.Encode(data)
 	require.NoError(b, err)
 
+	b.SetBytes(int64(len(data)))
 	b.ReportAllocs()
 	b.ResetTimer()
 
