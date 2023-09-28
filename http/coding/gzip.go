@@ -26,6 +26,10 @@ func NewGZIP(outBuff []byte) Coding {
 	}
 }
 
+func (g *GZIP) Token() string {
+	return "gzip"
+}
+
 func (g *GZIP) Decode(input []byte) (output []byte, err error) {
 	g.inBuff.Reset()
 	g.inBuff.Write(input)
