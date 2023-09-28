@@ -1,7 +1,6 @@
 package main
 
 import (
-	"fmt"
 	"log"
 
 	"github.com/indigo-web/indigo"
@@ -10,7 +9,10 @@ import (
 	"github.com/indigo-web/indigo/router/simple"
 )
 
-var addr = "localhost:8080"
+const (
+	host = "0.0.0.0"
+	port = 8080
+)
 
 func MyHandler(request *http.Request) *http.Response {
 	return request.Respond().
@@ -24,7 +26,7 @@ func main() {
 		return request.Respond().WithError(err)
 	})
 
-	fmt.Println("Listening on", addr)
-	app := indigo.NewApp(addr)
+	app := indigo.NewApp(host, port)
+	log.Println("Listening on", host, port)
 	log.Fatal(app.Serve(myRouter))
 }
