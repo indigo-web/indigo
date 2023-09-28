@@ -3,7 +3,7 @@ package render
 import (
 	"context"
 	"github.com/indigo-web/indigo/http"
-	"github.com/indigo-web/indigo/http/decoder"
+	"github.com/indigo-web/indigo/http/coding"
 	"github.com/indigo-web/indigo/http/headers"
 	"github.com/indigo-web/indigo/http/query"
 	"github.com/indigo-web/indigo/http/status"
@@ -46,7 +46,7 @@ func BenchmarkRenderer_Response(b *testing.B) {
 	hdrs := headers.NewHeaders()
 	response := http.NewResponse()
 	bodyReader := http1.NewBodyReader(
-		dummy.NewNopClient(), nil, decoder.NewManager(0),
+		dummy.NewNopClient(), nil, coding.NewManager(0),
 	)
 	request := http.NewRequest(
 		context.Background(), hdrs, query.NewQuery(nil), http.NewResponse(), dummy.NewNopConn(),

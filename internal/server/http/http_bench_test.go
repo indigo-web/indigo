@@ -2,7 +2,7 @@ package http
 
 import (
 	"context"
-	"github.com/indigo-web/indigo/http/decoder"
+	"github.com/indigo-web/indigo/http/coding"
 	"github.com/indigo-web/indigo/http/method"
 	"github.com/indigo-web/indigo/http/status"
 	"github.com/indigo-web/indigo/internal/requestgen"
@@ -118,7 +118,7 @@ func Benchmark_Get(b *testing.B) {
 	s := settings.Default()
 	q := query.NewQuery(headers.NewHeaders())
 	bodyReader := http1.NewBodyReader(
-		dummy.NewNopClient(), nil, decoder.NewManager(0),
+		dummy.NewNopClient(), nil, coding.NewManager(0),
 	)
 	body := http.NewBody(bodyReader)
 	hdrs := headers.FromMap(make(map[string][]string, 10))
@@ -222,7 +222,7 @@ func Benchmark_Post(b *testing.B) {
 	hdrs := headers.FromMap(make(map[string][]string, 10))
 	withBodyClient := dummy.NewCircularClient(simplePOST)
 	reader := http1.NewBodyReader(
-		withBodyClient, nil, decoder.NewManager(0),
+		withBodyClient, nil, coding.NewManager(0),
 	)
 	body := http.NewBody(reader)
 	request := http.NewRequest(

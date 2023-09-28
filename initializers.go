@@ -4,7 +4,7 @@ import (
 	"context"
 	"github.com/indigo-web/chunkedbody"
 	"github.com/indigo-web/indigo/http"
-	"github.com/indigo-web/indigo/http/decoder"
+	"github.com/indigo-web/indigo/http/coding"
 	"github.com/indigo-web/indigo/http/headers"
 	"github.com/indigo-web/indigo/http/query"
 	httpparser "github.com/indigo-web/indigo/internal/parser"
@@ -36,11 +36,11 @@ func newKeyValueArenas(s settings.Headers) (*buffer.Buffer[byte], *buffer.Buffer
 	return keyArena, valArena
 }
 
-func newBodyReader(client tcp.Client, body settings.Body, decoders map[string]decoder.Constructor) http.BodyReader {
-	manager := decoder.NewManager(body.DecodedBufferSize)
+func newBodyReader(client tcp.Client, body settings.Body, codings []coding.Constructor) http.BodyReader {
+	manager := coding.NewManager(body.DecodedBufferSize)
 
-	for token, constructor := range decoders {
-		manager.Add(token, constructor)
+	for _, constructor := range codings {
+		manager.AddCoding(constructor)
 	}
 
 	chunkedbodySettings := chunkedbody.DefaultSettings()
