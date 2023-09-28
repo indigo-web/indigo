@@ -5,15 +5,14 @@ import (
 	"crypto/tls"
 	"errors"
 	"fmt"
+	"github.com/indigo-web/indigo/http/coding"
 	"net"
-	"strconv"
 	"strings"
 
 	httpserver "github.com/indigo-web/indigo/internal/server/http"
 	"github.com/indigo-web/indigo/internal/server/tcp"
 	"github.com/indigo-web/utils/mapconv"
 
-	"github.com/indigo-web/indigo/http/decoder"
 	"github.com/indigo-web/indigo/router"
 	"github.com/indigo-web/indigo/settings"
 )
@@ -32,25 +31,26 @@ var DefaultHeaders = map[string][]string{
 // not used. Planning to replace it with context.WithCancel()
 type Application struct {
 	ctx              context.Context
-	decoders         map[string]decoder.Constructor
+	codings          []coding.Constructor
 	defaultHeaders   map[string][]string
-	addr             string
+	host             string
+	port             uint16
 	servers          []*tcp.Server
 	gracefulShutdown bool
 }
 
 // NewApp returns a new application object with initialized shutdown chan
-func NewApp(addr string) *Application {
+func NewApp(host string, port uint16) *Application {
 	return &Application{
-		addr:           addr,
-		decoders:       map[string]decoder.Constructor{},
+		host:           host,
+		port:           port,
 		defaultHeaders: mapconv.Copy(DefaultHeaders),
 	}
 }
 
-// AddContentDecoder simply adds a new content decoder
-func (a *Application) AddContentDecoder(token string, decoder decoder.Constructor) {
-	a.decoders[token] = decoder
+// AddCoding adds a new content coding, available for both encoding and decoding
+func (a *Application) AddCoding(constructor coding.Constructor) {
+	a.codings = append(a.codings, constructor)
 }
 
 // SetDefaultHeaders overrides default headers to a passed ones.
@@ -79,11 +79,7 @@ func (a *Application) Serve(r router.Router, optionalSettings ...settings.Settin
 		// because of the special treatment of default headers by rendering engine, better to
 		// join these values manually. Otherwise, each value will be rendered individually, that
 		// still follows the standard, but brings some unnecessary networking overhead
-		acceptTokens := strings.Join(mapconv.Keys(a.decoders), ",")
-		if len(acceptTokens) == 0 {
-			acceptTokens = "identity"
-		}
-
+		acceptTokens := strings.Join(availableEncodings(a.codings...), ",")
 		a.defaultHeaders["Accept-Encodings"] = []string{acceptTokens}
 	}
 
@@ -97,16 +93,12 @@ func (a *Application) Serve(r router.Router, optionalSettings ...settings.Settin
 	}
 
 	if s.TLS.Enable {
-		tlsAddr, err := replacePort(a.addr, s.TLS.Port)
-		if err != nil {
-			return err
-		}
-
 		cert, err := tls.LoadX509KeyPair(s.TLS.Cert, s.TLS.Key)
 		if err != nil {
 			return err
 		}
 
+		tlsAddr := fmt.Sprintf("%s:%d", a.host, s.TLS.Port)
 		cfg := &tls.Config{Certificates: []tls.Certificate{cert}}
 		listener, err := tls.Listen("tcp", tlsAddr, cfg)
 		if err != nil {
@@ -115,7 +107,7 @@ func (a *Application) Serve(r router.Router, optionalSettings ...settings.Settin
 
 		a.servers = append(a.servers, tcp.NewServer(listener, func(conn net.Conn) {
 			client := newClient(s.TCP, conn)
-			bodyReader := newBodyReader(client, s.Body, a.decoders)
+			bodyReader := newBodyReader(client, s.Body, a.codings)
 			request := newRequest(a.ctx, s, conn, bodyReader)
 			request.IsTLS = true
 			renderer := newRenderer(s.HTTP, a)
@@ -126,14 +118,15 @@ func (a *Application) Serve(r router.Router, optionalSettings ...settings.Settin
 		}))
 	}
 
-	sock, err := net.Listen("tcp", a.addr)
+	addr := fmt.Sprintf("%s:%d", a.host, a.port)
+	sock, err := net.Listen("tcp", addr)
 	if err != nil {
 		return err
 	}
 
 	a.servers = append(a.servers, tcp.NewServer(sock, func(conn net.Conn) {
 		client := newClient(s.TCP, conn)
-		bodyReader := newBodyReader(client, s.Body, a.decoders)
+		bodyReader := newBodyReader(client, s.Body, a.codings)
 		request := newRequest(a.ctx, s, conn, bodyReader)
 		renderer := newRenderer(s.HTTP, a)
 		httpParser := newHTTPParser(s, request)
@@ -204,20 +197,16 @@ func concreteSettings(s ...settings.Settings) (settings.Settings, error) {
 	}
 }
 
-func replacePort(addr string, newPort uint16) (newAddr string, err error) {
-	host, err := hostFromAddr(addr)
-	if err != nil {
-		return "", err
+func availableEncodings(codings ...coding.Constructor) []string {
+	if len(codings) == 0 {
+		return []string{"identity"}
 	}
 
-	return host + ":" + strconv.Itoa(int(newPort)), nil
-}
+	available := make([]string, 0, len(codings))
 
-func hostFromAddr(addr string) (host string, err error) {
-	semicolon := strings.IndexByte(addr, ':')
-	if semicolon == -1 {
-		return "", fmt.Errorf("bad address: %s", addr)
+	for _, constructor := range codings {
+		available = append(available, constructor(nil).Token())
 	}
 
-	return addr[:semicolon], nil
+	return available
 }
