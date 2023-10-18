@@ -19,7 +19,10 @@ import (
   "github.com/indigo-web/indigo/router/inbuilt"
 )
 
-const addr = "0.0.0.0:8080"
+const (
+  addr = "0.0.0.0"
+  port = 8080
+)
 
 func MyHandler(request *http.Request) *http.Response {
   return request.Respond().WithBody("Hello, world!")
@@ -31,7 +34,7 @@ func main() {
     Get(MyHandler).
     Post(MyHandler)
 
-  app := indigo.NewApp(addr)
+  app := indigo.NewApp(addr, port)
   if err := app.Serve(router); err != nil {
     log.Fatal(err)
   }
