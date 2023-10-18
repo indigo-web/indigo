@@ -92,7 +92,7 @@ func main() {
 	s.TCP.ReadTimeout = time.Hour
 
 	app := indigo.NewApp(host, port)
-	fmt.Println("Listening on", host, port)
+	log.Println("Listening on", host, port)
 
 	if err := app.Serve(r, s); err != nil {
 		log.Fatal(err)
