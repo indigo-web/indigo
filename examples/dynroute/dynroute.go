@@ -1,7 +1,6 @@
 package main
 
 import (
-	"fmt"
 	"log"
 
 	"github.com/indigo-web/indigo/http"
@@ -10,7 +9,10 @@ import (
 	"github.com/indigo-web/indigo/router/inbuilt"
 )
 
-var addr = "localhost:8080"
+const (
+	host = "0.0.0.0"
+	port = 8080
+)
 
 func MyDynamicHandler(request *http.Request) *http.Response {
 	worldName := request.Params["world-name"]
@@ -23,7 +25,7 @@ func main() {
 
 	r.Get("/hello/{world-name}", MyDynamicHandler)
 
-	fmt.Println("Listening on", addr)
-	app := indigo.NewApp(addr)
+	app := indigo.NewApp(host, port)
+	log.Println("Listening on", host, port)
 	log.Fatal(app.Serve(r))
 }

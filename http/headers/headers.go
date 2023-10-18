@@ -84,13 +84,13 @@ func (h *Headers) ValueOr(key, or string) string {
 
 // ValuesIter returns an iterator over all the values of a key
 func (h *Headers) ValuesIter(key string) iter.Iterator[string] {
-	valuesPairs := iter.Filter[[]string](h.Iter(), func(el []string) bool {
+	valuesPairs := iter.Filter[[]string](func(el []string) bool {
 		return strcomp.EqualFold(el[0], key)
-	})
+	}, h.Iter())
 
-	return iter.Map[[]string, string](valuesPairs, func(el []string) string {
+	return iter.Map[[]string, string](func(el []string) string {
 		return el[1]
-	})
+	}, valuesPairs)
 }
 
 // Values returns all the values of a key
@@ -103,18 +103,18 @@ func (h *Headers) Values(key string) (values []string) {
 
 // KeysIter returns an iterator over all unique keys
 func (h *Headers) KeysIter() iter.Iterator[string] {
-	keys := iter.Map[[]string, string](h.Iter(), func(el []string) string {
+	keys := iter.Map[[]string, string](func(el []string) string {
 		return el[0]
-	})
+	}, h.Iter())
 	buff := h.ensureNotNil(h.uniqueBuff)
-	it := iter.Filter[string](keys, func(el string) bool {
+	it := iter.Filter[string](func(el string) bool {
 		if contains(buff, el) {
 			return false
 		}
 
 		buff = append(buff, el)
 		return true
-	})
+	}, keys)
 
 	h.uniqueBuff = buff[:0]
 

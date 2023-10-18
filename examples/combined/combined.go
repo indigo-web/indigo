@@ -2,7 +2,6 @@ package main
 
 import (
 	"fmt"
-	"github.com/indigo-web/indigo/http/decoder"
 	"github.com/indigo-web/indigo/router/inbuilt/middleware"
 	"github.com/indigo-web/indigo/settings"
 	"log"
@@ -16,8 +15,9 @@ import (
 	"github.com/indigo-web/indigo/router/inbuilt"
 )
 
-var (
-	addr  = "localhost:8080"
+const (
+	host  = "0.0.0.0"
+	port  = 8080
 	index = "index.html"
 )
 
@@ -91,9 +91,8 @@ func main() {
 	s := settings.Default()
 	s.TCP.ReadTimeout = time.Hour
 
-	app := indigo.NewApp(addr)
-	app.AddContentDecoder("gzip", decoder.NewGZIPDecoder)
-	fmt.Println("Listening on", addr)
+	app := indigo.NewApp(host, port)
+	log.Println("Listening on", host, port)
 
 	if err := app.Serve(r, s); err != nil {
 		log.Fatal(err)

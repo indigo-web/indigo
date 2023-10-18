@@ -2,7 +2,7 @@ package inbuilt
 
 import (
 	"context"
-	"github.com/indigo-web/indigo/http/decoder"
+	"github.com/indigo-web/indigo/http/coding"
 	"github.com/indigo-web/indigo/http/method"
 	"github.com/indigo-web/indigo/http/status"
 	"github.com/indigo-web/indigo/internal/server/tcp/dummy"
@@ -62,7 +62,7 @@ func getMiddleware(mware middleware, stack *callstack) types.Middleware {
 func getRequest() *http.Request {
 	q := query.NewQuery(nil)
 	bodyReader := http1.NewBodyReader(
-		dummy.NewNopClient(), nil, decoder.NewManager(0),
+		dummy.NewNopClient(), nil, coding.NewManager(0),
 	)
 
 	return http.NewRequest(

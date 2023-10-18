@@ -6,7 +6,7 @@ import (
 	"context"
 	"github.com/indigo-web/chunkedbody"
 	"github.com/indigo-web/indigo/http"
-	"github.com/indigo-web/indigo/http/decoder"
+	"github.com/indigo-web/indigo/http/coding"
 	"github.com/indigo-web/indigo/http/headers"
 	"github.com/indigo-web/indigo/http/method"
 	"github.com/indigo-web/indigo/http/proto"
@@ -29,7 +29,7 @@ func getEngine(defaultHeaders map[string][]string) *engine {
 func newRequest() *http.Request {
 	return http.NewRequest(
 		context.Background(), headers.NewHeaders(), query.Query{}, http.NewResponse(), dummy.NewNopConn(),
-		http.NewBody(http1.NewBodyReader(dummy.NewNopClient(), nil, decoder.NewManager(0))),
+		http.NewBody(http1.NewBodyReader(dummy.NewNopClient(), nil, coding.NewManager(0))),
 		nil, false,
 	)
 }

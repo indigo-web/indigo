@@ -3,7 +3,7 @@ package http1
 import (
 	"github.com/indigo-web/chunkedbody"
 	"github.com/indigo-web/indigo/http"
-	"github.com/indigo-web/indigo/http/decoder"
+	"github.com/indigo-web/indigo/http/coding"
 	"github.com/indigo-web/indigo/http/headers"
 	"github.com/indigo-web/indigo/internal/server/tcp"
 	"io"
@@ -14,11 +14,11 @@ type bodyReader struct {
 	bodyBytesLeft int
 	chunkedParser *chunkedbody.Parser
 	encoding      headers.Encoding
-	manager       *decoder.Manager
+	manager       coding.Manager
 }
 
 func NewBodyReader(
-	client tcp.Client, chunkedParser *chunkedbody.Parser, manager *decoder.Manager,
+	client tcp.Client, chunkedParser *chunkedbody.Parser, manager coding.Manager,
 ) http.BodyReader {
 	return &bodyReader{
 		client:        client,
@@ -70,14 +70,18 @@ func (b *bodyReader) plainBodyReader(data []byte) (body []byte, err error) {
 
 	for _, token := range b.encoding.Transfer {
 		data, err = b.manager.Decode(token, data)
-		if err != nil {
+		switch err {
+		case nil, io.EOF:
+		default:
 			return nil, err
 		}
 	}
 
 	for _, token := range b.encoding.Content {
 		data, err = b.manager.Decode(token, data)
-		if err != nil {
+		switch err {
+		case nil, io.EOF:
+		default:
 			return nil, err
 		}
 	}

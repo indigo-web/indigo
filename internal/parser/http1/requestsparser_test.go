@@ -3,13 +3,13 @@ package http1
 import (
 	"context"
 	"fmt"
+	"github.com/indigo-web/indigo/http/coding"
 	"strings"
 	"testing"
 
 	"github.com/dchest/uniuri"
 	"github.com/indigo-web/chunkedbody"
 	"github.com/indigo-web/indigo/http"
-	"github.com/indigo-web/indigo/http/decoder"
 	"github.com/indigo-web/indigo/http/headers"
 	"github.com/indigo-web/indigo/http/method"
 	"github.com/indigo-web/indigo/http/proto"
@@ -57,7 +57,7 @@ func getParser() (httpparser.HTTPRequestsParser, *http.Request) {
 	chunkedParserSettings.MaxChunkSize = s.Body.MaxChunkSize
 	chunkedParser := chunkedbody.NewParser(chunkedParserSettings)
 	body := NewBodyReader(
-		dummy.NewNopClient(), chunkedParser, decoder.NewManager(0))
+		dummy.NewNopClient(), chunkedParser, coding.NewManager(0))
 	request := http.NewRequest(
 		context.Background(), headers.NewHeaders(), query.Query{}, http.NewResponse(),
 		dummy.NewNopConn(), http.NewBody(body), nil, false,

@@ -2,6 +2,7 @@ package http1
 
 import (
 	"context"
+	"github.com/indigo-web/indigo/http/coding"
 	"io"
 	"strconv"
 	"strings"
@@ -9,7 +10,6 @@ import (
 
 	"github.com/indigo-web/chunkedbody"
 	"github.com/indigo-web/indigo/http"
-	"github.com/indigo-web/indigo/http/decoder"
 	"github.com/indigo-web/indigo/http/headers"
 	"github.com/indigo-web/indigo/http/query"
 	"github.com/indigo-web/indigo/internal/server/tcp/dummy"
@@ -20,7 +20,7 @@ import (
 func getRequestWithReader(chunked bool, body ...[]byte) (*http.Request, http.BodyReader) {
 	client := dummy.NewCircularClient(body...)
 	chunkedParser := chunkedbody.NewParser(chunkedbody.DefaultSettings())
-	reader := NewBodyReader(client, chunkedParser, decoder.NewManager(0))
+	reader := NewBodyReader(client, chunkedParser, coding.NewManager(0))
 	reqBody := http.NewBody(reader)
 
 	var (
@@ -114,7 +114,7 @@ func TestBodyReader_Plain(t *testing.T) {
 		)
 		request.ContentLength = buffSize
 		chunkedParser := chunkedbody.NewParser(chunkedbody.DefaultSettings())
-		reader := NewBodyReader(client, chunkedParser, decoder.NewManager(0))
+		reader := NewBodyReader(client, chunkedParser, coding.NewManager(0))
 		reader.Init(request)
 
 		data, err := reader.Read()

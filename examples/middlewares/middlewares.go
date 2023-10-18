@@ -12,7 +12,10 @@ import (
 	"github.com/indigo-web/indigo/router/inbuilt"
 )
 
-var addr = "localhost:8080"
+const (
+	host = "0.0.0.0"
+	port = 8080
+)
 
 func HelloWorldMiddleware(next types.Handler, request *http.Request) *http.Response {
 	fmt.Println("running middleware before handler")
@@ -46,7 +49,7 @@ func main() {
 	v1.Use(SecondMiddleware)
 	v1.Get("/hello", MyBeautifulHandler)
 
-	fmt.Println("listening on", addr)
-	app := indigo.NewApp(addr)
+	app := indigo.NewApp(host, port)
+	log.Println("listening on", host, port)
 	log.Fatal(app.Serve(r))
 }
