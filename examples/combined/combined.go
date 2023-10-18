@@ -2,7 +2,6 @@ package main
 
 import (
 	"fmt"
-	"github.com/indigo-web/indigo/http/coding"
 	"github.com/indigo-web/indigo/router/inbuilt/middleware"
 	"github.com/indigo-web/indigo/settings"
 	"log"
@@ -93,7 +92,6 @@ func main() {
 	s.TCP.ReadTimeout = time.Hour
 
 	app := indigo.NewApp(host, port)
-	app.AddCoding(coding.NewGZIP)
 	fmt.Println("Listening on", host, port)
 
 	if err := app.Serve(r, s); err != nil {
