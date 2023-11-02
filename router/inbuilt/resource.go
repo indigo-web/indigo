@@ -28,61 +28,68 @@ func (r Resource) Use(middlewares ...types.Middleware) Resource {
 	return r
 }
 
+// Catch registers a catcher. A catcher is a handler, that is being called if requested path
+// is not found, and it starts with a defined prefix
+func (r Resource) Catch(prefix string, handler types.Handler, mwares ...types.Middleware) Resource {
+	r.group.Catch(prefix, handler, mwares...)
+	return r
+}
+
 // Route is a shortcut to group.Route, providing the extra empty path to the call
 func (r Resource) Route(method method.Method, fun types.Handler, mwares ...types.Middleware) Resource {
 	r.group.Route(method, "", fun, mwares...)
 	return r
 }
 
-// Get is a shortcut for registering GET-requests
+// Get registers a handler for GET-requests
 func (r Resource) Get(handler types.Handler, mwares ...types.Middleware) Resource {
 	r.group.Get("", handler, mwares...)
 	return r
 }
 
-// Head is a shortcut for registering HEAD-requests
+// Head registers a handler for HEAD-requests
 func (r Resource) Head(handler types.Handler, mwares ...types.Middleware) Resource {
 	r.group.Head("", handler, mwares...)
 	return r
 }
 
-// Post is a shortcut for registering POST-requests
+// Post registers a handler for POST-requests
 func (r Resource) Post(handler types.Handler, mwares ...types.Middleware) Resource {
 	r.group.Post("", handler, mwares...)
 	return r
 }
 
-// Put is a shortcut for registering PUT-requests
+// Put registers a handler for PUT-requests
 func (r Resource) Put(handler types.Handler, mwares ...types.Middleware) Resource {
 	r.group.Put("", handler, mwares...)
 	return r
 }
 
-// Delete is a shortcut for registering DELETE-requests
+// Delete registers a handler for DELETE-requests
 func (r Resource) Delete(handler types.Handler, mwares ...types.Middleware) Resource {
 	r.group.Delete("", handler, mwares...)
 	return r
 }
 
-// Connect is a shortcut for registering CONNECT-requests
+// Connect registers a handler for CONNECT-requests
 func (r Resource) Connect(handler types.Handler, mwares ...types.Middleware) Resource {
 	r.group.Connect("", handler, mwares...)
 	return r
 }
 
-// Options is a shortcut for registering OPTIONS-requests
+// Options registers a handler for OPTIONS-requests
 func (r Resource) Options(handler types.Handler, mwares ...types.Middleware) Resource {
 	r.group.Options("", handler, mwares...)
 	return r
 }
 
-// Trace is a shortcut for registering TRACE-requests
+// Trace registers a handler for TRACE-requests
 func (r Resource) Trace(handler types.Handler, mwares ...types.Middleware) Resource {
 	r.group.Trace("", handler, mwares...)
 	return r
 }
 
-// Patch is a shortcut for registering PATCH-requests
+// Patch registers a handler for PATCH-requests
 func (r Resource) Patch(handler types.Handler, mwares ...types.Middleware) Resource {
 	r.group.Patch("", handler, mwares...)
 	return r

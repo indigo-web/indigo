@@ -4,6 +4,7 @@ import (
 	"github.com/indigo-web/indigo/http/method"
 	"github.com/indigo-web/indigo/http/status"
 	"github.com/indigo-web/indigo/router/inbuilt/types"
+	"path"
 )
 
 // AllErrors is used to be passed into Router.RouteError, indicating by that,
@@ -16,7 +17,7 @@ func (r *Router) Route(
 	method method.Method, path string, handlerFunc types.Handler,
 	middlewares ...types.Middleware,
 ) *Router {
-	err := r.registrar.Add(r.prefix+path, method, combine(handlerFunc, middlewares))
+	err := r.registrar.Add(r.prefix+path, method, compose(handlerFunc, middlewares))
 	if err != nil {
 		panic(err)
 	}
@@ -55,4 +56,17 @@ func (r *Router) RouteError(handler types.Handler, codes ...status.Code) {
 
 		r.errHandlers.Set(code, handler)
 	}
+
+	return r
+}
+
+// Catch registers a catcher. A catcher is a handler, that is being called if requested path
+// is not found, and it starts with a defined prefix
+func (r *Router) Catch(prefix string, handler types.Handler, middlewares ...types.Middleware) *Router {
+	r.catchers = append(r.catchers, types.Catcher{
+		Prefix:  path.Join(r.prefix, prefix),
+		Handler: compose(handler, middlewares),
+	})
+
+	return r
 }
