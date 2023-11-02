@@ -1,6 +1,7 @@
 package http
 
 import (
+	"github.com/indigo-web/indigo/http/mime"
 	"github.com/indigo-web/indigo/http/status"
 	"github.com/indigo-web/indigo/internal/render/types"
 	"github.com/indigo-web/utils/strcomp"
@@ -8,6 +9,7 @@ import (
 	json "github.com/json-iterator/go"
 	"io"
 	"os"
+	"path/filepath"
 )
 
 type ResponseWriter func(b []byte) error
@@ -119,18 +121,24 @@ func (r *Response) Write(b []byte) (n int, err error) {
 // to the file FD. In case not found or any other error, it'll be directly returned.
 // In case error occurred while opening the file, Response builder won't be affected and stay
 // clean
-func (r *Response) WithFile(path string) (*Response, error) {
-	file, err := os.Open(path)
+func (r *Response) WithFile(file string) (*Response, error) {
+	fd, err := os.Open(file)
 	if err != nil {
 		return r, err
 	}
 
-	stat, err := file.Stat()
+	stat, err := fd.Stat()
 	if err != nil {
 		return r, err
 	}
 
-	return r.WithAttachment(file, int(stat.Size())), nil
+	if contentType, ok := mime.Extension[filepath.Ext(file)]; ok {
+		r.ContentType = contentType
+	} else {
+		r.ContentType = "application/octet-stream"
+	}
+
+	return r.WithAttachment(fd, int(stat.Size())), nil
 }
 
 // WithAttachment sets a Response's attachment. In this case Response body will be ignored.
