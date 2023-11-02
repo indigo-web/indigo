@@ -25,12 +25,12 @@ func IndexSay(request *http.Request) *http.Response {
 		return request.Respond().WithCode(status.UnavailableForLegalReasons)
 	}
 
-	body, err := request.Body().Full()
+	body, err := request.Body.String()
 	if err != nil {
 		return request.Respond().WithError(err)
 	}
 
-	fmt.Println("Somebody said:", strconv.Quote(string(body)))
+	fmt.Println("Somebody said:", strconv.Quote(body))
 
 	return request.Respond()
 }
