@@ -38,7 +38,7 @@ func (r *Router) Route(
 // - status.RequestEntityTooLarge
 // - status.CloseConnection
 // - status.RequestURITooLong
-// - status.RequestHeaderFieldsTooLarge
+// - status.HeaderFieldsTooLarge
 // - status.HTTPVersionNotSupported
 // - status.UnsupportedMediaType
 // - status.NotImplemented
@@ -47,7 +47,7 @@ func (r *Router) Route(
 // You can set your own handler and override default response.
 //
 // WARNING: calling this method from groups will affect ALL routers, including root
-func (r *Router) RouteError(handler types.Handler, codes ...status.Code) {
+func (r *Router) RouteError(handler types.Handler, codes ...status.Code) *Router {
 	for _, code := range codes {
 		if code == AllErrors {
 			r.errHandlers.SetUniversal(handler)
