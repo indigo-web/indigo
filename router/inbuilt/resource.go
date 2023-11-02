@@ -35,6 +35,13 @@ func (r Resource) Catch(prefix string, handler types.Handler, mwares ...types.Mi
 	return r
 }
 
+// Static adds a catcher of prefix, that automatically returns files from defined root
+// directory
+func (r Resource) Static(prefix, root string) Resource {
+	r.group.Static(prefix, root)
+	return r
+}
+
 // Route is a shortcut to group.Route, providing the extra empty path to the call
 func (r Resource) Route(method method.Method, fun types.Handler, mwares ...types.Middleware) Resource {
 	r.group.Route(method, "", fun, mwares...)

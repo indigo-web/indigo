@@ -13,6 +13,10 @@ type (
 	// handler. But if we are not a closing middleware, we will call next
 	// middleware that is simply a partial middleware with already provided next
 	Middleware func(next Handler, request *http.Request) *http.Response
+	Catcher    struct {
+		Prefix  string
+		Handler Handler
+	}
 	MethodsMap [method.Count]Handler
 )
 
