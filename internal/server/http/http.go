@@ -16,11 +16,11 @@ import (
 )
 
 type Server interface {
-	Run(tcp.Client, *http.Request, *http.Body, render.Engine, parser.HTTPRequestsParser)
+	Run(tcp.Client, *http.Request, render.Engine, parser.HTTPRequestsParser)
 }
 
 type BenchmarkServer interface {
-	RunOnce(tcp.Client, *http.Request, *http.Body, render.Engine, parser.HTTPRequestsParser)
+	RunOnce(tcp.Client, *http.Request, render.Engine, parser.HTTPRequestsParser)
 }
 
 var upgrading = http.NewResponse().
@@ -38,11 +38,10 @@ func NewHTTPServer(router router.Router) Server {
 }
 
 func (h *httpServer) Run(
-	client tcp.Client, req *http.Request, body *http.Body,
-	renderer render.Engine, p parser.HTTPRequestsParser,
+	client tcp.Client, req *http.Request, renderer render.Engine, p parser.HTTPRequestsParser,
 ) {
 	for {
-		if !h.RunOnce(client, req, body, renderer, p) {
+		if !h.RunOnce(client, req, renderer, p) {
 			break
 		}
 	}
@@ -51,8 +50,7 @@ func (h *httpServer) Run(
 }
 
 func (h *httpServer) RunOnce(
-	client tcp.Client, req *http.Request, body *http.Body,
-	renderer render.Engine, p parser.HTTPRequestsParser,
+	client tcp.Client, req *http.Request, renderer render.Engine, p parser.HTTPRequestsParser,
 ) (continue_ bool) {
 	data, err := client.Read()
 	if err != nil {
@@ -79,7 +77,7 @@ func (h *httpServer) RunOnce(
 		}
 
 		client.Unread(extra)
-		body.Init(req)
+		req.Body.Init(req)
 		response := h.router.OnRequest(req)
 
 		if req.WasHijacked() {

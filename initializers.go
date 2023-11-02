@@ -36,7 +36,7 @@ func newKeyValueArenas(s settings.Headers) (*buffer.Buffer[byte], *buffer.Buffer
 	return keyArena, valArena
 }
 
-func newBodyReader(client tcp.Client, body settings.Body, codings []coding.Constructor) http.BodyReader {
+func newBody(client tcp.Client, body settings.Body, codings []coding.Constructor) http.Body {
 	manager := coding.NewManager(body.DecodedBufferSize)
 
 	for _, constructor := range codings {
@@ -46,17 +46,16 @@ func newBodyReader(client tcp.Client, body settings.Body, codings []coding.Const
 	chunkedbodySettings := chunkedbody.DefaultSettings()
 	chunkedbodySettings.MaxChunkSize = body.MaxChunkSize
 
-	return http1.NewBodyReader(client, chunkedbody.NewParser(chunkedbodySettings), manager)
+	return http1.NewBody(client, chunkedbody.NewParser(chunkedbodySettings), manager)
 }
 
 func newRequest(
-	ctx context.Context, s settings.Settings, conn net.Conn, r http.BodyReader,
+	ctx context.Context, s settings.Settings, conn net.Conn, body http.Body,
 ) *http.Request {
 	q := query.NewQuery(headers.NewHeaders())
 	hdrs := headers.NewPreallocHeaders(s.Headers.Number.Default)
 	response := http.NewResponse()
 	params := make(http.Params)
-	body := http.NewBody(r)
 
 	return http.NewRequest(ctx, hdrs, q, response, conn, body, params, s.URL.Params.DisableMapClear)
 }

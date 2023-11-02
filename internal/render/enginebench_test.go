@@ -45,12 +45,12 @@ func BenchmarkRenderer_Response(b *testing.B) {
 
 	hdrs := headers.NewHeaders()
 	response := http.NewResponse()
-	bodyReader := http1.NewBodyReader(
+	body := http1.NewBody(
 		dummy.NewNopClient(), nil, coding.NewManager(0),
 	)
 	request := http.NewRequest(
 		context.Background(), hdrs, query.NewQuery(nil), http.NewResponse(), dummy.NewNopConn(),
-		http.NewBody(bodyReader), nil, false,
+		body, nil, false,
 	)
 	client := NopClientWriter{}
 

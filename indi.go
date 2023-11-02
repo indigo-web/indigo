@@ -107,14 +107,14 @@ func (a *Application) Serve(r router.Router, optionalSettings ...settings.Settin
 
 		a.servers = append(a.servers, tcp.NewServer(listener, func(conn net.Conn) {
 			client := newClient(s.TCP, conn)
-			bodyReader := newBodyReader(client, s.Body, a.codings)
+			bodyReader := newBody(client, s.Body, a.codings)
 			request := newRequest(a.ctx, s, conn, bodyReader)
 			request.IsTLS = true
 			renderer := newRenderer(s.HTTP, a)
 			httpParser := newHTTPParser(s, request)
 
 			httpServer := httpserver.NewHTTPServer(r)
-			httpServer.Run(client, request, request.Body(), renderer, httpParser)
+			httpServer.Run(client, request, renderer, httpParser)
 		}))
 	}
 
@@ -126,13 +126,13 @@ func (a *Application) Serve(r router.Router, optionalSettings ...settings.Settin
 
 	a.servers = append(a.servers, tcp.NewServer(sock, func(conn net.Conn) {
 		client := newClient(s.TCP, conn)
-		bodyReader := newBodyReader(client, s.Body, a.codings)
+		bodyReader := newBody(client, s.Body, a.codings)
 		request := newRequest(a.ctx, s, conn, bodyReader)
 		renderer := newRenderer(s.HTTP, a)
 		httpParser := newHTTPParser(s, request)
 
 		httpServer := httpserver.NewHTTPServer(r)
-		httpServer.Run(client, request, request.Body(), renderer, httpParser)
+		httpServer.Run(client, request, renderer, httpParser)
 	}))
 
 	err = a.startServers()

@@ -61,13 +61,13 @@ func getMiddleware(mware middleware, stack *callstack) types.Middleware {
 
 func getRequest() *http.Request {
 	q := query.NewQuery(nil)
-	bodyReader := http1.NewBodyReader(
+	body := http1.NewBody(
 		dummy.NewNopClient(), nil, coding.NewManager(0),
 	)
 
 	return http.NewRequest(
 		context.Background(), headers.NewHeaders(), q, http.NewResponse(), dummy.NewNopConn(),
-		http.NewBody(bodyReader), nil, false,
+		body, nil, false,
 	)
 }
 
