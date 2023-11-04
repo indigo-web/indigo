@@ -17,4 +17,12 @@ var Extension = map[string]string{
 	".wasm": "application/wasm",
 	".webp": "image/webp",
 	".xml":  "text/xml; charset=utf-8",
+	".gz":   "application/gzip",
+	".sql":  "application/sql",
+	".tzif": "application/tzif",
+	".yaml": "application/yaml",
+	".xfdf": "application/xfdf",
+	".zip":  "application/zip",
+	".zlib": "application/zlib",
+	".zstd": "application/zstd",
 }
