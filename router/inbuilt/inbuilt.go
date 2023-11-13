@@ -155,18 +155,12 @@ func stripTrailingSlash(path string) string {
 	return path[0:1]
 }
 
-// getHandler looks for a handler in the methodsMap. In case not found, it checks whether
-// the method is HEAD. In this case, we're looking for a GET method handler, as semantically
-// both methods are same, except response body (response to a HEAD request MUST NOT contain
-// a body)
+// getHandler looks up for a handler in the methodsMap. In case request method is HEAD, however
+// no matching handler is found, a handler for corresponding GET request will be retrieved
 func getHandler(reqMethod method.Method, methodsMap types.MethodsMap) types.Handler {
 	handler := methodsMap[reqMethod]
-	if handler == nil {
-		if reqMethod == method.HEAD {
-			return getHandler(method.GET, methodsMap)
-		}
-
-		return nil
+	if reqMethod == method.HEAD && handler == nil {
+		return getHandler(method.GET, methodsMap)
 	}
 
 	return handler
