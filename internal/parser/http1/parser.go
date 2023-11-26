@@ -300,19 +300,9 @@ headerValue:
 		case strcomp.EqualFold(p.headerKey, "upgrade"):
 			p.request.Upgrade = proto.ChooseUpgrade(value)
 		case strcomp.EqualFold(p.headerKey, "transfer-encoding"):
-			tokens, err := p.fillEncoding(value)
-			if err != nil {
-				return parser.Error, nil, err
-			}
-
-			p.request.Encoding.Transfer = tokens
+			p.request.Encoding.Transfer = parseEncodingString(p.encToksBuff, value, cap(p.encToksBuff))
 		case strcomp.EqualFold(p.headerKey, "content-encoding"):
-			tokens, err := p.fillEncoding(value)
-			if err != nil {
-				return parser.Error, nil, err
-			}
-
-			p.request.Encoding.Content = tokens
+			p.request.Encoding.Content = parseEncodingString(p.encToksBuff, value, cap(p.encToksBuff))
 		case strcomp.EqualFold(p.headerKey, "trailer"):
 			p.request.Encoding.HasTrailer = true
 		}
@@ -333,13 +323,6 @@ headerValueCRLFCR:
 	return parser.Error, nil, status.ErrBadRequest
 }
 
-func (p *httpRequestsParser) fillEncoding(value string) (tokens []string, err error) {
-	tokens, chunked, err := parseEncodingString(p.encToksBuff[:0], value)
-	p.request.Encoding.Chunked = p.request.Encoding.Chunked || chunked
-
-	return tokens, err
-}
-
 func (p *httpRequestsParser) Release() {
 	p.request.Headers.Clear()
 	p.headersNumber = 0
@@ -351,44 +334,32 @@ func (p *httpRequestsParser) Release() {
 	p.state = eMethod
 }
 
-func parseEncodingString(buff []string, value string) (toks []string, chunked bool, err error) {
+func parseEncodingString(buff []string, value string, maxTokens int) (toks []string) {
 	var offset int
 
-	for i := range value {
+	for i := 0; i < len(value); i++ {
 		if value[i] == ',' {
-			var isChunked bool
-			buff, isChunked, err = processEncodingToken(buff, value[offset:i])
-			if err != nil {
-				return nil, false, err
+			token := strings.TrimSpace(value[offset:i])
+			offset = i + 1
+
+			if len(token) == 0 {
+				continue
 			}
 
-			chunked = chunked || isChunked
-			offset = i + 1
+			if len(buff)+1 > maxTokens {
+				return nil
+			}
+
+			buff = append(buff, token)
 		}
 	}
 
-	var isChunked bool
-	buff, isChunked, err = processEncodingToken(buff, value[offset:])
-
-	return buff, chunked || isChunked, err
-}
-
-func processEncodingToken(
-	buff []string, rawToken string,
-) ([]string, bool, error) {
-	switch token := strings.TrimSpace(rawToken); token {
-	case "":
-	case "chunked":
-		return buff, true, nil
-	default:
-		if len(buff)+1 >= cap(buff) {
-			return nil, false, status.ErrUnsupportedEncoding
-		}
-
+	token := strings.TrimSpace(value[offset:])
+	if len(token) > 0 {
 		buff = append(buff, token)
 	}
 
-	return buff, false, nil
+	return buff
 }
 
 func trimPrefixSpaces(b []byte) []byte {

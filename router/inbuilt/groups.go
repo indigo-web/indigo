@@ -30,6 +30,8 @@ func (r *Router) prepare() error {
 		if err := r.registrar.Merge(child.registrar); err != nil {
 			return err
 		}
+
+		r.catchers = append(r.catchers, child.catchers...)
 	}
 
 	r.applyMiddlewares()

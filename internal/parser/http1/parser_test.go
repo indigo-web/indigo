@@ -56,11 +56,11 @@ func getParser() (httpparser.HTTPRequestsParser, *http.Request) {
 	chunkedParserSettings := chunkedbody.DefaultSettings()
 	chunkedParserSettings.MaxChunkSize = s.Body.MaxChunkSize
 	chunkedParser := chunkedbody.NewParser(chunkedParserSettings)
-	body := NewBodyReader(
+	body := NewBody(
 		dummy.NewNopClient(), chunkedParser, coding.NewManager(0))
 	request := http.NewRequest(
 		context.Background(), headers.NewHeaders(), query.Query{}, http.NewResponse(),
-		dummy.NewNopConn(), http.NewBody(body), nil, false,
+		dummy.NewNopConn(), body, nil, false,
 	)
 
 	return NewHTTPRequestsParser(
@@ -509,69 +509,47 @@ func TestHttpRequestsParser_Parse_Negative(t *testing.T) {
 
 func TestParseEncoding(t *testing.T) {
 	t.Run("empty string", func(t *testing.T) {
-		toks, chunked, err := parseEncodingString(make([]string, 0, 10), "")
-		require.NoError(t, err)
-		require.False(t, chunked)
+		toks := parseEncodingString(make([]string, 0, 10), "", 10)
 		require.Empty(t, toks)
 	})
 
 	t.Run("only chunked", func(t *testing.T) {
-		toks, chunked, err := parseEncodingString(make([]string, 0, 10), "chunked")
-		require.NoError(t, err)
-
-		require.True(t, chunked)
-		require.Empty(t, toks)
+		toks := parseEncodingString(make([]string, 0, 10), "chunked", 10)
+		require.Equal(t, []string{"chunked"}, toks)
 	})
 
 	t.Run("only gzip", func(t *testing.T) {
-		toks, chunked, err := parseEncodingString(make([]string, 0, 10), "gzip")
-		require.NoError(t, err)
-
-		require.False(t, chunked)
+		toks := parseEncodingString(make([]string, 0, 10), "gzip", 10)
 		require.Equal(t, []string{"gzip"}, toks)
 	})
 
 	t.Run("chunked,gzip without space", func(t *testing.T) {
-		toks, chunked, err := parseEncodingString(make([]string, 0, 10), "chunked,gzip")
-		require.NoError(t, err)
+		toks := parseEncodingString(make([]string, 0, 10), "chunked,gzip", 10)
+		require.Equal(t, []string{"chunked", "gzip"}, toks)
 
-		require.True(t, chunked)
-		require.Equal(t, []string{"gzip"}, toks)
-
-		toks, chunked, err = parseEncodingString(make([]string, 0, 10), "gzip,chunked")
-		require.NoError(t, err)
-		require.True(t, chunked)
-		require.Equal(t, []string{"gzip"}, toks)
+		toks = parseEncodingString(make([]string, 0, 10), "gzip,chunked", 10)
+		require.Equal(t, []string{"gzip", "chunked"}, toks)
 	})
 
 	t.Run("chunked,gzip with space", func(t *testing.T) {
-		toks, chunked, err := parseEncodingString(make([]string, 0, 10), "chunked,  gzip")
-		require.NoError(t, err)
+		toks := parseEncodingString(make([]string, 0, 10), "chunked,  gzip", 10)
+		require.Equal(t, []string{"chunked", "gzip"}, toks)
 
-		require.True(t, chunked)
-		require.Equal(t, []string{"gzip"}, toks)
-
-		toks, chunked, err = parseEncodingString(make([]string, 0, 10), "gzip,  chunked")
-		require.NoError(t, err)
-		require.True(t, chunked)
-		require.Equal(t, []string{"gzip"}, toks)
+		toks = parseEncodingString(make([]string, 0, 10), "gzip,  chunked", 10)
+		require.Equal(t, []string{"gzip", "chunked"}, toks)
 	})
 
 	t.Run("extra commas", func(t *testing.T) {
-		toks, chunked, err := parseEncodingString(make([]string, 0, 10), " , chunked, gzip, ")
-		require.NoError(t, err)
+		toks := parseEncodingString(make([]string, 0, 10), " , chunked, gzip, ", 10)
+		require.Equal(t, []string{"chunked", "gzip"}, toks)
 
-		require.True(t, chunked)
-		require.Equal(t, []string{"gzip"}, toks)
-
-		toks, chunked, err = parseEncodingString(make([]string, 0, 10), " , chunked")
-		require.NoError(t, err)
-		require.True(t, chunked)
+		toks = parseEncodingString(make([]string, 0, 10), " , chunked", 10)
+		require.Equal(t, []string{"chunked"}, toks)
 	})
 
 	t.Run("overflow tokens limit", func(t *testing.T) {
-		_, _, err := parseEncodingString(make([]string, 0, 1), "gzip,flate,chunked")
-		require.EqualError(t, err, status.ErrUnsupportedEncoding.Error())
+		toks := parseEncodingString(make([]string, 0, 1), "gzip,flate,chunked", 1)
+		require.Nil(t, toks)
 	})
 }
 

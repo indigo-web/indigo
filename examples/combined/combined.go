@@ -16,35 +16,21 @@ import (
 )
 
 const (
-	host  = "0.0.0.0"
-	port  = 8080
-	index = "index.html"
+	host = "0.0.0.0"
+	port = 8080
 )
-
-func Index(request *http.Request) *http.Response {
-	resp, err := request.Respond().WithFile(index)
-	if err != nil {
-		return request.Respond().
-			WithCode(status.NotFound).
-			WithBody(
-				index + ": not found; try running this example directly from examples/combined folder",
-			)
-	}
-
-	return resp
-}
 
 func IndexSay(request *http.Request) *http.Response {
 	if talking := request.Headers.Value("talking"); talking != "allowed" {
 		return request.Respond().WithCode(status.UnavailableForLegalReasons)
 	}
 
-	body, err := request.Body().Full()
+	body, err := request.Body.String()
 	if err != nil {
 		return request.Respond().WithError(err)
 	}
 
-	fmt.Println("Somebody said:", strconv.Quote(string(body)))
+	fmt.Println("Somebody said:", strconv.Quote(body))
 
 	return request.Respond()
 }
@@ -81,8 +67,8 @@ func main() {
 		Get("/stress", Stressful, middleware.Recover)
 
 	r.Resource("/").
-		Get(Index).
-		Post(IndexSay)
+		Post(IndexSay).
+		Static("/static", "static")
 
 	r.Group("/hello").
 		Get("/world", World).

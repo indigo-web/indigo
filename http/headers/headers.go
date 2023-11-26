@@ -2,6 +2,7 @@ package headers
 
 import (
 	"github.com/indigo-web/iter"
+	"github.com/indigo-web/iter/filter"
 	"github.com/indigo-web/utils/strcomp"
 )
 
@@ -106,17 +107,8 @@ func (h *Headers) KeysIter() iter.Iterator[string] {
 	keys := iter.Map[[]string, string](func(el []string) string {
 		return el[0]
 	}, h.Iter())
-	buff := h.ensureNotNil(h.uniqueBuff)
-	it := iter.Filter[string](func(el string) bool {
-		if contains(buff, el) {
-			return false
-		}
-
-		buff = append(buff, el)
-		return true
-	}, keys)
-
-	h.uniqueBuff = buff[:0]
+	it := iter.Filter[string](filter.Unique(h.ensureNotNil(h.uniqueBuff)), keys)
+	h.uniqueBuff = h.uniqueBuff[:0]
 
 	return it
 }

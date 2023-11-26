@@ -37,7 +37,7 @@ type Request struct {
 	// IsTLS describes, whether request was made via https
 	IsTLS          bool
 	defaultCtx     context.Context
-	body           *Body
+	Body           Body
 	conn           net.Conn
 	wasHijacked    bool
 	clearParamsMap bool
@@ -51,7 +51,7 @@ type Request struct {
 // that default method is a null-value (proto.Unknown)
 func NewRequest(
 	ctx context.Context, hdrs *headers.Headers, query query.Query, response *Response,
-	conn net.Conn, body *Body, paramsMap Params, disableParamsMapClearing bool,
+	conn net.Conn, body Body, paramsMap Params, disableParamsMapClearing bool,
 ) *Request {
 	request := &Request{
 		Query:          query,
@@ -61,7 +61,7 @@ func NewRequest(
 		Remote:         conn.RemoteAddr(),
 		Ctx:            ctx,
 		defaultCtx:     ctx,
-		body:           body,
+		Body:           body,
 		conn:           conn,
 		clearParamsMap: !disableParamsMapClearing,
 		response:       response,
@@ -79,7 +79,7 @@ func (r *Request) JSON(model any) error {
 		return status.ErrUnsupportedMediaType
 	}
 
-	data, err := r.Body().Full()
+	data, err := r.Body.Bytes()
 	if err != nil {
 		return err
 	}
@@ -90,11 +90,6 @@ func (r *Request) JSON(model any) error {
 	json.ConfigDefault.ReturnIterator(iterator)
 
 	return err
-}
-
-// Body returns an entity representing a request's body
-func (r *Request) Body() *Body {
-	return r.body
 }
 
 // Respond returns Response object.
@@ -109,7 +104,7 @@ func (r *Request) Respond() *Response {
 // should read it before) all the body left. After handler exits, the connection will
 // be closed, so the connection can be hijacked only once
 func (r *Request) Hijack() (net.Conn, error) {
-	if err := r.body.Reset(); err != nil {
+	if err := r.Body.Reset(); err != nil {
 		return nil, err
 	}
 
@@ -129,7 +124,7 @@ func (r *Request) Clear() (err error) {
 	r.Query.Set(nil)
 	r.Ctx = r.defaultCtx
 
-	if err = r.body.Reset(); err != nil {
+	if err = r.Body.Reset(); err != nil {
 		return err
 	}
 

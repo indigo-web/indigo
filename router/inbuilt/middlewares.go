@@ -19,12 +19,12 @@ func (r *Router) Use(middlewares ...types.Middleware) *Router {
 
 func (r *Router) applyMiddlewares() {
 	r.registrar.Apply(func(handler types.Handler) types.Handler {
-		return combine(handler, r.middlewares)
+		return compose(handler, r.middlewares)
 	})
 }
 
-// combine produces an array of middlewares into the chain, represented by types.Handle
-func combine(handler types.Handler, middlewares []types.Middleware) types.Handler {
+// compose produces an array of middlewares into the chain, represented by types.Handler
+func compose(handler types.Handler, middlewares []types.Middleware) types.Handler {
 	for i := len(middlewares) - 1; i >= 0; i-- {
 		handler = func(handler types.Handler, middleware types.Middleware) types.Handler {
 			return func(request *http.Request) *http.Response {

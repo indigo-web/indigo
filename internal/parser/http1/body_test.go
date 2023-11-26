@@ -17,11 +17,10 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func getRequestWithReader(chunked bool, body ...[]byte) (*http.Request, http.BodyReader) {
+func getRequestWithBody(chunked bool, body ...[]byte) (*http.Request, http.Body) {
 	client := dummy.NewCircularClient(body...)
 	chunkedParser := chunkedbody.NewParser(chunkedbody.DefaultSettings())
-	reader := NewBodyReader(client, chunkedParser, coding.NewManager(0))
-	reqBody := http.NewBody(reader)
+	reqBody := NewBody(client, chunkedParser, coding.NewManager(0))
 
 	var (
 		contentLength int
@@ -50,36 +49,22 @@ func getRequestWithReader(chunked bool, body ...[]byte) (*http.Request, http.Bod
 	request.ContentLength = contentLength
 	request.Encoding.Chunked = chunked
 
-	return request, reader
-}
-
-func readFullBody(reader http.BodyReader) (body []byte, err error) {
-	for {
-		piece, err := reader.Read()
-		switch err {
-		case nil:
-			body = append(body, piece...)
-		case io.EOF:
-			return body, nil
-		default:
-			return nil, err
-		}
-	}
+	return request, reqBody
 }
 
 func TestBodyReader_Plain(t *testing.T) {
-	t.Run("CallOnce", func(t *testing.T) {
-		body := []byte("Hello, world!")
-		request, reader := getRequestWithReader(false, body)
-		reader.Init(request)
+	t.Run("call once", func(t *testing.T) {
+		sample := []byte("Hello, world!")
+		request, body := getRequestWithBody(false, sample)
+		body.Init(request)
 
-		actualBody, err := readFullBody(reader)
+		actualBody, err := body.String()
 		require.NoError(t, err)
-		require.Equal(t, string(body), string(actualBody))
+		require.Equal(t, string(sample), actualBody)
 	})
 
-	t.Run("CallMultipleTimes", func(t *testing.T) {
-		body := [][]byte{
+	t.Run("multiple calls", func(t *testing.T) {
+		sample := [][]byte{
 			[]byte("Hel"),
 			[]byte("lo, "),
 			[]byte("wor"),
@@ -88,17 +73,17 @@ func TestBodyReader_Plain(t *testing.T) {
 		toString := func(b []byte) string {
 			return string(b)
 		}
-		bodyString := ft.Sum(ft.Map(toString, body))
+		bodyString := ft.Sum(ft.Map(toString, sample))
 
-		request, reader := getRequestWithReader(false, body...)
-		reader.Init(request)
+		request, body := getRequestWithBody(false, sample...)
+		body.Init(request)
 
-		actualBody, err := readFullBody(reader)
+		actualBody, err := body.String()
 		require.NoError(t, err)
-		require.Equal(t, bodyString, string(actualBody))
+		require.Equal(t, bodyString, actualBody)
 	})
 
-	t.Run("ALotOfData", func(t *testing.T) {
+	t.Run("a lot of data", func(t *testing.T) {
 		const buffSize = 10
 		var (
 			first  = strings.Repeat("a", buffSize)
@@ -114,14 +99,14 @@ func TestBodyReader_Plain(t *testing.T) {
 		)
 		request.ContentLength = buffSize
 		chunkedParser := chunkedbody.NewParser(chunkedbody.DefaultSettings())
-		reader := NewBodyReader(client, chunkedParser, coding.NewManager(0))
-		reader.Init(request)
+		body := NewBody(client, chunkedParser, coding.NewManager(0))
+		body.Init(request)
 
-		data, err := reader.Read()
+		data, err := body.Retrieve()
 		require.NoError(t, err)
 		require.Equal(t, first, string(data))
 
-		data, err = reader.Read()
+		data, err = body.Retrieve()
 		require.EqualError(t, err, io.EOF.Error())
 		require.Empty(t, data)
 
@@ -134,10 +119,10 @@ func TestBodyReader_Plain(t *testing.T) {
 func TestBodyReader_Chunked(t *testing.T) {
 	chunked := []byte("7\r\nMozilla\r\n9\r\nDeveloper\r\n7\r\nNetwork\r\n0\r\n\r\n")
 	wantBody := "MozillaDeveloperNetwork"
-	request, reader := getRequestWithReader(true, chunked)
-	reader.Init(request)
+	request, body := getRequestWithBody(true, chunked)
+	body.Init(request)
 
-	actualBody, err := readFullBody(reader)
+	actualBody, err := body.String()
 	require.NoError(t, err)
-	require.Equal(t, wantBody, string(actualBody))
+	require.Equal(t, wantBody, actualBody)
 }

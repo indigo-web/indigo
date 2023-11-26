@@ -92,7 +92,7 @@ func getStaticRouter(t *testing.T) router.Router {
 		requestHeader := strings.Join(request.Headers.Values(testHeaderKey), ",")
 		require.Equal(t, testHeaderValue, requestHeader)
 
-		body, err := request.Body().Full()
+		body, err := request.Body.String()
 		require.NoError(t, err)
 		require.Empty(t, body)
 
@@ -123,23 +123,23 @@ func getStaticRouter(t *testing.T) router.Router {
 	// is tested, that is enough to make sure that requestbody works correct
 
 	r.Post("/read-body", func(request *http.Request) *http.Response {
-		body, err := request.Body().Full()
+		body, err := request.Body.String()
 		require.NoError(t, err)
-		require.Equal(t, testRequestBody, string(body))
+		require.Equal(t, testRequestBody, body)
 
 		return request.Respond()
 	})
 
 	r.Post("/read-body-gzipped", func(request *http.Request) *http.Response {
-		body, err := request.Body().Full()
+		body, err := request.Body.String()
 		require.NoError(t, err)
-		require.Equal(t, testRequestBody, string(body))
+		require.Equal(t, testRequestBody, body)
 
 		return request.Respond()
 	})
 
 	r.Post("/body-reader", func(request *http.Request) *http.Response {
-		body, err := io.ReadAll(request.Body())
+		body, err := io.ReadAll(request.Body)
 		require.NoError(t, err)
 		require.Equal(t, testRequestBody, string(body))
 
@@ -165,7 +165,7 @@ func getStaticRouter(t *testing.T) router.Router {
 	})
 
 	r.Get("/hijack-conn-with-body-read", func(request *http.Request) *http.Response {
-		_, _ = request.Body().Full()
+		_, _ = request.Body.String()
 
 		conn, err := request.Hijack()
 		require.NoError(t, err)

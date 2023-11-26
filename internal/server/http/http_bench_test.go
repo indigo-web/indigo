@@ -64,7 +64,7 @@ func getInbuiltRouter() router.Router {
 	r.Resource("/").
 		Get(http.Respond).
 		Post(func(request *http.Request) *http.Response {
-			_ = request.Body().Callback(func([]byte) error {
+			_ = request.Body.Callback(func([]byte) error {
 				return nil
 			})
 
@@ -88,7 +88,7 @@ func getSimpleRouter() router.Router {
 			case method.GET:
 				return request.Respond()
 			case method.POST:
-				_ = request.Body().Callback(func([]byte) error {
+				_ = request.Body.Callback(func([]byte) error {
 					return nil
 				})
 
@@ -117,13 +117,12 @@ func Benchmark_Get(b *testing.B) {
 	r := getInbuiltRouter()
 	s := settings.Default()
 	q := query.NewQuery(headers.NewHeaders())
-	bodyReader := http1.NewBodyReader(
+	body := http1.NewBody(
 		dummy.NewNopClient(), nil, coding.NewManager(0),
 	)
-	body := http.NewBody(bodyReader)
 	hdrs := headers.FromMap(make(map[string][]string, 10))
 	request := http.NewRequest(
-		context.Background(), hdrs, q, http.NewResponse(), dummy.NewNopConn(), http.NewBody(bodyReader),
+		context.Background(), hdrs, q, http.NewResponse(), dummy.NewNopConn(), body,
 		nil, false,
 	)
 	keyArena := buffer.NewBuffer[byte](
@@ -151,7 +150,7 @@ func Benchmark_Get(b *testing.B) {
 		b.ResetTimer()
 
 		for i := 0; i < b.N; i++ {
-			server.RunOnce(tenHeadersGETClient, request, body, renderer, parser)
+			server.RunOnce(tenHeadersGETClient, request, renderer, parser)
 		}
 	})
 
@@ -162,7 +161,7 @@ func Benchmark_Get(b *testing.B) {
 		b.ResetTimer()
 
 		for i := 0; i < b.N; i++ {
-			server.RunOnce(withRespHeadersGETClient, request, body, renderer, parser)
+			server.RunOnce(withRespHeadersGETClient, request, renderer, parser)
 		}
 	})
 
@@ -174,7 +173,7 @@ func Benchmark_Get(b *testing.B) {
 		b.ResetTimer()
 
 		for i := 0; i < b.N; i++ {
-			server.RunOnce(client, request, body, renderer, parser)
+			server.RunOnce(client, request, renderer, parser)
 		}
 	})
 
@@ -186,7 +185,7 @@ func Benchmark_Get(b *testing.B) {
 		b.ResetTimer()
 
 		for i := 0; i < b.N; i++ {
-			server.RunOnce(client, request, body, renderer, parser)
+			server.RunOnce(client, request, renderer, parser)
 		}
 	})
 
@@ -198,7 +197,7 @@ func Benchmark_Get(b *testing.B) {
 		b.ResetTimer()
 
 		for i := 0; i < b.N; i++ {
-			server.RunOnce(client, request, body, renderer, parser)
+			server.RunOnce(client, request, renderer, parser)
 		}
 	})
 
@@ -210,7 +209,7 @@ func Benchmark_Get(b *testing.B) {
 		b.ResetTimer()
 
 		for i := 0; i < b.N; i++ {
-			server.RunOnce(client, request, body, renderer, parser)
+			server.RunOnce(client, request, renderer, parser)
 		}
 	})
 }
@@ -221,12 +220,11 @@ func Benchmark_Post(b *testing.B) {
 	q := query.NewQuery(headers.NewHeaders())
 	hdrs := headers.FromMap(make(map[string][]string, 10))
 	withBodyClient := dummy.NewCircularClient(simplePOST)
-	reader := http1.NewBodyReader(
+	body := http1.NewBody(
 		withBodyClient, nil, coding.NewManager(0),
 	)
-	body := http.NewBody(reader)
 	request := http.NewRequest(
-		context.Background(), hdrs, q, http.NewResponse(), dummy.NewNopConn(), http.NewBody(reader),
+		context.Background(), hdrs, q, http.NewResponse(), dummy.NewNopConn(), body,
 		nil, false,
 	)
 	keyArena := buffer.NewBuffer[byte](
@@ -253,7 +251,7 @@ func Benchmark_Post(b *testing.B) {
 		b.ResetTimer()
 
 		for i := 0; i < b.N; i++ {
-			server.RunOnce(withBodyClient, request, body, renderer, parser)
+			server.RunOnce(withBodyClient, request, renderer, parser)
 		}
 	})
 }

@@ -8,6 +8,8 @@ import (
 	"github.com/indigo-web/indigo/router"
 	"github.com/indigo-web/indigo/router/inbuilt/radix"
 	"github.com/indigo-web/indigo/router/inbuilt/types"
+	"sort"
+	"strings"
 )
 
 var _ router.Router = &Router{}
@@ -23,6 +25,7 @@ type Router struct {
 	routesMap        types.RoutesMap
 	tree             radix.Tree
 	isStatic         bool
+	catchers         []types.Catcher
 	errHandlers      *types.ErrHandlers
 	reusableErrCtx   ctx.ReusableContext[string, error]
 	reusableAllowCtx ctx.ReusableContext[string, string]
@@ -48,6 +51,10 @@ func (r *Router) OnStart() error {
 	if err := r.prepare(); err != nil {
 		return err
 	}
+
+	sort.Slice(r.catchers, func(i, j int) bool {
+		return len(r.catchers[i].Prefix) > len(r.catchers[j].Prefix)
+	})
 
 	if r.registrar.IsDynamic() {
 		r.tree = r.registrar.AsRadixTree()
@@ -105,6 +112,14 @@ func (r *Router) OnError(request *http.Request, err error) *http.Response {
 		return traceResponse(request.Respond(), r.traceBuff)
 	}
 
+	if err == status.ErrNotFound {
+		for _, catcher := range r.catchers {
+			if strings.HasPrefix(request.Path, catcher.Prefix) {
+				return catcher.Handler(request)
+			}
+		}
+	}
+
 	httpErr, ok := err.(status.HTTPError)
 	if !ok {
 		return request.Respond().WithCode(status.InternalServerError)
@@ -140,18 +155,12 @@ func stripTrailingSlash(path string) string {
 	return path[0:1]
 }
 
-// getHandler looks for a handler in the methodsMap. In case not found, it checks whether
-// the method is HEAD. In this case, we're looking for a GET method handler, as semantically
-// both methods are same, except response body (response to a HEAD request MUST NOT contain
-// a body)
+// getHandler looks up for a handler in the methodsMap. In case request method is HEAD, however
+// no matching handler is found, a handler for corresponding GET request will be retrieved
 func getHandler(reqMethod method.Method, methodsMap types.MethodsMap) types.Handler {
 	handler := methodsMap[reqMethod]
-	if handler == nil {
-		if reqMethod == method.HEAD {
-			return getHandler(method.GET, methodsMap)
-		}
-
-		return nil
+	if reqMethod == method.HEAD && handler == nil {
+		return getHandler(method.GET, methodsMap)
 	}
 
 	return handler
