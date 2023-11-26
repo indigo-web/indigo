@@ -134,10 +134,11 @@ func (e *engine) renderHeaders(response *http.Response) {
 // io.Reader implementations
 func (e *engine) sendAttachment(
 	request *http.Request, response *http.Response, writer ClientWriter,
-) error {
+) (err error) {
 	attachment := response.Attachment()
+	size := attachment.Size()
 
-	if size := attachment.Size(); size > 0 {
+	if size > 0 {
 		e.renderHeaders(response)
 		e.renderContentLength(int64(size))
 	} else {
@@ -150,7 +151,7 @@ func (e *engine) sendAttachment(
 
 	e.crlf()
 
-	if err := writer.Write(e.buff); err != nil {
+	if err = writer.Write(e.buff); err != nil {
 		return status.ErrCloseConnection
 	}
 
@@ -168,11 +169,15 @@ func (e *engine) sendAttachment(
 		e.fileBuff = make([]byte, fileBuffSize)
 	}
 
-	if size := attachment.Size(); size > 0 {
-		return e.writePlainBody(attachment.Content(), writer)
+	if attachment.Size() > 0 {
+		err = e.writePlainBody(attachment.Content(), writer)
+	} else {
+		err = e.writeChunkedBody(attachment.Content(), writer)
 	}
 
-	return e.writeChunkedBody(attachment.Content(), writer)
+	attachment.Close()
+
+	return err
 }
 
 func (e *engine) writePlainBody(r io.Reader, writer ClientWriter) error {

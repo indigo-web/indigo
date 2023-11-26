@@ -117,12 +117,10 @@ func (r *Response) Write(b []byte) (n int, err error) {
 	return len(b), nil
 }
 
-// WithFile opens a file for reading, and returns a new Response with attachment corresponding
-// to the file FD. In case not found or any other error, it'll be directly returned.
-// In case error occurred while opening the file, Response builder won't be affected and stay
-// clean
-func (r *Response) WithFile(file string) (*Response, error) {
-	fd, err := os.Open(file)
+// WithRetrieveFile opens a file for reading and returns a new Response with attachment, set to the file
+// descriptor. If error occurred during opening a file, it'll be returned
+func (r *Response) WithRetrieveFile(path string) (*Response, error) {
+	fd, err := os.Open(path)
 	if err != nil {
 		return r, err
 	}
@@ -132,13 +130,24 @@ func (r *Response) WithFile(file string) (*Response, error) {
 		return r, err
 	}
 
-	if contentType, ok := mime.Extension[filepath.Ext(file)]; ok {
+	if contentType, ok := mime.Extension[filepath.Ext(path)]; ok {
 		r.ContentType = contentType
 	} else {
 		r.ContentType = "application/octet-stream"
 	}
 
 	return r.WithAttachment(fd, int(stat.Size())), nil
+}
+
+// WithFile opens a file for reading and returns a new Response with attachment, set to the file
+// descriptor. If error occurred, it'll be silently returned
+func (r *Response) WithFile(path string) *Response {
+	resp, err := r.WithRetrieveFile(path)
+	if err != nil {
+		return r.WithError(err)
+	}
+
+	return resp
 }
 
 // WithAttachment sets a Response's attachment. In this case Response body will be ignored.

@@ -14,12 +14,8 @@ func (r *Router) Static(prefix, root string, mwares ...types.Middleware) *Router
 
 	return r.Catch(prefix, func(request *http.Request) *http.Response {
 		path := strings.TrimPrefix(request.Path, prefix)
-		file, err := request.Respond().WithFile(root + path)
-		if err != nil {
-			return request.Respond().WithError(err)
-		}
 
-		return file
+		return request.Respond().WithFile(root + path)
 	}, mwares...)
 }
 
