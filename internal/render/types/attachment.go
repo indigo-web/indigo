@@ -25,3 +25,9 @@ func (a Attachment) Content() io.Reader {
 func (a Attachment) Size() int {
 	return a.size
 }
+
+func (a Attachment) Close() {
+	if closer, ok := a.content.(io.Closer); ok {
+		_ = closer.Close()
+	}
+}
