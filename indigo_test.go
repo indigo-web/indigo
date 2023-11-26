@@ -108,12 +108,12 @@ func getStaticRouter(t *testing.T) router.Router {
 			return request.Respond()
 		}).
 		Get("file", func(request *http.Request) *http.Response {
-			resp, err := request.Respond().WithFile(testFilename)
+			resp, err := request.Respond().WithRetrieveFile(testFilename)
 			require.NoError(t, err)
 			return resp
 		}).
 		Get("file-notfound", func(request *http.Request) *http.Response {
-			_, err := request.Respond().WithFile(testFilename + "non-existing")
+			_, err := request.Respond().WithRetrieveFile(testFilename + "non-existing")
 			require.Error(t, err)
 
 			return request.Respond().WithBody(testFileIfNotFound)
