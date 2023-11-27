@@ -1,0 +1,45 @@
+@import url('https://fonts.googleapis.com/css2?family=Noto+Sans&display=swap');
+
+:root {
+    /*--background-rgb: 2 6 23;*/
+    --background-rgb: 255 255 255;
+    --background-light-rgb: 30 41 59;
+
+    --hyperplexed-main-rgb: 41 121 255;
+    --hyperplexed-main-light-rgb: 56 182 255;
+    --hyperplexed-secondary-rgb: 42 252 152;
+}
+
+body {
+    background: rgb(var(--background-rgb));
+}
+
+.center{
+    height: 100vh;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    font-family: 'Noto Sans', sans-serif;
+}
+
+.block {
+    display: grid;
+    grid-template-columns: auto;
+    width: 70%;
+    height: 70%;
+    overflow-x: hidden;
+    overflow-wrap: anywhere;
+    border-radius: 30px;
+    cursor: pointer;
+    background: radial-gradient(
+        rgb(var(--background-light-rgb)) 40%,
+        rgb(var(--hyperplexed-main-rgb)) 50%,
+        rgb(var(--hyperplexed-main-light-rgb)),
+        rgb(var(--hyperplexed-secondary-rgb))
+    );
+    mix-blend-mode: darken;
+    z-index: 3;
+    transition: opacity 400ms;
+}
+
+
