@@ -68,7 +68,7 @@ func main() {
 
 	r.Resource("/").
 		Post(IndexSay).
-		Static("/static", "static")
+		Static("/static", "./examples/combined/static")
 
 	r.Group("/hello").
 		Get("/world", World).
