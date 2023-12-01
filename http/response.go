@@ -14,10 +14,12 @@ import (
 
 type ResponseWriter func(b []byte) error
 
-// IDK why 7, but let it be
 const (
+	// why 7? I don't know. There's no theory behind the number. It can be adjusted
+	// to 10 as well, but why you would ever need to do this?
 	defaultHeadersNumber = 7
 	defaultContentType   = "text/html"
+	defaultFileMIME      = "application/octet-stream"
 )
 
 type Response struct {
@@ -122,18 +124,22 @@ func (r *Response) Write(b []byte) (n int, err error) {
 func (r *Response) WithRetrieveFile(path string) (*Response, error) {
 	fd, err := os.Open(path)
 	if err != nil {
-		return r, err
+		// if we can't open it, it doesn't exist
+		return r, status.ErrNotFound
 	}
 
 	stat, err := fd.Stat()
 	if err != nil {
-		return r, err
+		// ...and if we can't get stats on it, it exists, however something in system went wrong
+		return r, status.ErrInternalServerError
+	}
+	if stat.IsDir() {
+		return r, status.ErrNotFound
 	}
 
-	if contentType, ok := mime.Extension[filepath.Ext(path)]; ok {
-		r.ContentType = contentType
-	} else {
-		r.ContentType = "application/octet-stream"
+	r.ContentType = mime.Extension[filepath.Ext(path)]
+	if len(r.ContentType) == 0 {
+		r.ContentType = defaultFileMIME
 	}
 
 	return r.WithAttachment(fd, int(stat.Size())), nil
@@ -177,6 +183,10 @@ func (r *Response) WithJSON(model any) (*Response, error) {
 // status.HTTPError. Otherwise, code is considered to be 500 Internal Server Error.
 // Note: revealing error text may be dangerous
 func (r *Response) WithError(err error) *Response {
+	if err == nil {
+		return r
+	}
+
 	if http, ok := err.(status.HTTPError); ok {
 		return r.
 			WithCode(http.Code).
