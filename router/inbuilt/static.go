@@ -14,6 +14,6 @@ func (r *Router) Static(prefix, root string, mwares ...types.Middleware) *Router
 	return r.Catch(prefix, func(request *http.Request) *http.Response {
 		pathReplacer.Set(request.Path)
 
-		return request.Respond().WithFile(pathReplacer.Relative())
+		return request.Respond().File(pathReplacer.Relative())
 	}, mwares...)
 }

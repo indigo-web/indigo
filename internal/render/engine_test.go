@@ -65,8 +65,8 @@ func TestEngine_Write(t *testing.T) {
 
 	testWithHeaders := func(t *testing.T, renderer Engine) {
 		response := http.NewResponse().
-			WithHeader("Hello", "nether").
-			WithHeader("Something", "special", "here")
+			Header("Hello", "nether").
+			Header("Something", "special", "here")
 
 		writer := new(accumulativeClient)
 		require.NoError(t, renderer.Write(proto.HTTP11, request, response, writer))
@@ -110,7 +110,7 @@ func TestEngine_Write(t *testing.T) {
 	t.Run("HeadResponse", func(t *testing.T) {
 		const body = "Hello, world!"
 		renderer := getEngine(nil)
-		response := http.NewResponse().WithBody(body)
+		response := http.NewResponse().String(body)
 		request := newRequest()
 		request.Method = method.HEAD
 
@@ -136,7 +136,7 @@ func TestEngine_Write(t *testing.T) {
 
 	t.Run("CustomCodeAndStatus", func(t *testing.T) {
 		renderer := getEngine(nil)
-		response := http.NewResponse().WithCode(600)
+		response := http.NewResponse().Code(600)
 
 		writer := new(accumulativeClient)
 		require.NoError(t, renderer.Write(proto.HTTP11, request, response, writer))
@@ -150,7 +150,7 @@ func TestEngine_Write(t *testing.T) {
 		const body = "Hello, world!"
 		reader := strings.NewReader(body)
 		renderer := getEngine(nil)
-		response := http.NewResponse().WithAttachment(reader, reader.Len())
+		response := http.NewResponse().Attachment(reader, reader.Len())
 
 		writer := new(accumulativeClient)
 		require.NoError(t, renderer.Write(proto.HTTP11, request, response, writer))
@@ -168,7 +168,7 @@ func TestEngine_Write(t *testing.T) {
 		const body = "Hello, world!"
 		reader := strings.NewReader(body)
 		renderer := getEngine(nil)
-		response := http.NewResponse().WithAttachment(reader, 0)
+		response := http.NewResponse().Attachment(reader, 0)
 
 		writer := new(accumulativeClient)
 		require.NoError(t, renderer.Write(proto.HTTP11, request, response, writer))
@@ -185,7 +185,7 @@ func TestEngine_Write(t *testing.T) {
 		const body = "Hello, world!"
 		reader := strings.NewReader(body)
 		renderer := getEngine(nil)
-		response := http.NewResponse().WithAttachment(reader, reader.Len())
+		response := http.NewResponse().Attachment(reader, reader.Len())
 		request.Method = method.HEAD
 		stdreq, err := stdhttp.NewRequest(stdhttp.MethodHead, "/", nil)
 		require.NoError(t, err)
@@ -213,9 +213,9 @@ func TestEngine_PreWrite(t *testing.T) {
 		request.Proto = proto.HTTP10
 		request.Upgrade = proto.HTTP11
 		preResponse := http.NewResponse().
-			WithCode(status.SwitchingProtocols).
-			WithHeader("Connection", "upgrade").
-			WithHeader("Upgrade", "HTTP/1.1")
+			Code(status.SwitchingProtocols).
+			Header("Connection", "upgrade").
+			Header("Upgrade", "HTTP/1.1")
 		renderer.PreWrite(request.Proto, preResponse)
 
 		writer := new(accumulativeClient)

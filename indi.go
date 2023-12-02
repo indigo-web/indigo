@@ -9,7 +9,7 @@ import (
 	"net"
 	"strings"
 
-	httpserver "github.com/indigo-web/indigo/internal/server/http"
+	"github.com/indigo-web/indigo/internal/server/http"
 	"github.com/indigo-web/indigo/internal/server/tcp"
 	"github.com/indigo-web/utils/mapconv"
 
@@ -113,7 +113,7 @@ func (a *Application) Serve(r router.Router, optionalSettings ...settings.Settin
 			renderer := newRenderer(s.HTTP, a)
 			httpParser := newHTTPParser(s, request)
 
-			httpServer := httpserver.NewHTTPServer(r)
+			httpServer := http.NewServer(r)
 			httpServer.Run(client, request, renderer, httpParser)
 		}))
 	}
@@ -131,7 +131,7 @@ func (a *Application) Serve(r router.Router, optionalSettings ...settings.Settin
 		renderer := newRenderer(s.HTTP, a)
 		httpParser := newHTTPParser(s, request)
 
-		httpServer := httpserver.NewHTTPServer(r)
+		httpServer := http.NewServer(r)
 		httpServer.Run(client, request, renderer, httpParser)
 	}))
 

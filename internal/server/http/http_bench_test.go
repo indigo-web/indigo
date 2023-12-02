@@ -57,7 +57,7 @@ var longPath = strings.Repeat("a", 500)
 func getInbuiltRouter() router.Router {
 	r := inbuilt.New().
 		Get("/with-header", func(request *http.Request) *http.Response {
-			return request.Respond().WithHeader("Hello", "World")
+			return request.Respond().Header("Hello", "World")
 		}).
 		Get("/"+longPath, http.Respond)
 
@@ -94,19 +94,16 @@ func getSimpleRouter() router.Router {
 
 				return request.Respond()
 			default:
-				return request.Respond().WithError(status.ErrMethodNotAllowed)
+				return http.Error(request, status.ErrMethodNotAllowed)
 			}
 		case "/with-header":
-			return request.Respond().WithHeader("Hello", "World")
+			return request.Respond().Header("Hello", "World")
 		case longpath:
 			return request.Respond()
 		default:
-			return request.Respond().
-				WithError(status.ErrNotFound)
+			return http.Error(request, status.ErrNotFound)
 		}
-	}, func(request *http.Request, err error) *http.Response {
-		return request.Respond().WithError(err)
-	})
+	}, http.Error)
 
 	return r
 }
@@ -141,7 +138,7 @@ func Benchmark_Get(b *testing.B) {
 		request, *keyArena, *valArena, *startLineArena, *objPool, s.Headers,
 	)
 	renderer := render.NewEngine(make([]byte, 0, 1024), nil, defaultHeaders)
-	server := NewHTTPServer(r).(*httpServer)
+	server := NewServer(r)
 
 	b.Run("simple get", func(b *testing.B) {
 		tenHeadersGETClient := dummy.NewCircularClient(tenHeadersGETRequest)
@@ -150,7 +147,7 @@ func Benchmark_Get(b *testing.B) {
 		b.ResetTimer()
 
 		for i := 0; i < b.N; i++ {
-			server.RunOnce(tenHeadersGETClient, request, renderer, parser)
+			server.HandleRequest(tenHeadersGETClient, request, renderer, parser)
 		}
 	})
 
@@ -161,7 +158,7 @@ func Benchmark_Get(b *testing.B) {
 		b.ResetTimer()
 
 		for i := 0; i < b.N; i++ {
-			server.RunOnce(withRespHeadersGETClient, request, renderer, parser)
+			server.HandleRequest(withRespHeadersGETClient, request, renderer, parser)
 		}
 	})
 
@@ -173,7 +170,7 @@ func Benchmark_Get(b *testing.B) {
 		b.ResetTimer()
 
 		for i := 0; i < b.N; i++ {
-			server.RunOnce(client, request, renderer, parser)
+			server.HandleRequest(client, request, renderer, parser)
 		}
 	})
 
@@ -185,7 +182,7 @@ func Benchmark_Get(b *testing.B) {
 		b.ResetTimer()
 
 		for i := 0; i < b.N; i++ {
-			server.RunOnce(client, request, renderer, parser)
+			server.HandleRequest(client, request, renderer, parser)
 		}
 	})
 
@@ -197,7 +194,7 @@ func Benchmark_Get(b *testing.B) {
 		b.ResetTimer()
 
 		for i := 0; i < b.N; i++ {
-			server.RunOnce(client, request, renderer, parser)
+			server.HandleRequest(client, request, renderer, parser)
 		}
 	})
 
@@ -209,7 +206,7 @@ func Benchmark_Get(b *testing.B) {
 		b.ResetTimer()
 
 		for i := 0; i < b.N; i++ {
-			server.RunOnce(client, request, renderer, parser)
+			server.HandleRequest(client, request, renderer, parser)
 		}
 	})
 }
@@ -243,7 +240,7 @@ func Benchmark_Post(b *testing.B) {
 		request, *keyArena, *valArena, *startLineArena, *objPool, s.Headers,
 	)
 	renderer := render.NewEngine(make([]byte, 0, 1024), nil, defaultHeaders)
-	server := NewHTTPServer(r).(*httpServer)
+	server := NewServer(r)
 
 	b.Run("simple POST", func(b *testing.B) {
 		b.SetBytes(int64(len(simplePOST)))
@@ -251,7 +248,7 @@ func Benchmark_Post(b *testing.B) {
 		b.ResetTimer()
 
 		for i := 0; i < b.N; i++ {
-			server.RunOnce(withBodyClient, request, renderer, parser)
+			server.HandleRequest(withBodyClient, request, renderer, parser)
 		}
 	})
 }

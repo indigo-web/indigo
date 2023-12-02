@@ -1,7 +1,6 @@
 package main
 
 import (
-	"fmt"
 	"log"
 	"strconv"
 
@@ -36,7 +35,7 @@ func MyHandler(request *http.Request) *http.Response {
 			return request.Respond()
 		}
 
-		fmt.Println("somebody says:", strconv.Quote(string(readBuff[:n])))
+		log.Println("somebody says:", strconv.Quote(string(readBuff[:n])))
 	}
 }
 

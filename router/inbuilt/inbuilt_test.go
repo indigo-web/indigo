@@ -29,7 +29,7 @@ func TestRoute(t *testing.T) {
 		request.Method = method.GET
 		request.Path = "/"
 		resp := r.OnRequest(request)
-		require.Equal(t, status.OK, resp.Code)
+		require.Equal(t, status.OK, resp.Reveal().Code)
 	})
 
 	t.Run("POST /", func(t *testing.T) {
@@ -39,7 +39,7 @@ func TestRoute(t *testing.T) {
 		request.Method = method.POST
 		request.Path = "/"
 		resp := r.OnRequest(request)
-		require.Equal(t, status.OK, resp.Code)
+		require.Equal(t, status.OK, resp.Reveal().Code)
 	})
 
 	t.Run("POST /hello", func(t *testing.T) {
@@ -49,7 +49,7 @@ func TestRoute(t *testing.T) {
 		request.Method = method.POST
 		request.Path = "/hello"
 		resp := r.OnRequest(request)
-		require.Equal(t, status.OK, resp.Code)
+		require.Equal(t, status.OK, resp.Reveal().Code)
 	})
 
 	t.Run("HEAD /", func(t *testing.T) {
@@ -60,8 +60,8 @@ func TestRoute(t *testing.T) {
 		resp := r.OnRequest(request)
 		// we have not registered any HEAD-method handler yet, so GET method
 		// is expected to be called (but without body)
-		require.Equal(t, status.OK, resp.Code)
-		require.Empty(t, string(resp.Body))
+		require.Equal(t, status.OK, resp.Reveal().Code)
+		require.Empty(t, string(resp.Reveal().Body))
 	})
 }
 
@@ -184,43 +184,43 @@ func TestRouter_MethodNotAllowed(t *testing.T) {
 	request.Path = "/"
 	request.Method = method.POST
 	response := r.OnRequest(request)
-	require.Equal(t, status.MethodNotAllowed, response.Code)
+	require.Equal(t, status.MethodNotAllowed, response.Reveal().Code)
 }
 
 func TestRouter_RouteError(t *testing.T) {
 	r := New()
 	r.RouteError(func(req *http.Request) *http.Response {
 		return req.Respond().
-			WithCode(status.Teapot).
-			WithBody(req.Ctx.Value("error").(error).Error())
+			Code(status.Teapot).
+			String(req.Ctx.Value("error").(error).Error())
 	}, status.BadRequest)
 
 	t.Run("status.ErrBadRequest", func(t *testing.T) {
 		request := getRequest()
 		resp := r.OnError(request, status.ErrBadRequest)
-		require.Equal(t, status.Teapot, resp.Code)
-		require.Equal(t, status.ErrBadRequest.Error(), string(resp.Body))
+		require.Equal(t, status.Teapot, resp.Reveal().Code)
+		require.Equal(t, status.ErrBadRequest.Error(), string(resp.Reveal().Body))
 	})
 
 	t.Run("status.ErrURIDecoding (also bad request)", func(t *testing.T) {
 		request := getRequest()
 		resp := r.OnError(request, status.ErrURIDecoding)
-		require.Equal(t, status.Teapot, resp.Code)
-		require.Equal(t, status.ErrURIDecoding.Error(), string(resp.Body))
+		require.Equal(t, status.Teapot, resp.Reveal().Code)
+		require.Equal(t, status.ErrURIDecoding.Error(), string(resp.Reveal().Body))
 	})
 
 	t.Run("unregistered http error", func(t *testing.T) {
 		request := getRequest()
 		resp := r.OnError(request, status.ErrNotImplemented)
-		require.Equal(t, status.NotImplemented, resp.Code)
-		require.Equal(t, status.ErrNotImplemented.Error(), string(resp.Body))
+		require.Equal(t, status.NotImplemented, resp.Reveal().Code)
+		require.Equal(t, status.ErrNotImplemented.Error(), string(resp.Reveal().Body))
 	})
 
 	t.Run("unregistered ordinary error", func(t *testing.T) {
 		request := getRequest()
 		resp := r.OnError(request, errors.New("any error text here"))
-		require.Equal(t, status.InternalServerError, resp.Code)
-		require.Empty(t, string(resp.Body))
+		require.Equal(t, status.InternalServerError, resp.Reveal().Code)
+		require.Empty(t, string(resp.Reveal().Body))
 	})
 
 	t.Run("universal handler", func(t *testing.T) {
@@ -229,13 +229,13 @@ func TestRouter_RouteError(t *testing.T) {
 		r := New()
 		r.RouteError(func(req *http.Request) *http.Response {
 			return req.Respond().
-				WithCode(status.Teapot).
-				WithBody(fromUniversal)
+				Code(status.Teapot).
+				String(fromUniversal)
 		}, AllErrors)
 
 		request := getRequest()
 		resp := r.OnError(request, status.ErrNotImplemented)
-		require.Equal(t, int(status.Teapot), int(resp.Code))
-		require.Equal(t, fromUniversal, string(resp.Body))
+		require.Equal(t, int(status.Teapot), int(resp.Reveal().Code))
+		require.Equal(t, fromUniversal, string(resp.Reveal().Body))
 	})
 }

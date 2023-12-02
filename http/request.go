@@ -150,5 +150,9 @@ func Respond(request *Request) *Response {
 }
 
 func Error(request *Request, err error) *Response {
-	return request.Respond().WithError(err)
+	return request.Respond().Error(err)
+}
+
+func Code(request *Request, code status.Code) *Response {
+	return request.Respond().Code(code)
 }

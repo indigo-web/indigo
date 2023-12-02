@@ -17,11 +17,12 @@ func HTTPSOnly(next types.Handler, req *http.Request) *http.Response {
 
 	host := req.Headers.Value("host")
 	if len(host) == 0 {
-		return http.Error(req, status.ErrBadRequest).
-			WithBody("the request lacks Host header value")
+		return req.Respond().
+			Code(status.BadRequest).
+			String("the request lacks Host header")
 	}
 
 	return req.Respond().
-		WithCode(status.MovedPermanently).
-		WithHeader("Location", "https://"+host+req.Path)
+		Code(status.MovedPermanently).
+		Header("Location", "https://"+host+req.Path)
 }

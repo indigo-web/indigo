@@ -16,9 +16,9 @@ const (
 
 func MyHandler(request *http.Request) *http.Response {
 	return request.Respond().
-		WithCode(status.OK).
-		WithHeader("Hello", "world").
-		WithBody("<h1>How are you doing?</h1>")
+		Code(status.OK).
+		Header("Hello", "world").
+		String("<h1>How are you doing?</h1>")
 }
 
 func main() {
