@@ -15,8 +15,8 @@ http requests back as a response to a trace request
 
 func traceResponse(respond *http.Response, messageBody []byte) *http.Response {
 	return respond.
-		WithHeader("Content-Type", "message/http").
-		WithBodyByte(messageBody)
+		Header("Content-Type", "message/http").
+		Bytes(messageBody)
 }
 
 func renderHTTPRequest(request *http.Request, buff []byte) []byte {

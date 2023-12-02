@@ -84,7 +84,7 @@ func getStaticRouter(t *testing.T) router.Router {
 	})
 
 	r.Get("/get-resp-body", func(request *http.Request) *http.Response {
-		return request.Respond().WithBody(testRequestBody)
+		return request.Respond().String(testRequestBody)
 	})
 
 	r.Get("/get-read-body", func(request *http.Request) *http.Response {
@@ -108,15 +108,15 @@ func getStaticRouter(t *testing.T) router.Router {
 			return request.Respond()
 		}).
 		Get("file", func(request *http.Request) *http.Response {
-			resp, err := request.Respond().WithRetrieveFile(testFilename)
+			resp, err := request.Respond().RetrieveFile(testFilename)
 			require.NoError(t, err)
 			return resp
 		}).
 		Get("file-notfound", func(request *http.Request) *http.Response {
-			_, err := request.Respond().WithRetrieveFile(testFilename + "non-existing")
+			_, err := request.Respond().RetrieveFile(testFilename + "non-existing")
 			require.Error(t, err)
 
-			return request.Respond().WithBody(testFileIfNotFound)
+			return request.Respond().String(testFileIfNotFound)
 		})
 
 	// request.OnBody() is not tested because request.Body() (wrapper for OnBody)

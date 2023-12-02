@@ -1,7 +1,6 @@
 package main
 
 import (
-	"fmt"
 	"github.com/indigo-web/indigo/router/inbuilt/middleware"
 	"github.com/indigo-web/indigo/settings"
 	"log"
@@ -22,21 +21,21 @@ const (
 
 func IndexSay(request *http.Request) *http.Response {
 	if talking := request.Headers.Value("talking"); talking != "allowed" {
-		return request.Respond().WithCode(status.UnavailableForLegalReasons)
+		return http.Code(request, status.UnavailableForLegalReasons)
 	}
 
 	body, err := request.Body.String()
 	if err != nil {
-		return request.Respond().WithError(err)
+		return http.Error(request, err)
 	}
 
-	fmt.Println("Somebody said:", strconv.Quote(body))
+	log.Println("Somebody said:", strconv.Quote(body))
 
 	return request.Respond()
 }
 
 func World(request *http.Request) *http.Response {
-	return request.Respond().WithBody(
+	return request.Respond().String(
 		`<h1>Hello, world!</h1>`,
 	)
 }
@@ -44,18 +43,18 @@ func World(request *http.Request) *http.Response {
 func Easter(request *http.Request) *http.Response {
 	if request.Headers.Has("easter") {
 		return request.Respond().
-			WithCode(status.Teapot).
-			WithHeader("Easter", "Egg").
-			WithBody("You have discovered an easter egg! Congratulations!")
+			Code(status.Teapot).
+			Header("Easter", "Egg").
+			String("You have discovered an easter egg! Congratulations!")
 	}
 
-	return request.Respond().WithBody("Pretty ordinary page, isn't it?")
+	return request.Respond().String("Pretty ordinary page, isn't it?")
 }
 
 func Stressful(request *http.Request) *http.Response {
 	resp := request.Respond().
-		WithHeader("Should", "never be seen").
-		WithBody("Hello, world!")
+		Header("Should", "never be seen").
+		String("Hello, world!")
 
 	panic("TOO MUCH STRESS")
 

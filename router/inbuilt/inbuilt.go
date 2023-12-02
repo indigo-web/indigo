@@ -122,14 +122,14 @@ func (r *Router) OnError(request *http.Request, err error) *http.Response {
 
 	httpErr, ok := err.(status.HTTPError)
 	if !ok {
-		return request.Respond().WithCode(status.InternalServerError)
+		return http.Code(request, status.InternalServerError)
 	}
 
 	handler := r.errHandlers.Get(httpErr)
 	if handler == nil {
 		return request.Respond().
-			WithCode(httpErr.Code).
-			WithBody(httpErr.Message)
+			Code(httpErr.Code).
+			String(httpErr.Message)
 	}
 
 	r.reusableErrCtx.Set(request.Ctx, "error", err)

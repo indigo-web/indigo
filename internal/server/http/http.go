@@ -15,33 +15,25 @@ import (
 	"os"
 )
 
-type Server interface {
-	Run(tcp.Client, *http.Request, render.Engine, parser.HTTPRequestsParser)
-}
-
-type BenchmarkServer interface {
-	RunOnce(tcp.Client, *http.Request, render.Engine, parser.HTTPRequestsParser)
-}
-
 var upgrading = http.NewResponse().
-	WithCode(status.SwitchingProtocols).
-	WithHeader("Connection", "upgrade")
+	Code(status.SwitchingProtocols).
+	Header("Connection", "upgrade")
 
-type httpServer struct {
+type Server struct {
 	router router.Router
 }
 
-func NewHTTPServer(router router.Router) Server {
-	return &httpServer{
+func NewServer(router router.Router) *Server {
+	return &Server{
 		router: router,
 	}
 }
 
-func (h *httpServer) Run(
+func (h *Server) Run(
 	client tcp.Client, req *http.Request, renderer render.Engine, p parser.HTTPRequestsParser,
 ) {
 	for {
-		if !h.RunOnce(client, req, renderer, p) {
+		if !h.HandleRequest(client, req, renderer, p) {
 			break
 		}
 	}
@@ -49,7 +41,7 @@ func (h *httpServer) Run(
 	_ = client.Close()
 }
 
-func (h *httpServer) RunOnce(
+func (h *Server) HandleRequest(
 	client tcp.Client, req *http.Request, renderer render.Engine, p parser.HTTPRequestsParser,
 ) (continue_ bool) {
 	data, err := client.Read()
@@ -72,7 +64,7 @@ func (h *httpServer) RunOnce(
 
 		if req.Upgrade != proto.Unknown && proto.HTTP1&req.Upgrade == req.Upgrade {
 			protoToken := uf.B2S(bytes.TrimSpace(proto.ToBytes(req.Upgrade)))
-			renderer.PreWrite(req.Proto, upgrading.WithHeader("Upgrade", protoToken))
+			renderer.PreWrite(req.Proto, upgrading.Header("Upgrade", protoToken))
 			protocol = req.Upgrade
 		}
 

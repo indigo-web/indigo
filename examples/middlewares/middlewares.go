@@ -1,7 +1,6 @@
 package main
 
 import (
-	"fmt"
 	"log"
 
 	"github.com/indigo-web/indigo/http"
@@ -18,23 +17,23 @@ const (
 )
 
 func HelloWorldMiddleware(next types.Handler, request *http.Request) *http.Response {
-	fmt.Println("running middleware before handler")
+	log.Println("running middleware before handler")
 	response := next(request)
-	fmt.Println("running middleware after handler")
+	log.Println("running middleware after handler")
 
 	return response
 }
 
 func SecondMiddleware(next types.Handler, request *http.Request) *http.Response {
-	fmt.Println("running second middleware before first one")
+	log.Println("running second middleware before first one")
 	response := next(request)
-	fmt.Println("running second middleware after first one")
+	log.Println("running second middleware after first one")
 
 	return response
 }
 
 func MyBeautifulHandler(request *http.Request) *http.Response {
-	fmt.Println("running handler")
+	log.Println("running handler")
 
 	return request.Respond()
 }

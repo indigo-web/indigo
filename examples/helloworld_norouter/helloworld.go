@@ -16,15 +16,13 @@ const (
 
 func MyHandler(request *http.Request) *http.Response {
 	return request.Respond().
-		WithCode(status.OK).
-		WithHeader("Hello", "world").
-		WithBody("<h1>How are you doing?</h1>")
+		Code(status.OK).
+		Header("Hello", "world").
+		String("<h1>How are you doing?</h1>")
 }
 
 func main() {
-	myRouter := simple.NewRouter(MyHandler, func(request *http.Request, err error) *http.Response {
-		return request.Respond().WithError(err)
-	})
+	myRouter := simple.NewRouter(MyHandler, http.Error)
 
 	app := indigo.NewApp(host, port)
 	log.Println("Listening on", host, port)

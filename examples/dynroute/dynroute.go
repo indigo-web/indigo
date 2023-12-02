@@ -17,7 +17,7 @@ const (
 func MyDynamicHandler(request *http.Request) *http.Response {
 	worldName := request.Params["world-name"]
 
-	return request.Respond().WithBody("your world-name is " + worldName)
+	return request.Respond().String("your world-name is " + worldName)
 }
 
 func main() {

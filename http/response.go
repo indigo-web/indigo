@@ -4,6 +4,7 @@ import (
 	"github.com/indigo-web/indigo/http/mime"
 	"github.com/indigo-web/indigo/http/status"
 	"github.com/indigo-web/indigo/internal/render/types"
+	"github.com/indigo-web/indigo/internal/response"
 	"github.com/indigo-web/utils/strcomp"
 	"github.com/indigo-web/utils/uf"
 	json "github.com/json-iterator/go"
@@ -15,113 +16,106 @@ import (
 type ResponseWriter func(b []byte) error
 
 const (
-	// why 7? I don't know. There's no theory behind the number. It can be adjusted
+	// why 7? I don't know. There's no theory behind the number.fields. It can be adjusted
 	// to 10 as well, but why you would ever need to do this?
 	defaultHeadersNumber = 7
-	defaultContentType   = "text/html"
 	defaultFileMIME      = "application/octet-stream"
 )
 
 type Response struct {
-	attachment  types.Attachment
-	Status      status.Status
-	ContentType string
-	// TODO: add corresponding Content-Encoding field
-	// TODO: automatically apply the encoding on a body when specified
-	TransferEncoding string
-	headers          []string
-	Body             []byte
-	Code             status.Code
+	fields response.Fields
 }
 
 func NewResponse() *Response {
 	return &Response{
-		Code:        status.OK,
-		headers:     make([]string, 0, defaultHeadersNumber*2),
-		ContentType: defaultContentType,
+		response.Fields{
+			Code:        status.OK,
+			Headers:     make([]string, 0, defaultHeadersNumber*2),
+			ContentType: response.DefaultContentType,
+		},
 	}
 }
 
-// WithCode sets a Response code and a corresponding status.
+// Code sets a Response code and a corresponding status.
 // In case of unknown code, "Unknown Status Code" will be set as a status
 // code. In this case you should call Status explicitly
-func (r *Response) WithCode(code status.Code) *Response {
-	r.Code = code
+func (r *Response) Code(code status.Code) *Response {
+	r.fields.Code = code
 	return r
 }
 
-// WithStatus sets a custom status text. This text does not matter at all, and usually
+// Status sets a custom status text. This text does not matter at all, and usually
 // totally ignored by client, so there is actually no reasons to use this except some
 // rare cases when you need to represent a Response status text somewhere
-func (r *Response) WithStatus(status status.Status) *Response {
-	r.Status = status
+func (r *Response) Status(status status.Status) *Response {
+	r.fields.Status = status
 	return r
 }
 
-// WithContentType sets a custom Content-Type header value.
-func (r *Response) WithContentType(value string) *Response {
-	r.ContentType = value
+// ContentType sets a custom Content-Type header value.
+func (r *Response) ContentType(value string) *Response {
+	r.fields.ContentType = value
 	return r
 }
 
-// WithTransferEncoding sets a custom Transfer-Encoding header value.
-func (r *Response) WithTransferEncoding(value string) *Response {
-	r.TransferEncoding = value
+// TransferEncoding sets a custom Transfer-Encoding header value.
+func (r *Response) TransferEncoding(value string) *Response {
+	r.fields.TransferEncoding = value
 	return r
 }
 
-// WithHeader sets header values to a key. In case it already exists the value will
+// Header sets header values to a key. In case it already exists the value will
 // be appended.
-func (r *Response) WithHeader(key string, values ...string) *Response {
+func (r *Response) Header(key string, values ...string) *Response {
 	switch {
 	case strcomp.EqualFold(key, "content-type"):
-		return r.WithContentType(values[0])
+		return r.ContentType(values[0])
 	case strcomp.EqualFold(key, "transfer-encoding"):
-		return r.WithTransferEncoding(values[0])
+		return r.TransferEncoding(values[0])
 	}
 
 	for i := range values {
-		r.headers = append(r.headers, key, values[i])
+		r.fields.Headers = append(r.fields.Headers, key, values[i])
 	}
 
 	return r
 }
 
-// WithHeaders simply merges passed headers into Response. Also, it is the only
+// Headers simply merges passed headers into Response. Also, it is the only
 // way to specify a quality marker of value. In case headers were not initialized
 // before, Response headers will be set to a passed map, so editing this map
 // will affect Response
-func (r *Response) WithHeaders(headers map[string][]string) *Response {
+func (r *Response) Headers(headers map[string][]string) *Response {
 	resp := r
 
 	for k, v := range headers {
-		resp = resp.WithHeader(k, v...)
+		resp = resp.Header(k, v...)
 	}
 
 	return resp
 }
 
-// WithBody sets a string as a Response body. This will override already-existing
-// body if it was set
-func (r *Response) WithBody(body string) *Response {
-	return r.WithBodyByte(uf.S2B(body))
+// String sets the response's body to the passed string
+func (r *Response) String(body string) *Response {
+	return r.Bytes(uf.S2B(body))
 }
 
-// WithBodyByte does all the same as Body does, but for byte slices
-func (r *Response) WithBodyByte(body []byte) *Response {
-	r.Body = body
+// Bytes sets the response's body to passed slice WITHOUT COPYING. Changing
+// the passed slice later will affect the response by itself
+func (r *Response) Bytes(body []byte) *Response {
+	r.fields.Body = body
 	return r
 }
 
 // Write implements io.Reader interface. It always returns n=len(b) and err=nil
 func (r *Response) Write(b []byte) (n int, err error) {
-	r.Body = append(r.Body, b...)
+	r.fields.Body = append(r.fields.Body, b...)
 	return len(b), nil
 }
 
-// WithRetrieveFile opens a file for reading and returns a new Response with attachment, set to the file
-// descriptor. If error occurred during opening a file, it'll be returned
-func (r *Response) WithRetrieveFile(path string) (*Response, error) {
+// RetrieveFile opens a file for reading and returns a new Response with attachment, set to the file
+// descriptor.fields. If error occurred during opening a file, it'll be returned
+func (r *Response) RetrieveFile(path string) (*Response, error) {
 	fd, err := os.Open(path)
 	if err != nil {
 		// if we can't open it, it doesn't exist
@@ -137,37 +131,36 @@ func (r *Response) WithRetrieveFile(path string) (*Response, error) {
 		return r, status.ErrNotFound
 	}
 
-	r.ContentType = mime.Extension[filepath.Ext(path)]
-	if len(r.ContentType) == 0 {
-		r.ContentType = defaultFileMIME
+	r.fields.ContentType = mime.Extension[filepath.Ext(path)]
+	if len(r.fields.ContentType) == 0 {
+		r.fields.ContentType = defaultFileMIME
 	}
 
-	return r.WithAttachment(fd, int(stat.Size())), nil
+	return r.Attachment(fd, int(stat.Size())), nil
 }
 
-// WithFile opens a file for reading and returns a new Response with attachment, set to the file
-// descriptor. If error occurred, it'll be silently returned
-func (r *Response) WithFile(path string) *Response {
-	resp, err := r.WithRetrieveFile(path)
+// File opens a file for reading and returns a new Response with attachment, set to the file
+// descriptor.fields. If error occurred, it'll be silently returned
+func (r *Response) File(path string) *Response {
+	resp, err := r.RetrieveFile(path)
 	if err != nil {
-		return r.WithError(err)
+		return r.Error(err)
 	}
 
 	return resp
 }
 
-// WithAttachment sets a Response's attachment. In this case Response body will be ignored.
+// Attachment sets a Response's attachment. In this case Response body will be ignored.
 // If size <= 0, then Transfer-Encoding: chunked will be used
-func (r *Response) WithAttachment(reader io.Reader, size int) *Response {
-	r.attachment = types.NewAttachment(reader, size)
+func (r *Response) Attachment(reader io.Reader, size int) *Response {
+	r.fields.Attachment = types.NewAttachment(reader, size)
 	return r
 }
 
-// WithJSON receives a model (must be a pointer to the structure) and returns a new Response
+// JSON receives a model (must be a pointer to the structure) and returns a new Response
 // object and an error
-func (r *Response) WithJSON(model any) (*Response, error) {
-	r.Body = r.Body[:0]
-
+func (r *Response) JSON(model any) (*Response, error) {
+	r.fields.Body = r.fields.Body[:0]
 	stream := json.ConfigDefault.BorrowStream(r)
 	stream.WriteVal(model)
 	err := stream.Flush()
@@ -176,48 +169,36 @@ func (r *Response) WithJSON(model any) (*Response, error) {
 		return r, err
 	}
 
-	return r.WithContentType("application/json"), nil
+	return r.ContentType("application/json"), nil
 }
 
-// WithError returns Response with corresponding HTTP error code, if passed error is
-// status.HTTPError. Otherwise, code is considered to be 500 Internal Server Error.
+// Error returns Response with corresponding HTTP error code, if passed error is
+// status.HTTPError.fields. Otherwise, code is considered to be 500 Internal Server Error.fields.
 // Note: revealing error text may be dangerous
-func (r *Response) WithError(err error) *Response {
+func (r *Response) Error(err error) *Response {
 	if err == nil {
 		return r
 	}
 
 	if http, ok := err.(status.HTTPError); ok {
 		return r.
-			WithCode(http.Code).
-			WithBody(http.Message)
+			Code(http.Code).
+			String(http.Message)
 	}
 
 	return r.
-		WithCode(status.InternalServerError).
-		WithBody(err.Error())
+		Code(status.InternalServerError).
+		String(err.Error())
 }
 
-// Headers returns an underlying Response headers
-func (r *Response) Headers() []string {
-	return r.headers
-}
-
-// Attachment returns Response's attachment.
-//
-// Note: it serves mostly internal purposes
-func (r *Response) Attachment() types.Attachment {
-	return r.attachment
+// Reveal returns a struct with values, filled by builder. Used mostly in internal purposes
+func (r *Response) Reveal() response.Fields {
+	return r.fields
 }
 
 // Clear discards everything was done with Response object before
 func (r *Response) Clear() *Response {
-	r.Code = status.OK
-	r.Status = ""
-	r.ContentType = defaultContentType
-	r.TransferEncoding = ""
-	r.headers = r.headers[:0]
-	r.Body = nil
-	r.attachment = types.Attachment{}
+	r.fields = r.fields.Clear()
+
 	return r
 }

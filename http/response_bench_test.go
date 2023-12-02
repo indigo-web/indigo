@@ -13,13 +13,13 @@ func BenchmarkResponse_WithError(b *testing.B) {
 
 	b.Run("KnownError", func(b *testing.B) {
 		for i := 0; i < b.N; i++ {
-			resp.WithError(knownErr)
+			resp.Error(knownErr)
 		}
 	})
 
 	b.Run("UnknownError", func(b *testing.B) {
 		for i := 0; i < b.N; i++ {
-			resp.WithError(unknownErr)
+			resp.Error(unknownErr)
 		}
 	})
 }

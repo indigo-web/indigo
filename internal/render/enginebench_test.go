@@ -99,7 +99,7 @@ func BenchmarkRenderer_Response(b *testing.B) {
 	})
 
 	b.Run("101SwitchingProtocol", func(b *testing.B) {
-		resp := http.NewResponse().WithCode(status.SwitchingProtocols)
+		resp := http.NewResponse().Code(status.SwitchingProtocols)
 		buff := make([]byte, 0, 128)
 		renderer := NewEngine(buff, nil, nil)
 		b.ReportAllocs()

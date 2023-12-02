@@ -7,6 +7,7 @@ import (
 	"github.com/indigo-web/indigo/http/status"
 	"github.com/indigo-web/indigo/internal/httpchars"
 	"github.com/indigo-web/indigo/internal/render/types"
+	"github.com/indigo-web/indigo/internal/response"
 	"github.com/indigo-web/utils/ft"
 	"github.com/indigo-web/utils/strcomp"
 	"io"
@@ -62,7 +63,7 @@ func newEngine(buff, fileBuff []byte, defaultHeaders map[string][]string) *engin
 // for informational responses
 func (e *engine) PreWrite(protocol proto.Proto, response *http.Response) {
 	e.renderProtocol(protocol)
-	e.renderHeaders(response)
+	e.renderHeaders(response.Reveal())
 	e.crlf()
 }
 
@@ -73,19 +74,20 @@ func (e *engine) Write(
 	defer e.clear()
 
 	e.renderProtocol(protocol)
+	fields := response.Reveal()
 
-	if response.Attachment().Content() != nil {
+	if fields.Attachment.Content() != nil {
 		return e.sendAttachment(request, response, writer)
 	}
 
-	e.renderHeaders(response)
-	e.renderContentLength(int64(len(response.Body)))
+	e.renderHeaders(fields)
+	e.renderContentLength(int64(len(fields.Body)))
 	e.crlf()
 
 	if request.Method != method.HEAD {
 		// HEAD request responses must be similar to GET request responses, except
 		// forced lack of body, even if Content-Length is specified
-		e.buff = append(e.buff, response.Body...)
+		e.buff = append(e.buff, fields.Body...)
 	}
 
 	err = writer.Write(e.buff)
@@ -97,18 +99,18 @@ func (e *engine) Write(
 	return err
 }
 
-func (e *engine) renderHeaders(response *http.Response) {
-	codeStatus := status.CodeStatus(response.Code)
+func (e *engine) renderHeaders(fields response.Fields) {
+	codeStatus := status.CodeStatus(fields.Code)
 
-	if response.Status == "" && codeStatus != "" {
+	if fields.Status == "" && codeStatus != "" {
 		e.buff = append(e.buff, codeStatus...)
 	} else {
 		// in case we have a custom response status text or unknown code, fallback to an old way
-		e.buff = append(strconv.AppendInt(e.buff, int64(response.Code), 10), httpchars.SP...)
-		e.buff = append(append(e.buff, status.Text(response.Code)...), httpchars.CR, httpchars.LF)
+		e.buff = append(strconv.AppendInt(e.buff, int64(fields.Code), 10), httpchars.SP...)
+		e.buff = append(append(e.buff, status.Text(fields.Code)...), httpchars.CR, httpchars.LF)
 	}
 
-	responseHeaders := response.Headers()
+	responseHeaders := fields.Headers
 
 	for i := 0; i < len(responseHeaders); i += 2 {
 		e.renderHeader(responseHeaders[i], responseHeaders[i+1])
@@ -124,9 +126,9 @@ func (e *engine) renderHeaders(response *http.Response) {
 	}
 
 	// Content-Type is compulsory. Transfer-Encoding is not
-	e.renderContentType(response.ContentType)
-	if len(response.TransferEncoding) > 0 {
-		e.renderTransferEncoding(response.TransferEncoding)
+	e.renderContentType(fields.ContentType)
+	if len(fields.TransferEncoding) > 0 {
+		e.renderTransferEncoding(fields.TransferEncoding)
 	}
 }
 
@@ -135,14 +137,14 @@ func (e *engine) renderHeaders(response *http.Response) {
 func (e *engine) sendAttachment(
 	request *http.Request, response *http.Response, writer ClientWriter,
 ) (err error) {
-	attachment := response.Attachment()
-	size := attachment.Size()
+	fields := response.Reveal()
+	size := fields.Attachment.Size()
 
 	if size > 0 {
-		e.renderHeaders(response)
+		e.renderHeaders(fields)
 		e.renderContentLength(int64(size))
 	} else {
-		e.renderHeaders(response.WithTransferEncoding("chunked"))
+		e.renderHeaders(response.TransferEncoding("chunked").Reveal())
 	}
 
 	// now we have to send the body via plain text or chunked transfer encoding.
@@ -169,13 +171,13 @@ func (e *engine) sendAttachment(
 		e.fileBuff = make([]byte, fileBuffSize)
 	}
 
-	if attachment.Size() > 0 {
-		err = e.writePlainBody(attachment.Content(), writer)
+	if fields.Attachment.Size() > 0 {
+		err = e.writePlainBody(fields.Attachment.Content(), writer)
 	} else {
-		err = e.writeChunkedBody(attachment.Content(), writer)
+		err = e.writeChunkedBody(fields.Attachment.Content(), writer)
 	}
 
-	attachment.Close()
+	fields.Attachment.Close()
 
 	return err
 }
