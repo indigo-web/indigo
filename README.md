@@ -25,7 +25,7 @@ const (
 )
 
 func MyHandler(request *http.Request) *http.Response {
-  return request.Respond().WithBody("Hello, world!")
+  return request.Respond().String("Hello, world!")
 }
 
 func main() {
