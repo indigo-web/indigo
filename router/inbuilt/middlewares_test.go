@@ -81,8 +81,8 @@ func TestMiddlewares(t *testing.T) {
 	v1.Use(getMiddleware(m4, stack))
 
 	v2 := api.Group("/v2")
-	v2.Get("/world", http.Respond, getMiddleware(m7, stack))
 	v2.Use(getMiddleware(m5, stack))
+	v2.Get("/world", http.Respond, getMiddleware(m7, stack))
 
 	require.NoError(t, r.OnStart())
 

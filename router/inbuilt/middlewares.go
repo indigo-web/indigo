@@ -4,9 +4,10 @@ import (
 	"github.com/indigo-web/indigo/http"
 )
 
-/*
-This file is responsible for middlewares
-*/
+// Middleware works like a chain of nested calls, next may be even directly
+// handler. But if we are not a closing middleware, we will call next
+// middleware that is simply a partial middleware with already provided next
+type Middleware func(next Handler, request *http.Request) *http.Response
 
 // Use adds middlewares into the global list of a group's middlewares. But they will
 // be applied only after the server will be started

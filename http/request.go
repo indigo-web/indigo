@@ -20,6 +20,8 @@ type Environment struct {
 	// specific endpoint. Has non-zero-value only when 405 Method Not Allowed raises
 	AllowMethods string
 	IsTLS        bool
+	// reserved for router
+	AliasFrom string
 }
 
 var zeroContext = context.Background()
