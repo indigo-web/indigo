@@ -1,7 +1,6 @@
 package indigo
 
 import (
-	"context"
 	"github.com/indigo-web/chunkedbody"
 	"github.com/indigo-web/indigo/http"
 	"github.com/indigo-web/indigo/http/coding"
@@ -43,21 +42,19 @@ func newBody(client tcp.Client, body settings.Body, codings []coding.Constructor
 		manager.AddCoding(constructor)
 	}
 
-	chunkedbodySettings := chunkedbody.DefaultSettings()
-	chunkedbodySettings.MaxChunkSize = body.MaxChunkSize
+	chunkedBodySettings := chunkedbody.DefaultSettings()
+	chunkedBodySettings.MaxChunkSize = body.MaxChunkSize
 
-	return http1.NewBody(client, chunkedbody.NewParser(chunkedbodySettings), manager)
+	return http1.NewBody(client, chunkedbody.NewParser(chunkedBodySettings), manager)
 }
 
-func newRequest(
-	ctx context.Context, s settings.Settings, conn net.Conn, body http.Body,
-) *http.Request {
+func newRequest(s settings.Settings, conn net.Conn, body http.Body) *http.Request {
 	q := query.NewQuery(headers.NewHeaders())
 	hdrs := headers.NewPreallocHeaders(s.Headers.Number.Default)
 	response := http.NewResponse()
 	params := make(http.Params)
 
-	return http.NewRequest(ctx, hdrs, q, response, conn, body, params, s.URL.Params.DisableMapClear)
+	return http.NewRequest(hdrs, q, response, conn, body, params, s.URL.Params.DisableMapClear)
 }
 
 func newRenderer(httpSettings settings.HTTP, a *Application) render.Engine {
