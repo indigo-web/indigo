@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"github.com/indigo-web/indigo/http/method"
 	radix2 "github.com/indigo-web/indigo/router/inbuilt/internal/radix"
+	"github.com/indigo-web/indigo/router/inbuilt/internal/types"
 	"strings"
 )
 
@@ -68,16 +69,16 @@ func (r *registrar) IsDynamic() bool {
 	return r.isDynamic
 }
 
-func (r *registrar) AsMap() RoutesMap {
-	routesMap := make(RoutesMap)
+func (r *registrar) AsMap() routesMap {
+	rmap := make(routesMap)
 
 	for path, v := range r.routes {
 		for method_, handler := range v {
-			routesMap.Add(path, method_, handler)
+			rmap.Add(path, method_, handler)
 		}
 	}
 
-	return routesMap
+	return rmap
 }
 
 func (r *registrar) AsRadixTree() radix2.Tree {
@@ -85,7 +86,7 @@ func (r *registrar) AsRadixTree() radix2.Tree {
 
 	for path, v := range r.routes {
 		var (
-			methodsMap MethodsMap
+			methodsMap types.MethodsMap
 			allow      string
 		)
 

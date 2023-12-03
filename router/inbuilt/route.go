@@ -3,7 +3,6 @@ package inbuilt
 import (
 	"github.com/indigo-web/indigo/http/method"
 	"github.com/indigo-web/indigo/http/status"
-	"path"
 )
 
 // AllErrors is used to be passed into Router.RouteError, indicating by that,
@@ -64,17 +63,6 @@ func (r *Router) RouteError(handler Handler, codes ...status.Code) *Router {
 	for _, code := range codes {
 		r.errHandlers[code] = handler
 	}
-
-	return r
-}
-
-// Catch registers a catcher. A catcher is a handler, that is being called if requested path
-// is not found, and it starts with a defined prefix
-func (r *Router) Catch(prefix string, handler Handler, middlewares ...Middleware) *Router {
-	r.catchers = append(r.catchers, Catcher{
-		Prefix:  path.Join(r.prefix, prefix),
-		Handler: compose(handler, middlewares),
-	})
 
 	return r
 }

@@ -6,24 +6,29 @@ import (
 	"github.com/indigo-web/indigo/http/status"
 	"github.com/indigo-web/indigo/router"
 	"github.com/indigo-web/indigo/router/inbuilt/internal/radix"
+	"github.com/indigo-web/indigo/router/inbuilt/internal/types"
 	"sort"
 	"strings"
 )
 
 var _ router.Router = &Router{}
 
+type mutator func(*http.Request)
+
 // Router is a built-in implementation of router.Router interface that provides
 // some basic router features like middlewares, groups, dynamic routing, error
 // handlers, and some implicit things like calling GET-handlers for HEAD-requests,
 // or rendering TRACE-responses automatically in case no handler is registered
 type Router struct {
+	isRoot      bool
 	prefix      string
 	middlewares []Middleware
-	registrar   *registrar
-	routesMap   RoutesMap
-	tree        radix.Tree
-	isStatic    bool
 	catchers    []Catcher
+	registrar   *registrar
+	routesMap   routesMap
+	tree        radix.Tree
+	aliases     map[string]string
+	isStatic    bool
 	errHandlers errorHandlers
 
 	children  []*Router
@@ -33,6 +38,7 @@ type Router struct {
 // New constructs a new instance of inbuilt router
 func New() *Router {
 	r := &Router{
+		isRoot:      true,
 		registrar:   newRegistrar(),
 		errHandlers: newErrorHandlers(),
 	}
@@ -40,7 +46,7 @@ func New() *Router {
 	return r
 }
 
-// OnStart composes all the registered handlers with middlewares
+// OnStart initializes the router. It merges all the groups and prepares
 func (r *Router) OnStart() error {
 	r.applyErrorHandlersMiddlewares()
 
@@ -52,19 +58,23 @@ func (r *Router) OnStart() error {
 		return len(r.catchers[i].Prefix) > len(r.catchers[j].Prefix)
 	})
 
-	if r.registrar.IsDynamic() {
-		r.tree = r.registrar.AsRadixTree()
-	} else {
+	r.isStatic = !r.registrar.IsDynamic()
+	if r.isStatic {
 		r.routesMap = r.registrar.AsMap()
-		r.isStatic = true
+	} else {
+		r.tree = r.registrar.AsRadixTree()
 	}
 
 	return nil
 }
 
-// OnRequest routes the request
+// OnRequest processes the request
 func (r *Router) OnRequest(request *http.Request) *http.Response {
 	request.Path = stripTrailingSlash(request.Path)
+
+	if r.aliases != nil {
+		r.retrieveAlias(request)
+	}
 
 	if r.isStatic {
 		endpoint, found := r.routesMap[request.Path]
@@ -167,7 +177,7 @@ func stripTrailingSlash(path string) string {
 
 // getHandler looks up for a handler in the methodsMap. In case request method is HEAD, however
 // no matching handler is found, a handler for corresponding GET request will be retrieved
-func getHandler(reqMethod method.Method, methodsMap MethodsMap) Handler {
+func getHandler(reqMethod method.Method, methodsMap types.MethodsMap) Handler {
 	handler := methodsMap[reqMethod]
 	if handler == nil && reqMethod == method.HEAD {
 		return getHandler(method.GET, methodsMap)
