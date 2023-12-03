@@ -1,7 +1,6 @@
 package http1
 
 import (
-	"context"
 	"fmt"
 	"github.com/indigo-web/indigo/http/coding"
 	"strings"
@@ -59,7 +58,7 @@ func getParser() (httpparser.HTTPRequestsParser, *http.Request) {
 	body := NewBody(
 		dummy.NewNopClient(), chunkedParser, coding.NewManager(0))
 	request := http.NewRequest(
-		context.Background(), headers.NewHeaders(), query.Query{}, http.NewResponse(),
+		headers.NewHeaders(), query.Query{}, http.NewResponse(),
 		dummy.NewNopConn(), body, nil, false,
 	)
 

@@ -1,7 +1,6 @@
 package render
 
 import (
-	"context"
 	"github.com/indigo-web/indigo/http"
 	"github.com/indigo-web/indigo/http/coding"
 	"github.com/indigo-web/indigo/http/headers"
@@ -49,7 +48,7 @@ func BenchmarkRenderer_Response(b *testing.B) {
 		dummy.NewNopClient(), nil, coding.NewManager(0),
 	)
 	request := http.NewRequest(
-		context.Background(), hdrs, query.NewQuery(nil), http.NewResponse(), dummy.NewNopConn(),
+		hdrs, query.NewQuery(nil), http.NewResponse(), dummy.NewNopConn(),
 		body, nil, false,
 	)
 	client := NopClientWriter{}

@@ -7,8 +7,6 @@ import (
 
 	"github.com/indigo-web/indigo/http"
 
-	"github.com/indigo-web/indigo/router/inbuilt/types"
-
 	"github.com/indigo-web/indigo/http/status"
 
 	"github.com/indigo-web/indigo/http/method"
@@ -67,7 +65,7 @@ func TestRoute(t *testing.T) {
 
 func testMethodShorthand(
 	t *testing.T, router *Router,
-	route func(string, types.Handler, ...types.Middleware) *Router,
+	route func(string, Handler, ...Middleware) *Router,
 	method method.Method,
 ) {
 	route("/", http.Respond)
@@ -192,7 +190,7 @@ func TestRouter_RouteError(t *testing.T) {
 	r.RouteError(func(req *http.Request) *http.Response {
 		return req.Respond().
 			Code(status.Teapot).
-			String(req.Ctx.Value("error").(error).Error())
+			String(req.Env.Error.Error())
 	}, status.BadRequest)
 
 	t.Run("status.ErrBadRequest", func(t *testing.T) {
