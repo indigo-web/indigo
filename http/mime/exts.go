@@ -25,4 +25,5 @@ var Extension = map[string]string{
 	".zip":  "application/zip",
 	".zlib": "application/zlib",
 	".zstd": "application/zstd",
+	".ico":  "image/vnd.microsoft.icon",
 }
