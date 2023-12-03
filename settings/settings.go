@@ -133,10 +133,9 @@ type Settings struct {
 	TLS     TLS
 }
 
+// Default returns default settings. Those are initially well-balanced, however maximal defaults
+// are pretty permitting
 func Default() Settings {
-	// Usually, Default field stands for size of pre-allocated something
-	// and Maximal stands for maximal size of something
-
 	return Settings{
 		Headers: Headers{
 			Number: HeadersNumber{
@@ -189,63 +188,72 @@ func Default() Settings {
 	}
 }
 
-// Fill takes some settings and fills it with default values
-// everywhere where it is left uninitialized
-func Fill(original Settings) (modified Settings) {
-	defaultSettings := Default()
+// Fill fills zero-values from partially-filled Settings instance with default ones
+func Fill(src Settings) (modified Settings) {
+	defaults := Default()
 
-	original.Headers.Number.Default = customOrDefault(
-		original.Headers.Number.Default, defaultSettings.Headers.Number.Default)
-	original.Headers.Number.Maximal = customOrDefault(
-		original.Headers.Number.Maximal, defaultSettings.Headers.Number.Maximal)
-	original.Headers.MaxKeyLength = customOrDefault(
-		original.Headers.MaxKeyLength, defaultSettings.Headers.MaxKeyLength)
-	original.Headers.MaxValueLength = customOrDefault(
-		original.Headers.MaxValueLength, defaultSettings.Headers.MaxValueLength)
-	original.Headers.ValueSpace.Default = customOrDefault(
-		original.Headers.ValueSpace.Default, defaultSettings.Headers.ValueSpace.Default)
-	original.Headers.ValueSpace.Maximal = customOrDefault(
-		original.Headers.ValueSpace.Maximal, defaultSettings.Headers.ValueSpace.Maximal)
-	original.Headers.MaxValuesObjectPoolSize = customOrDefault(
-		original.Headers.MaxValuesObjectPoolSize, defaultSettings.Headers.MaxValuesObjectPoolSize)
-	original.Headers.MaxEncodingTokens = customOrDefault(
-		original.Headers.MaxEncodingTokens, defaultSettings.Headers.MaxEncodingTokens)
-	original.URL.BufferSize.Default = customOrDefault(
-		original.URL.BufferSize.Default, defaultSettings.URL.BufferSize.Default)
-	original.URL.BufferSize.Maximal = customOrDefault(
-		original.URL.BufferSize.Maximal, defaultSettings.URL.BufferSize.Maximal)
-	original.URL.Query.MaxLength = customOrDefault(
-		original.URL.Query.MaxLength, defaultSettings.URL.Query.MaxLength)
-	original.URL.Query.DefaultMapSize = customOrDefault(
-		original.URL.Query.DefaultMapSize, defaultSettings.URL.Query.DefaultMapSize)
-	/* skip original.URL.Params.DisableMapClear, as its zero value is already default one */
-	original.TCP.ReadBufferSize = customOrDefault(
-		original.TCP.ReadBufferSize, defaultSettings.TCP.ReadBufferSize)
-	original.TCP.ReadTimeout = customOrDefault(
-		original.TCP.ReadTimeout, defaultSettings.TCP.ReadTimeout)
-	original.Body.MaxSize = customOrDefault(
-		original.Body.MaxSize, defaultSettings.Body.MaxSize)
-	original.Body.MaxChunkSize = customOrDefault(
-		original.Body.MaxChunkSize, defaultSettings.Body.MaxChunkSize)
-	original.Body.DecodedBufferSize = customOrDefault(
-		original.Body.DecodedBufferSize, defaultSettings.Body.DecodedBufferSize)
-	original.HTTP.ResponseBuffSize = customOrDefault(
-		original.HTTP.ResponseBuffSize, defaultSettings.HTTP.ResponseBuffSize)
-	original.TLS.Enable = original.TLS.Enable || defaultSettings.TLS.Enable
-	original.TLS.Port = customOrDefault(
-		original.TLS.Port, defaultSettings.TLS.Port)
-	if len(original.TLS.Cert) == 0 {
-		original.TLS.Cert = defaultSettings.TLS.Cert
+	return Settings{
+		Headers: Headers{
+			Number: HeadersNumber{
+				Default: valueOr(src.Headers.Number.Default, defaults.Headers.Number.Default),
+				Maximal: valueOr(src.Headers.Number.Maximal, defaults.Headers.Number.Maximal),
+			},
+			MaxKeyLength:   valueOr(src.Headers.MaxKeyLength, defaults.Headers.MaxKeyLength),
+			MaxValueLength: valueOr(src.Headers.MaxValueLength, defaults.Headers.MaxValueLength),
+			ValueSpace: HeadersValuesSpace{
+				Default: valueOr(src.Headers.ValueSpace.Default, defaults.Headers.ValueSpace.Default),
+				Maximal: valueOr(src.Headers.ValueSpace.Maximal, defaults.Headers.ValueSpace.Maximal),
+			},
+			MaxValuesObjectPoolSize: valueOr(src.Headers.MaxValuesObjectPoolSize, defaults.Headers.MaxValuesObjectPoolSize),
+			MaxEncodingTokens:       valueOr(src.Headers.MaxEncodingTokens, defaults.Headers.MaxEncodingTokens),
+		},
+		URL: URL{
+			BufferSize: URLBufferSize{
+				Default: valueOr(src.URL.BufferSize.Default, defaults.URL.BufferSize.Default),
+				Maximal: valueOr(src.URL.BufferSize.Maximal, defaults.URL.BufferSize.Maximal),
+			},
+			Query: Query{
+				MaxLength:      valueOr(src.URL.Query.MaxLength, defaults.URL.Query.MaxLength),
+				DefaultMapSize: valueOr(src.URL.Query.DefaultMapSize, defaults.URL.Query.DefaultMapSize),
+			},
+			Params: URLParams{
+				// as we can't determine, whether set value is a zero-value or set on purpose, just leave
+				// it as it is. It's anyway equal to zero-value by default
+				DisableMapClear: src.URL.Params.DisableMapClear,
+			},
+		},
+		TCP: TCP{
+			ReadBufferSize: valueOr(src.TCP.ReadBufferSize, defaults.TCP.ReadBufferSize),
+			ReadTimeout:    valueOr(src.TCP.ReadTimeout, defaults.TCP.ReadTimeout),
+		},
+		Body: Body{
+			MaxSize:           valueOr(src.Body.MaxSize, defaults.Body.MaxSize),
+			MaxChunkSize:      valueOr(src.Body.MaxChunkSize, defaults.Body.MaxChunkSize),
+			DecodedBufferSize: valueOr(src.Body.DecodedBufferSize, defaults.Body.DecodedBufferSize),
+		},
+		HTTP: HTTP{
+			ResponseBuffSize: valueOr(src.HTTP.ResponseBuffSize, defaults.HTTP.ResponseBuffSize),
+		},
+		TLS: TLS{
+			// same situation as with URL.Params.DisableMapClear
+			Enable: src.TLS.Enable,
+			Port:   valueOr(src.TLS.Port, defaults.TLS.Port),
+			Cert:   strValueOr(src.TLS.Cert, defaults.TLS.Cert),
+			Key:    strValueOr(src.TLS.Key, defaults.TLS.Key),
+		},
 	}
-	if len(original.TLS.Key) == 0 {
-		original.TLS.Key = defaultSettings.TLS.Key
-	}
-
-	return original
 }
 
-func customOrDefault[T constraint.Number](custom, defaultVal T) T {
+func valueOr[T constraint.Number](custom, defaultVal T) T {
 	if custom == 0 {
+		return defaultVal
+	}
+
+	return custom
+}
+
+func strValueOr(custom, defaultVal string) string {
+	if len(custom) == 0 {
 		return defaultVal
 	}
 
