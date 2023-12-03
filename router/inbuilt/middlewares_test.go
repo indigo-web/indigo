@@ -1,7 +1,6 @@
 package inbuilt
 
 import (
-	"context"
 	"github.com/indigo-web/indigo/http/coding"
 	"github.com/indigo-web/indigo/http/method"
 	"github.com/indigo-web/indigo/http/status"
@@ -10,11 +9,9 @@ import (
 	"testing"
 
 	"github.com/indigo-web/indigo/http"
-	"github.com/indigo-web/indigo/internal/parser/http1"
-	"github.com/indigo-web/indigo/router/inbuilt/types"
-
 	"github.com/indigo-web/indigo/http/headers"
 	"github.com/indigo-web/indigo/http/query"
+	"github.com/indigo-web/indigo/internal/parser/http1"
 )
 
 /*
@@ -51,8 +48,8 @@ func (c *callstack) Clear() {
 	c.chain = c.chain[:0]
 }
 
-func getMiddleware(mware middleware, stack *callstack) types.Middleware {
-	return func(next types.Handler, request *http.Request) *http.Response {
+func getMiddleware(mware middleware, stack *callstack) Middleware {
+	return func(next Handler, request *http.Request) *http.Response {
 		stack.Push(mware)
 
 		return next(request)
@@ -66,8 +63,7 @@ func getRequest() *http.Request {
 	)
 
 	return http.NewRequest(
-		context.Background(), headers.NewHeaders(), q, http.NewResponse(), dummy.NewNopConn(),
-		body, nil, false,
+		headers.NewHeaders(), q, http.NewResponse(), dummy.NewNopConn(), body, nil, false,
 	)
 }
 
