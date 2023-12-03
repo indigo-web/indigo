@@ -1,13 +1,11 @@
 package inbuilt
 
 import (
-	"github.com/indigo-web/indigo/ctx"
 	"github.com/indigo-web/indigo/http"
 	"github.com/indigo-web/indigo/http/method"
 	"github.com/indigo-web/indigo/http/status"
 	"github.com/indigo-web/indigo/router"
-	"github.com/indigo-web/indigo/router/inbuilt/radix"
-	"github.com/indigo-web/indigo/router/inbuilt/types"
+	"github.com/indigo-web/indigo/router/inbuilt/internal/radix"
 	"sort"
 	"strings"
 )
@@ -19,16 +17,14 @@ var _ router.Router = &Router{}
 // handlers, and some implicit things like calling GET-handlers for HEAD-requests,
 // or rendering TRACE-responses automatically in case no handler is registered
 type Router struct {
-	prefix           string
-	middlewares      []types.Middleware
-	registrar        *registrar
-	routesMap        types.RoutesMap
-	tree             radix.Tree
-	isStatic         bool
-	catchers         []types.Catcher
-	errHandlers      *types.ErrHandlers
-	reusableErrCtx   ctx.ReusableContext[string, error]
-	reusableAllowCtx ctx.ReusableContext[string, string]
+	prefix      string
+	middlewares []Middleware
+	registrar   *registrar
+	routesMap   RoutesMap
+	tree        radix.Tree
+	isStatic    bool
+	catchers    []Catcher
+	errHandlers errorHandlers
 
 	children  []*Router
 	traceBuff []byte
@@ -37,10 +33,8 @@ type Router struct {
 // New constructs a new instance of inbuilt router
 func New() *Router {
 	r := &Router{
-		registrar:        newRegistrar(),
-		errHandlers:      newErrorHandlers(),
-		reusableErrCtx:   ctx.NewReusable[string, error](),
-		reusableAllowCtx: ctx.NewReusable[string, string](),
+		registrar:   newRegistrar(),
+		errHandlers: newErrorHandlers(),
 	}
 
 	return r
@@ -48,6 +42,8 @@ func New() *Router {
 
 // OnStart composes all the registered handlers with middlewares
 func (r *Router) OnStart() error {
+	r.applyErrorHandlersMiddlewares()
+
 	if err := r.prepare(); err != nil {
 		return err
 	}
@@ -71,15 +67,14 @@ func (r *Router) OnRequest(request *http.Request) *http.Response {
 	request.Path = stripTrailingSlash(request.Path)
 
 	if r.isStatic {
-		methodsMap, allow, ok := r.routesMap.Get(request.Path)
-		if !ok {
+		endpoint, found := r.routesMap[request.Path]
+		if !found {
 			return r.OnError(request, status.ErrNotFound)
 		}
 
-		handler := getHandler(request.Method, methodsMap)
+		handler := getHandler(request.Method, endpoint.methodsMap)
 		if handler == nil {
-			r.reusableAllowCtx.Set(request.Ctx, "allow", allow)
-			request.Ctx = r.reusableAllowCtx
+			request.Env.AllowMethods = endpoint.allow
 
 			return r.OnError(request, status.ErrMethodNotAllowed)
 		}
@@ -87,15 +82,14 @@ func (r *Router) OnRequest(request *http.Request) *http.Response {
 		return handler(request)
 	}
 
-	payload := r.tree.Match(request.Params, request.Path)
-	if payload == nil {
+	endpoint := r.tree.Match(request.Params, request.Path)
+	if endpoint == nil {
 		return r.OnError(request, status.ErrNotFound)
 	}
 
-	handler := getHandler(request.Method, payload.MethodsMap)
+	handler := getHandler(request.Method, endpoint.MethodsMap)
 	if handler == nil {
-		r.reusableAllowCtx.Set(request.Ctx, "allow", payload.Allow)
-		request.Ctx = r.reusableAllowCtx
+		request.Env.AllowMethods = endpoint.Allow
 
 		return r.OnError(request, status.ErrMethodNotAllowed)
 	}
@@ -125,17 +119,33 @@ func (r *Router) OnError(request *http.Request, err error) *http.Response {
 		return http.Code(request, status.InternalServerError)
 	}
 
-	handler := r.errHandlers.Get(httpErr)
+	handler := r.retrieveErrorHandler(httpErr.Code)
 	if handler == nil {
+		// not using http.Error(request, err) for performance purposes, as in this case
+		// it would try under the hood to unwrap the error again, however we did this already
 		return request.Respond().
 			Code(httpErr.Code).
 			String(httpErr.Message)
 	}
 
-	r.reusableErrCtx.Set(request.Ctx, "error", err)
-	request.Ctx = r.reusableErrCtx
+	request.Env.Error = err
 
 	return handler(request)
+}
+
+func (r *Router) retrieveErrorHandler(code status.Code) Handler {
+	handler, found := r.errHandlers[code]
+	if !found {
+		return r.errHandlers[AllErrors]
+	}
+
+	return handler
+}
+
+func (r *Router) applyErrorHandlersMiddlewares() {
+	for code, handler := range r.errHandlers {
+		r.errHandlers[code] = compose(handler, r.middlewares)
+	}
 }
 
 // stripTrailingSlash just removes a trailing slash of request path in case it is presented.
@@ -157,9 +167,9 @@ func stripTrailingSlash(path string) string {
 
 // getHandler looks up for a handler in the methodsMap. In case request method is HEAD, however
 // no matching handler is found, a handler for corresponding GET request will be retrieved
-func getHandler(reqMethod method.Method, methodsMap types.MethodsMap) types.Handler {
+func getHandler(reqMethod method.Method, methodsMap MethodsMap) Handler {
 	handler := methodsMap[reqMethod]
-	if reqMethod == method.HEAD && handler == nil {
+	if handler == nil && reqMethod == method.HEAD {
 		return getHandler(method.GET, methodsMap)
 	}
 
