@@ -61,9 +61,9 @@ func Stressful(request *http.Request) *http.Response {
 func main() {
 	r := inbuilt.New().
 		Use(middleware.LogRequests()).
-		Use(middleware.Redirect("/favicon.ico", "/static/favicon.ico")).
-		Use(middleware.Redirect("/", "/static/index.html")).
-		Static("/static", "./examples/combined/static")
+		Alias("/", "/static/index.html").
+		Alias("/favicon.ico", "/static/favicon.ico").
+		Static("/static", "examples/combined/static")
 
 	r.Get("/stress", Stressful, middleware.Recover)
 
