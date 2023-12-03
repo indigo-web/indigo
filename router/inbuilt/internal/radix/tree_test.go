@@ -1,9 +1,9 @@
 package radix
 
 import (
+	"github.com/indigo-web/indigo/router/inbuilt/internal/types"
 	"testing"
 
-	"github.com/indigo-web/indigo/router/inbuilt/types"
 	"github.com/stretchr/testify/require"
 )
 

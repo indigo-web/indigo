@@ -3,15 +3,15 @@ package middleware
 import (
 	"github.com/indigo-web/indigo/http"
 	"github.com/indigo-web/indigo/http/status"
-	"github.com/indigo-web/indigo/router/inbuilt/types"
+	"github.com/indigo-web/indigo/router/inbuilt"
 )
 
 // HTTPSOnly redirects all http requests to https. In case no Host header is provided,
 // 400 Bad Request will be returned without calling the actual handler.
 //
 // Note: it causes 1 (one) allocation
-func HTTPSOnly(next types.Handler, req *http.Request) *http.Response {
-	if req.IsTLS {
+func HTTPSOnly(next inbuilt.Handler, req *http.Request) *http.Response {
+	if req.Env.IsTLS {
 		return next(req)
 	}
 

@@ -5,18 +5,13 @@ import (
 
 	"github.com/indigo-web/indigo/http"
 
-	"github.com/indigo-web/indigo/router/inbuilt/types"
-
 	"github.com/indigo-web/indigo"
 	"github.com/indigo-web/indigo/router/inbuilt"
 )
 
-const (
-	host = "0.0.0.0"
-	port = 8080
-)
+const addr = ":8080"
 
-func HelloWorldMiddleware(next types.Handler, request *http.Request) *http.Response {
+func HelloWorldMiddleware(next inbuilt.Handler, request *http.Request) *http.Response {
 	log.Println("running middleware before handler")
 	response := next(request)
 	log.Println("running middleware after handler")
@@ -24,7 +19,7 @@ func HelloWorldMiddleware(next types.Handler, request *http.Request) *http.Respo
 	return response
 }
 
-func SecondMiddleware(next types.Handler, request *http.Request) *http.Response {
+func SecondMiddleware(next inbuilt.Handler, request *http.Request) *http.Response {
 	log.Println("running second middleware before first one")
 	response := next(request)
 	log.Println("running second middleware after first one")
@@ -48,7 +43,7 @@ func main() {
 	v1.Use(SecondMiddleware)
 	v1.Get("/hello", MyBeautifulHandler)
 
-	app := indigo.NewApp(host, port)
-	log.Println("listening on", host, port)
+	app := indigo.NewApp(addr)
+	log.Println("listening on", addr)
 	log.Fatal(app.Serve(r))
 }

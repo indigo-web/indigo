@@ -10,10 +10,7 @@ import (
 	"github.com/indigo-web/indigo/router/inbuilt"
 )
 
-const (
-	host = "0.0.0.0"
-	port = 8080
-)
+const addr = ":8080"
 
 func MyHandler(request *http.Request) *http.Response {
 	conn, err := request.Hijack()
@@ -43,7 +40,7 @@ func main() {
 	r := inbuilt.New()
 	r.Get("/", MyHandler)
 
-	app := indigo.NewApp(host, port)
-	log.Println("Listening on", host, port)
+	app := indigo.NewApp(addr)
+	log.Println("Listening on", addr)
 	log.Fatal(app.Serve(r))
 }

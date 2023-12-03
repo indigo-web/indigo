@@ -1,7 +1,6 @@
 package http1
 
 import (
-	"context"
 	"github.com/indigo-web/indigo/http/coding"
 	"io"
 	"strconv"
@@ -43,8 +42,7 @@ func getRequestWithBody(chunked bool, body ...[]byte) (*http.Request, http.Body)
 	}
 
 	request := http.NewRequest(
-		context.Background(), hdrs, query.Query{}, http.NewResponse(),
-		dummy.NewNopConn(), reqBody, nil, false,
+		hdrs, query.Query{}, http.NewResponse(), dummy.NewNopConn(), reqBody, nil, false,
 	)
 	request.ContentLength = contentLength
 	request.Encoding.Chunked = chunked
@@ -94,8 +92,8 @@ func TestBodyReader_Plain(t *testing.T) {
 
 		hdrs := headers.NewHeaders()
 		request := http.NewRequest(
-			context.Background(), hdrs, query.Query{}, http.NewResponse(),
-			dummy.NewNopConn(), nil, nil, false,
+			hdrs, query.Query{}, http.NewResponse(), dummy.NewNopConn(), nil,
+			nil, false,
 		)
 		request.ContentLength = buffSize
 		chunkedParser := chunkedbody.NewParser(chunkedbody.DefaultSettings())

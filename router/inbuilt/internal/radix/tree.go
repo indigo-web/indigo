@@ -2,8 +2,7 @@ package radix
 
 import (
 	"errors"
-
-	"github.com/indigo-web/indigo/router/inbuilt/types"
+	"github.com/indigo-web/indigo/router/inbuilt/internal/types"
 )
 
 var ErrNotImplemented = errors.New(

@@ -14,13 +14,10 @@ import (
 	"github.com/indigo-web/indigo/router/inbuilt"
 )
 
-const (
-	host = "0.0.0.0"
-	port = 8080
-)
+const addr = ":8080"
 
 func IndexSay(request *http.Request) *http.Response {
-	if talking := request.Headers.Value("talking"); talking != "allowed" {
+	if request.Headers.Value("talking") != "allowed" {
 		return http.Code(request, status.UnavailableForLegalReasons)
 	}
 
@@ -29,7 +26,7 @@ func IndexSay(request *http.Request) *http.Response {
 		return http.Error(request, err)
 	}
 
-	log.Println("Somebody said:", strconv.Quote(body))
+	log.Println("someone says:", strconv.Quote(body))
 
 	return request.Respond()
 }
@@ -63,11 +60,15 @@ func Stressful(request *http.Request) *http.Response {
 
 func main() {
 	r := inbuilt.New().
-		Get("/stress", Stressful, middleware.Recover)
+		Use(middleware.LogRequests()).
+		Use(middleware.Redirect("/favicon.ico", "/static/favicon.ico")).
+		Use(middleware.Redirect("/", "/static/index.html")).
+		Static("/static", "./examples/combined/static")
+
+	r.Get("/stress", Stressful, middleware.Recover)
 
 	r.Resource("/").
-		Post(IndexSay).
-		Static("/static", "./examples/combined/static")
+		Post(IndexSay)
 
 	r.Group("/hello").
 		Get("/world", World).
@@ -76,8 +77,8 @@ func main() {
 	s := settings.Default()
 	s.TCP.ReadTimeout = time.Hour
 
-	app := indigo.NewApp(host, port)
-	log.Println("Listening on", host, port)
+	app := indigo.NewApp(addr)
+	log.Println("Listening on", addr)
 
 	if err := app.Serve(r, s); err != nil {
 		log.Fatal(err)

@@ -1,11 +1,10 @@
 package indigo
 
 import (
-	"context"
 	"crypto/tls"
-	"errors"
 	"fmt"
 	"github.com/indigo-web/indigo/http/coding"
+	"github.com/indigo-web/indigo/internal/address"
 	"net"
 	"strings"
 
@@ -30,20 +29,17 @@ var DefaultHeaders = map[string][]string{
 // Application is just a struct with addr and shutdown channel that is currently
 // not used. Planning to replace it with context.WithCancel()
 type Application struct {
-	ctx              context.Context
 	codings          []coding.Constructor
 	defaultHeaders   map[string][]string
-	host             string
-	port             uint16
+	addr             string
 	servers          []*tcp.Server
 	gracefulShutdown bool
 }
 
 // NewApp returns a new application object with initialized shutdown chan
-func NewApp(host string, port uint16) *Application {
+func NewApp(addr string) *Application {
 	return &Application{
-		host:           host,
-		port:           port,
+		addr:           addr,
 		defaultHeaders: mapconv.Copy(DefaultHeaders),
 	}
 }
@@ -67,14 +63,15 @@ func (a *Application) DeleteDefaultHeader(key string) {
 	delete(a.defaultHeaders, key)
 }
 
-func (a *Application) SetContext(ctx context.Context) {
-	a.ctx = ctx
-}
-
 // Serve takes a router and someSettings, that must be only 0 or 1 elements
 // otherwise, error is returned
 // Also, if specified, Accept-Encodings default header's value will be set here
 func (a *Application) Serve(r router.Router, optionalSettings ...settings.Settings) error {
+	addr, err := address.Parse(a.addr)
+	if err != nil {
+		return fmt.Errorf("bad address: %s", err.Error())
+	}
+
 	if accept, found := a.defaultHeaders["Accept-Encodings"]; found && accept == nil {
 		// because of the special treatment of default headers by rendering engine, better to
 		// join these values manually. Otherwise, each value will be rendered individually, that
@@ -87,10 +84,7 @@ func (a *Application) Serve(r router.Router, optionalSettings ...settings.Settin
 		return err
 	}
 
-	s, err := concreteSettings(optionalSettings...)
-	if err != nil {
-		return err
-	}
+	s := concreteSettings(optionalSettings...)
 
 	if s.TLS.Enable {
 		cert, err := tls.LoadX509KeyPair(s.TLS.Cert, s.TLS.Key)
@@ -98,9 +92,8 @@ func (a *Application) Serve(r router.Router, optionalSettings ...settings.Settin
 			return err
 		}
 
-		tlsAddr := fmt.Sprintf("%s:%d", a.host, s.TLS.Port)
 		cfg := &tls.Config{Certificates: []tls.Certificate{cert}}
-		listener, err := tls.Listen("tcp", tlsAddr, cfg)
+		listener, err := tls.Listen("tcp", addr.SetPort(s.TLS.Port).String(), cfg)
 		if err != nil {
 			return err
 		}
@@ -108,8 +101,8 @@ func (a *Application) Serve(r router.Router, optionalSettings ...settings.Settin
 		a.servers = append(a.servers, tcp.NewServer(listener, func(conn net.Conn) {
 			client := newClient(s.TCP, conn)
 			bodyReader := newBody(client, s.Body, a.codings)
-			request := newRequest(a.ctx, s, conn, bodyReader)
-			request.IsTLS = true
+			request := newRequest(s, conn, bodyReader)
+			request.Env.IsTLS = true
 			renderer := newRenderer(s.HTTP, a)
 			httpParser := newHTTPParser(s, request)
 
@@ -118,8 +111,7 @@ func (a *Application) Serve(r router.Router, optionalSettings ...settings.Settin
 		}))
 	}
 
-	addr := fmt.Sprintf("%s:%d", a.host, a.port)
-	sock, err := net.Listen("tcp", addr)
+	sock, err := net.Listen("tcp", addr.String())
 	if err != nil {
 		return err
 	}
@@ -127,7 +119,7 @@ func (a *Application) Serve(r router.Router, optionalSettings ...settings.Settin
 	a.servers = append(a.servers, tcp.NewServer(sock, func(conn net.Conn) {
 		client := newClient(s.TCP, conn)
 		bodyReader := newBody(client, s.Body, a.codings)
-		request := newRequest(a.ctx, s, conn, bodyReader)
+		request := newRequest(s, conn, bodyReader)
 		renderer := newRenderer(s.HTTP, a)
 		httpParser := newHTTPParser(s, request)
 
@@ -186,14 +178,14 @@ func (a *Application) gracefulShutdownServers() {
 }
 
 // concreteSettings converts optional settings to concrete ones
-func concreteSettings(s ...settings.Settings) (settings.Settings, error) {
+func concreteSettings(s ...settings.Settings) settings.Settings {
 	switch len(s) {
 	case 0:
-		return settings.Default(), nil
+		return settings.Default()
 	case 1:
-		return settings.Fill(s[0]), nil
+		return settings.Fill(s[0])
 	default:
-		return settings.Settings{}, errors.New("too many settings (none or single struct is expected)")
+		panic("too many settings. None or single instance is expected")
 	}
 }
 

@@ -1,7 +1,6 @@
 package http
 
 import (
-	"context"
 	"github.com/indigo-web/indigo/http/coding"
 	"github.com/indigo-web/indigo/http/method"
 	"github.com/indigo-web/indigo/http/status"
@@ -119,8 +118,7 @@ func Benchmark_Get(b *testing.B) {
 	)
 	hdrs := headers.FromMap(make(map[string][]string, 10))
 	request := http.NewRequest(
-		context.Background(), hdrs, q, http.NewResponse(), dummy.NewNopConn(), body,
-		nil, false,
+		hdrs, q, http.NewResponse(), dummy.NewNopConn(), body, nil, false,
 	)
 	keyArena := buffer.NewBuffer[byte](
 		s.Headers.MaxKeyLength*s.Headers.Number.Default,
@@ -220,10 +218,7 @@ func Benchmark_Post(b *testing.B) {
 	body := http1.NewBody(
 		withBodyClient, nil, coding.NewManager(0),
 	)
-	request := http.NewRequest(
-		context.Background(), hdrs, q, http.NewResponse(), dummy.NewNopConn(), body,
-		nil, false,
-	)
+	request := http.NewRequest(hdrs, q, http.NewResponse(), dummy.NewNopConn(), body, nil, false)
 	keyArena := buffer.NewBuffer[byte](
 		s.Headers.MaxKeyLength*s.Headers.Number.Default,
 		s.Headers.MaxKeyLength*s.Headers.Number.Maximal,

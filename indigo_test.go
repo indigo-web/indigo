@@ -6,7 +6,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"github.com/indigo-web/indigo/ctx"
+	"github.com/indigo-web/indigo/router/inbuilt/middleware"
 	"github.com/stretchr/testify/require"
 	"io"
 	"net"
@@ -18,24 +18,17 @@ import (
 	"testing"
 	"time"
 
-	"github.com/indigo-web/indigo/http/status"
-
-	"github.com/indigo-web/indigo/settings"
-
 	"github.com/indigo-web/indigo/http"
-
 	"github.com/indigo-web/indigo/http/method"
 	"github.com/indigo-web/indigo/http/proto"
-	"github.com/indigo-web/indigo/router"
+	"github.com/indigo-web/indigo/http/status"
 	"github.com/indigo-web/indigo/router/inbuilt"
+	"github.com/indigo-web/indigo/settings"
 )
 
 const (
-	host       = "localhost"
-	port       = uint16(16100)
-	portString = "16100"
-	addr       = host + ":" + portString
-	URL        = "http://" + addr
+	addr = "localhost:16100"
+	URL  = "http://" + addr
 )
 
 const (
@@ -71,7 +64,7 @@ func readN(conn net.Conn, n int) ([]byte, error) {
 	}
 }
 
-func getStaticRouter(t *testing.T) router.Router {
+func getStaticRouter(t *testing.T) *inbuilt.Router {
 	r := inbuilt.New()
 
 	r.Get("/simple-get", func(request *http.Request) *http.Response {
@@ -192,12 +185,13 @@ func getStaticRouter(t *testing.T) router.Router {
 
 func TestServer_Static(t *testing.T) {
 	r := getStaticRouter(t)
+	r.Use(middleware.CustomContext(context.WithValue(context.Background(), "easter", "egg")))
 	s := settings.Default()
 	s.TCP.ReadTimeout = 1 * time.Second
-	app := NewApp(host, port)
+	app := NewApp(addr)
 	//app.AddCoding(coding.NewGZIP)
 
-	runningServer := newServer(ctx.WithValue(context.Background(), "easter", "egg"), app)
+	runningServer := newServer(app)
 	go runningServer.Start(t, r, s)
 
 	// wait a bit to guarantee that server is running
@@ -437,12 +431,12 @@ func TestServer_Static(t *testing.T) {
 		conn, err := net.Dial("tcp4", addr)
 		require.NoError(t, err)
 
-		body, err := io.ReadAll(conn)
-		wantResponseLine := "HTTP/1.1 408 Request Timeout\r\n"
-		require.GreaterOrEqual(t, len(body), len(wantResponseLine))
-		require.Equal(t, wantResponseLine, string(body[:len(wantResponseLine)]))
-		// io.ReadAll() returns nil as an error in case error was io.EOF
+		response, err := io.ReadAll(conn)
 		require.NoError(t, err)
+		wantResponseLine := "HTTP/1.1 408 Request Timeout\r\n"
+		lf := bytes.IndexByte(response, '\n')
+		require.NotEqual(t, -1, lf, "http response must contain at least one LF")
+		require.Equal(t, wantResponseLine, string(response[:lf+1]))
 	})
 
 	t.Run("/ctx-value", func(t *testing.T) {
@@ -492,16 +486,14 @@ type serverWrap struct {
 	ctx      context.Context
 }
 
-func newServer(ctx context.Context, app *Application) serverWrap {
+func newServer(app *Application) serverWrap {
 	return serverWrap{
 		app:      app,
 		shutdown: make(chan struct{}),
-		ctx:      ctx,
 	}
 }
 
-func (s serverWrap) Start(t *testing.T, r router.Router, settings ...settings.Settings) {
-	s.app.SetContext(s.ctx)
+func (s serverWrap) Start(t *testing.T, r *inbuilt.Router, settings ...settings.Settings) {
 	require.Equal(t, status.ErrShutdown, s.app.Serve(r, settings...))
 	s.shutdown <- struct{}{}
 }
