@@ -237,3 +237,127 @@ func TestRouter_RouteError(t *testing.T) {
 		require.Equal(t, fromUniversal, string(resp.Reveal().Body))
 	})
 }
+
+func TestAliases(t *testing.T) {
+	testRootAlias := func(t *testing.T, r *Router) {
+		req := getRequest()
+		req.Path = "/"
+		req.Method = method.GET
+		response := r.OnRequest(req)
+		require.Equal(t, status.OK, response.Reveal().Code)
+		require.Equal(t, "magic word", string(response.Reveal().Body))
+	}
+
+	t.Run("single alias", func(t *testing.T) {
+		r := New().
+			Get("/hello", func(req *http.Request) *http.Response {
+				require.Equal(t, "/hello", req.Path)
+				require.Equal(t, "/", req.Env.AliasFrom)
+
+				return req.Respond().String("magic word")
+			}).
+			Alias("/", "/hello")
+
+		require.NoError(t, r.OnStart())
+
+		testRootAlias(t, r)
+	})
+
+	t.Run("override normal handler", func(t *testing.T) {
+		r := New().
+			Get("/", func(req *http.Request) *http.Response {
+				require.Fail(t, "the handler must be overridden and never be called")
+				return http.Respond(req)
+			}).
+			Get("/hello", func(req *http.Request) *http.Response {
+				require.Equal(t, "/hello", req.Path)
+				require.Equal(t, "/", req.Env.AliasFrom)
+
+				return req.Respond().String("magic word")
+			}).
+			Alias("/", "/hello")
+
+		require.NoError(t, r.OnStart())
+
+		testRootAlias(t, r)
+	})
+
+	testOrdinaryRequest := func(t *testing.T, r *Router) {
+		req := getRequest()
+		req.Path = "/hello"
+		req.Method = method.GET
+		response := r.OnRequest(req)
+		require.Equal(t, status.OK, response.Reveal().Code)
+		require.Equal(t, "ordinary word", string(response.Reveal().Body))
+	}
+
+	t.Run("multiple calls", func(t *testing.T) {
+		var i int
+
+		r := New().
+			Get("/", func(req *http.Request) *http.Response {
+				require.Fail(t, "the handler must be overridden and never be called")
+				return http.Respond(req)
+			}).
+			Get("/hello", func(req *http.Request) *http.Response {
+				defer func() {
+					i++
+				}()
+
+				if i%2 == 0 {
+					require.Equalf(t, "/hello", req.Path, "on iteration: %d", i)
+					require.Equalf(t, "/", req.Env.AliasFrom, "on iteration: %d", i)
+
+					return req.Respond().String("magic word")
+				} else {
+					require.Equalf(t, "/hello", req.Path, "on iteration: %d", i)
+					require.Emptyf(t, req.Env.AliasFrom, "on iteration: %d", i)
+
+					return req.Respond().String("ordinary word")
+				}
+			}).
+			Alias("/", "/hello")
+
+		require.NoError(t, r.OnStart())
+
+		testRootAlias(t, r)
+		testOrdinaryRequest(t, r)
+		testRootAlias(t, r)
+		testOrdinaryRequest(t, r)
+	})
+}
+
+func TestCatchers(t *testing.T) {
+	request := func(m method.Method, path string) *http.Request {
+		req := getRequest()
+		req.Method = m
+		req.Path = path
+		return req
+	}
+
+	t.Run("multiple overriding endpoints", func(t *testing.T) {
+		r := New().
+			Get("/", http.Respond).
+			Get("/hello", http.Respond).
+			Catch("/", func(req *http.Request) *http.Response {
+				return req.Respond().String("magic")
+			}).
+			Catch("/hello", func(req *http.Request) *http.Response {
+				return req.Respond().String("double magic")
+			})
+		require.NoError(t, r.OnStart())
+
+		resp := r.OnRequest(request(method.GET, "/"))
+		require.Equal(t, status.OK, resp.Reveal().Code)
+		require.Empty(t, resp.Reveal().Body)
+		resp = r.OnRequest(request(method.GET, "/hello"))
+		require.Equal(t, status.OK, resp.Reveal().Code)
+		require.Empty(t, resp.Reveal().Body)
+		resp = r.OnRequest(request(method.GET, "/anything"))
+		require.Equal(t, status.OK, resp.Reveal().Code)
+		require.Equal(t, "magic", string(resp.Reveal().Body))
+		resp = r.OnRequest(request(method.GET, "/helloworld"))
+		require.Equal(t, status.OK, resp.Reveal().Code)
+		require.Equal(t, "double magic", string(resp.Reveal().Body))
+	})
+}
