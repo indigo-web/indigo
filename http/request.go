@@ -13,6 +13,17 @@ import (
 
 type Params = map[string]string
 
+type Environment struct {
+	// Error is used mostly for error handlers
+	Error error
+	// AllowMethods is used to pass a string containing all the allowed methods for a
+	// specific endpoint. Has non-zero-value only when 405 Method Not Allowed raises
+	AllowMethods string
+	IsTLS        bool
+}
+
+var zeroContext = context.Background()
+
 // Request represents HTTP request
 type Request struct {
 	Method method.Method
@@ -29,14 +40,17 @@ type Request struct {
 	// Upgrade is the protocol token, which is set by default to proto.Unknown. In
 	// case it is anything else, then Upgrade header was received
 	Upgrade proto.Proto
-	// Remote represents remote net.Addr
+	// Remote represents remote net.Addr.
+	// WARNING: in order to use the value to represent a user, MAKE SURE there are no proxies
+	// in the middle
 	Remote net.Addr
 	// Ctx is a request context. It may be filled with arbitrary data across middlewares
-	// and handler by itself.
+	// and handler by itself
 	Ctx context.Context
-	// IsTLS describes, whether request was made via https
-	IsTLS          bool
-	defaultCtx     context.Context
+	// Env is a set of fixed variables passed by core. They are passed separately from Request.Ctx
+	// in order to not only distinguish user-defined values in ctx from those from core, but also
+	// to gain performance, as accessing the struct is much faster than looking up in context.Context
+	Env            Environment
 	Body           Body
 	conn           net.Conn
 	wasHijacked    bool
@@ -50,7 +64,7 @@ type Request struct {
 // is invalid, we need to render a response using request method, but appears
 // that default method is a null-value (proto.Unknown)
 func NewRequest(
-	ctx context.Context, hdrs *headers.Headers, query query.Query, response *Response,
+	hdrs *headers.Headers, query query.Query, response *Response,
 	conn net.Conn, body Body, paramsMap Params, disableParamsMapClearing bool,
 ) *Request {
 	request := &Request{
@@ -59,8 +73,7 @@ func NewRequest(
 		Proto:          proto.HTTP11,
 		Headers:        hdrs,
 		Remote:         conn.RemoteAddr(),
-		Ctx:            ctx,
-		defaultCtx:     ctx,
+		Ctx:            zeroContext,
 		Body:           body,
 		conn:           conn,
 		clearParamsMap: !disableParamsMapClearing,
@@ -122,7 +135,7 @@ func (r *Request) WasHijacked() bool {
 // It is implemented to clear the request object between requests
 func (r *Request) Clear() (err error) {
 	r.Query.Set(nil)
-	r.Ctx = r.defaultCtx
+	r.Ctx = zeroContext
 
 	if err = r.Body.Reset(); err != nil {
 		return err
@@ -132,6 +145,7 @@ func (r *Request) Clear() (err error) {
 	r.Encoding = headers.Encoding{}
 	r.ContentType = ""
 	r.Upgrade = proto.Unknown
+	r.Env = Environment{}
 
 	if r.clearParamsMap && len(r.Params) > 0 {
 		for k := range r.Params {
