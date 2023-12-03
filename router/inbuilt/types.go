@@ -1,14 +1,15 @@
-package types
+package inbuilt
 
 import (
 	"github.com/indigo-web/indigo/http"
 	"github.com/indigo-web/indigo/http/method"
 	"github.com/indigo-web/indigo/http/status"
+	"github.com/indigo-web/indigo/router/inbuilt/internal/types"
 	"strings"
 )
 
 type (
-	Handler func(*http.Request) *http.Response
+	Handler = types.Handler
 	// Middleware works like a chain of nested calls, next may be even directly
 	// handler. But if we are not a closing middleware, we will call next
 	// middleware that is simply a partial middleware with already provided next
@@ -17,36 +18,10 @@ type (
 		Prefix  string
 		Handler Handler
 	}
-	MethodsMap [method.Count]Handler
+	MethodsMap = types.MethodsMap
 )
 
-type ErrHandlers struct {
-	handlers  map[status.Code]Handler
-	universal Handler
-}
-
-func NewErrHandlers() *ErrHandlers {
-	return &ErrHandlers{
-		handlers: make(map[status.Code]Handler),
-	}
-}
-
-func (e *ErrHandlers) Set(code status.Code, handler Handler) {
-	e.handlers[code] = handler
-}
-
-func (e *ErrHandlers) SetUniversal(universal Handler) {
-	e.universal = universal
-}
-
-func (e *ErrHandlers) Get(err status.HTTPError) Handler {
-	handler := e.handlers[err.Code]
-	if handler == nil {
-		handler = e.universal
-	}
-
-	return handler
-}
+type errorHandlers map[status.Code]Handler
 
 type routesMapEntry struct {
 	methodsMap MethodsMap
@@ -54,12 +29,6 @@ type routesMapEntry struct {
 }
 
 type RoutesMap map[string]routesMapEntry
-
-func (r RoutesMap) Get(path string) (MethodsMap, string, bool) {
-	entry, found := r[path]
-
-	return entry.methodsMap, entry.allow, found
-}
 
 func (r RoutesMap) Add(path string, m method.Method, handler Handler) {
 	entry := r[path]
