@@ -40,7 +40,7 @@ type Application struct {
 func NewApp(addr string) *Application {
 	return &Application{
 		addr:           addr,
-		defaultHeaders: mapconv.Copy(DefaultHeaders),
+		defaultHeaders: mapconv.Clone(DefaultHeaders),
 	}
 }
 

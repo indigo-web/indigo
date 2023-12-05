@@ -1,6 +1,9 @@
 package inbuilt
 
-import "github.com/indigo-web/indigo/http"
+import (
+	"github.com/indigo-web/indigo/http"
+	"path"
+)
 
 // Alias makes an implicitly redirects to other endpoint by changing request path
 // before a handler is called. In case of implicit redirect, original path is stored in
@@ -10,7 +13,7 @@ func (r *Router) Alias(from, to string) *Router {
 		r.aliases = make(map[string]string, 1)
 	}
 
-	r.aliases[from] = to
+	r.aliases[path.Join(r.prefix, from)] = to
 	return r
 }
 
