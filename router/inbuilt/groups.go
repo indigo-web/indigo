@@ -1,5 +1,7 @@
 package inbuilt
 
+import "github.com/indigo-web/utils/mapconv"
+
 /*
 This file is responsible for endpoint groups
 */
@@ -31,6 +33,7 @@ func (r *Router) prepare() error {
 			return err
 		}
 
+		r.aliases = mapconv.Copy(r.aliases, child.aliases)
 		r.catchers = append(r.catchers, child.catchers...)
 	}
 
