@@ -23,9 +23,7 @@ func TestRoute(t *testing.T) {
 	t.Run("GET /", func(t *testing.T) {
 		require.Contains(t, r.registrar.routes, "/")
 		require.NotNil(t, r.registrar.routes["/"][method.GET])
-		request := getRequest()
-		request.Method = method.GET
-		request.Path = "/"
+		request := getRequest(method.GET, "/")
 		resp := r.OnRequest(request)
 		require.Equal(t, status.OK, resp.Reveal().Code)
 	})
@@ -33,9 +31,7 @@ func TestRoute(t *testing.T) {
 	t.Run("POST /", func(t *testing.T) {
 		require.Contains(t, r.registrar.routes, "/")
 		require.NotNil(t, r.registrar.routes["/"][method.POST])
-		request := getRequest()
-		request.Method = method.POST
-		request.Path = "/"
+		request := getRequest(method.POST, "/")
 		resp := r.OnRequest(request)
 		require.Equal(t, status.OK, resp.Reveal().Code)
 	})
@@ -43,18 +39,13 @@ func TestRoute(t *testing.T) {
 	t.Run("POST /hello", func(t *testing.T) {
 		require.Contains(t, r.registrar.routes, "/hello")
 		require.NotNil(t, r.registrar.routes["/hello"][method.POST])
-		request := getRequest()
-		request.Method = method.POST
-		request.Path = "/hello"
+		request := getRequest(method.POST, "/hello")
 		resp := r.OnRequest(request)
 		require.Equal(t, status.OK, resp.Reveal().Code)
 	})
 
 	t.Run("HEAD /", func(t *testing.T) {
-		request := getRequest()
-		request.Method = method.HEAD
-		request.Path = "/"
-
+		request := getRequest(method.HEAD, "/")
 		resp := r.OnRequest(request)
 		// we have not registered any HEAD-method handler yet, so GET method
 		// is expected to be called (but without body)
@@ -178,9 +169,7 @@ func TestRouter_MethodNotAllowed(t *testing.T) {
 		Get("/", http.Respond)
 	require.NoError(t, r.OnStart())
 
-	request := getRequest()
-	request.Path = "/"
-	request.Method = method.POST
+	request := getRequest(method.POST, "/")
 	response := r.OnRequest(request)
 	require.Equal(t, status.MethodNotAllowed, response.Reveal().Code)
 }
@@ -194,28 +183,28 @@ func TestRouter_RouteError(t *testing.T) {
 	}, status.BadRequest)
 
 	t.Run("status.ErrBadRequest", func(t *testing.T) {
-		request := getRequest()
+		request := getRequest(method.GET, "/")
 		resp := r.OnError(request, status.ErrBadRequest)
 		require.Equal(t, status.Teapot, resp.Reveal().Code)
 		require.Equal(t, status.ErrBadRequest.Error(), string(resp.Reveal().Body))
 	})
 
 	t.Run("status.ErrURIDecoding (also bad request)", func(t *testing.T) {
-		request := getRequest()
+		request := getRequest(method.GET, "/")
 		resp := r.OnError(request, status.ErrURIDecoding)
 		require.Equal(t, status.Teapot, resp.Reveal().Code)
 		require.Equal(t, status.ErrURIDecoding.Error(), string(resp.Reveal().Body))
 	})
 
 	t.Run("unregistered http error", func(t *testing.T) {
-		request := getRequest()
+		request := getRequest(method.GET, "/")
 		resp := r.OnError(request, status.ErrNotImplemented)
 		require.Equal(t, status.NotImplemented, resp.Reveal().Code)
 		require.Equal(t, status.ErrNotImplemented.Error(), string(resp.Reveal().Body))
 	})
 
 	t.Run("unregistered ordinary error", func(t *testing.T) {
-		request := getRequest()
+		request := getRequest(method.GET, "/")
 		resp := r.OnError(request, errors.New("any error text here"))
 		require.Equal(t, status.InternalServerError, resp.Reveal().Code)
 		require.Empty(t, string(resp.Reveal().Body))
@@ -231,7 +220,7 @@ func TestRouter_RouteError(t *testing.T) {
 				String(fromUniversal)
 		}, AllErrors)
 
-		request := getRequest()
+		request := getRequest(method.GET, "/")
 		resp := r.OnError(request, status.ErrNotImplemented)
 		require.Equal(t, int(status.Teapot), int(resp.Reveal().Code))
 		require.Equal(t, fromUniversal, string(resp.Reveal().Body))
@@ -240,10 +229,8 @@ func TestRouter_RouteError(t *testing.T) {
 
 func TestAliases(t *testing.T) {
 	testRootAlias := func(t *testing.T, r *Router) {
-		req := getRequest()
-		req.Path = "/"
-		req.Method = method.GET
-		response := r.OnRequest(req)
+		request := getRequest(method.GET, "/")
+		response := r.OnRequest(request)
 		require.Equal(t, status.OK, response.Reveal().Code)
 		require.Equal(t, "magic word", string(response.Reveal().Body))
 	}
@@ -283,10 +270,8 @@ func TestAliases(t *testing.T) {
 	})
 
 	testOrdinaryRequest := func(t *testing.T, r *Router) {
-		req := getRequest()
-		req.Path = "/hello"
-		req.Method = method.GET
-		response := r.OnRequest(req)
+		request := getRequest(method.GET, "/hello")
+		response := r.OnRequest(request)
 		require.Equal(t, status.OK, response.Reveal().Code)
 		require.Equal(t, "ordinary word", string(response.Reveal().Body))
 	}
@@ -325,16 +310,21 @@ func TestAliases(t *testing.T) {
 		testRootAlias(t, r)
 		testOrdinaryRequest(t, r)
 	})
+
+	t.Run("aliases on groups", func(t *testing.T) {
+		r := New()
+		r.Get("/heaven", http.Respond)
+		r.Group("/hello").
+			Alias("/world", "/heaven")
+		require.NoError(t, r.OnStart())
+
+		request := getRequest(method.GET, "/hello/world")
+		response := r.OnRequest(request)
+		require.Equal(t, status.OK, response.Reveal().Code)
+	})
 }
 
 func TestCatchers(t *testing.T) {
-	request := func(m method.Method, path string) *http.Request {
-		req := getRequest()
-		req.Method = m
-		req.Path = path
-		return req
-	}
-
 	t.Run("multiple overriding endpoints", func(t *testing.T) {
 		r := New().
 			Get("/", http.Respond).
@@ -347,16 +337,16 @@ func TestCatchers(t *testing.T) {
 			})
 		require.NoError(t, r.OnStart())
 
-		resp := r.OnRequest(request(method.GET, "/"))
+		resp := r.OnRequest(getRequest(method.GET, "/"))
 		require.Equal(t, status.OK, resp.Reveal().Code)
 		require.Empty(t, resp.Reveal().Body)
-		resp = r.OnRequest(request(method.GET, "/hello"))
+		resp = r.OnRequest(getRequest(method.GET, "/hello"))
 		require.Equal(t, status.OK, resp.Reveal().Code)
 		require.Empty(t, resp.Reveal().Body)
-		resp = r.OnRequest(request(method.GET, "/anything"))
+		resp = r.OnRequest(getRequest(method.GET, "/anything"))
 		require.Equal(t, status.OK, resp.Reveal().Code)
 		require.Equal(t, "magic", string(resp.Reveal().Body))
-		resp = r.OnRequest(request(method.GET, "/helloworld"))
+		resp = r.OnRequest(getRequest(method.GET, "/helloworld"))
 		require.Equal(t, status.OK, resp.Reveal().Code)
 		require.Equal(t, "double magic", string(resp.Reveal().Body))
 	})

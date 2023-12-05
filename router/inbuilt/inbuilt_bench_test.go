@@ -12,28 +12,14 @@ import (
 func BenchmarkRouter_OnRequest_Static(b *testing.B) {
 	r := New()
 
-	GETRootRequest := getRequest()
-	GETRootRequest.Path = "/"
-	GETRootRequest.Method = method.GET
+	GETRootRequest := getRequest(method.GET, "/")
 	r.Get(GETRootRequest.Path, http.Respond)
-
-	longURIRequest := getRequest()
-	longURIRequest.Method = method.GET
-	longURIRequest.Path = "/" + strings.Repeat("a", 65534)
+	longURIRequest := getRequest(method.GET, "/"+strings.Repeat("a", 65534))
 	r.Get(longURIRequest.Path, http.Respond)
-
-	mediumURIRequest := getRequest()
-	mediumURIRequest.Method = method.GET
-	mediumURIRequest.Path = "/" + strings.Repeat("a", 50)
+	mediumURIRequest := getRequest(method.GET, "/"+strings.Repeat("a", 50))
 	r.Get(mediumURIRequest.Path, http.Respond)
-
-	unknownURIRequest := getRequest()
-	unknownURIRequest.Method = method.GET
-	unknownURIRequest.Path = "/" + strings.Repeat("b", 65534)
-
-	unknownMethodRequest := getRequest()
-	unknownMethodRequest.Method = method.POST
-	unknownMethodRequest.Path = longURIRequest.Path
+	unknownURIRequest := getRequest(method.GET, "/"+strings.Repeat("b", 65534))
+	unknownMethodRequest := getRequest(method.POST, longURIRequest.Path)
 
 	emptyCtx := context.Background()
 
