@@ -4,6 +4,7 @@ import (
 	"context"
 	"github.com/indigo-web/indigo/http/headers"
 	"github.com/indigo-web/indigo/http/method"
+	"github.com/indigo-web/indigo/http/mime"
 	"github.com/indigo-web/indigo/http/proto"
 	"github.com/indigo-web/indigo/http/query"
 	"github.com/indigo-web/indigo/http/status"
@@ -90,7 +91,7 @@ func NewRequest(
 // will be returned. If JSON is malformed, or it doesn't match the model, then custom jsoniter error
 // will be returned
 func (r *Request) JSON(model any) error {
-	if len(r.ContentType) > 0 && r.ContentType != "application/json" {
+	if len(r.ContentType) > 0 && r.ContentType != mime.JSON {
 		return status.ErrUnsupportedMediaType
 	}
 
