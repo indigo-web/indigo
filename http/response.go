@@ -19,7 +19,7 @@ const (
 	// why 7? I don't know. There's no theory behind the number.fields. It can be adjusted
 	// to 10 as well, but why you would ever need to do this?
 	defaultHeadersNumber = 7
-	defaultFileMIME      = "application/octet-stream"
+	defaultFileMIME      = mime.OctetStream
 )
 
 type Response struct {
@@ -169,7 +169,7 @@ func (r *Response) JSON(model any) (*Response, error) {
 		return r, err
 	}
 
-	return r.ContentType("application/json"), nil
+	return r.ContentType(mime.JSON), nil
 }
 
 // Error returns Response with corresponding HTTP error code, if passed error is
