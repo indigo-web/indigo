@@ -86,29 +86,24 @@ func (a *Application) Serve(r router.Router, optionalSettings ...settings.Settin
 
 	s := concreteSettings(optionalSettings...)
 
-	if s.TLS.Enable {
-		cert, err := tls.LoadX509KeyPair(s.TLS.Cert, s.TLS.Key)
+	if len(s.HTTPS.Addr) > 0 {
+		httpsAddr, err := address.Parse(s.HTTPS.Addr)
+		if err != nil {
+			return err
+		}
+
+		cert, err := tls.LoadX509KeyPair(s.HTTPS.Cert, s.HTTPS.Key)
 		if err != nil {
 			return err
 		}
 
 		cfg := &tls.Config{Certificates: []tls.Certificate{cert}}
-		listener, err := tls.Listen("tcp", addr.SetPort(s.TLS.Port).String(), cfg)
+		listener, err := tls.Listen("tcp", httpsAddr.String(), cfg)
 		if err != nil {
 			return err
 		}
 
-		a.servers = append(a.servers, tcp.NewServer(listener, func(conn net.Conn) {
-			client := newClient(s.TCP, conn)
-			bodyReader := newBody(client, s.Body, a.codings)
-			request := newRequest(s, conn, bodyReader)
-			request.Env.IsTLS = true
-			renderer := newRenderer(s.HTTP, a)
-			httpParser := newHTTPParser(s, request)
-
-			httpServer := http.NewServer(r)
-			httpServer.Run(client, request, renderer, httpParser)
-		}))
+		a.servers = append(a.servers, tcp.NewServer(listener, a.newTCPCallback(s, r, true)))
 	}
 
 	sock, err := net.Listen("tcp", addr.String())
@@ -116,16 +111,7 @@ func (a *Application) Serve(r router.Router, optionalSettings ...settings.Settin
 		return err
 	}
 
-	a.servers = append(a.servers, tcp.NewServer(sock, func(conn net.Conn) {
-		client := newClient(s.TCP, conn)
-		bodyReader := newBody(client, s.Body, a.codings)
-		request := newRequest(s, conn, bodyReader)
-		renderer := newRenderer(s.HTTP, a)
-		httpParser := newHTTPParser(s, request)
-
-		httpServer := http.NewServer(r)
-		httpServer.Run(client, request, renderer, httpParser)
-	}))
+	a.servers = append(a.servers, tcp.NewServer(sock, a.newTCPCallback(s, r, false)))
 
 	err = a.startServers()
 
@@ -174,6 +160,20 @@ func (a *Application) stopServers() {
 func (a *Application) gracefulShutdownServers() {
 	for _, server := range a.servers {
 		_ = server.GracefulShutdown()
+	}
+}
+
+func (a *Application) newTCPCallback(s settings.Settings, r router.Router, isTLS bool) tcp.OnConn {
+	return func(conn net.Conn) {
+		client := newClient(s.TCP, conn)
+		bodyReader := newBody(client, s.Body, a.codings)
+		request := newRequest(s, conn, bodyReader)
+		request.Env.IsTLS = isTLS
+		renderer := newRenderer(s.HTTP, a)
+		httpParser := newHTTPParser(s, request)
+
+		httpServer := http.NewServer(r)
+		httpServer.Run(client, request, renderer, httpParser)
 	}
 }
 
