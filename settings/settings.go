@@ -178,7 +178,6 @@ func Default() Settings {
 			ResponseBuffSize: 1024,
 		},
 		HTTPS: HTTPS{
-			Addr: "0.0.0.0:443",
 			Cert: "fullchain.pem",
 			Key:  "privkey.pem",
 		},
