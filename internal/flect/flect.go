@@ -97,6 +97,10 @@ func (m Model[T]) WriteInt64(into T, key string, num int64) T {
 	return m.write(into, key, unsafe.Pointer(&num), unsafe.Sizeof(num))
 }
 
+func (m Model[T]) WriteString(into T, key string, value string) T {
+	return m.write(into, key, unsafe.Pointer(&value), unsafe.Sizeof(value))
+}
+
 func memcpy(dst, src unsafe.Pointer, size uintptr) {
 	copy(unsafe.Slice((*byte)(dst), size), unsafe.Slice((*byte)(src), size))
 }
