@@ -106,11 +106,9 @@ type (
 		ResponseBuffSize int64
 	}
 
-	TLS struct {
-		// Enable states, whether HTTPS will be running (on a separated port).
-		Enable bool
-		// Port considers, on which port HTTPS listener will be started. By default, it is 443
-		Port uint16
+	HTTPS struct {
+		// Addr defines an address for HTTPS. If left empty, HTTPS will be disabled
+		Addr string
 		// Cert is a path to the .pem file with the actual certificate.
 		// When using certbot, it is usually stored at /etc/letsencrypt/live/<domain>/fullchain.pem
 		//
@@ -130,7 +128,7 @@ type Settings struct {
 	TCP     TCP
 	Body    Body
 	HTTP    HTTP
-	TLS     TLS
+	HTTPS   HTTPS
 }
 
 // Default returns default settings. Those are initially well-balanced, however maximal defaults
@@ -179,11 +177,9 @@ func Default() Settings {
 		HTTP: HTTP{
 			ResponseBuffSize: 1024,
 		},
-		TLS: TLS{
-			Enable: false,
-			Port:   443,
-			Cert:   "fullchain.pem",
-			Key:    "privkey.pem",
+		HTTPS: HTTPS{
+			Cert: "fullchain.pem",
+			Key:  "privkey.pem",
 		},
 	}
 }
@@ -234,12 +230,11 @@ func Fill(src Settings) (modified Settings) {
 		HTTP: HTTP{
 			ResponseBuffSize: valueOr(src.HTTP.ResponseBuffSize, defaults.HTTP.ResponseBuffSize),
 		},
-		TLS: TLS{
-			// same situation as with URL.Params.DisableMapClear
-			Enable: src.TLS.Enable,
-			Port:   valueOr(src.TLS.Port, defaults.TLS.Port),
-			Cert:   strValueOr(src.TLS.Cert, defaults.TLS.Cert),
-			Key:    strValueOr(src.TLS.Key, defaults.TLS.Key),
+		HTTPS: HTTPS{
+			// Addr is either defined or not. Default value - empty string - disables HTTPS
+			Addr: src.HTTPS.Addr,
+			Cert: strValueOr(src.HTTPS.Cert, defaults.HTTPS.Cert),
+			Key:  strValueOr(src.HTTPS.Key, defaults.HTTPS.Key),
 		},
 	}
 }

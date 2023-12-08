@@ -6,17 +6,17 @@ import (
 	"sync"
 )
 
-type onConnection func(net.Conn)
+type OnConn func(net.Conn)
 
 type Server struct {
 	sock     net.Listener
-	onConn   onConnection
+	onConn   OnConn
 	mu       sync.Mutex
 	conns    map[net.Conn]struct{}
 	shutdown bool
 }
 
-func NewServer(sock net.Listener, onConn onConnection) *Server {
+func NewServer(sock net.Listener, onConn OnConn) *Server {
 	return &Server{
 		sock:   sock,
 		onConn: onConn,
