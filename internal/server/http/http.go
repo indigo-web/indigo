@@ -15,17 +15,15 @@ import (
 	"os"
 )
 
-var upgrading = http.NewResponse().
-	Code(status.SwitchingProtocols).
-	Header("Connection", "upgrade")
-
 type Server struct {
-	router router.Router
+	router         router.Router
+	upgradePreResp *http.Response
 }
 
 func NewServer(router router.Router) *Server {
 	return &Server{
-		router: router,
+		router:         router,
+		upgradePreResp: http.NewResponse(),
 	}
 }
 
@@ -64,7 +62,13 @@ func (h *Server) HandleRequest(
 
 		if req.Upgrade != proto.Unknown && proto.HTTP1&req.Upgrade == req.Upgrade {
 			protoToken := uf.B2S(bytes.TrimSpace(proto.ToBytes(req.Upgrade)))
-			renderer.PreWrite(req.Proto, upgrading.Header("Upgrade", protoToken))
+			renderer.PreWrite(
+				req.Proto,
+				h.upgradePreResp.
+					Code(status.SwitchingProtocols).
+					Header("Connection", "upgrade").
+					Header("Upgrade", protoToken),
+			)
 			protocol = req.Upgrade
 		}
 
