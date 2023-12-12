@@ -12,13 +12,13 @@ import (
 	"github.com/indigo-web/utils/strcomp"
 	"io"
 	"strconv"
+	"strings"
 )
 
 var (
 	contentLength    = []byte("Content-Length: ")
 	contentType      = []byte("Content-Type: ")
 	transferEncoding = []byte("Transfer-Encoding: ")
-
 	emptyChunkedPart = []byte("0\r\n\r\n")
 )
 
@@ -294,14 +294,13 @@ func isKeepAlive(protocol proto.Proto, req *http.Request) bool {
 	}
 }
 
-func parseDefaultHeaders(hdrs map[string][]string) []string {
-	parsedHeaders := make([]string, 0, len(hdrs))
+func parseDefaultHeaders(hdrs map[string][]string) types.DefaultHeaders {
+	parsed := make([]string, 0, len(hdrs))
 
 	for key, values := range hdrs {
-		for _, value := range values {
-			parsedHeaders = append(parsedHeaders, key, value)
-		}
+		value := strings.Join(values, ",")
+		parsed = append(parsed, key, value)
 	}
 
-	return parsedHeaders
+	return parsed
 }

@@ -76,7 +76,7 @@ func TestEngine_Write(t *testing.T) {
 		require.Equal(t, "nether", resp.Header["Hello"][0])
 		require.Equal(t, 1, len(resp.Header["Server"]))
 		require.Equal(t, "indigo", resp.Header["Server"][0])
-		require.Equal(t, []string{"ipsum", "something else"}, resp.Header["Lorem"])
+		require.Equal(t, []string{"ipsum,something else"}, resp.Header["Lorem"])
 		require.Equal(t, []string{"special", "here"}, resp.Header["Something"])
 
 		body, err := io.ReadAll(resp.Body)
