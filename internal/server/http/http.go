@@ -7,9 +7,8 @@ import (
 	"github.com/indigo-web/indigo/http"
 	"github.com/indigo-web/indigo/http/proto"
 	"github.com/indigo-web/indigo/http/status"
-	"github.com/indigo-web/indigo/internal/parser"
-	"github.com/indigo-web/indigo/internal/render"
 	"github.com/indigo-web/indigo/internal/server/tcp"
+	"github.com/indigo-web/indigo/internal/transport"
 	"github.com/indigo-web/indigo/router"
 	"github.com/indigo-web/utils/uf"
 	"os"
@@ -28,10 +27,10 @@ func NewServer(router router.Router) *Server {
 }
 
 func (h *Server) Run(
-	client tcp.Client, req *http.Request, renderer render.Engine, p parser.HTTPRequestsParser,
+	client tcp.Client, req *http.Request, trans transport.Transport,
 ) {
 	for {
-		if !h.HandleRequest(client, req, renderer, p) {
+		if !h.HandleRequest(client, req, trans) {
 			break
 		}
 	}
@@ -40,7 +39,7 @@ func (h *Server) Run(
 }
 
 func (h *Server) HandleRequest(
-	client tcp.Client, req *http.Request, renderer render.Engine, p parser.HTTPRequestsParser,
+	client tcp.Client, req *http.Request, trans transport.Transport,
 ) (continue_ bool) {
 	data, err := client.Read()
 	if err != nil {
@@ -50,19 +49,19 @@ func (h *Server) HandleRequest(
 			err = status.ErrCloseConnection
 		}
 
-		_ = renderer.Write(req.Proto, req, h.router.OnError(req, err), client)
+		_ = trans.Dump(req.Proto, req, h.router.OnError(req, err), client)
 		return false
 	}
 
-	state, extra, err := p.Parse(data)
+	state, extra, err := trans.Parse(data)
 	switch state {
-	case parser.Pending:
-	case parser.HeadersCompleted:
+	case transport.Pending:
+	case transport.HeadersCompleted:
 		protocol := req.Proto
 
 		if req.Upgrade != proto.Unknown && proto.HTTP1&req.Upgrade == req.Upgrade {
 			protoToken := uf.B2S(bytes.TrimSpace(proto.ToBytes(req.Upgrade)))
-			renderer.PreWrite(
+			trans.PreDump(
 				req.Proto,
 				h.upgradePreResp.
 					Code(status.SwitchingProtocols).
@@ -80,7 +79,7 @@ func (h *Server) HandleRequest(
 			return false
 		}
 
-		if err = renderer.Write(protocol, req, response, client); err != nil {
+		if err = trans.Dump(protocol, req, response, client); err != nil {
 			// in case we failed to render the response, just close the connection silently.
 			// This may affect cases, when the error occurred during rendering an attachment,
 			// but server anyway cannot recognize them, so the only thing will be done here
@@ -89,8 +88,6 @@ func (h *Server) HandleRequest(
 			return false
 		}
 
-		p.Release()
-
 		if err = req.Clear(); err != nil {
 			// abusing the fact, that req.Clear() will return an error ONLY if socket error
 			// occurred while reading.
@@ -98,11 +95,10 @@ func (h *Server) HandleRequest(
 			h.router.OnError(req, status.ErrCloseConnection)
 			return false
 		}
-	case parser.Error:
+	case transport.Error:
 		// as fatal error already happened and connection will anyway be closed, we don't
 		// care about any socket errors anymore
-		_ = renderer.Write(req.Proto, req, h.router.OnError(req, err), client)
-		p.Release()
+		_ = trans.Dump(req.Proto, req, h.router.OnError(req, err), client)
 		return false
 	default:
 		panic(fmt.Sprintf("BUG: got unexpected parser state"))

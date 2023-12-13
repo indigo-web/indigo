@@ -3,8 +3,8 @@ package http
 import (
 	"github.com/indigo-web/indigo/http/mime"
 	"github.com/indigo-web/indigo/http/status"
-	"github.com/indigo-web/indigo/internal/render/types"
 	"github.com/indigo-web/indigo/internal/response"
+	"github.com/indigo-web/indigo/internal/types"
 	"github.com/indigo-web/utils/strcomp"
 	"github.com/indigo-web/utils/uf"
 	json "github.com/json-iterator/go"

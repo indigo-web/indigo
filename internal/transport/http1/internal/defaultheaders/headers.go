@@ -1,4 +1,4 @@
-package types
+package defaultheaders
 
 type DefaultHeaders []string
 

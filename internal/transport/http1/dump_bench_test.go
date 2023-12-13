@@ -1,4 +1,4 @@
-package render
+package http1
 
 import (
 	"github.com/indigo-web/indigo/http"
@@ -6,7 +6,6 @@ import (
 	"github.com/indigo-web/indigo/http/headers"
 	"github.com/indigo-web/indigo/http/query"
 	"github.com/indigo-web/indigo/http/status"
-	"github.com/indigo-web/indigo/internal/parser/http1"
 	"github.com/indigo-web/indigo/internal/server/tcp/dummy"
 	"testing"
 )
@@ -17,7 +16,7 @@ func (n NopClientWriter) Write([]byte) error {
 	return nil
 }
 
-func BenchmarkRenderer_Response(b *testing.B) {
+func BenchmarkDumper(b *testing.B) {
 	defaultHeadersSmall := map[string][]string{
 		"Server": {"indigo"},
 	}
@@ -44,7 +43,7 @@ func BenchmarkRenderer_Response(b *testing.B) {
 
 	hdrs := headers.NewHeaders()
 	response := http.NewResponse()
-	body := http1.NewBody(
+	body := NewBody(
 		dummy.NewNopClient(), nil, coding.NewManager(0),
 	)
 	request := http.NewRequest(
@@ -55,57 +54,57 @@ func BenchmarkRenderer_Response(b *testing.B) {
 
 	b.Run("DefaultResponse_NoDefHeaders", func(b *testing.B) {
 		buff := make([]byte, 0, 1024)
-		renderer := NewEngine(buff, nil, nil)
+		dumper := NewDumper(buff, nil, nil)
 		b.ReportAllocs()
 		b.ResetTimer()
 
 		for i := 0; i < b.N; i++ {
-			_ = renderer.Write(request.Proto, request, response, client)
+			_ = dumper.Dump(request.Proto, request, response, client)
 		}
 	})
 
 	b.Run("DefaultResponse_1DefaultHeader", func(b *testing.B) {
 		buff := make([]byte, 0, 1024)
-		renderer := NewEngine(buff, nil, defaultHeadersSmall)
+		dumper := NewDumper(buff, nil, defaultHeadersSmall)
 		b.ReportAllocs()
 		b.ResetTimer()
 
 		for i := 0; i < b.N; i++ {
-			_ = renderer.Write(request.Proto, request, response, client)
+			_ = dumper.Dump(request.Proto, request, response, client)
 		}
 	})
 
 	b.Run("DefaultResponse_3DefaultHeaders", func(b *testing.B) {
 		buff := make([]byte, 0, 1024)
-		renderer := NewEngine(buff, nil, defaultHeadersMedium)
+		dumper := NewDumper(buff, nil, defaultHeadersMedium)
 		b.ReportAllocs()
 		b.ResetTimer()
 
 		for i := 0; i < b.N; i++ {
-			_ = renderer.Write(request.Proto, request, response, client)
+			_ = dumper.Dump(request.Proto, request, response, client)
 		}
 	})
 
 	b.Run("DefaultResponse_8DefaultHeaders", func(b *testing.B) {
 		buff := make([]byte, 0, 1024)
-		renderer := NewEngine(buff, nil, defaultHeadersBig)
+		dumper := NewDumper(buff, nil, defaultHeadersBig)
 		b.ReportAllocs()
 		b.ResetTimer()
 
 		for i := 0; i < b.N; i++ {
-			_ = renderer.Write(request.Proto, request, response, client)
+			_ = dumper.Dump(request.Proto, request, response, client)
 		}
 	})
 
 	b.Run("101SwitchingProtocol", func(b *testing.B) {
 		resp := http.NewResponse().Code(status.SwitchingProtocols)
 		buff := make([]byte, 0, 128)
-		renderer := NewEngine(buff, nil, nil)
+		dumper := NewDumper(buff, nil, nil)
 		b.ReportAllocs()
 		b.ResetTimer()
 
 		for i := 0; i < b.N; i++ {
-			_ = renderer.Write(request.Proto, request, resp, client)
+			_ = dumper.Dump(request.Proto, request, resp, client)
 		}
 	})
 }
