@@ -40,14 +40,14 @@ var (
 
 func getParser() (*Parser, *http.Request) {
 	s := settings.Default()
-	keyBuff := buffer.NewBuffer[byte](
+	keyBuff := buffer.New(
 		s.Headers.MaxKeyLength*s.Headers.Number.Default,
 		s.Headers.MaxKeyLength*s.Headers.Number.Maximal,
 	)
-	valBuff := buffer.NewBuffer[byte](
+	valBuff := buffer.New(
 		s.Headers.ValueSpace.Default, s.Headers.ValueSpace.Maximal,
 	)
-	startLineBuff := buffer.NewBuffer[byte](
+	startLineBuff := buffer.New(
 		s.URL.BufferSize.Default,
 		s.URL.BufferSize.Maximal,
 	)

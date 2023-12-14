@@ -6,7 +6,7 @@ require (
 	github.com/dchest/uniuri v1.2.0
 	github.com/indigo-web/chunkedbody v0.1.0
 	github.com/indigo-web/iter v0.1.0
-	github.com/indigo-web/utils v0.5.2
+	github.com/indigo-web/utils v0.6.0
 	github.com/json-iterator/go v1.1.12
 	github.com/stretchr/testify v1.8.4
 )
