@@ -62,6 +62,10 @@ method:
 	for i := range data {
 		switch data[i] {
 		case ' ':
+			if !p.startLineBuff.Append(data[:i]) {
+				return transport.Error, nil, status.ErrBadRequest
+			}
+
 			if p.startLineBuff.SegmentLength() == 0 {
 				return transport.Error, nil, status.ErrBadRequest
 			}
@@ -83,11 +87,11 @@ method:
 			// implementing here the same behaviour
 
 			return transport.Error, nil, status.ErrBadRequest
-		default:
-			if !p.startLineBuff.Append(data[i : i+1]) {
-				return transport.Error, nil, status.ErrBadRequest
-			}
 		}
+	}
+
+	if !p.startLineBuff.Append(data) {
+		return transport.Error, nil, status.ErrBadRequest
 	}
 
 	return transport.Pending, nil, nil
@@ -96,6 +100,10 @@ path:
 	for i := range data {
 		switch data[i] {
 		case ' ':
+			if !p.startLineBuff.Append(data[:i]) {
+				return transport.Error, nil, status.ErrBadRequest
+			}
+
 			p.request.Path = uf.B2S(p.startLineBuff.Finish())
 			if len(p.request.Path) == 0 {
 				return transport.Error, nil, status.ErrBadRequest
@@ -105,10 +113,18 @@ path:
 			p.state = eProto
 			goto proto
 		case '%':
+			if !p.startLineBuff.Append(data[:i]) {
+				return transport.Error, nil, status.ErrBadRequest
+			}
+
 			data = data[i+1:]
 			p.state = ePathDecode1Char
 			goto pathDecode1Char
 		case '?':
+			if !p.startLineBuff.Append(data[:i]) {
+				return transport.Error, nil, status.ErrBadRequest
+			}
+
 			p.request.Path = uf.B2S(p.startLineBuff.Finish())
 			if len(p.request.Path) == 0 {
 				p.request.Path = "/"
@@ -118,6 +134,10 @@ path:
 			p.state = eQuery
 			goto query
 		case '#':
+			if !p.startLineBuff.Append(data[:i]) {
+				return transport.Error, nil, status.ErrBadRequest
+			}
+
 			p.request.Path = uf.B2S(p.startLineBuff.Finish())
 			if len(p.request.Path) == 0 {
 				p.request.Path = "/"
@@ -129,11 +149,11 @@ path:
 		case '\x00', '\n', '\r', '\t', '\b', '\a', '\v', '\f':
 			// request path MUST NOT include any non-printable characters
 			return transport.Error, nil, status.ErrBadRequest
-		default:
-			if !p.startLineBuff.Append(data[i : i+1]) {
-				return transport.Error, nil, status.ErrURITooLong
-			}
 		}
+	}
+
+	if !p.startLineBuff.Append(data) {
+		return transport.Error, nil, status.ErrBadRequest
 	}
 
 	return transport.Pending, nil, nil
@@ -144,7 +164,6 @@ pathDecode1Char:
 	}
 
 	if !isHex(data[0]) {
-		panic("")
 		return transport.Error, nil, status.ErrURIDecoding
 	}
 
@@ -178,29 +197,40 @@ query:
 	for i := range data {
 		switch data[i] {
 		case ' ':
+			if !p.startLineBuff.Append(data[:i]) {
+				return transport.Error, nil, status.ErrBadRequest
+			}
+
 			p.request.Query.Set(p.startLineBuff.Finish())
 			data = data[i+1:]
 			p.state = eProto
 			goto proto
 		case '#':
+			if !p.startLineBuff.Append(data[:i]) {
+				return transport.Error, nil, status.ErrBadRequest
+			}
+
 			p.request.Query.Set(p.startLineBuff.Finish())
 			data = data[i+1:]
 			p.state = eFragment
 			goto fragment
 		case '%':
+			if !p.startLineBuff.Append(data[:i]) {
+				return transport.Error, nil, status.ErrBadRequest
+			}
+
 			data = data[i+1:]
 			p.state = eQueryDecode1Char
 			goto queryDecode1Char
 		case '+':
 			data[i] = ' '
-			if !p.startLineBuff.Append(data[i : i+1]) {
-				return transport.Error, nil, status.ErrURITooLong
-			}
 		case '\x00', '\n', '\r', '\t', '\b', '\a', '\v', '\f':
 			return transport.Error, nil, status.ErrBadRequest
-		default:
-			p.startLineBuff.Append(data[i : i+1])
 		}
+	}
+
+	if !p.startLineBuff.Append(data) {
+		return transport.Error, nil, status.ErrBadRequest
 	}
 
 	return transport.Pending, nil, nil
