@@ -208,15 +208,15 @@ func newServer() (*Server, *http.Request, transport.Transport) {
 	request := http.NewRequest(
 		hdrs, q, http.NewResponse(), dummy.NewNopConn(), body, nil, false,
 	)
-	keyBuff := buffer.NewBuffer[byte](
+	keyBuff := buffer.New(
 		s.Headers.MaxKeyLength*s.Headers.Number.Default,
 		s.Headers.MaxKeyLength*s.Headers.Number.Maximal,
 	)
-	valBuff := buffer.NewBuffer[byte](
+	valBuff := buffer.New(
 		s.Headers.ValueSpace.Default, s.Headers.ValueSpace.Maximal,
 	)
 	objPool := pool.NewObjectPool[[]string](20)
-	startLineBuff := buffer.NewBuffer[byte](
+	startLineBuff := buffer.New(
 		s.URL.BufferSize.Default,
 		s.URL.BufferSize.Maximal,
 	)

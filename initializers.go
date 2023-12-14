@@ -21,12 +21,12 @@ func newClient(tcpSettings settings.TCP, conn net.Conn) tcp.Client {
 	return tcp.NewClient(conn, tcpSettings.ReadTimeout, readBuff)
 }
 
-func newKeyValueBuffs(s settings.Headers) (*buffer.Buffer[byte], *buffer.Buffer[byte]) {
-	keyBuff := buffer.NewBuffer[byte](
+func newKeyValueBuffs(s settings.Headers) (*buffer.Buffer, *buffer.Buffer) {
+	keyBuff := buffer.New(
 		s.MaxKeyLength*s.Number.Default,
 		s.MaxKeyLength*s.Number.Maximal,
 	)
-	valBuff := buffer.NewBuffer[byte](
+	valBuff := buffer.New(
 		s.ValueSpace.Default,
 		s.ValueSpace.Maximal,
 	)
@@ -59,7 +59,7 @@ func newRequest(s settings.Settings, conn net.Conn, body http.Body) *http.Reques
 func newTransport(s settings.Settings, req *http.Request, a *Application) transport.Transport {
 	keyBuff, valBuff := newKeyValueBuffs(s.Headers)
 	objPool := pool.NewObjectPool[[]string](s.Headers.MaxValuesObjectPoolSize)
-	startLineBuff := buffer.NewBuffer[byte](
+	startLineBuff := buffer.New(
 		s.URL.BufferSize.Default,
 		s.URL.BufferSize.Maximal,
 	)
