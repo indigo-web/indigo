@@ -3,6 +3,7 @@ package http1
 import (
 	"fmt"
 	"github.com/indigo-web/indigo/http/coding"
+	"github.com/indigo-web/indigo/internal/requestgen"
 	"github.com/indigo-web/indigo/internal/transport"
 	"strings"
 	"testing"
@@ -30,8 +31,7 @@ var (
 
 	simpleGETQuery = []byte("GET /path?hello=world HTTP/1.1\r\n\r\n")
 
-	biggerGETOnlyLF     = []byte("GET / HTTP/1.1\nHello: World!\n\n")
-	biggerGETURLEncoded = []byte("GET /hello%20world HTTP/1.1\r\n\r\n")
+	biggerGETOnlyLF = []byte("GET / HTTP/1.1\nHello: World!\n\n")
 
 	somePOST = []byte("POST / HTTP/1.1\r\nHello: World!\r\nContent-Length: 13\r\n\r\nHello, World!")
 
@@ -211,24 +211,41 @@ func TestHttpRequestsParser_Parse_GET(t *testing.T) {
 		require.NoError(t, request.Clear())
 	})
 
-	t.Run("with urlencoded", func(t *testing.T) {
-		state, extra, err := parser.Parse(biggerGETURLEncoded)
-		require.NoError(t, err)
-		require.Equal(t, transport.HeadersCompleted, state)
-		require.Empty(t, extra)
-
-		wanted := wantedRequest{
-			Method:   method.GET,
-			Path:     "/hello world",
-			Protocol: proto.HTTP11,
-			Headers:  headers.NewHeaders(),
+	t.Run("escaping", func(t *testing.T) {
+		tcs := []struct {
+			Raw      []byte
+			WantPath string
+		}{
+			{
+				[]byte("GET /hello%2C%20world HTTP/1.1\r\n\r\n"),
+				"/hello, world",
+			},
+			{
+				requestgen.Generate(strings.Repeat("%20", 500), 10),
+				"/" + strings.Repeat(" ", 500),
+			},
 		}
 
-		compareRequests(t, wanted, request)
-		require.NoError(t, request.Clear())
+		for i, tc := range tcs {
+			state, extra, err := parser.Parse(tc.Raw)
+			require.NoError(t, err, i)
+			require.Equal(t, transport.HeadersCompleted, state, i)
+			require.Empty(t, extra, i)
+
+			wanted := wantedRequest{
+				Method:   method.GET,
+				Path:     tc.WantPath,
+				Protocol: proto.HTTP11,
+				Headers:  headers.NewHeaders(),
+			}
+
+			compareRequests(t, wanted, request)
+			require.NoError(t, request.Clear())
+		}
+
 	})
 
-	t.Run("fuzz GET by different chunk sizes", func(t *testing.T) {
+	t.Run("fuzz GET", func(t *testing.T) {
 		for i := 1; i < len(biggerGET); i++ {
 			state, extra, err := feedPartially(parser, biggerGET, i)
 			require.NoError(t, err, i)
@@ -266,7 +283,7 @@ func TestHttpRequestsParser_Parse_GET(t *testing.T) {
 		require.NoError(t, request.Clear())
 	})
 
-	t.Run("single content-length", func(t *testing.T) {
+	t.Run("content-length", func(t *testing.T) {
 		raw := "GET / HTTP/1.1\r\nContent-Length: 13\n\r\nHello, world!"
 		state, extra, err := parser.Parse([]byte(raw))
 		require.NoError(t, err)
@@ -274,11 +291,9 @@ func TestHttpRequestsParser_Parse_GET(t *testing.T) {
 		require.Equal(t, "Hello, world!", string(extra))
 		require.Equal(t, 13, request.ContentLength)
 		require.NoError(t, request.Clear())
-	})
 
-	t.Run("content-length in the beginning", func(t *testing.T) {
-		raw := "GET / HTTP/1.1\r\nContent-Length: 13\r\nHi-Hi: ha-ha\r\n\r\nHello, world!"
-		state, extra, err := parser.Parse([]byte(raw))
+		raw = "GET / HTTP/1.1\r\nContent-Length: 13\r\nHi-Hi: ha-ha\r\n\r\nHello, world!"
+		state, extra, err = parser.Parse([]byte(raw))
 		require.NoError(t, err)
 		require.Equal(t, transport.HeadersCompleted, state)
 		require.Equal(t, "Hello, world!", string(extra))
@@ -372,7 +387,7 @@ func TestHttpRequestsParser_Parse_Negative(t *testing.T) {
 		require.Equal(t, transport.Error, state)
 	})
 
-	t.Run("short invalid transport", func(t *testing.T) {
+	t.Run("short invalid protocol", func(t *testing.T) {
 		parser, _ := getParser()
 		raw := []byte("GET / HTT\r\n\r\n")
 		state, _, err := parser.Parse(raw)
@@ -380,7 +395,7 @@ func TestHttpRequestsParser_Parse_Negative(t *testing.T) {
 		require.Equal(t, transport.Error, state)
 	})
 
-	t.Run("long invalid transport", func(t *testing.T) {
+	t.Run("long invalid protocol", func(t *testing.T) {
 		parser, _ := getParser()
 		raw := []byte("GET / HTTPS/1.1\r\n\r\n")
 		state, _, err := parser.Parse(raw)

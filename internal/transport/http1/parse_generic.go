@@ -1,5 +1,4 @@
-// go:build generic_parser
-// go:build !(386 || amd64)
+//go:build !(386 || amd64) || generic_parser
 
 package http1
 
@@ -62,10 +61,6 @@ func (p *Parser) Parse(data []byte) (state transport.RequestState, extra []byte,
 method:
 	for i := range data {
 		switch data[i] {
-		case '\r', '\n': // rfc2068, 4.1
-			if p.startLineBuff.SegmentLength() > 0 {
-				return transport.Error, nil, status.ErrMethodNotImplemented
-			}
 		case ' ':
 			if p.startLineBuff.SegmentLength() == 0 {
 				return transport.Error, nil, status.ErrBadRequest
@@ -82,6 +77,12 @@ method:
 			data = data[i+1:]
 			p.state = ePath
 			goto path
+		case '\r', '\n':
+			// According to rfc2068, 4.1, leading CR or LF should be ignored. However, SIMD parser
+			// can't do that and returns just status.ErrBadRequest. In order to stay a bit more consistent,
+			// implementing here the same behaviour
+
+			return transport.Error, nil, status.ErrBadRequest
 		default:
 			if !p.startLineBuff.Append(data[i : i+1]) {
 				return transport.Error, nil, status.ErrBadRequest
@@ -143,6 +144,7 @@ pathDecode1Char:
 	}
 
 	if !isHex(data[0]) {
+		panic("")
 		return transport.Error, nil, status.ErrURIDecoding
 	}
 
@@ -152,22 +154,25 @@ pathDecode1Char:
 	goto pathDecode2Char
 
 pathDecode2Char:
-	if len(data) == 0 {
-		return transport.Pending, nil, nil
-	}
+	{
+		if len(data) == 0 {
+			return transport.Pending, nil, nil
+		}
 
-	if !isHex(data[0]) {
-		return transport.Error, nil, status.ErrURIDecoding
-	}
+		if !isHex(data[0]) {
+			return transport.Error, nil, status.ErrURIDecoding
+		}
 
-	data[0] = p.urlEncodedChar | unHex(data[0])
-	if !p.startLineBuff.Append(data[0:1]) {
-		return transport.Error, nil, status.ErrURITooLong
-	}
+		var decodedChar [1]byte
+		decodedChar[0] = p.urlEncodedChar | unHex(data[0])
+		if !p.startLineBuff.Append(decodedChar[:]) {
+			return transport.Error, nil, status.ErrURITooLong
+		}
 
-	data = data[1:]
-	p.state = ePath
-	goto path
+		data = data[1:]
+		p.state = ePath
+		goto path
+	}
 
 query:
 	for i := range data {
@@ -215,22 +220,25 @@ queryDecode1Char:
 	goto queryDecode2Char
 
 queryDecode2Char:
-	if len(data) == 0 {
-		return transport.Pending, nil, nil
-	}
+	{
+		if len(data) == 0 {
+			return transport.Pending, nil, nil
+		}
 
-	if !isHex(data[0]) {
-		return transport.Error, nil, status.ErrURIDecoding
-	}
+		if !isHex(data[0]) {
+			return transport.Error, nil, status.ErrURIDecoding
+		}
 
-	data[0] = p.urlEncodedChar | unHex(data[0])
-	if !p.startLineBuff.Append(data[0:1]) {
-		return transport.Error, nil, status.ErrURITooLong
-	}
+		var decodedChar [1]byte
+		decodedChar[0] = p.urlEncodedChar | unHex(data[0])
+		if !p.startLineBuff.Append(decodedChar[:]) {
+			return transport.Error, nil, status.ErrURITooLong
+		}
 
-	data = data[1:]
-	p.state = eQuery
-	goto query
+		data = data[1:]
+		p.state = eQuery
+		goto query
+	}
 
 fragment:
 	{
@@ -252,6 +260,11 @@ proto:
 				return transport.Error, nil, status.ErrUnsupportedProtocol
 			}
 
+			p.request.Proto = proto.FromBytes(p.startLineBuff.Finish())
+			if p.request.Proto == proto.Unknown {
+				return transport.Error, nil, status.ErrUnsupportedProtocol
+			}
+
 			data = data[i+1:]
 			p.state = eProtoCR
 			goto protoCR
@@ -260,12 +273,22 @@ proto:
 				return transport.Error, nil, status.ErrUnsupportedProtocol
 			}
 
+			p.request.Proto = proto.FromBytes(p.startLineBuff.Finish())
+			if p.request.Proto == proto.Unknown {
+				return transport.Error, nil, status.ErrUnsupportedProtocol
+			}
+
 			data = data[i+1:]
 			p.state = eProtoEnd
+			goto protoEnd
 		}
 	}
 
-	return transport.Error, nil, status.ErrBadRequest
+	if !p.startLineBuff.Append(data) {
+		return transport.Error, nil, status.ErrUnsupportedProtocol
+	}
+
+	return transport.Pending, nil, nil
 
 protoCR:
 	if len(data) == 0 {
@@ -277,33 +300,27 @@ protoCR:
 	}
 
 	data = data[1:]
+	p.state = eProtoEnd
 	goto protoEnd
 
 protoEnd:
-	{
-		if len(data) == 0 {
-			return transport.Pending, nil, nil
-		}
-
-		p.request.Proto = proto.FromBytes(p.startLineBuff.Finish())
-		if p.request.Proto == proto.Unknown {
-			return transport.Error, nil, status.ErrUnsupportedProtocol
-		}
-
-		char := data[0]
-		data = data[1:]
-
-		switch char {
-		case '\r':
-			p.state = eProtoCRLFCR
-			goto protoCRLFCR
-		case '\n':
-			return transport.HeadersCompleted, data, nil
-		}
-
-		p.state = eHeaderKey
-		goto headerKey
+	if len(data) == 0 {
+		return transport.Pending, nil, nil
 	}
+
+	switch data[0] {
+	case '\r':
+		data = data[1:]
+		p.state = eProtoCRLFCR
+		goto protoCRLFCR
+	case '\n':
+		p.reset()
+
+		return transport.HeadersCompleted, data[1:], nil
+	}
+
+	p.state = eHeaderKey
+	goto headerKey
 
 protoCRLFCR:
 	if len(data) == 0 {
@@ -311,26 +328,30 @@ protoCRLFCR:
 	}
 
 	if data[0] == '\n' {
+		p.reset()
+
 		return transport.HeadersCompleted, data[1:], nil
 	}
 
 	return transport.Error, nil, status.ErrBadRequest
 
 headerKey:
-	if len(data) == 0 {
-		return transport.Pending, nil, err
-	}
-
-	switch data[0] {
-	case '\n':
-		return transport.HeadersCompleted, data[1:], nil
-	case '\r':
-		data = data[1:]
-		p.state = eHeaderValueCRLFCR
-		goto headerValueCRLFCR
-	}
-
 	{
+		if len(data) == 0 {
+			return transport.Pending, nil, err
+		}
+
+		switch data[0] {
+		case '\n':
+			p.reset()
+
+			return transport.HeadersCompleted, data[1:], nil
+		case '\r':
+			data = data[1:]
+			p.state = eHeaderValueCRLFCR
+			goto headerValueCRLFCR
+		}
+
 		colon := bytes.IndexByte(data, ':')
 		if colon == -1 {
 			if !p.headerKeyBuff.Append(data) {
@@ -416,6 +437,8 @@ contentLengthCRLFCR:
 	}
 
 	if data[0] == '\n' {
+		p.reset()
+
 		return transport.HeadersCompleted, data[1:], nil
 	}
 
@@ -475,6 +498,8 @@ headerValueCRLFCR:
 	}
 
 	if data[0] == '\n' {
+		p.reset()
+
 		return transport.HeadersCompleted, data[1:], nil
 	}
 
