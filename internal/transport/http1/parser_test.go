@@ -23,21 +23,6 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-var (
-	simpleGET            = []byte("GET / HTTP/1.1\r\n\r\n")
-	simpleGETLeadingCRLF = []byte("\r\n\r\nGET / HTTP/1.1\r\n\r\n")
-	simpleGETAbsPath     = []byte("GET http://www.w3.org/pub/WWW/TheProject.html HTTP/1.1\r\n\r\n")
-	biggerGET            = []byte("GET / HTTP/1.1\r\nHello: World!\r\nEaster: Egg\r\n\r\n")
-
-	simpleGETQuery = []byte("GET /path?hello=world HTTP/1.1\r\n\r\n")
-
-	biggerGETOnlyLF = []byte("GET / HTTP/1.1\nHello: World!\n\n")
-
-	somePOST = []byte("POST / HTTP/1.1\r\nHello: World!\r\nContent-Length: 13\r\n\r\nHello, World!")
-
-	multipleHeaders = []byte("GET / HTTP/1.1\r\nAccept: one,two\r\nAccept: three\r\n\r\n")
-)
-
 func getParser() (*Parser, *http.Request) {
 	s := settings.Default()
 	keyBuff := buffer.New(
@@ -129,7 +114,8 @@ func TestHttpRequestsParser_Parse_GET(t *testing.T) {
 	parser, request := getParser()
 
 	t.Run("simple GET", func(t *testing.T) {
-		state, extra, err := parser.Parse(simpleGET)
+		raw := "GET / HTTP/1.1\r\n\r\n"
+		state, extra, err := parser.Parse([]byte(raw))
 		require.NoError(t, err)
 		require.Equal(t, transport.HeadersCompleted, state)
 		require.Empty(t, extra)
@@ -146,7 +132,8 @@ func TestHttpRequestsParser_Parse_GET(t *testing.T) {
 	})
 
 	t.Run("simple GET with leading CRLF", func(t *testing.T) {
-		state, extra, err := parser.Parse(simpleGETLeadingCRLF)
+		raw := "\r\n\r\nGET / HTTP/1.1\r\n\r\n"
+		state, extra, err := parser.Parse([]byte(raw))
 		require.Error(t, err, status.ErrBadRequest.Error())
 		require.Equal(t, transport.Error, state)
 		require.Empty(t, extra)
@@ -155,7 +142,8 @@ func TestHttpRequestsParser_Parse_GET(t *testing.T) {
 	})
 
 	t.Run("normal GET", func(t *testing.T) {
-		state, extra, err := parser.Parse(biggerGET)
+		raw := "GET / HTTP/1.1\r\nHello: World!\r\nEaster: Egg\r\n\r\n"
+		state, extra, err := parser.Parse([]byte(raw))
 		require.NoError(t, err)
 		require.Equal(t, transport.HeadersCompleted, state)
 		require.Empty(t, extra)
@@ -174,7 +162,8 @@ func TestHttpRequestsParser_Parse_GET(t *testing.T) {
 	})
 
 	t.Run("multiple header values", func(t *testing.T) {
-		state, extra, err := parser.Parse(multipleHeaders)
+		raw := "GET / HTTP/1.1\r\nAccept: one,two\r\nAccept: three\r\n\r\n"
+		state, extra, err := parser.Parse([]byte(raw))
 		require.NoError(t, err)
 		require.Equal(t, transport.HeadersCompleted, state)
 		require.Empty(t, extra)
@@ -193,7 +182,8 @@ func TestHttpRequestsParser_Parse_GET(t *testing.T) {
 	})
 
 	t.Run("only lf", func(t *testing.T) {
-		state, extra, err := parser.Parse(biggerGETOnlyLF)
+		raw := "GET / HTTP/1.1\nHello: World!\n\n"
+		state, extra, err := parser.Parse([]byte(raw))
 		require.NoError(t, err)
 		require.Equal(t, transport.HeadersCompleted, state)
 		require.Empty(t, extra)
@@ -246,8 +236,10 @@ func TestHttpRequestsParser_Parse_GET(t *testing.T) {
 	})
 
 	t.Run("fuzz GET", func(t *testing.T) {
-		for i := 1; i < len(biggerGET); i++ {
-			state, extra, err := feedPartially(parser, biggerGET, i)
+		raw := "GET / HTTP/1.1\r\nHello: World!\r\nEaster: Egg\r\n\r\n"
+
+		for i := 1; i < len(raw); i++ {
+			state, extra, err := feedPartially(parser, []byte(raw), i)
 			require.NoError(t, err, i)
 			require.Empty(t, extra)
 			require.Equal(t, transport.HeadersCompleted, state)
@@ -267,7 +259,8 @@ func TestHttpRequestsParser_Parse_GET(t *testing.T) {
 	})
 
 	t.Run("absolute path", func(t *testing.T) {
-		state, extra, err := parser.Parse(simpleGETAbsPath)
+		raw := "GET http://www.w3.org/pub/WWW/TheProject.html HTTP/1.1\r\n\r\n"
+		state, extra, err := parser.Parse([]byte(raw))
 		require.NoError(t, err)
 		require.Equal(t, transport.HeadersCompleted, state)
 		require.Empty(t, extra)
@@ -304,12 +297,14 @@ func TestHttpRequestsParser_Parse_GET(t *testing.T) {
 	})
 }
 
-func TestHttpRequestsParser_ParsePOST(t *testing.T) {
+func TestHttpRequestsParser_POST(t *testing.T) {
 	parser, request := getParser()
 
 	t.Run("fuzz POST by different chunk sizes", func(t *testing.T) {
-		for i := 1; i < len(somePOST); i++ {
-			state, _, err := feedPartially(parser, somePOST, i)
+		raw := "POST / HTTP/1.1\r\nHello: World!\r\nContent-Length: 13\r\n\r\nHello, World!"
+
+		for i := 1; i < len(raw); i++ {
+			state, _, err := feedPartially(parser, []byte(raw), i)
 			require.NoError(t, err)
 			require.Equal(t, transport.HeadersCompleted, state)
 
@@ -328,7 +323,8 @@ func TestHttpRequestsParser_ParsePOST(t *testing.T) {
 	})
 
 	t.Run("query in a path", func(t *testing.T) {
-		state, extra, err := parser.Parse(simpleGETQuery)
+		raw := "GET /path?hello=world HTTP/1.1\r\n\r\n"
+		state, extra, err := parser.Parse([]byte(raw))
 		require.NoError(t, err)
 		require.Equal(t, transport.HeadersCompleted, state)
 		require.Empty(t, extra)
