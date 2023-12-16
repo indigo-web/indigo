@@ -22,8 +22,5 @@ jobs:
         with:
           go-version: 1.18
 
-      - name: Run tests (generic parser)
-        run: go test -race -tags=generic_parser ./...
-
-      - name: Run tests (SIMD parser)
-        run: go test -race -tags=!generic_parser ./...
+      - name: Run tests
+        run: go test -race ./...
