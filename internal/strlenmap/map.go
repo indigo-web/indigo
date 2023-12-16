@@ -23,10 +23,6 @@ func (m *Map[T]) Get(key string) (v T, found bool) {
 	return v, false
 }
 
-func (m *Map[T]) Rename(key, to string) {
-	
-}
-
 // Insert inserts a value. If the key already exists, it won't be overridden. However,
 // a new value will be ignored, and the first one added will always be used
 func (m *Map[T]) Insert(key string, value T) {

@@ -1,14 +1,13 @@
 package proto
 
 import (
-	"github.com/indigo-web/indigo/internal/cutbyte"
 	"strings"
 )
 
 func ChooseUpgrade(line string) Proto {
 	for len(line) > 0 {
 		var token string
-		token, line = cutbyte.Cut(line, ',')
+		token, line = cutbyte(line, ',')
 
 		if proto := parseUpgradeToken(strings.TrimSpace(token)); proto != Unknown {
 			// pick the first supported protocol, as they are placed in an order of
@@ -36,4 +35,14 @@ func parseUpgradeToken(token string) Proto {
 	}
 
 	return Unknown
+}
+
+func cutbyte(str string, sep byte) (prefix, postfix string) {
+	for i := 0; i < len(str); i++ {
+		if str[i] == sep {
+			return str[:i], str[i+1:]
+		}
+	}
+
+	return str, ""
 }
