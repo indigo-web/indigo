@@ -1,26 +1,25 @@
 package http
 
 import (
-	"github.com/indigo-web/indigo/http/coding"
-	"github.com/indigo-web/indigo/http/method"
-	"github.com/indigo-web/indigo/http/status"
-	"github.com/indigo-web/indigo/internal/requestgen"
-	"github.com/indigo-web/indigo/internal/server/tcp/dummy"
-	"github.com/indigo-web/indigo/router"
-	"github.com/indigo-web/indigo/router/inbuilt"
-	"github.com/indigo-web/indigo/router/simple"
 	"strings"
 	"testing"
 
 	"github.com/indigo-web/indigo/http"
-	"github.com/indigo-web/utils/pool"
-
+	"github.com/indigo-web/indigo/http/coding"
 	"github.com/indigo-web/indigo/http/headers"
+	"github.com/indigo-web/indigo/http/method"
 	"github.com/indigo-web/indigo/http/query"
-	"github.com/indigo-web/indigo/internal/parser/http1"
-	"github.com/indigo-web/indigo/internal/render"
+	"github.com/indigo-web/indigo/http/status"
+	"github.com/indigo-web/indigo/internal/requestgen"
+	"github.com/indigo-web/indigo/internal/server/tcp/dummy"
+	"github.com/indigo-web/indigo/internal/transport"
+	"github.com/indigo-web/indigo/internal/transport/http1"
+	"github.com/indigo-web/indigo/router"
+	"github.com/indigo-web/indigo/router/inbuilt"
+	"github.com/indigo-web/indigo/router/simple"
 	"github.com/indigo-web/indigo/settings"
 	"github.com/indigo-web/utils/buffer"
+	"github.com/indigo-web/utils/pool"
 )
 
 var (
@@ -108,6 +107,95 @@ func getSimpleRouter() router.Router {
 }
 
 func Benchmark_Get(b *testing.B) {
+	server, request, trans := newServer()
+
+	b.Run("simple get", func(b *testing.B) {
+		tenHeadersGETClient := dummy.NewCircularClient(tenHeadersGETRequest)
+		b.SetBytes(int64(len(tenHeadersGETRequest)))
+		b.ReportAllocs()
+		b.ResetTimer()
+
+		for i := 0; i < b.N; i++ {
+			server.HandleRequest(tenHeadersGETClient, request, trans)
+		}
+	})
+
+	b.Run("with resp header", func(b *testing.B) {
+		withRespHeadersGETClient := dummy.NewCircularClient(simpleGETWithHeader)
+		b.SetBytes(int64(len(simpleGETWithHeader)))
+		b.ReportAllocs()
+		b.ResetTimer()
+
+		for i := 0; i < b.N; i++ {
+			server.HandleRequest(withRespHeadersGETClient, request, trans)
+		}
+	})
+
+	b.Run("5 headers", func(b *testing.B) {
+		data := requestgen.Generate(longPath, 5)
+		client := dummy.NewCircularClient(data)
+		b.SetBytes(int64(len(data)))
+		b.ReportAllocs()
+		b.ResetTimer()
+
+		for i := 0; i < b.N; i++ {
+			server.HandleRequest(client, request, trans)
+		}
+	})
+
+	b.Run("10 headers", func(b *testing.B) {
+		data := requestgen.Generate(longPath, 10)
+		client := dummy.NewCircularClient(data)
+		b.SetBytes(int64(len(data)))
+		b.ReportAllocs()
+		b.ResetTimer()
+
+		for i := 0; i < b.N; i++ {
+			server.HandleRequest(client, request, trans)
+		}
+	})
+
+	b.Run("50 headers", func(b *testing.B) {
+		data := requestgen.Generate(longPath, 50)
+		client := dummy.NewCircularClient(data)
+		b.SetBytes(int64(len(data)))
+		b.ReportAllocs()
+		b.ResetTimer()
+
+		for i := 0; i < b.N; i++ {
+			server.HandleRequest(client, request, trans)
+		}
+	})
+
+	b.Run("heavily escaped", func(b *testing.B) {
+		data := requestgen.Generate(strings.Repeat("%20", 500), 20)
+		client := dummy.NewCircularClient(data)
+		b.SetBytes(int64(len(data)))
+		b.ReportAllocs()
+		b.ResetTimer()
+
+		for i := 0; i < b.N; i++ {
+			server.HandleRequest(client, request, trans)
+		}
+	})
+}
+
+func Benchmark_Post(b *testing.B) {
+	withBodyClient := dummy.NewCircularClient(simplePOST)
+	server, request, trans := newServer()
+
+	b.Run("simple POST", func(b *testing.B) {
+		b.SetBytes(int64(len(simplePOST)))
+		b.ReportAllocs()
+		b.ResetTimer()
+
+		for i := 0; i < b.N; i++ {
+			server.HandleRequest(withBodyClient, request, trans)
+		}
+	})
+}
+
+func newServer() (*Server, *http.Request, transport.Transport) {
 	// for benchmarking, using more realistic conditions. In case we want a pure performance - use
 	// getSimpleRouter() here. It is visibly faster
 	r := getInbuiltRouter()
@@ -120,130 +208,27 @@ func Benchmark_Get(b *testing.B) {
 	request := http.NewRequest(
 		hdrs, q, http.NewResponse(), dummy.NewNopConn(), body, nil, false,
 	)
-	keyArena := buffer.NewBuffer[byte](
+	keyBuff := buffer.New(
 		s.Headers.MaxKeyLength*s.Headers.Number.Default,
 		s.Headers.MaxKeyLength*s.Headers.Number.Maximal,
 	)
-	valArena := buffer.NewBuffer[byte](
+	valBuff := buffer.New(
 		s.Headers.ValueSpace.Default, s.Headers.ValueSpace.Maximal,
 	)
 	objPool := pool.NewObjectPool[[]string](20)
-	startLineArena := buffer.NewBuffer[byte](
+	startLineBuff := buffer.New(
 		s.URL.BufferSize.Default,
 		s.URL.BufferSize.Maximal,
 	)
-	parser := http1.NewHTTPRequestsParser(
-		request, *keyArena, *valArena, *startLineArena, *objPool, s.Headers,
+	trans := http1.New(
+		request,
+		*keyBuff, *valBuff, *startLineBuff,
+		*objPool,
+		s.Headers,
+		make([]byte, 0, 1024),
+		nil,
+		defaultHeaders,
 	)
-	renderer := render.NewEngine(make([]byte, 0, 1024), nil, defaultHeaders)
-	server := NewServer(r)
 
-	b.Run("simple get", func(b *testing.B) {
-		tenHeadersGETClient := dummy.NewCircularClient(tenHeadersGETRequest)
-		b.SetBytes(int64(len(tenHeadersGETRequest)))
-		b.ReportAllocs()
-		b.ResetTimer()
-
-		for i := 0; i < b.N; i++ {
-			server.HandleRequest(tenHeadersGETClient, request, renderer, parser)
-		}
-	})
-
-	b.Run("with resp header", func(b *testing.B) {
-		withRespHeadersGETClient := dummy.NewCircularClient(simpleGETWithHeader)
-		b.SetBytes(int64(len(simpleGETWithHeader)))
-		b.ReportAllocs()
-		b.ResetTimer()
-
-		for i := 0; i < b.N; i++ {
-			server.HandleRequest(withRespHeadersGETClient, request, renderer, parser)
-		}
-	})
-
-	b.Run("5 headers", func(b *testing.B) {
-		data := requestgen.Generate(longPath, 5)
-		client := dummy.NewCircularClient(data)
-		b.SetBytes(int64(len(data)))
-		b.ReportAllocs()
-		b.ResetTimer()
-
-		for i := 0; i < b.N; i++ {
-			server.HandleRequest(client, request, renderer, parser)
-		}
-	})
-
-	b.Run("10 headers", func(b *testing.B) {
-		data := requestgen.Generate(longPath, 10)
-		client := dummy.NewCircularClient(data)
-		b.SetBytes(int64(len(data)))
-		b.ReportAllocs()
-		b.ResetTimer()
-
-		for i := 0; i < b.N; i++ {
-			server.HandleRequest(client, request, renderer, parser)
-		}
-	})
-
-	b.Run("50 headers", func(b *testing.B) {
-		data := requestgen.Generate(longPath, 50)
-		client := dummy.NewCircularClient(data)
-		b.SetBytes(int64(len(data)))
-		b.ReportAllocs()
-		b.ResetTimer()
-
-		for i := 0; i < b.N; i++ {
-			server.HandleRequest(client, request, renderer, parser)
-		}
-	})
-
-	b.Run("heavily escaped", func(b *testing.B) {
-		data := requestgen.Generate(strings.Repeat("%20", 500), 20)
-		client := dummy.NewCircularClient(data)
-		b.SetBytes(int64(len(data)))
-		b.ReportAllocs()
-		b.ResetTimer()
-
-		for i := 0; i < b.N; i++ {
-			server.HandleRequest(client, request, renderer, parser)
-		}
-	})
-}
-
-func Benchmark_Post(b *testing.B) {
-	r := getInbuiltRouter()
-	s := settings.Default()
-	q := query.NewQuery(headers.NewHeaders())
-	hdrs := headers.FromMap(make(map[string][]string, 10))
-	withBodyClient := dummy.NewCircularClient(simplePOST)
-	body := http1.NewBody(
-		withBodyClient, nil, coding.NewManager(0),
-	)
-	request := http.NewRequest(hdrs, q, http.NewResponse(), dummy.NewNopConn(), body, nil, false)
-	keyArena := buffer.NewBuffer[byte](
-		s.Headers.MaxKeyLength*s.Headers.Number.Default,
-		s.Headers.MaxKeyLength*s.Headers.Number.Maximal,
-	)
-	valArena := buffer.NewBuffer[byte](
-		s.Headers.ValueSpace.Default, s.Headers.ValueSpace.Maximal,
-	)
-	objPool := pool.NewObjectPool[[]string](20)
-	startLineArena := buffer.NewBuffer[byte](
-		s.URL.BufferSize.Default,
-		s.URL.BufferSize.Maximal,
-	)
-	parser := http1.NewHTTPRequestsParser(
-		request, *keyArena, *valArena, *startLineArena, *objPool, s.Headers,
-	)
-	renderer := render.NewEngine(make([]byte, 0, 1024), nil, defaultHeaders)
-	server := NewServer(r)
-
-	b.Run("simple POST", func(b *testing.B) {
-		b.SetBytes(int64(len(simplePOST)))
-		b.ReportAllocs()
-		b.ResetTimer()
-
-		for i := 0; i < b.N; i++ {
-			server.HandleRequest(withBodyClient, request, renderer, parser)
-		}
-	})
+	return NewServer(r), request, trans
 }

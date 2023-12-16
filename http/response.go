@@ -3,8 +3,8 @@ package http
 import (
 	"github.com/indigo-web/indigo/http/mime"
 	"github.com/indigo-web/indigo/http/status"
-	"github.com/indigo-web/indigo/internal/render/types"
 	"github.com/indigo-web/indigo/internal/response"
+	"github.com/indigo-web/indigo/internal/types"
 	"github.com/indigo-web/utils/strcomp"
 	"github.com/indigo-web/utils/uf"
 	json "github.com/json-iterator/go"
@@ -26,6 +26,10 @@ type Response struct {
 	fields response.Fields
 }
 
+// NewResponse returns a new instance of the Response object with status code set to 200 OK,
+// pre-allocated space for response headers and text/html content-type.
+// NOTE: it's recommended to use Request.Respond() method inside of handlers, if there's no
+// clear reason otherwise
 func NewResponse() *Response {
 	return &Response{
 		response.Fields{

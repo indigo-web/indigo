@@ -166,14 +166,13 @@ func (a *Application) gracefulShutdownServers() {
 func (a *Application) newTCPCallback(s settings.Settings, r router.Router, isTLS bool) tcp.OnConn {
 	return func(conn net.Conn) {
 		client := newClient(s.TCP, conn)
-		bodyReader := newBody(client, s.Body, a.codings)
-		request := newRequest(s, conn, bodyReader)
+		body := newBody(client, s.Body, a.codings)
+		request := newRequest(s, conn, body)
 		request.Env.IsTLS = isTLS
-		renderer := newRenderer(s.HTTP, a)
-		httpParser := newHTTPParser(s, request)
+		trans := newTransport(s, request, a)
 
 		httpServer := http.NewServer(r)
-		httpServer.Run(client, request, renderer, httpParser)
+		httpServer.Run(client, request, trans)
 	}
 }
 

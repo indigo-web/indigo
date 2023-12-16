@@ -2,7 +2,7 @@ package response
 
 import (
 	"github.com/indigo-web/indigo/http/status"
-	"github.com/indigo-web/indigo/internal/render/types"
+	"github.com/indigo-web/indigo/internal/types"
 )
 
 const DefaultContentType = "text/html"

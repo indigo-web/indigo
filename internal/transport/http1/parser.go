@@ -3,35 +3,47 @@ package http1
 import (
 	"bytes"
 	"fmt"
-	"strings"
-
-	"github.com/indigo-web/indigo/http"
 	"github.com/indigo-web/indigo/http/method"
 	"github.com/indigo-web/indigo/http/proto"
 	"github.com/indigo-web/indigo/http/status"
-	"github.com/indigo-web/indigo/internal/parser"
+	"github.com/indigo-web/indigo/internal/transport"
 	"github.com/indigo-web/indigo/internal/uridecode"
+	"github.com/indigo-web/utils/strcomp"
+	"github.com/indigo-web/utils/uf"
+	"strings"
+
+	"github.com/indigo-web/indigo/http"
 	"github.com/indigo-web/indigo/settings"
 	"github.com/indigo-web/utils/buffer"
 	"github.com/indigo-web/utils/pool"
-	"github.com/indigo-web/utils/strcomp"
-	"github.com/indigo-web/utils/uf"
 )
 
-// httpRequestsParser is a stream-based http requests parser. It modifies
+type parserState uint8
+
+const (
+	eMethod parserState = iota + 1
+	ePath
+	eHeaderKey
+	eContentLength
+	eContentLengthCR
+	eHeaderValue
+	eHeaderValueCRLFCR
+)
+
+// Parser is a stream-based http requests transport. It modifies
 // request object by pointer in performance purposes. Decodes query-encoded
 // values by its own, you can see that by presented states ePathDecode1Char,
 // ePathDecode2Char, etc. When headers are parsed, parser returns state
-// parser.HeadersCompleted to notify http server about this, attaching all
+// transport.HeadersCompleted to notify http server about this, attaching all
 // the pending data as an extra. Body must be processed separately
-type httpRequestsParser struct {
+type Parser struct {
 	request           *http.Request
-	startLineArena    buffer.Buffer[byte]
+	startLineBuff     buffer.Buffer
 	encToksBuff       []string
 	headerKey         string
 	headersValuesPool pool.ObjectPool[[]string]
-	headerKeyArena    buffer.Buffer[byte]
-	headerValueArena  buffer.Buffer[byte]
+	headerKeyBuff     buffer.Buffer
+	headerValueBuff   buffer.Buffer
 	headersSettings   settings.Headers
 	headersNumber     int
 	contentLength     int
@@ -39,23 +51,23 @@ type httpRequestsParser struct {
 	state             parserState
 }
 
-func NewHTTPRequestsParser(
-	request *http.Request, keyArena, valArena, startLineArena buffer.Buffer[byte],
+func NewParser(
+	request *http.Request, keyBuff, valBuff, startLineBuff buffer.Buffer,
 	valuesPool pool.ObjectPool[[]string], headersSettings settings.Headers,
-) parser.HTTPRequestsParser {
-	return &httpRequestsParser{
+) *Parser {
+	return &Parser{
 		state:             eMethod,
 		request:           request,
 		headersSettings:   headersSettings,
-		startLineArena:    startLineArena,
+		startLineBuff:     startLineBuff,
 		encToksBuff:       make([]string, 0, headersSettings.MaxEncodingTokens),
-		headerKeyArena:    keyArena,
-		headerValueArena:  valArena,
+		headerKeyBuff:     keyBuff,
+		headerValueBuff:   valBuff,
 		headersValuesPool: valuesPool,
 	}
 }
 
-func (p *httpRequestsParser) Parse(data []byte) (state parser.RequestState, extra []byte, err error) {
+func (p *Parser) Parse(data []byte) (state transport.RequestState, extra []byte, err error) {
 	_ = *p.request
 	requestHeaders := p.request.Headers
 
@@ -82,32 +94,31 @@ method:
 	{
 		sp := bytes.IndexByte(data, ' ')
 		if sp == -1 {
-			if !p.startLineArena.Append(data...) {
-				return parser.Error, nil, status.ErrTooLongRequestLine
+			if !p.startLineBuff.Append(data) {
+				return transport.Error, nil, status.ErrTooLongRequestLine
 			}
 
-			return parser.Pending, nil, nil
+			return transport.Pending, nil, nil
 		}
 
 		var methodValue []byte
-		if p.startLineArena.SegmentLength() == 0 {
+		if p.startLineBuff.SegmentLength() == 0 {
 			methodValue = data[:sp]
 		} else {
-			if !p.startLineArena.Append(data[:sp]...) {
-				return parser.Error, nil, status.ErrTooLongRequestLine
+			if !p.startLineBuff.Append(data[:sp]) {
+				return transport.Error, nil, status.ErrTooLongRequestLine
 			}
 
-			methodValue = p.startLineArena.Finish()
+			methodValue = p.startLineBuff.Finish()
 		}
 
 		if len(methodValue) == 0 {
-			return parser.Error, nil, status.ErrBadRequest
+			return transport.Error, nil, status.ErrBadRequest
 		}
 
 		p.request.Method = method.Parse(uf.B2S(methodValue))
-
 		if p.request.Method == method.Unknown {
-			return parser.Error, nil, status.ErrMethodNotImplemented
+			return transport.Error, nil, status.ErrMethodNotImplemented
 		}
 
 		data = data[sp+1:]
@@ -119,21 +130,21 @@ path:
 	{
 		lf := bytes.IndexByte(data, '\n')
 		if lf == -1 {
-			if !p.startLineArena.Append(data...) {
-				return parser.Error, nil, status.ErrURITooLong
+			if !p.startLineBuff.Append(data) {
+				return transport.Error, nil, status.ErrURITooLong
 			}
 
-			return parser.Pending, nil, nil
+			return transport.Pending, nil, nil
 		}
 
-		if !p.startLineArena.Append(data[:lf]...) {
-			return parser.Error, nil, status.ErrURITooLong
+		if !p.startLineBuff.Append(data[:lf]) {
+			return transport.Error, nil, status.ErrURITooLong
 		}
 
-		pathAndProto := p.startLineArena.Finish()
+		pathAndProto := p.startLineBuff.Finish()
 		sp := bytes.LastIndexByte(pathAndProto, ' ')
 		if sp == -1 {
-			return parser.Error, nil, status.ErrBadRequest
+			return transport.Error, nil, status.ErrBadRequest
 		}
 
 		reqPath, reqProto := pathAndProto[:sp], pathAndProto[sp+1:]
@@ -148,18 +159,18 @@ path:
 		}
 
 		if len(reqPath) == 0 {
-			return parser.Error, nil, status.ErrBadRequest
+			return transport.Error, nil, status.ErrBadRequest
 		}
 
 		reqPath, err = uridecode.Decode(reqPath, reqPath[:0])
 		if err != nil {
-			return parser.Error, nil, err
+			return transport.Error, nil, err
 		}
 
 		p.request.Path = uf.B2S(reqPath)
 		p.request.Proto = proto.FromBytes(reqProto)
 		if p.request.Proto == proto.Unknown {
-			return parser.Error, nil, status.ErrUnsupportedProtocol
+			return transport.Error, nil, status.ErrUnsupportedProtocol
 		}
 
 		data = data[lf+1:]
@@ -167,41 +178,43 @@ path:
 		goto headerKey
 	}
 
-	return parser.Pending, nil, nil
+	return transport.Pending, nil, nil
 
 headerKey:
-	if len(data) == 0 {
-		return parser.Pending, nil, err
-	}
-
-	switch data[0] {
-	case '\n':
-		return parser.HeadersCompleted, data[1:], nil
-	case '\r':
-		data = data[1:]
-		p.state = eHeaderValueCRLFCR
-		goto headerValueCRLFCR
-	}
-
 	{
+		if len(data) == 0 {
+			return transport.Pending, nil, err
+		}
+
+		switch data[0] {
+		case '\n':
+			p.reset()
+
+			return transport.HeadersCompleted, data[1:], nil
+		case '\r':
+			data = data[1:]
+			p.state = eHeaderValueCRLFCR
+			goto headerValueCRLFCR
+		}
+
 		colon := bytes.IndexByte(data, ':')
 		if colon == -1 {
-			if !p.headerKeyArena.Append(data...) {
-				return parser.Error, nil, status.ErrHeaderFieldsTooLarge
+			if !p.headerKeyBuff.Append(data) {
+				return transport.Error, nil, status.ErrHeaderFieldsTooLarge
 			}
 
-			return parser.Pending, nil, nil
+			return transport.Pending, nil, nil
 		}
 
-		if !p.headerKeyArena.Append(data[:colon]...) {
-			return parser.Error, nil, status.ErrHeaderFieldsTooLarge
+		if !p.headerKeyBuff.Append(data[:colon]) {
+			return transport.Error, nil, status.ErrHeaderFieldsTooLarge
 		}
 
-		p.headerKey = uf.B2S(p.headerKeyArena.Finish())
+		p.headerKey = uf.B2S(p.headerKeyBuff.Finish())
 		data = data[colon+1:]
 
 		if p.headersNumber++; p.headersNumber > p.headersSettings.Number.Maximal {
-			return parser.Error, nil, status.ErrTooManyHeaders
+			return transport.Error, nil, status.ErrTooManyHeaders
 		}
 
 		if strcomp.EqualFold(p.headerKey, "content-length") {
@@ -227,7 +240,7 @@ contentLength:
 		p.contentLength = p.contentLength*10 + int(char-'0')
 	}
 
-	return parser.Pending, nil, nil
+	return transport.Pending, nil, nil
 
 contentLengthEnd:
 	// guaranteed, that data at this point contains AT LEAST 1 byte.
@@ -247,16 +260,16 @@ contentLengthEnd:
 		p.state = eHeaderKey
 		goto headerKey
 	default:
-		return parser.Error, nil, status.ErrBadRequest
+		return transport.Error, nil, status.ErrBadRequest
 	}
 
 contentLengthCR:
 	if len(data) == 0 {
-		return parser.Pending, nil, nil
+		return transport.Pending, nil, nil
 	}
 
 	if data[0] != '\n' {
-		return parser.Error, nil, status.ErrBadRequest
+		return transport.Error, nil, status.ErrBadRequest
 	}
 
 	data = data[1:]
@@ -267,27 +280,27 @@ headerValue:
 	{
 		lf := bytes.IndexByte(data, '\n')
 		if lf == -1 {
-			if !p.headerValueArena.Append(data...) {
-				return parser.Error, nil, status.ErrHeaderFieldsTooLarge
+			if !p.headerValueBuff.Append(data) {
+				return transport.Error, nil, status.ErrHeaderFieldsTooLarge
 			}
 
-			if p.headerValueArena.SegmentLength() > p.headersSettings.MaxValueLength {
-				return parser.Error, nil, status.ErrHeaderFieldsTooLarge
+			if p.headerValueBuff.SegmentLength() > p.headersSettings.MaxValueLength {
+				return transport.Error, nil, status.ErrHeaderFieldsTooLarge
 			}
 
-			return parser.Pending, nil, nil
+			return transport.Pending, nil, nil
 		}
 
-		if !p.headerValueArena.Append(data[:lf]...) {
-			return parser.Error, nil, status.ErrHeaderFieldsTooLarge
+		if !p.headerValueBuff.Append(data[:lf]) {
+			return transport.Error, nil, status.ErrHeaderFieldsTooLarge
 		}
 
-		if p.headerValueArena.SegmentLength() > p.headersSettings.MaxValueLength {
-			return parser.Error, nil, status.ErrHeaderFieldsTooLarge
+		if p.headerValueBuff.SegmentLength() > p.headersSettings.MaxValueLength {
+			return transport.Error, nil, status.ErrHeaderFieldsTooLarge
 		}
 
 		data = data[lf+1:]
-		value := uf.B2S(trimPrefixSpaces(p.headerValueArena.Finish()))
+		value := uf.B2S(trimPrefixSpaces(p.headerValueBuff.Finish()))
 		if value[len(value)-1] == '\r' {
 			value = value[:len(value)-1]
 		}
@@ -313,22 +326,23 @@ headerValue:
 
 headerValueCRLFCR:
 	if len(data) == 0 {
-		return parser.Pending, nil, nil
+		return transport.Pending, nil, nil
 	}
 
 	if data[0] == '\n' {
-		return parser.HeadersCompleted, data[1:], nil
+		p.reset()
+
+		return transport.HeadersCompleted, data[1:], nil
 	}
 
-	return parser.Error, nil, status.ErrBadRequest
+	return transport.Error, nil, status.ErrBadRequest
 }
 
-func (p *httpRequestsParser) Release() {
-	p.request.Headers.Clear()
+func (p *Parser) reset() {
 	p.headersNumber = 0
-	p.headerKeyArena.Clear()
-	p.headerValueArena.Clear()
-	p.startLineArena.Clear()
+	p.headerKeyBuff.Clear()
+	p.headerValueBuff.Clear()
+	p.startLineBuff.Clear()
 	p.contentLength = 0
 	p.encToksBuff = p.encToksBuff[:0]
 	p.state = eMethod

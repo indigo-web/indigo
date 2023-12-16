@@ -10,6 +10,8 @@ github.com/indigo-web/iter v0.1.0 h1:3LJG319EytEULerDX6meT4xW/lqncIqTnZewsMtiPT4
 github.com/indigo-web/iter v0.1.0/go.mod h1:hftmhzfi4hpWc715PmXsfMjE1K0FLwznr+iyLxM7wyQ=
 github.com/indigo-web/utils v0.5.2 h1:izFEOxMDayj3uGUJT4I5ttuWYL1J9BqwQqn1KCCpyZc=
 github.com/indigo-web/utils v0.5.2/go.mod h1:fBdCfyNyprkgC0FvqaLE1B43CZgByQyhjDRxz4pNt8U=
+github.com/indigo-web/utils v0.6.0 h1:rmVWFkCLMiw9sCBAvBdxTHtPCm54tOsCf+hmvuY9zxQ=
+github.com/indigo-web/utils v0.6.0/go.mod h1:Q+voOJjIRN7DV+ifWozy6RY6cDF10Ev0NPDjsuOAXfQ=
 github.com/json-iterator/go v1.1.12 h1:PV8peI4a0ysnczrg+LtxykD8LfKY9ML6u2jnxaEnrnM=
 github.com/json-iterator/go v1.1.12/go.mod h1:e30LSqwooZae/UwlEbR2852Gd8hjQvJoHmT4TnhNGBo=
 github.com/modern-go/concurrent v0.0.0-20180228061459-e0a39a4cb421 h1:ZqeYNhU3OHLH3mGKHDcjJRFFRrJa6eAM5H+CtDdOsPc=

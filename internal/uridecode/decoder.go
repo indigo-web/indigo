@@ -14,6 +14,10 @@ func Decode(src, buff []byte) ([]byte, error) {
 				return src, nil
 			}
 
+			if len(buff) == 0 {
+				return src, nil
+			}
+
 			return append(buff, src...), nil
 		}
 

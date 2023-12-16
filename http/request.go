@@ -144,6 +144,7 @@ func (r *Request) Clear() (err error) {
 		return err
 	}
 
+	r.Headers.Clear()
 	r.ContentLength = 0
 	r.Encoding = headers.Encoding{}
 	r.ContentType = ""
