@@ -8,37 +8,32 @@ import (
 	"github.com/indigo-web/indigo/internal/httpchars"
 	"github.com/indigo-web/indigo/internal/response"
 	"github.com/indigo-web/indigo/internal/transport"
-	"github.com/indigo-web/indigo/internal/transport/http1/internal/defaultheaders"
-	"github.com/indigo-web/utils/ft"
 	"github.com/indigo-web/utils/strcomp"
+	"github.com/indigo-web/utils/uf"
 	"io"
 	"strconv"
-	"strings"
 )
 
-var (
-	contentLength    = []byte("Content-Length: ")
-	contentType      = []byte("Content-Type: ")
-	transferEncoding = []byte("Transfer-Encoding: ")
-	emptyChunkedPart = []byte("0\r\n\r\n")
+const (
+	contentType      = "Content-Type: "
+	transferEncoding = "Transfer-Encoding: "
+	contentLength    = "Content-Length: "
 )
+
+var chunkedFinalizer = []byte("0\r\n\r\n")
 
 type Dumper struct {
-	buff                  []byte
-	fileBuff              []byte
-	defaultHeaders        defaultheaders.DefaultHeaders
-	defaultHeadersReserve defaultheaders.DefaultHeaders
-	buffOffset            int
+	buff           []byte
+	fileBuff       []byte
+	defaultHeaders defaultHeaders
+	buffOffset     int
 }
 
-func NewDumper(buff, fileBuff []byte, defaultHeaders map[string][]string) *Dumper {
-	parsedDefaultHeaders := parseDefaultHeaders(defaultHeaders)
-
+func NewDumper(buff, fileBuff []byte, defHdrs map[string]string) *Dumper {
 	return &Dumper{
-		buff:                  buff,
-		fileBuff:              fileBuff,
-		defaultHeadersReserve: ft.Map(ft.Nop[string], parsedDefaultHeaders), // copy the slice
-		defaultHeaders:        parsedDefaultHeaders,
+		buff:           buff[:0],
+		fileBuff:       fileBuff,
+		defaultHeaders: processDefaultHeaders(defHdrs),
 	}
 }
 
@@ -46,7 +41,9 @@ func NewDumper(buff, fileBuff []byte, defaultHeaders map[string][]string) *Dumpe
 // for informational responses
 func (d *Dumper) PreDump(protocol proto.Proto, response *http.Response) {
 	d.renderProtocol(protocol)
-	d.renderHeaders(response.Reveal())
+	fields := response.Reveal()
+	d.renderResponseLine(fields)
+	d.renderHeaders(fields)
 	d.crlf()
 }
 
@@ -58,6 +55,7 @@ func (d *Dumper) Dump(
 
 	d.renderProtocol(protocol)
 	fields := response.Reveal()
+	d.renderResponseLine(fields)
 
 	if fields.Attachment.Content() != nil {
 		return d.sendAttachment(request, response, writer)
@@ -82,36 +80,41 @@ func (d *Dumper) Dump(
 	return err
 }
 
-func (d *Dumper) renderHeaders(fields response.Fields) {
+func (d *Dumper) renderResponseLine(fields response.Fields) {
 	codeStatus := status.CodeStatus(fields.Code)
 
 	if fields.Status == "" && codeStatus != "" {
 		d.buff = append(d.buff, codeStatus...)
-	} else {
-		// in case we have a custom response status text or unknown code, fallback to an old way
-		d.buff = append(strconv.AppendInt(d.buff, int64(fields.Code), 10), httpchars.SP...)
-		d.buff = append(append(d.buff, status.Text(fields.Code)...), httpchars.CR, httpchars.LF)
+		return
 	}
 
+	// in case we have a custom response status text or unknown code, fallback to an old way
+	d.buff = strconv.AppendInt(d.buff, int64(fields.Code), 10)
+	d.sp()
+	d.buff = append(d.buff, status.Text(fields.Code)...)
+	d.crlf()
+}
+
+func (d *Dumper) renderHeaders(fields response.Fields) {
 	responseHeaders := fields.Headers
 
-	for i := 0; i < len(responseHeaders); i += 2 {
-		d.renderHeader(responseHeaders[i], responseHeaders[i+1])
-		d.defaultHeaders.EraseEntry(responseHeaders[i])
+	for _, header := range responseHeaders {
+		d.renderHeader(header)
+		d.defaultHeaders.Exclude(header.Key)
 	}
 
-	for i := 0; i < len(d.defaultHeaders); i += 2 {
-		if len(d.defaultHeaders[i]) == 0 {
+	for _, header := range d.defaultHeaders {
+		if header.Excluded {
 			continue
 		}
 
-		d.renderHeader(d.defaultHeaders[i], d.defaultHeaders[i+1])
+		d.buff = append(d.buff, header.Full...)
 	}
 
 	// Content-Type is compulsory. Transfer-Encoding is not
-	d.renderContentType(fields.ContentType)
+	d.renderKnownHeader(contentType, fields.ContentType)
 	if len(fields.TransferEncoding) > 0 {
-		d.renderTransferEncoding(fields.TransferEncoding)
+		d.renderKnownHeader(transferEncoding, fields.TransferEncoding)
 	}
 }
 
@@ -214,7 +217,7 @@ func (d *Dumper) writeChunkedBody(r io.Reader, writer transport.Writer) error {
 		switch err {
 		case nil:
 		case io.EOF:
-			return writer.Write(emptyChunkedPart)
+			return writer.Write(chunkedFinalizer)
 		default:
 			return status.ErrCloseConnection
 		}
@@ -222,10 +225,10 @@ func (d *Dumper) writeChunkedBody(r io.Reader, writer transport.Writer) error {
 }
 
 // renderHeaderInto the buffer. Appends CRLF in the end
-func (d *Dumper) renderHeader(key, value string) {
-	d.buff = append(d.buff, key...)
-	d.buff = append(d.buff, httpchars.COLONSP...)
-	d.buff = append(d.buff, value...)
+func (d *Dumper) renderHeader(header response.Header) {
+	d.buff = append(d.buff, header.Key...)
+	d.colonsp()
+	d.buff = append(d.buff, header.Value...)
 	d.crlf()
 }
 
@@ -234,14 +237,8 @@ func (d *Dumper) renderContentLength(value int64) {
 	d.crlf()
 }
 
-func (d *Dumper) renderContentType(value string) {
-	d.buff = append(d.buff, contentType...)
-	d.buff = append(d.buff, value...)
-	d.crlf()
-}
-
-func (d *Dumper) renderTransferEncoding(value string) {
-	d.buff = append(d.buff, transferEncoding...)
+func (d *Dumper) renderKnownHeader(key, value string) {
+	d.buff = append(d.buff, key...)
 	d.buff = append(d.buff, value...)
 	d.crlf()
 }
@@ -250,13 +247,21 @@ func (d *Dumper) renderProtocol(protocol proto.Proto) {
 	d.buff = append(d.buff, proto.ToBytes(protocol)...)
 }
 
+func (d *Dumper) sp() {
+	d.buff = append(d.buff, ' ')
+}
+
+func (d *Dumper) colonsp() {
+	d.buff = append(d.buff, httpchars.COLONSP...)
+}
+
 func (d *Dumper) crlf() {
 	d.buff = append(d.buff, httpchars.CRLF...)
 }
 
 func (d *Dumper) clear() {
 	d.buff = d.buff[:0]
-	d.defaultHeadersReserve.Copy(d.defaultHeaders)
+	d.defaultHeaders.Reset()
 }
 
 func isKeepAlive(protocol proto.Proto, req *http.Request) bool {
@@ -277,13 +282,46 @@ func isKeepAlive(protocol proto.Proto, req *http.Request) bool {
 	}
 }
 
-func parseDefaultHeaders(hdrs map[string][]string) defaultheaders.DefaultHeaders {
-	parsed := make([]string, 0, len(hdrs))
+func processDefaultHeaders(hdrs map[string]string) defaultHeaders {
+	processed := make(defaultHeaders, 0, len(hdrs))
 
-	for key, values := range hdrs {
-		value := strings.Join(values, ",")
-		parsed = append(parsed, key, value)
+	for key, value := range hdrs {
+		full := renderHeader(key, value)
+		processed = append(processed, defaultHeader{
+			// we let the GC release all the values of the map, as here we're using only
+			// the brand-new line without keeping the original string
+			Key:  full[:len(key)],
+			Full: full,
+		})
 	}
 
-	return parsed
+	return processed
+}
+
+func renderHeader(key, value string) string {
+	return key + httpchars.COLONSP + value + uf.B2S(httpchars.CRLF)
+}
+
+type defaultHeader struct {
+	Excluded bool
+	Key      string
+	Full     string
+}
+
+type defaultHeaders []defaultHeader
+
+func (d defaultHeaders) Exclude(key string) {
+	for i, header := range d {
+		if strcomp.EqualFold(header.Key, key) {
+			header.Excluded = true
+			d[i] = header
+			return
+		}
+	}
+}
+
+func (d defaultHeaders) Reset() {
+	for _, header := range d {
+		header.Excluded = false
+	}
 }
