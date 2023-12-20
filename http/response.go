@@ -34,7 +34,7 @@ func NewResponse() *Response {
 	return &Response{
 		response.Fields{
 			Code:        status.OK,
-			Headers:     make([]string, 0, defaultHeadersNumber*2),
+			Headers:     make([]response.Header, 0, defaultHeadersNumber),
 			ContentType: response.DefaultContentType,
 		},
 	}
@@ -79,7 +79,10 @@ func (r *Response) Header(key string, values ...string) *Response {
 	}
 
 	for i := range values {
-		r.fields.Headers = append(r.fields.Headers, key, values[i])
+		r.fields.Headers = append(r.fields.Headers, response.Header{
+			Key:   key,
+			Value: values[i],
+		})
 	}
 
 	return r
