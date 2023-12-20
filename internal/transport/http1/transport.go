@@ -20,7 +20,7 @@ func New(
 	valuesPool pool.ObjectPool[[]string],
 	headersSettings settings.Headers,
 	respBuff, respFileBuff []byte,
-	defaultHeaders map[string][]string,
+	defaultHeaders map[string]string,
 ) *Transport {
 	return &Transport{
 		parser: NewParser(request, keyBuff, valBuff, startLineBuff, valuesPool, headersSettings),

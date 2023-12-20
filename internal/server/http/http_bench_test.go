@@ -1,6 +1,7 @@
 package http
 
 import (
+	"github.com/indigo-web/indigo/internal/server/tcp"
 	"strings"
 	"testing"
 
@@ -22,32 +23,12 @@ import (
 	"github.com/indigo-web/utils/pool"
 )
 
-var (
-	tenHeadersGETRequest = []byte(
-		"GET / HTTP/1.1\r\n" +
-			"Hello: world\r\n" +
-			"One: ok\r\n" +
-			"Content-Type: nothing but true;q=0.9\r\n" +
-			"Four: lorem ipsum\r\n" +
-			"Mistake: is made here\r\n" +
-			"Lorem: ipsum\r\n" +
-			"tired: of all this shit\r\n" +
-			"Eight: finally only two left\r\n" +
-			"my-brain: is not so creative\r\n" +
-			"to-create: ten random headers from scratch\r\n" +
-			"\r\n",
-	)
-	simpleGETWithHeader = []byte("GET /with-header HTTP/1.1\r\n\r\n")
-
-	simplePOST = []byte("POST / HTTP/1.1\r\nContent-Length: 13\r\n\r\nHello, world!")
-)
-
 // Using default headers pasted from indi.go. Not using original ones as
 // this leads to cycle import (why cannot compiler handle such situations?)
-var defaultHeaders = map[string][]string{
-	"Content-Type": {"text/html"},
+var defaultHeaders = map[string]string{
+	"Content-Type": "text/html",
 	// nil here means that value will be set later, when server will be initializing
-	"Accept-Encodings": nil,
+	"Accept-Encodings": "",
 }
 
 var longPath = strings.Repeat("a", 500)
@@ -62,7 +43,7 @@ func getInbuiltRouter() router.Router {
 	r.Resource("/").
 		Get(http.Respond).
 		Post(func(request *http.Request) *http.Response {
-			_ = request.Body.Callback(func([]byte) error {
+			_ = request.Body.Callback(func(b []byte) error {
 				return nil
 			})
 
@@ -107,27 +88,43 @@ func getSimpleRouter() router.Router {
 }
 
 func Benchmark_Get(b *testing.B) {
-	server, request, trans := newServer()
+	server, request, trans := newServer(dummy.NewNopClient())
 
 	b.Run("simple get", func(b *testing.B) {
-		tenHeadersGETClient := dummy.NewCircularClient(tenHeadersGETRequest)
-		b.SetBytes(int64(len(tenHeadersGETRequest)))
+		raw := []byte(
+			"GET / HTTP/1.1\r\n" +
+				"Hello: world\r\n" +
+				"One: ok\r\n" +
+				"Content-Type: nothing but true;q=0.9\r\n" +
+				"Four: lorem ipsum\r\n" +
+				"Mistake: is made here\r\n" +
+				"Lorem: ipsum\r\n" +
+				"tired: of all this shit\r\n" +
+				"Eight: finally only two left\r\n" +
+				"my-brain: is not so creative\r\n" +
+				"to-create: ten random headers from scratch\r\n" +
+				"\r\n",
+		)
+
+		client := dummy.NewCircularClient(raw)
+		b.SetBytes(int64(len(raw)))
 		b.ReportAllocs()
 		b.ResetTimer()
 
 		for i := 0; i < b.N; i++ {
-			server.HandleRequest(tenHeadersGETClient, request, trans)
+			server.HandleRequest(client, request, trans)
 		}
 	})
 
 	b.Run("with resp header", func(b *testing.B) {
-		withRespHeadersGETClient := dummy.NewCircularClient(simpleGETWithHeader)
-		b.SetBytes(int64(len(simpleGETWithHeader)))
+		raw := []byte("GET /with-header HTTP/1.1\r\n\r\n")
+		client := dummy.NewCircularClient(raw)
+		b.SetBytes(int64(len(raw)))
 		b.ReportAllocs()
 		b.ResetTimer()
 
 		for i := 0; i < b.N; i++ {
-			server.HandleRequest(withRespHeadersGETClient, request, trans)
+			server.HandleRequest(client, request, trans)
 		}
 	})
 
@@ -181,30 +178,30 @@ func Benchmark_Get(b *testing.B) {
 }
 
 func Benchmark_Post(b *testing.B) {
-	withBodyClient := dummy.NewCircularClient(simplePOST)
-	server, request, trans := newServer()
-
 	b.Run("simple POST", func(b *testing.B) {
-		b.SetBytes(int64(len(simplePOST)))
+		raw := []byte("POST / HTTP/1.1\r\nContent-Length: 13\r\n\r\nHello, world!")
+		client := dummy.NewCircularClient(raw)
+		server, request, trans := newServer(client)
+		b.SetBytes(int64(len(raw)))
 		b.ReportAllocs()
 		b.ResetTimer()
 
 		for i := 0; i < b.N; i++ {
-			server.HandleRequest(withBodyClient, request, trans)
+			server.HandleRequest(client, request, trans)
 		}
 	})
 }
 
-func newServer() (*Server, *http.Request, transport.Transport) {
+func newServer(client tcp.Client) (*Server, *http.Request, transport.Transport) {
 	// for benchmarking, using more realistic conditions. In case we want a pure performance - use
 	// getSimpleRouter() here. It is visibly faster
 	r := getInbuiltRouter()
 	s := settings.Default()
 	q := query.NewQuery(headers.NewHeaders())
 	body := http1.NewBody(
-		dummy.NewNopClient(), nil, coding.NewManager(0),
+		client, nil, coding.NewManager(0),
 	)
-	hdrs := headers.FromMap(make(map[string][]string, 10))
+	hdrs := headers.NewPreallocHeaders(10)
 	request := http.NewRequest(
 		hdrs, q, http.NewResponse(), dummy.NewNopConn(), body, nil, false,
 	)

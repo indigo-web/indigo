@@ -1,7 +1,10 @@
 package dummy
 
 import (
-	"github.com/indigo-web/utils/unreader"
+	"github.com/indigo-web/indigo/internal/server/tcp"
+)
+
+import (
 	"io"
 	"net"
 )
@@ -9,21 +12,20 @@ import (
 // CircularClient is a client that on every read-operation returns the same data as it
 // was initialised with. This is used mainly for benchmarking
 type CircularClient struct {
-	unreader        *unreader.Unreader
 	data            [][]byte
+	tmp             []byte
 	pointer         int
 	closed, oneTime bool
 }
 
 func NewCircularClient(data ...[]byte) *CircularClient {
 	return &CircularClient{
-		unreader: new(unreader.Unreader),
-		data:     data,
-		pointer:  -1,
+		data:    data,
+		pointer: -1,
 	}
 }
 
-func (c *CircularClient) Read() ([]byte, error) {
+func (c *CircularClient) Read() (data []byte, err error) {
 	if c.closed {
 		return nil, io.EOF
 	}
@@ -32,19 +34,23 @@ func (c *CircularClient) Read() ([]byte, error) {
 		c.closed = true
 	}
 
-	return c.unreader.PendingOr(func() ([]byte, error) {
-		c.pointer++
+	if len(c.tmp) > 0 {
+		data, c.tmp = c.tmp, nil
 
-		if c.pointer == len(c.data) {
-			c.pointer = 0
-		}
+		return data, nil
+	}
 
-		return c.data[c.pointer], nil
-	})
+	c.pointer++
+
+	if c.pointer >= len(c.data) {
+		c.pointer = 0
+	}
+
+	return c.data[c.pointer], nil
 }
 
 func (c *CircularClient) Unread(takeback []byte) {
-	c.unreader.Unread(takeback)
+	c.tmp = takeback
 }
 
 func (*CircularClient) Write([]byte) error {
@@ -62,4 +68,21 @@ func (c *CircularClient) Close() error {
 
 func (c *CircularClient) OneTime() {
 	c.oneTime = true
+}
+
+func NewNopClient() tcp.Client {
+	return NewCircularClient(nil)
+}
+
+type SinkholeWriter struct {
+	Data []byte
+}
+
+func NewSinkholeWriter() *SinkholeWriter {
+	return new(SinkholeWriter)
+}
+
+func (s *SinkholeWriter) Write(b []byte) error {
+	s.Data = append(s.Data, b...)
+	return nil
 }

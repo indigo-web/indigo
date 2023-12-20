@@ -21,16 +21,16 @@ import (
 //
 // WARNING: if you want to edit them, do it using Application.AddDefaultHeader or
 // Application.DeleteDefaultHeader instead
-var DefaultHeaders = map[string][]string{
+var DefaultHeaders = map[string]string{
 	// nil here means that value will be set later, when server will be initializing
-	"Accept-Encodings": nil,
+	"Accept-Encodings": "",
 }
 
 // Application is just a struct with addr and shutdown channel that is currently
 // not used. Planning to replace it with context.WithCancel()
 type Application struct {
 	codings          []coding.Constructor
-	defaultHeaders   map[string][]string
+	defaultHeaders   map[string]string
 	addr             string
 	servers          []*tcp.Server
 	gracefulShutdown bool
@@ -51,12 +51,12 @@ func (a *Application) AddCoding(constructor coding.Constructor) {
 
 // SetDefaultHeaders overrides default headers to a passed ones.
 // Doing this, make sure you know what are you doing
-func (a *Application) SetDefaultHeaders(headers map[string][]string) {
+func (a *Application) SetDefaultHeaders(headers map[string]string) {
 	a.defaultHeaders = headers
 }
 
-func (a *Application) AddDefaultHeader(key string, values ...string) {
-	a.defaultHeaders[key] = append(a.defaultHeaders[key], values...)
+func (a *Application) AddDefaultHeader(key string, value string) {
+	a.defaultHeaders[key] = value
 }
 
 func (a *Application) DeleteDefaultHeader(key string) {
@@ -72,12 +72,12 @@ func (a *Application) Serve(r router.Router, optionalSettings ...settings.Settin
 		return fmt.Errorf("bad address: %s", err.Error())
 	}
 
-	if accept, found := a.defaultHeaders["Accept-Encodings"]; found && accept == nil {
+	if accept, found := a.defaultHeaders["Accept-Encodings"]; found && len(accept) == 0 {
 		// because of the special treatment of default headers by rendering engine, better to
 		// join these values manually. Otherwise, each value will be rendered individually, that
 		// still follows the standard, but brings some unnecessary networking overhead
 		acceptTokens := strings.Join(availableEncodings(a.codings...), ",")
-		a.defaultHeaders["Accept-Encodings"] = []string{acceptTokens}
+		a.defaultHeaders["Accept-Encodings"] = acceptTokens
 	}
 
 	if err := r.OnStart(); err != nil {

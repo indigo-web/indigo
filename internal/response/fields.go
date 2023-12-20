@@ -7,6 +7,10 @@ import (
 
 const DefaultContentType = "text/html"
 
+type Header struct {
+	Key, Value string
+}
+
 type Fields struct {
 	Attachment  types.Attachment
 	Status      status.Status
@@ -14,7 +18,7 @@ type Fields struct {
 	// TODO: add corresponding Content-Encoding field
 	// TODO: automatically apply the encoding on a body when specified
 	TransferEncoding string
-	Headers          []string
+	Headers          []Header
 	Body             []byte
 	Code             status.Code
 }

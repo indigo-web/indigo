@@ -94,6 +94,25 @@ func (b *Body) Callback(cb http.OnBodyCallback) error {
 	}
 }
 
+func (b *Body) Retrieve() ([]byte, error) {
+	return b.unreader.PendingOr(func() ([]byte, error) {
+		if b.bodyBytesLeft == 0 {
+			return nil, io.EOF
+		}
+
+		data, err := b.client.Read()
+		if err != nil {
+			return nil, err
+		}
+
+		if b.encoding.Chunked {
+			return b.chunkedBody(data)
+		}
+
+		return b.plainBody(data)
+	})
+}
+
 func (b *Body) Reset() error {
 	for b.bodyBytesLeft > 0 {
 		_, err := b.Retrieve()
@@ -114,25 +133,6 @@ func (b *Body) Reset() error {
 	b.unreader.Reset()
 
 	return nil
-}
-
-func (b *Body) Retrieve() ([]byte, error) {
-	return b.unreader.PendingOr(func() ([]byte, error) {
-		if b.bodyBytesLeft == 0 {
-			return nil, io.EOF
-		}
-
-		data, err := b.client.Read()
-		if err != nil {
-			return nil, err
-		}
-
-		if b.encoding.Chunked {
-			return b.chunkedBody(data)
-		}
-
-		return b.plainBody(data)
-	})
 }
 
 func (b *Body) plainBody(data []byte) (body []byte, err error) {
