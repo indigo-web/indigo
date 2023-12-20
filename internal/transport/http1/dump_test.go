@@ -20,7 +20,7 @@ import (
 	"testing"
 )
 
-func getDumper(defaultHeaders map[string][]string) *Dumper {
+func getDumper(defaultHeaders map[string]string) *Dumper {
 	return NewDumper(make([]byte, 0, 1024), nil, defaultHeaders)
 }
 
@@ -71,12 +71,12 @@ func TestDumper_Write(t *testing.T) {
 		resp, err := stdhttp.ReadResponse(bufio.NewReader(bytes.NewBuffer(writer.Data)), stdreq)
 		require.Equal(t, 200, resp.StatusCode)
 
-		require.Equal(t, 1, len(resp.Header["Hello"]))
-		require.Equal(t, "nether", resp.Header["Hello"][0])
-		require.Equal(t, 1, len(resp.Header["Server"]))
-		require.Equal(t, "indigo", resp.Header["Server"][0])
-		require.Equal(t, []string{"ipsum,something else"}, resp.Header["Lorem"])
-		require.Equal(t, []string{"special", "here"}, resp.Header["Something"])
+		require.Equal(t, 1, len(resp.Header["Hello"]), resp.Header)
+		require.Equal(t, "nether", resp.Header["Hello"][0], resp.Header)
+		require.Equal(t, 1, len(resp.Header["Server"]), resp.Header)
+		require.Equal(t, "indigo", resp.Header["Server"][0], resp.Header)
+		require.Equal(t, []string{"ipsum, something else"}, resp.Header["Lorem"], resp.Header)
+		require.Equal(t, []string{"special", "here"}, resp.Header["Something"], resp.Header)
 
 		body, err := io.ReadAll(resp.Body)
 		require.NoError(t, err)
@@ -85,10 +85,10 @@ func TestDumper_Write(t *testing.T) {
 	}
 
 	t.Run("default headers", func(t *testing.T) {
-		defHeaders := map[string][]string{
-			"Hello":  {"world"},
-			"Server": {"indigo"},
-			"Lorem":  {"ipsum", "something else"},
+		defHeaders := map[string]string{
+			"Hello":  "world",
+			"Server": "indigo",
+			"Lorem":  "ipsum, something else",
 		}
 		dumper := getDumper(defHeaders)
 		testWithHeaders(t, dumper)
@@ -175,7 +175,7 @@ func TestDumper_Write(t *testing.T) {
 		require.NoError(t, err)
 		require.Equal(t, body, string(fullBody))
 	})
-	
+
 	t.Run("attachment in respose to a HEAD request", func(t *testing.T) {
 		const body = "Hello, world!"
 		reader := strings.NewReader(body)
@@ -200,8 +200,8 @@ func TestDumper_Write(t *testing.T) {
 
 func TestDumper_PreWrite(t *testing.T) {
 	t.Run("upgrade from HTTP/1.0 to HTTP/1.1", func(t *testing.T) {
-		defHeaders := map[string][]string{
-			"Hello": {"world"},
+		defHeaders := map[string]string{
+			"Hello": "world",
 		}
 		dumper := getDumper(defHeaders)
 		request := newRequest()
