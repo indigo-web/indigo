@@ -76,31 +76,28 @@ func (r *Router) OnRequest(request *http.Request) *http.Response {
 		r.retrieveAlias(request)
 	}
 
+	var methodsMap types.MethodsMap
+
 	if r.isStatic {
 		endpoint, found := r.routesMap[request.Path]
 		if !found {
 			return r.OnError(request, status.ErrNotFound)
 		}
 
-		handler := getHandler(request.Method, endpoint.methodsMap)
-		if handler == nil {
-			request.Env.AllowMethods = endpoint.allow
-
-			return r.OnError(request, status.ErrMethodNotAllowed)
+		methodsMap = endpoint.methodsMap
+		request.Env.AllowMethods = endpoint.allow
+	} else {
+		endpoint := r.tree.Match(request.Params, request.Path)
+		if endpoint == nil {
+			return r.OnError(request, status.ErrNotFound)
 		}
 
-		return handler(request)
-	}
-
-	endpoint := r.tree.Match(request.Params, request.Path)
-	if endpoint == nil {
-		return r.OnError(request, status.ErrNotFound)
-	}
-
-	handler := getHandler(request.Method, endpoint.MethodsMap)
-	if handler == nil {
+		methodsMap = endpoint.MethodsMap
 		request.Env.AllowMethods = endpoint.Allow
+	}
 
+	handler := getHandler(request.Method, methodsMap)
+	if handler == nil {
 		return r.OnError(request, status.ErrMethodNotAllowed)
 	}
 
@@ -131,7 +128,7 @@ func (r *Router) OnError(request *http.Request, err error) *http.Response {
 
 	handler := r.retrieveErrorHandler(httpErr.Code)
 	if handler == nil {
-		// not using http.Error(request, err) for performance purposes, as in this case
+		// not using http.Error(request, err) in performance purposes, as in this case
 		// it would try under the hood to unwrap the error again, however we did this already
 		return request.Respond().
 			Code(httpErr.Code).
