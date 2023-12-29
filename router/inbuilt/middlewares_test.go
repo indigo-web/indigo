@@ -62,7 +62,7 @@ func getRequest(m method.Method, path string) *http.Request {
 		dummy.NewNopClient(), nil, coding.NewManager(0),
 	)
 	request := http.NewRequest(
-		headers.NewHeaders(), q, http.NewResponse(), dummy.NewNopConn(), body, nil, false,
+		headers.New(), q, http.NewResponse(), dummy.NewNopConn(), body, nil,
 	)
 	request.Method = m
 	request.Path = path

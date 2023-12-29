@@ -8,11 +8,10 @@ import (
 	"github.com/indigo-web/indigo/http/proto"
 	"github.com/indigo-web/indigo/http/query"
 	"github.com/indigo-web/indigo/http/status"
+	"github.com/indigo-web/indigo/internal/datastruct"
 	json "github.com/json-iterator/go"
 	"net"
 )
-
-type Params = map[string]string
 
 type Environment struct {
 	// Error is used mostly for error handlers
@@ -25,6 +24,8 @@ type Environment struct {
 	AliasFrom string
 }
 
+type Params = datastruct.KeyValue
+
 var zeroContext = context.Background()
 
 // Request represents HTTP request
@@ -33,9 +34,9 @@ type Request struct {
 	Path   string
 	// Query is a key-value part of the Path
 	Query query.Query
-	// Params are dynamic segments, in case dynamic routing is enabled
-	Params        Params
-	Proto         proto.Proto
+	Query *query.Query
+	// Params are dynamic segment values
+	Params *Params
 	Headers       *headers.Headers
 	Encoding      headers.Encoding
 	ContentLength int
@@ -138,6 +139,7 @@ func (r *Request) WasHijacked() bool {
 // It is implemented to clear the request object between requests
 func (r *Request) Clear() (err error) {
 	r.Query.Set(nil)
+	r.Params.Clear()
 	r.Ctx = zeroContext
 
 	if err = r.Body.Reset(); err != nil {
@@ -150,12 +152,6 @@ func (r *Request) Clear() (err error) {
 	r.ContentType = ""
 	r.Upgrade = proto.Unknown
 	r.Env = Environment{}
-
-	if r.clearParamsMap && len(r.Params) > 0 {
-		for k := range r.Params {
-			delete(r.Params, k)
-		}
-	}
 
 	return nil
 }

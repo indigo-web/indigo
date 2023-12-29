@@ -1,24 +1,9 @@
 package radix
 
 import (
+	"github.com/indigo-web/indigo/internal/datastruct"
 	"github.com/indigo-web/indigo/router/inbuilt/internal/types"
 	"testing"
-)
-
-var (
-	staticSample = "/hello/world/length/does/not/matter"
-
-	unnamedTemplateSample = "/api/{}"
-	unnamedSample         = "/api/v1"
-
-	shortTemplateSample = "/hello/{world}"
-	shortSample         = "/hello/some-very-long-world"
-
-	mediumTemplateSample = "/hello/{world}/very/{good}/{ok}"
-	mediumSample         = "/hello/world-finally-became/very/good-as-fuck/ok-let-it-be"
-
-	longTemplateSample = "/hello/{world}/very/{good}/{ok}/{wanna}/somestatic/{finally}/good"
-	longSample         = "/hello/world-finally-became/very/good-as-fuck/ok-let-it-be/i-wanna-/somestatic/finally-matcher-is-here/good"
 )
 
 func BenchmarkTreeMatch(b *testing.B) {
@@ -32,30 +17,30 @@ func BenchmarkTreeMatch(b *testing.B) {
 	tree.MustInsert(MustParse(shortTemplateSample), payload)
 	tree.MustInsert(MustParse(mediumTemplateSample), payload)
 	tree.MustInsert(MustParse(longTemplateSample), payload)
-	const paramsMapDefaultSize = 5
-	params := make(Params, paramsMapDefaultSize)
+	const paramsPreAlloc = 5
+	params := datastruct.NewKeyValuePreAlloc(paramsPreAlloc)
 
-	b.Run("OnlyStatic", func(b *testing.B) {
+	b.Run("simple static", func(b *testing.B) {
 		for i := 0; i < b.N; i++ {
-			tree.Match(params, staticSample)
+			tree.Match(staticSample, params)
 		}
 	})
 
-	b.Run("Short", func(b *testing.B) {
+	b.Run("short dynamic", func(b *testing.B) {
 		for i := 0; i < b.N; i++ {
-			tree.Match(params, shortSample)
+			tree.Match(shortSample, params)
 		}
 	})
 
-	b.Run("Medium", func(b *testing.B) {
+	b.Run("medium dynamic", func(b *testing.B) {
 		for i := 0; i < b.N; i++ {
-			tree.Match(params, mediumSample)
+			tree.Match(mediumSample, params)
 		}
 	})
 
-	b.Run("Long", func(b *testing.B) {
+	b.Run("long dynamic", func(b *testing.B) {
 		for i := 0; i < b.N; i++ {
-			tree.Match(params, longSample)
+			tree.Match(longSample, params)
 		}
 	})
 }

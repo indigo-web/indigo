@@ -13,8 +13,6 @@ import (
 
 var _ router.Router = &Router{}
 
-type mutator func(*http.Request)
-
 // Router is a built-in implementation of router.Router interface that provides
 // some basic router features like middlewares, groups, dynamic routing, error
 // handlers, and some implicit things like calling GET-handlers for HEAD-requests,
@@ -87,7 +85,7 @@ func (r *Router) OnRequest(request *http.Request) *http.Response {
 		methodsMap = endpoint.methodsMap
 		request.Env.AllowMethods = endpoint.allow
 	} else {
-		endpoint := r.tree.Match(request.Params, request.Path)
+		endpoint := r.tree.Match(request.Path, request.Params)
 		if endpoint == nil {
 			return r.OnError(request, status.ErrNotFound)
 		}

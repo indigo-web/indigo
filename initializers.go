@@ -6,6 +6,7 @@ import (
 	"github.com/indigo-web/indigo/http/coding"
 	"github.com/indigo-web/indigo/http/headers"
 	"github.com/indigo-web/indigo/http/query"
+	"github.com/indigo-web/indigo/internal/datastruct"
 	"github.com/indigo-web/indigo/internal/server/tcp"
 	"github.com/indigo-web/indigo/internal/transport"
 	"github.com/indigo-web/indigo/internal/transport/http1"
@@ -48,12 +49,12 @@ func newBody(client tcp.Client, body settings.Body, codings []coding.Constructor
 }
 
 func newRequest(s settings.Settings, conn net.Conn, body http.Body) *http.Request {
-	q := query.NewQuery(headers.NewHeaders())
-	hdrs := headers.NewPreallocHeaders(s.Headers.Number.Default)
+	q := query.NewQuery(headers.NewPrealloc(s.URL.Query.PreAlloc))
+	hdrs := headers.NewPrealloc(s.Headers.Number.Default)
 	response := http.NewResponse()
-	params := make(http.Params)
+	params := datastruct.NewKeyValue()
 
-	return http.NewRequest(hdrs, q, response, conn, body, params, s.URL.Params.DisableMapClear)
+	return http.NewRequest(hdrs, q, response, conn, body, params)
 }
 
 func newTransport(s settings.Settings, req *http.Request, a *Application) transport.Transport {
@@ -71,7 +72,7 @@ func newTransport(s settings.Settings, req *http.Request, a *Application) transp
 		*objPool,
 		s.Headers,
 		respBuff,
-		nil, // TODO: pass response buff size from settings,
+		s.HTTP.FileBuffSize,
 		a.defaultHeaders,
 	)
 }

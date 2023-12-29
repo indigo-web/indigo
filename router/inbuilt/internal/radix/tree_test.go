@@ -1,16 +1,31 @@
 package radix
 
 import (
+	"github.com/indigo-web/indigo/internal/datastruct"
 	"github.com/indigo-web/indigo/router/inbuilt/internal/types"
 	"testing"
 
 	"github.com/stretchr/testify/require"
 )
 
+var (
+	staticSample = "/hello/world/length/does/not/matter"
+
+	unnamedTemplateSample = "/api/{}"
+	unnamedSample         = "/api/v1"
+
+	shortTemplateSample = "/hello/{world}"
+	shortSample         = "/hello/some-very-long-world"
+
+	mediumTemplateSample = "/hello/{world}/very/{good}/{ok}"
+	mediumSample         = "/hello/world-finally-became/very/good-as-fuck/ok-let-it-be"
+
+	longTemplateSample = "/hello/{world}/very/{good}/{ok}/{wanna}/somestatic/{finally}/good"
+	longSample         = "/hello/world-finally-became/very/good-as-fuck/ok-let-it-be/i-wanna-/somestatic/finally-matcher-is-here/good"
+)
+
 func TestNode_Match_Positive(t *testing.T) {
 	tree := NewTree()
-	params := make(Params)
-
 	payload := Payload{
 		MethodsMap: types.MethodsMap{},
 	}
@@ -21,41 +36,44 @@ func TestNode_Match_Positive(t *testing.T) {
 	tree.MustInsert(MustParse(longTemplateSample), payload)
 	tree.MustInsert(MustParse("/"), payload)
 
-	t.Run("StaticMatch", func(t *testing.T) {
-		handler := tree.Match(params, staticSample)
+	t.Run("match static", func(t *testing.T) {
+		params := datastruct.NewKeyValue()
+		handler := tree.Match(staticSample, params)
 		require.NotNil(t, handler)
 	})
 
-	t.Run("UnnamedMatch", func(t *testing.T) {
-		handler := tree.Match(params, unnamedSample)
-		require.Empty(t, params[""])
+	t.Run("unnamed match", func(t *testing.T) {
+		params := datastruct.NewKeyValue()
+		handler := tree.Match(unnamedSample, params)
+		require.Empty(t, params.Values(""))
 		require.NotNil(t, handler)
 	})
 
-	t.Run("ShortTemplateMatch", func(t *testing.T) {
-		handler := tree.Match(params, shortSample)
+	t.Run("short template", func(t *testing.T) {
+		params := datastruct.NewKeyValue()
+		handler := tree.Match(shortSample, params)
 		require.NotNil(t, handler)
-		require.Equal(t, "some-very-long-world", params["world"])
+		require.Equal(t, "some-very-long-world", params.Value("world"))
 	})
 
-	t.Run("MediumTemplateMatch", func(t *testing.T) {
-		handler := tree.Match(params, mediumSample)
+	t.Run("medium template", func(t *testing.T) {
+		params := datastruct.NewKeyValue()
+		handler := tree.Match(mediumSample, params)
 		require.NotNil(t, handler)
-		require.Equal(t, "world-finally-became", params["world"])
-		require.Equal(t, "good-as-fuck", params["good"])
-		require.Equal(t, "ok-let-it-be", params["ok"])
+		require.Equal(t, "world-finally-became", params.Value("world"))
+		require.Equal(t, "good-as-fuck", params.Value("good"))
+		require.Equal(t, "ok-let-it-be", params.Value("ok"))
 	})
 
-	t.Run("Root", func(t *testing.T) {
-		handler := tree.Match(params, "/")
+	t.Run("root", func(t *testing.T) {
+		params := datastruct.NewKeyValue()
+		handler := tree.Match("/", params)
 		require.NotNil(t, handler)
 	})
 }
 
 func TestNode_Match_Negative(t *testing.T) {
 	tree := NewTree()
-	params := make(Params)
-
 	payload := Payload{
 		MethodsMap: types.MethodsMap{},
 	}
@@ -64,18 +82,17 @@ func TestNode_Match_Negative(t *testing.T) {
 	tree.MustInsert(MustParse(mediumTemplateSample), payload)
 	tree.MustInsert(MustParse(longTemplateSample), payload)
 
-	t.Run("EmptyDynamicPath_WithTrailingSlash", func(t *testing.T) {
-		handler := tree.Match(params, "/hello/")
+	t.Run("static prefix", func(t *testing.T) {
+		params := datastruct.NewKeyValue()
+		handler := tree.Match("/hello", params)
+		require.Nil(t, handler)
+		handler = tree.Match("/hello/", params)
 		require.Nil(t, handler)
 	})
 
-	t.Run("EmptyDynamicPath_NoTrailingSlash", func(t *testing.T) {
-		handler := tree.Match(params, "/hello")
-		require.Nil(t, handler)
-	})
-
-	t.Run("EmptyDynamicPath_BetweenStatic", func(t *testing.T) {
-		handler := tree.Match(params, "/hello//very/good/ok")
+	t.Run("empty dynamic section", func(t *testing.T) {
+		params := datastruct.NewKeyValue()
+		handler := tree.Match("/hello//very/good/ok", params)
 		require.Nil(t, handler)
 	})
 }

@@ -12,7 +12,7 @@ import (
 const addr = ":8080"
 
 func MyDynamicHandler(request *http.Request) *http.Response {
-	worldName := request.Params["world-name"]
+	worldName := request.Params.Value("world-name")
 
 	return request.Respond().String("your world-name is " + worldName)
 }

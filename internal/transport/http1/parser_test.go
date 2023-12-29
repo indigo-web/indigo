@@ -3,6 +3,7 @@ package http1
 import (
 	"fmt"
 	"github.com/indigo-web/indigo/http/coding"
+	"github.com/indigo-web/indigo/internal/datastruct"
 	"github.com/indigo-web/indigo/internal/requestgen"
 	"github.com/indigo-web/indigo/internal/transport"
 	"strings"
@@ -43,8 +44,8 @@ func getParser() (*Parser, *http.Request) {
 	body := NewBody(
 		dummy.NewNopClient(), chunkedParser, coding.NewManager(0))
 	request := http.NewRequest(
-		headers.NewHeaders(), query.Query{}, http.NewResponse(),
-		dummy.NewNopConn(), body, nil, false,
+		headers.New(), new(query.Query), http.NewResponse(),
+		dummy.NewNopConn(), body, datastruct.NewKeyValue(),
 	)
 
 	return NewParser(
@@ -64,12 +65,10 @@ func compareRequests(t *testing.T, wanted wantedRequest, actual *http.Request) {
 	require.Equal(t, wanted.Path, actual.Path)
 	require.Equal(t, wanted.Protocol, actual.Proto)
 
-	hdrs := wanted.Headers.Unwrap()
+	keys := wanted.Headers.Keys()
 
-	for i := 0; i < len(hdrs); i += 2 {
-		actualValues := actual.Headers.Values(hdrs[i])
-		require.NotNil(t, actualValues)
-		require.Equal(t, wanted.Headers.Values(hdrs[i]), actualValues)
+	for _, key := range keys {
+		require.Equal(t, wanted.Headers.Values(key), actual.Headers.Values(key))
 	}
 }
 
@@ -124,7 +123,7 @@ func TestHttpRequestsParser_Parse_GET(t *testing.T) {
 			Method:   method.GET,
 			Path:     "/",
 			Protocol: proto.HTTP11,
-			Headers:  headers.NewHeaders(),
+			Headers:  headers.New(),
 		}
 
 		compareRequests(t, wanted, request)
@@ -152,7 +151,7 @@ func TestHttpRequestsParser_Parse_GET(t *testing.T) {
 			Method:   method.GET,
 			Path:     "/",
 			Protocol: proto.HTTP11,
-			Headers: headers.FromMap(map[string][]string{
+			Headers: headers.NewFromMap(map[string][]string{
 				"hello": {"World!"},
 			}),
 		}
@@ -172,7 +171,7 @@ func TestHttpRequestsParser_Parse_GET(t *testing.T) {
 			Method:   method.GET,
 			Path:     "/",
 			Protocol: proto.HTTP11,
-			Headers: headers.FromMap(map[string][]string{
+			Headers: headers.NewFromMap(map[string][]string{
 				"accept": {"one,two", "three"},
 			}),
 		}
@@ -192,7 +191,7 @@ func TestHttpRequestsParser_Parse_GET(t *testing.T) {
 			Method:   method.GET,
 			Path:     "/",
 			Protocol: proto.HTTP11,
-			Headers: headers.FromMap(map[string][]string{
+			Headers: headers.NewFromMap(map[string][]string{
 				"hello": {"World!"},
 			}),
 		}
@@ -226,7 +225,7 @@ func TestHttpRequestsParser_Parse_GET(t *testing.T) {
 				Method:   method.GET,
 				Path:     tc.WantPath,
 				Protocol: proto.HTTP11,
-				Headers:  headers.NewHeaders(),
+				Headers:  headers.New(),
 			}
 
 			compareRequests(t, wanted, request)
@@ -248,7 +247,7 @@ func TestHttpRequestsParser_Parse_GET(t *testing.T) {
 				Method:   method.GET,
 				Path:     "/",
 				Protocol: proto.HTTP11,
-				Headers: headers.FromMap(map[string][]string{
+				Headers: headers.NewFromMap(map[string][]string{
 					"hello": {"World!"},
 				}),
 			}
@@ -269,7 +268,7 @@ func TestHttpRequestsParser_Parse_GET(t *testing.T) {
 			Method:   method.GET,
 			Path:     "http://www.w3.org/pub/WWW/TheProject.html",
 			Protocol: proto.HTTP11,
-			Headers:  headers.NewHeaders(),
+			Headers:  headers.New(),
 		}
 
 		compareRequests(t, wanted, request)
@@ -312,7 +311,7 @@ func TestHttpRequestsParser_POST(t *testing.T) {
 				Method:   method.POST,
 				Path:     "/",
 				Protocol: proto.HTTP11,
-				Headers: headers.FromMap(map[string][]string{
+				Headers: headers.NewFromMap(map[string][]string{
 					"hello": {"World!"},
 				}),
 			}
@@ -333,7 +332,7 @@ func TestHttpRequestsParser_POST(t *testing.T) {
 			Method:   method.GET,
 			Path:     "/path",
 			Protocol: proto.HTTP11,
-			Headers:  headers.NewHeaders(),
+			Headers:  headers.New(),
 		}
 
 		compareRequests(t, wanted, request)
