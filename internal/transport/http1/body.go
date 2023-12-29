@@ -23,6 +23,7 @@ type Body struct {
 	manager       coding.Manager
 	unreader      unreader.Unreader
 	fullBodyBuff  []byte
+	bodyRead      bool
 }
 
 func NewBody(
@@ -41,6 +42,7 @@ func (b *Body) Init(request *http.Request) {
 	if request.Encoding.Chunked {
 		b.bodyBytesLeft = chunkedMode
 	}
+	b.bodyRead = false
 }
 
 func (b *Body) Read(into []byte) (n int, err error) {
@@ -58,6 +60,10 @@ func (b *Body) String() (string, error) {
 }
 
 func (b *Body) Bytes() ([]byte, error) {
+	if b.bodyRead {
+		return b.fullBodyBuff, nil
+	}
+
 	if b.bodyBytesLeft != chunkedMode && cap(b.fullBodyBuff) < b.bodyBytesLeft {
 		b.fullBodyBuff = make([]byte, 0, b.bodyBytesLeft)
 	}
@@ -97,6 +103,7 @@ func (b *Body) Callback(cb http.OnBodyCallback) error {
 func (b *Body) Retrieve() ([]byte, error) {
 	return b.unreader.PendingOr(func() ([]byte, error) {
 		if b.bodyBytesLeft == 0 {
+			b.bodyRead = true
 			return nil, io.EOF
 		}
 

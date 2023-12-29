@@ -79,6 +79,10 @@ func TestBodyReader_Plain(t *testing.T) {
 		actualBody, err := body.String()
 		require.NoError(t, err)
 		require.Equal(t, bodyString, actualBody)
+
+		actualBody, err = body.String()
+		require.NoError(t, err)
+		require.Equal(t, bodyString, actualBody)
 	})
 
 	t.Run("a lot of data", func(t *testing.T) {
