@@ -19,12 +19,13 @@ func New(
 	keyBuff, valBuff, startLineBuff buffer.Buffer,
 	valuesPool pool.ObjectPool[[]string],
 	headersSettings settings.Headers,
-	respBuff, respFileBuff []byte,
+	respBuff []byte,
+	respFileBuffSize int,
 	defaultHeaders map[string]string,
 ) *Transport {
 	return &Transport{
 		parser: NewParser(request, keyBuff, valBuff, startLineBuff, valuesPool, headersSettings),
-		dumper: NewDumper(respBuff, respFileBuff, defaultHeaders),
+		dumper: NewDumper(respBuff, respFileBuffSize, defaultHeaders),
 	}
 }
 

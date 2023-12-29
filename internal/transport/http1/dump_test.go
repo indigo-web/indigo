@@ -21,14 +21,13 @@ import (
 )
 
 func getDumper(defaultHeaders map[string]string) *Dumper {
-	return NewDumper(make([]byte, 0, 1024), nil, defaultHeaders)
+	return NewDumper(make([]byte, 0, 1024), 1, defaultHeaders)
 }
 
 func newRequest() *http.Request {
 	return http.NewRequest(
-		headers.NewHeaders(), query.Query{}, http.NewResponse(), dummy.NewNopConn(),
+		headers.New(), new(query.Query), http.NewResponse(), dummy.NewNopConn(),
 		NewBody(dummy.NewNopClient(), nil, coding.NewManager(0)), nil,
-		false,
 	)
 }
 

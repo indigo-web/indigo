@@ -38,20 +38,20 @@ func BenchmarkDumper(b *testing.B) {
 		"Lorem":            "ipsum, doremi",
 	}
 
-	hdrs := headers.NewHeaders()
+	hdrs := headers.New()
 	response := http.NewResponse()
 	body := NewBody(
 		dummy.NewNopClient(), nil, coding.NewManager(0),
 	)
 	request := http.NewRequest(
 		hdrs, query.NewQuery(nil), http.NewResponse(), dummy.NewNopConn(),
-		body, nil, false,
+		body, nil,
 	)
 	client := NopClientWriter{}
 
 	b.Run("no body no def headers", func(b *testing.B) {
 		buff := make([]byte, 0, 1024)
-		dumper := NewDumper(buff, nil, nil)
+		dumper := NewDumper(buff, 0, nil)
 		respSize, err := estimateResponseSize(dumper, request, response)
 		require.NoError(b, err)
 		b.SetBytes(respSize)
@@ -66,7 +66,7 @@ func BenchmarkDumper(b *testing.B) {
 	b.Run("with 4kb body", func(b *testing.B) {
 		response := http.NewResponse().String(strings.Repeat("a", 4096))
 		buff := make([]byte, 0, 8192)
-		dumper := NewDumper(buff, nil, nil)
+		dumper := NewDumper(buff, 0, nil)
 		respSize, err := estimateResponseSize(dumper, request, response)
 		require.NoError(b, err)
 		b.SetBytes(respSize)
@@ -80,7 +80,7 @@ func BenchmarkDumper(b *testing.B) {
 
 	b.Run("no body 1 def header", func(b *testing.B) {
 		buff := make([]byte, 0, 1024)
-		dumper := NewDumper(buff, nil, defaultHeadersSmall)
+		dumper := NewDumper(buff, 0, defaultHeadersSmall)
 		respSize, err := estimateResponseSize(dumper, request, response)
 		require.NoError(b, err)
 		b.SetBytes(respSize)
@@ -94,7 +94,7 @@ func BenchmarkDumper(b *testing.B) {
 
 	b.Run("no body 3 def headers", func(b *testing.B) {
 		buff := make([]byte, 0, 1024)
-		dumper := NewDumper(buff, nil, defaultHeadersMedium)
+		dumper := NewDumper(buff, 0, defaultHeadersMedium)
 		respSize, err := estimateResponseSize(dumper, request, response)
 		require.NoError(b, err)
 		b.SetBytes(respSize)
@@ -108,7 +108,7 @@ func BenchmarkDumper(b *testing.B) {
 
 	b.Run("no body 8 def headers", func(b *testing.B) {
 		buff := make([]byte, 0, 1024)
-		dumper := NewDumper(buff, nil, defaultHeadersBig)
+		dumper := NewDumper(buff, 0, defaultHeadersBig)
 		respSize, err := estimateResponseSize(dumper, request, response)
 		require.NoError(b, err)
 		b.SetBytes(respSize)
@@ -123,7 +123,7 @@ func BenchmarkDumper(b *testing.B) {
 	b.Run("with pre-dump", func(b *testing.B) {
 		preResp := http.NewResponse().Code(status.SwitchingProtocols)
 		buff := make([]byte, 0, 128)
-		dumper := NewDumper(buff, nil, nil)
+		dumper := NewDumper(buff, 0, nil)
 		respSize, err := estimatePreDumpSize(dumper, request, preResp, response)
 		require.NoError(b, err)
 		b.SetBytes(respSize)
