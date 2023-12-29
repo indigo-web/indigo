@@ -2,24 +2,24 @@ package query
 
 import (
 	"errors"
-	"github.com/indigo-web/indigo/http/headers"
+	"github.com/indigo-web/indigo/internal/datastruct"
 
-	"github.com/indigo-web/indigo/internal/queryparser"
+	"github.com/indigo-web/indigo/internal/query"
 )
 
-var ErrNoSuchKey = errors.New("no such key")
+var ErrNoSuchKey = errors.New("no entry by the key")
 
-// Query is optional, it may contain rawQuery, but it will not be parsed until
-// needed
+// Query is a lazy structure for accessing URI parameters. Its laziness is defined
+// by the fact that parameters won't be parsed until requested
 type Query struct {
 	parsed bool
-	query  *headers.Headers
+	params *datastruct.KeyValue
 	raw    []byte
 }
 
-func NewQuery(query *headers.Headers) Query {
-	return Query{
-		query: query,
+func NewQuery(underlying *datastruct.KeyValue) *Query {
+	return &Query{
+		params: underlying,
 	}
 }
 
@@ -30,10 +30,9 @@ func (q *Query) Set(raw []byte) {
 	q.raw = raw
 
 	if q.parsed {
-		q.query.Clear()
+		q.parsed = false
+		q.params.Clear()
 	}
-
-	q.parsed = false
 }
 
 // Get is responsible for getting a key from query. In case this
@@ -43,7 +42,7 @@ func (q *Query) Set(raw []byte) {
 // ErrBadQuery will be returned
 func (q *Query) Get(key string) (value string, err error) {
 	if !q.parsed {
-		err = queryparser.Parse(q.raw, q.query)
+		err = query.Parse(q.raw, q.params)
 		if err != nil {
 			return "", err
 		}
@@ -51,7 +50,7 @@ func (q *Query) Get(key string) (value string, err error) {
 		q.parsed = true
 	}
 
-	value, found := q.query.Get(key)
+	value, found := q.params.Get(key)
 	if !found {
 		err = ErrNoSuchKey
 	}
