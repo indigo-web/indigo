@@ -30,17 +30,28 @@ var zeroContext = context.Background()
 
 // Request represents HTTP request
 type Request struct {
+	// Method represents the request's method
 	Method method.Method
-	Path   string
-	// Query is a key-value part of the Path
-	Query query.Query
+	// Path represents decoded request URI
+	Path string
+	// Query are request's URI parameters
 	Query *query.Query
 	// Params are dynamic segment values
 	Params *Params
-	Headers       *headers.Headers
-	Encoding      headers.Encoding
+	// Proto is the protocol, which was used to make the request
+	Proto proto.Proto
+	// Headers are request headers. They are stored non-normalized, however lookup is
+	// case-insensitive
+	Headers *headers.Headers
+	// Encoding holds an information about encoding, that was used to make the request
+	Encoding headers.Encoding
+	// ContentLength obtains the value from Content-Length header. It holds the value of 0
+	// if isn't presented.
+	//
+	// NOTE: if any of transfer-encodings were applied, you MUST NOT look at this value
 	ContentLength int
-	ContentType   string
+	// ContentType obtains Content-Type header value
+	ContentType string
 	// Upgrade is the protocol token, which is set by default to proto.Unknown. In
 	// case it is anything else, then Upgrade header was received
 	Upgrade proto.Proto
@@ -54,12 +65,12 @@ type Request struct {
 	// Env is a set of fixed variables passed by core. They are passed separately from Request.Ctx
 	// in order to not only distinguish user-defined values in ctx from those from core, but also
 	// to gain performance, as accessing the struct is much faster than looking up in context.Context
-	Env            Environment
-	Body           Body
-	conn           net.Conn
-	wasHijacked    bool
-	clearParamsMap bool
-	response       *Response
+	Env Environment
+	// Body accesses the request's body
+	Body        Body
+	conn        net.Conn
+	wasHijacked bool
+	response    *Response
 }
 
 // NewRequest returns a new instance of request object and body gateway
@@ -68,20 +79,19 @@ type Request struct {
 // is invalid, we need to render a response using request method, but appears
 // that default method is a null-value (proto.Unknown)
 func NewRequest(
-	hdrs *headers.Headers, query query.Query, response *Response,
-	conn net.Conn, body Body, paramsMap Params, disableParamsMapClearing bool,
+	hdrs *headers.Headers, query *query.Query, response *Response,
+	conn net.Conn, body Body, params *Params,
 ) *Request {
 	request := &Request{
-		Query:          query,
-		Params:         paramsMap,
-		Proto:          proto.HTTP11,
-		Headers:        hdrs,
-		Remote:         conn.RemoteAddr(),
-		Ctx:            zeroContext,
-		Body:           body,
-		conn:           conn,
-		clearParamsMap: !disableParamsMapClearing,
-		response:       response,
+		Query:    query,
+		Params:   params,
+		Proto:    proto.HTTP11,
+		Headers:  hdrs,
+		Remote:   conn.RemoteAddr(),
+		Ctx:      zeroContext,
+		Body:     body,
+		conn:     conn,
+		response: response,
 	}
 
 	return request
@@ -163,10 +173,14 @@ func Respond(request *Request) *Response {
 	return request.response
 }
 
-func Error(request *Request, err error) *Response {
-	return request.Respond().Error(err)
-}
-
 func Code(request *Request, code status.Code) *Response {
 	return request.Respond().Code(code)
+}
+
+func String(request *Request, str string) *Response {
+	return request.Respond().String(str)
+}
+
+func Error(request *Request, err error) *Response {
+	return request.Respond().Error(err)
 }
