@@ -2,7 +2,10 @@ package headers
 
 import "github.com/indigo-web/indigo/internal/datastruct"
 
-type Headers = datastruct.KeyValue
+type (
+	Header  = datastruct.Pair
+	Headers = datastruct.KeyValue
+)
 
 func NewPrealloc(n int) *Headers {
 	return datastruct.NewKeyValuePreAlloc(n)
