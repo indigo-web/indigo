@@ -20,31 +20,8 @@ type (
 		Default, Maximal int
 	}
 
-	URLParams struct {
-		// This option allows user to disable the automatic path params map clearing.
-		// May be useful in cases where params keys are being accessed directly only,
-		// and nothing tries to get all the map values
-		DisableMapClear bool
-	}
-
 	Query struct {
-		// MaxLength is responsible for a limit of the query length
-		MaxLength int
-		// DefaultMapSize is responsible for an initial capacity of query entries map.
-		// There is no up limit because:
-		//   Maximal number of entries equals to 65536 (math.MaxUint16) divided by
-		//   3 (minimal length of query entry) that equals to 21,845.
-		//   Worst case: sizeof(int) == 64 and sizeof(unsafe.Pointer) == 64. Then
-		//   slice type takes 16 bytes
-		//   In that case, we can calculate how much memory AT MOST will be used.
-		//   24 bytes (slice type - cap, len and pointer 8 bytes each) + 1 byte
-		//   (an array of a single char in best case) + 16 bytes (string type - len
-		//   and pointer) + 1 byte (an array of single char in best case)
-		//   42 bytes in total for each pair, 917490 bytes in total, that is 896 kilobytes
-		//   that is 0.87 megabytes. IMHO that is not that much to care about. In case it
-		//   is - somebody will open an issue, or even better, implement the limit by himself
-		//   (hope he is lucky enough to find out how to handle with my hand-made DI)
-		DefaultMapSize int
+		PreAlloc int
 	}
 )
 
@@ -77,7 +54,6 @@ type (
 		// until client disconnect
 		BufferSize URLBufferSize
 		Query      Query
-		Params     URLParams
 	}
 
 	TCP struct {
@@ -89,21 +65,22 @@ type (
 	}
 
 	Body struct {
-		// MaxSize is responsible for a maximal body size in case it is being transferred
-		// using ordinary Content-Length header, otherwise (e.g. chunked TE) this limit,
-		// unfortunately, doesn't work
-		MaxSize int64
+		// MaxSize describes the maximal size of a body, that can be processed. 0 will discard
+		// any request with body (each call to request's body will result in status.ErrBodyTooLarge)
+		MaxSize uint
 		// MaxChunkSize is responsible for a maximal size of a single chunk being transferred
 		// via chunked TE
 		MaxChunkSize int64
-		// DecodedBufferSize is a size of a buffer, used to store decompressed request body
-		DecodedBufferSize int64
+		// DecodingBufferSize is a size of a buffer, used to store decoded request's body
+		DecodingBufferSize int64
 	}
 
 	HTTP struct {
 		// ResponseBuffSize is responsible for a response buffer that is being allocated when
 		// client connects and is used for rendering the response into it
-		ResponseBuffSize int64
+		ResponseBuffSize int
+		// FileBuffSize defines the size of the read buffer when reading a file
+		FileBuffSize int
 	}
 
 	HTTPS struct {
@@ -140,27 +117,29 @@ func Default() Settings {
 				Default: 10,
 				Maximal: 50,
 			},
-			MaxKeyLength:   100,      // 100 bytes
+			MaxKeyLength:   100,      // basically 100 bytes
 			MaxValueLength: 8 * 1024, // 8 kilobytes (just like nginx)
 			ValueSpace: HeadersValuesSpace{
 				// for simple requests without many heavy-weighted headers must be enough
 				// to avoid a relatively big amount of re-allocations
-				Default: 2 * 1024,  // 2kb
-				Maximal: 64 * 1024, // 64kb as a limit of amount of memory for header values storing
+				Default: 1 * 1024, // allocate 1kb buffer by default
+				Maximal: 8 * 1024, // however allow at most 8kb of headers
 			},
-			MaxEncodingTokens: 10,
+			// this may be an issue, if there are more custom encodings than this. However,
+			// such cases are considered to be too rare
+			MaxEncodingTokens: 15,
 		},
 		URL: URL{
 			BufferSize: URLBufferSize{
-				Default: 4 * 1024, // 4kb
+				// allocate 2kb buffer by default for storing URI (including query and protocol)
+				Default: 2 * 1024,
+				// allow at most 64kb of URI, including query and protocol
 				Maximal: math.MaxUint16,
+				// NOTE: setting the maximal value too small (e.g. smaller than 10-15 bytes) may cause
+				// strange and ambiguous HTTP errors
 			},
 			Query: Query{
-				MaxLength:      math.MaxUint16,
-				DefaultMapSize: 20,
-			},
-			Params: URLParams{
-				DisableMapClear: false,
+				PreAlloc: 10,
 			},
 		},
 		TCP: TCP{
@@ -168,14 +147,15 @@ func Default() Settings {
 			ReadTimeout:    90 * time.Second,
 		},
 		Body: Body{
-			MaxSize:      math.MaxUint32,
-			MaxChunkSize: math.MaxUint32,
+			MaxSize:      512 * 1024 * 1024, // 512 megabytes
+			MaxChunkSize: 128 * 1024,        // 128 kilobytes
 			// 8 kilobytes is by default twice more than TCPs read buffer, so must
 			// be enough to avoid multiple reads per single TCP chunk
-			DecodedBufferSize: 8 * 1024,
+			DecodingBufferSize: 8 * 1024,
 		},
 		HTTP: HTTP{
 			ResponseBuffSize: 1024,
+			FileBuffSize:     64 * 1024, // 64kb read buffer for files is pretty much sufficient
 		},
 		HTTPS: HTTPS{
 			Cert: "fullchain.pem",
@@ -209,13 +189,7 @@ func Fill(src Settings) (modified Settings) {
 				Maximal: valueOr(src.URL.BufferSize.Maximal, defaults.URL.BufferSize.Maximal),
 			},
 			Query: Query{
-				MaxLength:      valueOr(src.URL.Query.MaxLength, defaults.URL.Query.MaxLength),
-				DefaultMapSize: valueOr(src.URL.Query.DefaultMapSize, defaults.URL.Query.DefaultMapSize),
-			},
-			Params: URLParams{
-				// as we can't determine, whether set value is a zero-value or set on purpose, just leave
-				// it as it is. It's anyway equal to zero-value by default
-				DisableMapClear: src.URL.Params.DisableMapClear,
+				PreAlloc: valueOr(src.URL.Query.PreAlloc, defaults.URL.Query.PreAlloc),
 			},
 		},
 		TCP: TCP{
@@ -223,12 +197,13 @@ func Fill(src Settings) (modified Settings) {
 			ReadTimeout:    valueOr(src.TCP.ReadTimeout, defaults.TCP.ReadTimeout),
 		},
 		Body: Body{
-			MaxSize:           valueOr(src.Body.MaxSize, defaults.Body.MaxSize),
-			MaxChunkSize:      valueOr(src.Body.MaxChunkSize, defaults.Body.MaxChunkSize),
-			DecodedBufferSize: valueOr(src.Body.DecodedBufferSize, defaults.Body.DecodedBufferSize),
+			MaxSize:            valueOr(src.Body.MaxSize, defaults.Body.MaxSize),
+			MaxChunkSize:       valueOr(src.Body.MaxChunkSize, defaults.Body.MaxChunkSize),
+			DecodingBufferSize: valueOr(src.Body.DecodingBufferSize, defaults.Body.DecodingBufferSize),
 		},
 		HTTP: HTTP{
 			ResponseBuffSize: valueOr(src.HTTP.ResponseBuffSize, defaults.HTTP.ResponseBuffSize),
+			FileBuffSize:     valueOr(src.HTTP.FileBuffSize, defaults.HTTP.FileBuffSize),
 		},
 		HTTPS: HTTPS{
 			// Addr is either defined or not. Default value - empty string - disables HTTPS
