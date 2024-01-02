@@ -1,4 +1,4 @@
-package headers
+package http
 
 type Encoding struct {
 	// Transfer represents Transfer-Encoding header value, split by comma
