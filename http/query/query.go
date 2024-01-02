@@ -9,11 +9,13 @@ import (
 
 var ErrNoSuchKey = errors.New("no entry by the key")
 
+type Params = datastruct.KeyValue
+
 // Query is a lazy structure for accessing URI parameters. Its laziness is defined
 // by the fact that parameters won't be parsed until requested
 type Query struct {
 	parsed bool
-	params *datastruct.KeyValue
+	params *Params
 	raw    []byte
 }
 
@@ -41,13 +43,8 @@ func (q *Query) Set(raw []byte) {
 // (or ErrNoSuchKey instead). In case of invalid query bytearray,
 // ErrBadQuery will be returned
 func (q *Query) Get(key string) (value string, err error) {
-	if !q.parsed {
-		err = query.Parse(q.raw, q.params)
-		if err != nil {
-			return "", err
-		}
-
-		q.parsed = true
+	if err = q.parse(); err != nil {
+		return "", err
 	}
 
 	value, found := q.params.Get(key)
@@ -58,7 +55,22 @@ func (q *Query) Get(key string) (value string, err error) {
 	return value, err
 }
 
+// Unwrap returns all query parameters. If error occurred, nil parameters will be returned
+func (q *Query) Unwrap() (*Params, error) {
+	return q.params, q.parse()
+}
+
 // Raw just returns a raw value of query as it is
 func (q *Query) Raw() []byte {
 	return q.raw
+}
+
+func (q *Query) parse() error {
+	if q.parsed {
+		return nil
+	}
+
+	q.parsed = true
+
+	return query.Parse(q.raw, q.params)
 }
