@@ -11,6 +11,7 @@ import (
 	"github.com/indigo-web/utils/strcomp"
 	"github.com/indigo-web/utils/uf"
 	"io"
+	"log"
 	"strconv"
 )
 
@@ -20,19 +21,34 @@ const (
 	contentLength    = "Content-Length: "
 )
 
+// minimalFileBuffSize defines the minimal size of the file buffer. In case it's less
+// it'll be set to this value and debug log will be printed
+const minimalFileBuffSize = 16
+
 var chunkedFinalizer = []byte("0\r\n\r\n")
 
 type Dumper struct {
-	buff           []byte
+	buff []byte
+	// fileBuff isn't allocated until needed in order to save memory in cases,
+	// where no files are being sent
 	fileBuff       []byte
+	fileBuffSize   int
 	defaultHeaders defaultHeaders
-	buffOffset     int
 }
 
-func NewDumper(buff, fileBuff []byte, defHdrs map[string]string) *Dumper {
+func NewDumper(buff []byte, fileBuffSize int, defHdrs map[string]string) *Dumper {
+	if fileBuffSize < minimalFileBuffSize {
+		log.Printf("misconfiguration: file buffer size (Settings.HTTP.FileBuffSize) is set to %d, "+
+			"however minimal possible value is %d. Setting it hard to %d\n",
+			fileBuffSize, minimalFileBuffSize, minimalFileBuffSize,
+		)
+
+		fileBuffSize = minimalFileBuffSize
+	}
+
 	return &Dumper{
 		buff:           buff[:0],
-		fileBuff:       fileBuff,
+		fileBuffSize:   fileBuffSize,
 		defaultHeaders: processDefaultHeaders(defHdrs),
 	}
 }
@@ -150,11 +166,7 @@ func (d *Dumper) sendAttachment(
 	}
 
 	if len(d.fileBuff) == 0 {
-		// write by blocks 64kb each. Not really efficient, but in close future
-		// file distributors will be implemented, so files uploading capabilities
-		// will be extended
-		const fileBuffSize = 128 /* kilobytes */ * 1024 /* bytes */
-		d.fileBuff = make([]byte, fileBuffSize)
+		d.fileBuff = make([]byte, d.fileBuffSize)
 	}
 
 	if fields.Attachment.Size() > 0 {
