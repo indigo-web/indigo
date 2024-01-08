@@ -3,54 +3,47 @@ package http1
 import (
 	"github.com/indigo-web/chunkedbody"
 	"github.com/indigo-web/indigo/http"
-	"github.com/indigo-web/indigo/http/coding"
-	"github.com/indigo-web/indigo/http/headers"
+	"github.com/indigo-web/indigo/http/status"
 	"github.com/indigo-web/indigo/internal/server/tcp"
+	"github.com/indigo-web/indigo/internal/stash"
+	"github.com/indigo-web/indigo/settings"
 	"github.com/indigo-web/utils/uf"
-	"github.com/indigo-web/utils/unreader"
 	"io"
+	"math"
 )
 
 var _ http.Body = &Body{}
 
-const chunkedMode = -1
-
 type Body struct {
-	client        tcp.Client
-	bodyBytesLeft int
-	chunkedParser *chunkedbody.Parser
-	encoding      headers.Encoding
-	manager       coding.Manager
-	unreader      unreader.Unreader
+	*stash.Reader
+	plain         plainBodyReader
+	chunked       chunkedBodyReader
+	isChunked     bool
+	contentLength int
 	fullBodyBuff  []byte
-	bodyRead      bool
+	eof           bool
 }
 
 func NewBody(
-	client tcp.Client, chunkedParser *chunkedbody.Parser, manager coding.Manager,
+	client tcp.Client, chunkedParser *chunkedbody.Parser, s settings.Body,
 ) *Body {
 	return &Body{
-		client:        client,
-		chunkedParser: chunkedParser,
-		manager:       manager,
+		Reader:  stash.New(),
+		plain:   newPlainBodyReader(client, s.MaxSize),
+		chunked: newChunkedBodyReader(client, s.MaxSize, chunkedParser),
 	}
 }
 
 func (b *Body) Init(request *http.Request) {
-	b.encoding = request.Encoding
-	b.bodyBytesLeft = request.ContentLength
-	if request.Encoding.Chunked {
-		b.bodyBytesLeft = chunkedMode
+	b.isChunked = request.Encoding.Chunked
+	if b.isChunked {
+		b.chunked.init(request)
+	} else {
+		b.plain.init(request)
 	}
-	b.bodyRead = false
-}
 
-func (b *Body) Read(into []byte) (n int, err error) {
-	data, err := b.Retrieve()
-	n = copy(into, data)
-	b.unreader.Unread(data[n:])
-
-	return n, err
+	b.eof = false
+	b.Reader.Reset(b.Retrieve)
 }
 
 func (b *Body) String() (string, error) {
@@ -60,12 +53,13 @@ func (b *Body) String() (string, error) {
 }
 
 func (b *Body) Bytes() ([]byte, error) {
-	if b.bodyRead {
+	if b.eof {
 		return b.fullBodyBuff, nil
 	}
 
-	if b.bodyBytesLeft != chunkedMode && cap(b.fullBodyBuff) < b.bodyBytesLeft {
-		b.fullBodyBuff = make([]byte, 0, b.bodyBytesLeft)
+	// FIXME: this barely works with applied transfer-encodings
+	if !b.isChunked && cap(b.fullBodyBuff) < b.contentLength {
+		b.fullBodyBuff = make([]byte, 0, b.contentLength)
 	}
 
 	b.fullBodyBuff = b.fullBodyBuff[:0]
@@ -101,79 +95,130 @@ func (b *Body) Callback(cb http.OnBodyCallback) error {
 }
 
 func (b *Body) Retrieve() ([]byte, error) {
-	return b.unreader.PendingOr(func() ([]byte, error) {
-		if b.bodyBytesLeft == 0 {
-			b.bodyRead = true
-			return nil, io.EOF
-		}
+	if b.eof {
+		return nil, io.EOF
+	}
 
-		data, err := b.client.Read()
-		if err != nil {
-			return nil, err
-		}
+	var (
+		piece []byte
+		err   error
+	)
 
-		if b.encoding.Chunked {
-			return b.chunkedBody(data)
-		}
+	if b.isChunked {
+		piece, err = b.chunked.read()
+	} else {
+		piece, err = b.plain.read()
+	}
 
-		return b.plainBody(data)
-	})
+	b.checkEOF(err)
+
+	return piece, err
 }
 
-func (b *Body) Reset() error {
-	for b.bodyBytesLeft > 0 {
-		_, err := b.Retrieve()
-		// this structural piece of code exists here just because of irrational fear
-		// of unconditional jumps. I could make this prettier by pasting ordinary
-		// error-switch as I used to do in all the samples above (and probably below), but
-		// from the switch I wouldn't be able to break a loop. So instead, we've got this
-		// pasta italiana. Enjoy the world you created.
+func (b *Body) Reset() (err error) {
+	for !b.eof {
+		_, err = b.Retrieve()
 		if err != nil {
-			if err == io.EOF {
-				break
-			}
-
-			return err
+			break
 		}
 	}
 
-	b.unreader.Reset()
-
-	return nil
-}
-
-func (b *Body) plainBody(data []byte) (body []byte, err error) {
-	// TODO: we can avoid one extra indirect function call by returning io.EOF with
-	//  body at the same time
-
-	b.bodyBytesLeft -= len(data)
-	if b.bodyBytesLeft < 0 {
-		b.client.Unread(data[len(data)+b.bodyBytesLeft:])
-		data = data[:len(data)+b.bodyBytesLeft]
-		b.bodyBytesLeft = 0
+	if err == io.EOF {
+		err = nil
 	}
 
-	return data, nil
+	return err
 }
 
-func (b *Body) chunkedBody(data []byte) (body []byte, err error) {
-	for _, token := range b.encoding.Transfer {
-		data, err = b.manager.Decode(token, data)
-		if err != nil {
-			return nil, err
-		}
+func (b *Body) checkEOF(err error) {
+	if err == io.EOF {
+		b.eof = true
+	}
+}
+
+type plainBodyReader struct {
+	client                tcp.Client
+	maxBodyLen, bytesLeft uint
+}
+
+func newPlainBodyReader(client tcp.Client, maxBodyLen uint) plainBodyReader {
+	return plainBodyReader{
+		client:     client,
+		maxBodyLen: maxBodyLen,
+	}
+}
+
+func (p *plainBodyReader) init(request *http.Request) {
+	p.bytesLeft = uint(request.ContentLength)
+}
+
+func (p *plainBodyReader) read() (body []byte, err error) {
+	data, err := p.client.Read()
+	if err != nil {
+		return nil, err
 	}
 
-	chunk, extra, err := b.chunkedParser.Parse(data, b.encoding.HasTrailer)
+	if p.bytesLeft > p.maxBodyLen {
+		return nil, status.ErrBodyTooLarge
+	}
+
+	if dataLen := uint(len(data)); dataLen >= p.bytesLeft {
+		body, data = data[:p.bytesLeft], data[p.bytesLeft:]
+		p.client.Unread(data)
+		p.bytesLeft = 0
+		err = io.EOF
+	} else {
+		p.bytesLeft -= dataLen
+		body = data
+	}
+
+	return body, err
+}
+
+type chunkedBodyReader struct {
+	client               tcp.Client
+	maxBodyLen, received uint
+	encoding             http.Encoding
+	parser               *chunkedbody.Parser
+}
+
+func newChunkedBodyReader(client tcp.Client, maxBodyLen uint, parser *chunkedbody.Parser) chunkedBodyReader {
+	return chunkedBodyReader{
+		client:     client,
+		maxBodyLen: maxBodyLen,
+		parser:     parser,
+	}
+}
+
+func (c *chunkedBodyReader) init(request *http.Request) {
+	c.encoding = request.Encoding
+	c.received = 0
+}
+
+func (c *chunkedBodyReader) read() (body []byte, err error) {
+	data, err := c.client.Read()
+	if err != nil {
+		return nil, err
+	}
+
+	chunk, extra, err := c.parser.Parse(data, c.encoding.HasTrailer)
 	switch err {
-	case nil:
-	case io.EOF:
-		b.bodyBytesLeft = 0
+	case nil, io.EOF:
 	default:
 		return nil, err
 	}
 
-	b.client.Unread(extra)
+	received, overflows := adduint(c.received, uint(len(chunk)))
+	if overflows || received > c.maxBodyLen {
+		return nil, status.ErrBodyTooLarge
+	}
 
-	return chunk, nil
+	c.received = received
+	c.client.Unread(extra)
+
+	return chunk, err
+}
+
+func adduint(x, y uint) (uint, bool) {
+	return x + y, math.MaxUint-x < y
 }

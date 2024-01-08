@@ -1,7 +1,8 @@
 package http1
 
 import (
-	"github.com/indigo-web/indigo/http/coding"
+	"github.com/indigo-web/indigo/http/status"
+	"github.com/indigo-web/indigo/settings"
 	"io"
 	"strconv"
 	"strings"
@@ -19,11 +20,11 @@ import (
 func getRequestWithBody(chunked bool, body ...[]byte) (*http.Request, http.Body) {
 	client := dummy.NewCircularClient(body...)
 	chunkedParser := chunkedbody.NewParser(chunkedbody.DefaultSettings())
-	reqBody := NewBody(client, chunkedParser, coding.NewManager(0))
+	reqBody := NewBody(client, chunkedParser, settings.Default().Body)
 
 	var (
 		contentLength int
-		hdrs          *headers.Headers
+		hdrs          headers.Headers
 	)
 
 	if chunked {
@@ -46,6 +47,7 @@ func getRequestWithBody(chunked bool, body ...[]byte) (*http.Request, http.Body)
 	)
 	request.ContentLength = contentLength
 	request.Encoding.Chunked = chunked
+	reqBody.Init(request)
 
 	return request, reqBody
 }
@@ -53,9 +55,7 @@ func getRequestWithBody(chunked bool, body ...[]byte) (*http.Request, http.Body)
 func TestBodyReader_Plain(t *testing.T) {
 	t.Run("call once", func(t *testing.T) {
 		sample := []byte("Hello, world!")
-		request, body := getRequestWithBody(false, sample)
-		body.Init(request)
-
+		_, body := getRequestWithBody(false, sample)
 		actualBody, err := body.String()
 		require.NoError(t, err)
 		require.Equal(t, string(sample), actualBody)
@@ -73,9 +73,7 @@ func TestBodyReader_Plain(t *testing.T) {
 		}
 		bodyString := ft.Sum(ft.Map(toString, sample))
 
-		request, body := getRequestWithBody(false, sample...)
-		body.Init(request)
-
+		_, body := getRequestWithBody(false, sample...)
 		actualBody, err := body.String()
 		require.NoError(t, err)
 		require.Equal(t, bodyString, actualBody)
@@ -100,20 +98,53 @@ func TestBodyReader_Plain(t *testing.T) {
 		)
 		request.ContentLength = buffSize
 		chunkedParser := chunkedbody.NewParser(chunkedbody.DefaultSettings())
-		body := NewBody(client, chunkedParser, coding.NewManager(0))
+		body := NewBody(client, chunkedParser, settings.Default().Body)
 		body.Init(request)
 
 		data, err := body.Retrieve()
-		require.NoError(t, err)
 		require.Equal(t, first, string(data))
+		require.EqualError(t, err, io.EOF.Error())
 
 		data, err = body.Retrieve()
-		require.EqualError(t, err, io.EOF.Error())
 		require.Empty(t, data)
+		require.EqualError(t, err, io.EOF.Error())
 
 		data, err = client.Read()
 		require.NoError(t, err)
 		require.Equal(t, second, string(data))
+	})
+
+	t.Run("reader", func(t *testing.T) {
+		data := "qwertyuiopasdfghjklzxcvbnm"
+		_, body := getRequestWithBody(false, []byte(data))
+		result := make([]byte, 0, len(data))
+		buff := make([]byte, 1)
+
+		for {
+			n, err := body.Read(buff)
+			result = append(result, buff[:n]...)
+			if err == io.EOF {
+				break
+			}
+
+			require.NoError(t, err)
+		}
+
+		require.Equal(t, data, string(result))
+	})
+
+	t.Run("too big plain body", func(t *testing.T) {
+		data := strings.Repeat("a", 10)
+		request, _ := getRequestWithBody(false, []byte(data))
+		client := dummy.NewCircularClient([]byte(data))
+		chunkedParser := chunkedbody.NewParser(chunkedbody.DefaultSettings())
+		s := settings.Default().Body
+		s.MaxSize = 9
+		body := NewBody(client, chunkedParser, s)
+		body.Init(request)
+
+		_, err := body.Bytes()
+		require.EqualError(t, err, status.ErrBodyTooLarge.Error())
 	})
 }
 
