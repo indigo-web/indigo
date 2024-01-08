@@ -5,6 +5,7 @@ import (
 	"github.com/indigo-web/indigo/http/method"
 	radix2 "github.com/indigo-web/indigo/router/inbuilt/internal/radix"
 	"github.com/indigo-web/indigo/router/inbuilt/internal/types"
+	"github.com/indigo-web/indigo/router/inbuilt/uri"
 	"strings"
 )
 
@@ -20,7 +21,7 @@ func newRegistrar() *registrar {
 }
 
 func (r *registrar) Add(path string, m method.Method, handler Handler) error {
-	path = stripTrailingSlash(path)
+	path = uri.Normalize(path)
 	methodsMap := r.routes[path]
 	if methodsMap == nil {
 		methodsMap = make(map[method.Method]Handler)

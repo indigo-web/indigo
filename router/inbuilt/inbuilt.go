@@ -7,6 +7,7 @@ import (
 	"github.com/indigo-web/indigo/router"
 	"github.com/indigo-web/indigo/router/inbuilt/internal/radix"
 	"github.com/indigo-web/indigo/router/inbuilt/internal/types"
+	"github.com/indigo-web/indigo/router/inbuilt/uri"
 	"sort"
 	"strings"
 )
@@ -166,23 +167,6 @@ func (r *Router) applyErrorHandlersMiddlewares() {
 	for code, handler := range r.errHandlers {
 		r.errHandlers[code] = compose(handler, r.middlewares)
 	}
-}
-
-// stripTrailingSlash just removes a trailing slash of request path in case it is presented.
-// Note: this removes only one trailing slash. In case 2 or more are presented they'll be treated
-// as an ordinary part of the path so won't be stripped
-func stripTrailingSlash(path string) string {
-	if len(path) == 1 {
-		return path
-	}
-
-	for i := len(path) - 1; i > 1; i-- {
-		if path[i] != '/' {
-			return path[:i+1]
-		}
-	}
-
-	return path[0:1]
 }
 
 // getHandler looks up for a handler in the methodsMap. In case request method is HEAD, however
