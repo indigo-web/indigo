@@ -7,7 +7,6 @@ import (
 	"testing"
 
 	"github.com/indigo-web/indigo/http"
-	"github.com/indigo-web/indigo/http/coding"
 	"github.com/indigo-web/indigo/http/headers"
 	"github.com/indigo-web/indigo/http/method"
 	"github.com/indigo-web/indigo/http/query"
@@ -200,7 +199,7 @@ func newServer(client tcp.Client) (*Server, *http.Request, transport.Transport) 
 	s := settings.Default()
 	q := query.NewQuery(datastruct.NewKeyValue())
 	body := http1.NewBody(
-		client, nil, coding.NewManager(0),
+		client, nil, s.Body,
 	)
 	hdrs := headers.NewPrealloc(10)
 	request := http.NewRequest(

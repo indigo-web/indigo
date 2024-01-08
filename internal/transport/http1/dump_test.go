@@ -5,13 +5,13 @@ import (
 	"bytes"
 	"github.com/indigo-web/chunkedbody"
 	"github.com/indigo-web/indigo/http"
-	"github.com/indigo-web/indigo/http/coding"
 	"github.com/indigo-web/indigo/http/headers"
 	"github.com/indigo-web/indigo/http/method"
 	"github.com/indigo-web/indigo/http/proto"
 	"github.com/indigo-web/indigo/http/query"
 	"github.com/indigo-web/indigo/http/status"
 	"github.com/indigo-web/indigo/internal/server/tcp/dummy"
+	"github.com/indigo-web/indigo/settings"
 	"github.com/stretchr/testify/require"
 	"io"
 	"math"
@@ -27,7 +27,7 @@ func getDumper(defaultHeaders map[string]string) *Dumper {
 func newRequest() *http.Request {
 	return http.NewRequest(
 		headers.New(), new(query.Query), http.NewResponse(), dummy.NewNopConn(),
-		NewBody(dummy.NewNopClient(), nil, coding.NewManager(0)), nil,
+		NewBody(dummy.NewNopClient(), nil, settings.Default().Body), nil,
 	)
 }
 

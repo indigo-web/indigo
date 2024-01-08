@@ -3,7 +3,6 @@ package indigo
 import (
 	"github.com/indigo-web/chunkedbody"
 	"github.com/indigo-web/indigo/http"
-	"github.com/indigo-web/indigo/http/coding"
 	"github.com/indigo-web/indigo/http/headers"
 	"github.com/indigo-web/indigo/http/query"
 	"github.com/indigo-web/indigo/internal/datastruct"
@@ -35,17 +34,11 @@ func newKeyValueBuffs(s settings.Headers) (*buffer.Buffer, *buffer.Buffer) {
 	return keyBuff, valBuff
 }
 
-func newBody(client tcp.Client, body settings.Body, codings []coding.Constructor) http.Body {
-	manager := coding.NewManager(body.DecodedBufferSize)
-
-	for _, constructor := range codings {
-		manager.AddCoding(constructor)
-	}
-
+func newBody(client tcp.Client, body settings.Body) http.Body {
 	chunkedBodySettings := chunkedbody.DefaultSettings()
 	chunkedBodySettings.MaxChunkSize = body.MaxChunkSize
 
-	return http1.NewBody(client, chunkedbody.NewParser(chunkedBodySettings), manager)
+	return http1.NewBody(client, chunkedbody.NewParser(chunkedBodySettings), body)
 }
 
 func newRequest(s settings.Settings, conn net.Conn, body http.Body) *http.Request {
@@ -57,7 +50,7 @@ func newRequest(s settings.Settings, conn net.Conn, body http.Body) *http.Reques
 	return http.NewRequest(hdrs, q, response, conn, body, params)
 }
 
-func newTransport(s settings.Settings, req *http.Request, a *Application) transport.Transport {
+func newTransport(s settings.Settings, req *http.Request) transport.Transport {
 	keyBuff, valBuff := newKeyValueBuffs(s.Headers)
 	objPool := pool.NewObjectPool[[]string](s.Headers.MaxValuesObjectPoolSize)
 	startLineBuff := buffer.New(
@@ -73,6 +66,6 @@ func newTransport(s settings.Settings, req *http.Request, a *Application) transp
 		s.Headers,
 		respBuff,
 		s.HTTP.FileBuffSize,
-		a.defaultHeaders,
+		s.Headers.Default,
 	)
 }

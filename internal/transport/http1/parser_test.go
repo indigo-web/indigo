@@ -2,7 +2,6 @@ package http1
 
 import (
 	"fmt"
-	"github.com/indigo-web/indigo/http/coding"
 	"github.com/indigo-web/indigo/internal/datastruct"
 	"github.com/indigo-web/indigo/internal/requestgen"
 	"github.com/indigo-web/indigo/internal/transport"
@@ -42,7 +41,7 @@ func getParser() (*Parser, *http.Request) {
 	chunkedParserSettings.MaxChunkSize = s.Body.MaxChunkSize
 	chunkedParser := chunkedbody.NewParser(chunkedParserSettings)
 	body := NewBody(
-		dummy.NewNopClient(), chunkedParser, coding.NewManager(0))
+		dummy.NewNopClient(), chunkedParser, s.Body)
 	request := http.NewRequest(
 		headers.New(), new(query.Query), http.NewResponse(),
 		dummy.NewNopConn(), body, datastruct.NewKeyValue(),
@@ -54,7 +53,7 @@ func getParser() (*Parser, *http.Request) {
 }
 
 type wantedRequest struct {
-	Headers  *headers.Headers
+	Headers  headers.Headers
 	Path     string
 	Method   method.Method
 	Protocol proto.Proto

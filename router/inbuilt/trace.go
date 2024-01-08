@@ -44,7 +44,7 @@ func requestURI(request *http.Request, buff []byte) []byte {
 	return buff
 }
 
-func requestHeaders(hdrs *headers.Headers, buff []byte) []byte {
+func requestHeaders(hdrs headers.Headers, buff []byte) []byte {
 	for _, pair := range hdrs.Unwrap() {
 		buff = append(append(buff, pair.Key...), httpchars.COLONSP...)
 		buff = append(append(buff, pair.Value...), httpchars.CRLF...)

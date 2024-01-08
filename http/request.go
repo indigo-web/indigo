@@ -42,9 +42,9 @@ type Request struct {
 	Proto proto.Proto
 	// Headers are request headers. They are stored non-normalized, however lookup is
 	// case-insensitive
-	Headers *headers.Headers
+	Headers headers.Headers
 	// Encoding holds an information about encoding, that was used to make the request
-	Encoding headers.Encoding
+	Encoding Encoding
 	// ContentLength obtains the value from Content-Length header. It holds the value of 0
 	// if isn't presented.
 	//
@@ -79,7 +79,7 @@ type Request struct {
 // is invalid, we need to render a response using request method, but appears
 // that default method is a null-value (proto.Unknown)
 func NewRequest(
-	hdrs *headers.Headers, query *query.Query, response *Response,
+	hdrs headers.Headers, query *query.Query, response *Response,
 	conn net.Conn, body Body, params *Params,
 ) *Request {
 	request := &Request{
@@ -158,7 +158,7 @@ func (r *Request) Clear() (err error) {
 
 	r.Headers.Clear()
 	r.ContentLength = 0
-	r.Encoding = headers.Encoding{}
+	r.Encoding = Encoding{}
 	r.ContentType = ""
 	r.Upgrade = proto.Unknown
 	r.Env = Environment{}

@@ -19,7 +19,7 @@ func BenchmarkParse(b *testing.B) {
 	b.Run("100 pairs", benchmark(veryManyPairs, params))
 }
 
-func benchmark(data []byte, params *headers.Headers) func(b *testing.B) {
+func benchmark(data []byte, params headers.Headers) func(b *testing.B) {
 	return func(b *testing.B) {
 		b.SetBytes(int64(len(data)))
 		b.ResetTimer()
