@@ -26,29 +26,18 @@ func (r *Router) Route(
 // RouteError adds an error handler for a corresponding HTTP error code.
 //
 // The following error codes may be registered:
-// - AllErrors (called only if no other error handlers found)
-//
-// - status.BadRequest
-//
-// - status.NotFound
-//
-// - status.MethodNotAllowed
-//
-// - status.RequestEntityTooLarge
-//
-// - status.CloseConnection
-//
-// - status.RequestURITooLong
-//
-// - status.HeaderFieldsTooLarge
-//
-// - status.HTTPVersionNotSupported
-//
-// - status.UnsupportedMediaType
-//
-// - status.NotImplemented
-//
-// - status.RequestTimeout
+//   - AllErrors (called only if no other error handlers found)
+//   - status.BadRequest
+//   - status.NotFound
+//   - status.MethodNotAllowed
+//   - status.RequestEntityTooLarge
+//   - status.CloseConnection
+//   - status.RequestURITooLong
+//   - status.HeaderFieldsTooLarge
+//   - status.HTTPVersionNotSupported
+//   - status.UnsupportedMediaType
+//   - status.NotImplemented
+//   - status.RequestTimeout
 //
 // Note: if handler returned one of error codes above, error handler WON'T be called.
 // Also, global middlewares, applied to the root router, will also be used for error handlers.
