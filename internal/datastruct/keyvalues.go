@@ -49,11 +49,12 @@ func NewKeyValue() *KeyValue {
 }
 
 // Add adds a new pair of key and value
-func (k *KeyValue) Add(key, value string) {
+func (k *KeyValue) Add(key, value string) *KeyValue {
 	k.pairs = append(k.pairs, Pair{
 		Key:   key,
 		Value: value,
 	})
+	return k
 }
 
 // Value returns the first value, corresponding to the key. Otherwise, empty string is returned
@@ -84,7 +85,7 @@ func (k *KeyValue) Get(key string) (string, bool) {
 	return "", false
 }
 
-// Values returns all values by the key.
+// Values returns all values by the key. Returns nil if key doesn't exist.
 //
 // WARNING: calling it twice will override values, returned by the first call. Consider
 // copying the returned slice for safe use
@@ -95,6 +96,10 @@ func (k *KeyValue) Values(key string) (values []string) {
 		if strcomp.EqualFold(pair.Key, key) {
 			k.valuesBuff = append(k.valuesBuff, pair.Value)
 		}
+	}
+
+	if len(k.valuesBuff) == 0 {
+		return nil
 	}
 
 	return k.valuesBuff
@@ -134,6 +139,16 @@ func (k *KeyValue) Has(key string) bool {
 	return false
 }
 
+// Clone creates a deep copy, which may be used later or stored somewhere safely. However,
+// it comes at cost of multiple allocations
+func (k *KeyValue) Clone() *KeyValue {
+	return &KeyValue{
+		pairs:      clone(k.pairs),
+		uniqueBuff: clone(k.uniqueBuff),
+		valuesBuff: clone(k.valuesBuff),
+	}
+}
+
 // Unwrap reveals underlying data structure. Try to avoid the method if possible, as
 // changing the signature may not affect a major version
 func (k *KeyValue) Unwrap() []Pair {
@@ -161,4 +176,15 @@ func contains(collection []string, key string) bool {
 	}
 
 	return false
+}
+
+func clone[T any](source []T) []T {
+	if len(source) == 0 {
+		return nil
+	}
+
+	newSlice := make([]T, len(source))
+	copy(newSlice, source)
+
+	return newSlice
 }
