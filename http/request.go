@@ -2,6 +2,7 @@ package http
 
 import (
 	"context"
+	"github.com/indigo-web/indigo/http/encryption"
 	"github.com/indigo-web/indigo/http/headers"
 	"github.com/indigo-web/indigo/http/method"
 	"github.com/indigo-web/indigo/http/mime"
@@ -19,7 +20,7 @@ type Environment struct {
 	// AllowMethods is used to pass a string containing all the allowed methods for a
 	// specific endpoint. Has non-zero-value only when 405 Method Not Allowed raises
 	AllowMethods string
-	IsTLS        bool
+	Encryption   encryption.Encryption
 	// reserved for router
 	AliasFrom string
 }
