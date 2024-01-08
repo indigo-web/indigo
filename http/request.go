@@ -182,6 +182,10 @@ func String(request *Request, str string) *Response {
 	return request.Respond().String(str)
 }
 
+func Bytes(request *Request, b []byte) *Response {
+	return request.Respond().Bytes(b)
+}
+
 func Error(request *Request, err error) *Response {
 	return request.Respond().Error(err)
 }
