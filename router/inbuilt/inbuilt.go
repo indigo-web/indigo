@@ -20,12 +20,12 @@ var _ router.Router = &Router{}
 type Router struct {
 	isRoot      bool
 	prefix      string
+	mutators    []Mutator
 	middlewares []Middleware
 	catchers    []Catcher
 	registrar   *registrar
 	routesMap   routesMap
 	tree        radix.Tree
-	aliases     map[string]string
 	isStatic    bool
 	errHandlers errorHandlers
 
@@ -68,12 +68,15 @@ func (r *Router) OnStart() error {
 
 // OnRequest processes the request
 func (r *Router) OnRequest(request *http.Request) *http.Response {
-	request.Path = stripTrailingSlash(request.Path)
+	r.runMutators(request)
 
-	if r.aliases != nil {
-		r.retrieveAlias(request)
-	}
+	// TODO: should path normalization be implemented as a mutator?
+	request.Path = uri.Normalize(request.Path)
 
+	return r.onRequest(request)
+}
+
+func (r *Router) onRequest(request *http.Request) *http.Response {
 	var methodsMap types.MethodsMap
 
 	if r.isStatic {
@@ -105,6 +108,12 @@ func (r *Router) OnRequest(request *http.Request) *http.Response {
 // OnError tries to find a handler for the error, in case it can't - simply
 // request.Respond().WithError(...) will be returned
 func (r *Router) OnError(request *http.Request, err error) *http.Response {
+	r.runMutators(request)
+
+	return r.onError(request, err)
+}
+
+func (r *Router) onError(request *http.Request, err error) *http.Response {
 	if request.Method == method.TRACE && err == status.ErrMethodNotAllowed {
 		r.traceBuff = renderHTTPRequest(request, r.traceBuff)
 
@@ -136,6 +145,12 @@ func (r *Router) OnError(request *http.Request, err error) *http.Response {
 	request.Env.Error = err
 
 	return handler(request)
+}
+
+func (r *Router) runMutators(request *http.Request) {
+	for _, mutator := range r.mutators {
+		mutator(request)
+	}
 }
 
 func (r *Router) retrieveErrorHandler(code status.Code) Handler {
