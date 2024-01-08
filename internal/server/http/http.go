@@ -74,6 +74,9 @@ func (h *Server) HandleRequest(
 		client.Unread(extra)
 		req.Body.Init(req)
 		response := h.router.OnRequest(req)
+		if response == nil {
+			response = req.Respond()
+		}
 
 		if req.WasHijacked() {
 			return false
