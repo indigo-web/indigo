@@ -1,85 +1,85 @@
 package tcp
 
 import (
-	"github.com/indigo-web/indigo/http/status"
 	"net"
 	"sync"
+	"sync/atomic"
 )
 
 type OnConn func(net.Conn)
 
 type Server struct {
+	wg       *sync.WaitGroup
 	sock     net.Listener
 	onConn   OnConn
-	mu       sync.Mutex
-	conns    map[net.Conn]struct{}
-	shutdown bool
+	shutdown atomic.Bool
 }
 
 func NewServer(sock net.Listener, onConn OnConn) *Server {
 	return &Server{
+		wg:     new(sync.WaitGroup),
 		sock:   sock,
 		onConn: onConn,
-		conns:  map[net.Conn]struct{}{},
 	}
 }
 
+// Start runs the accept-loop until an error during accepting the connection happens
+// or graceful shutdown invokes
 func (s *Server) Start() error {
-	wg := new(sync.WaitGroup)
-
-	for {
+	for !s.shutdown.Load() {
 		conn, err := s.sock.Accept()
 		if err != nil {
-			wg.Wait()
-
-			if s.shutdown {
-				return status.ErrShutdown
-			}
-
 			return err
 		}
 
-		s.mu.Lock()
-		s.conns[conn] = struct{}{}
-		s.mu.Unlock()
-		wg.Add(1)
-		go s.connHandler(wg, conn)
+		s.wg.Add(1)
+		go s.connHandler(conn)
 	}
-}
-
-func (s *Server) stopListener() error {
-	s.shutdown = true
-
-	return s.sock.Close()
-}
-
-// Stop shuts listener and ALL the connections down
-func (s *Server) Stop() error {
-	if err := s.stopListener(); err != nil {
-		return err
-	}
-
-	s.mu.Lock()
-
-	for conn := range s.conns {
-		_ = conn.Close()
-	}
-
-	s.mu.Unlock()
 
 	return nil
 }
 
-// GracefulShutdown stops a listener, but leaving all the connections free to end their
-// lives peacefully
-func (s *Server) GracefulShutdown() error {
-	return s.stopListener()
+// Stop closes the server socket, however all the clients won't be notified explicitly
+// until they try to send us anything
+func (s *Server) Stop() error {
+	return s.sock.Close()
 }
 
-func (s *Server) connHandler(wg *sync.WaitGroup, conn net.Conn) {
+// Pause stops listening to new connections, however doesn't close the socket.
+//
+// NOTE: it doesn't stop the accept-loop immediately, however it waits until the next client connects
+func (s *Server) Pause() {
+	s.shutdown.Store(true)
+}
+
+// Wait blocks the caller until all the connections are closed
+func (s *Server) Wait() {
+	s.wg.Wait()
+}
+
+func (s *Server) connHandler(conn net.Conn) {
 	s.onConn(conn)
-	wg.Done()
-	s.mu.Lock()
-	delete(s.conns, conn)
-	s.mu.Unlock()
+	s.wg.Done()
+}
+
+func StopAll(servers []*Server) {
+	for _, server := range servers {
+		_ = server.Stop()
+	}
+
+	WaitAll(servers)
+}
+
+func PauseAll(servers []*Server) {
+	for _, server := range servers {
+		server.Pause()
+	}
+
+	WaitAll(servers)
+}
+
+func WaitAll(servers []*Server) {
+	for _, server := range servers {
+		server.Wait()
+	}
 }
