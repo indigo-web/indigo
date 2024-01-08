@@ -7,6 +7,10 @@ import (
 	"github.com/indigo-web/utils/constraint"
 )
 
+var DefaultHeaders = map[string]string{
+	"Accept-Encodings": "identity",
+}
+
 type (
 	HeadersNumber struct {
 		Default, Maximal int
@@ -47,6 +51,9 @@ type (
 		// MaxEncodingTokens is a limit of how many encodings can be applied at the body
 		// for a single request
 		MaxEncodingTokens int
+		// Default headers are those, which will be rendered on each response unless they were
+		// not overridden by user
+		Default map[string]string
 	}
 
 	URL struct {
@@ -82,21 +89,6 @@ type (
 		// FileBuffSize defines the size of the read buffer when reading a file
 		FileBuffSize int
 	}
-
-	HTTPS struct {
-		// Addr defines an address for HTTPS. If left empty, HTTPS will be disabled
-		Addr string
-		// Cert is a path to the .pem file with the actual certificate.
-		// When using certbot, it is usually stored at /etc/letsencrypt/live/<domain>/fullchain.pem
-		//
-		// By default, just looking for fullchain.pem in the current working directory.
-		Cert string
-		// Key is a path to the .pem file with the actual key.
-		// When using certbot, it is usually stored at /etc/letsencrypt/live/<domain>/privkey.pem
-		//
-		// By default, just looking for privkey.pem in the current working directory.
-		Key string
-	}
 )
 
 type Settings struct {
@@ -105,7 +97,6 @@ type Settings struct {
 	TCP     TCP
 	Body    Body
 	HTTP    HTTP
-	HTTPS   HTTPS
 }
 
 // Default returns default settings. Those are initially well-balanced, however maximal defaults
@@ -128,6 +119,7 @@ func Default() Settings {
 			// this may be an issue, if there are more custom encodings than this. However,
 			// such cases are considered to be too rare
 			MaxEncodingTokens: 15,
+			Default:           DefaultHeaders,
 		},
 		URL: URL{
 			BufferSize: URLBufferSize{
@@ -157,64 +149,55 @@ func Default() Settings {
 			ResponseBuffSize: 1024,
 			FileBuffSize:     64 * 1024, // 64kb read buffer for files is pretty much sufficient
 		},
-		HTTPS: HTTPS{
-			Cert: "fullchain.pem",
-			Key:  "privkey.pem",
-		},
 	}
 }
 
 // Fill fills zero-values from partially-filled Settings instance with default ones
-func Fill(src Settings) (modified Settings) {
+func Fill(src Settings) (new Settings) {
 	defaults := Default()
 
 	return Settings{
 		Headers: Headers{
 			Number: HeadersNumber{
-				Default: valueOr(src.Headers.Number.Default, defaults.Headers.Number.Default),
-				Maximal: valueOr(src.Headers.Number.Maximal, defaults.Headers.Number.Maximal),
+				Default: numOr(src.Headers.Number.Default, defaults.Headers.Number.Default),
+				Maximal: numOr(src.Headers.Number.Maximal, defaults.Headers.Number.Maximal),
 			},
-			MaxKeyLength:   valueOr(src.Headers.MaxKeyLength, defaults.Headers.MaxKeyLength),
-			MaxValueLength: valueOr(src.Headers.MaxValueLength, defaults.Headers.MaxValueLength),
+			MaxKeyLength:   numOr(src.Headers.MaxKeyLength, defaults.Headers.MaxKeyLength),
+			MaxValueLength: numOr(src.Headers.MaxValueLength, defaults.Headers.MaxValueLength),
 			ValueSpace: HeadersValuesSpace{
-				Default: valueOr(src.Headers.ValueSpace.Default, defaults.Headers.ValueSpace.Default),
-				Maximal: valueOr(src.Headers.ValueSpace.Maximal, defaults.Headers.ValueSpace.Maximal),
+				Default: numOr(src.Headers.ValueSpace.Default, defaults.Headers.ValueSpace.Default),
+				Maximal: numOr(src.Headers.ValueSpace.Maximal, defaults.Headers.ValueSpace.Maximal),
 			},
-			MaxValuesObjectPoolSize: valueOr(src.Headers.MaxValuesObjectPoolSize, defaults.Headers.MaxValuesObjectPoolSize),
-			MaxEncodingTokens:       valueOr(src.Headers.MaxEncodingTokens, defaults.Headers.MaxEncodingTokens),
+			MaxValuesObjectPoolSize: numOr(src.Headers.MaxValuesObjectPoolSize, defaults.Headers.MaxValuesObjectPoolSize),
+			MaxEncodingTokens:       numOr(src.Headers.MaxEncodingTokens, defaults.Headers.MaxEncodingTokens),
+			Default:                 mapOr(src.Headers.Default, defaults.Headers.Default),
 		},
 		URL: URL{
 			BufferSize: URLBufferSize{
-				Default: valueOr(src.URL.BufferSize.Default, defaults.URL.BufferSize.Default),
-				Maximal: valueOr(src.URL.BufferSize.Maximal, defaults.URL.BufferSize.Maximal),
+				Default: numOr(src.URL.BufferSize.Default, defaults.URL.BufferSize.Default),
+				Maximal: numOr(src.URL.BufferSize.Maximal, defaults.URL.BufferSize.Maximal),
 			},
 			Query: Query{
-				PreAlloc: valueOr(src.URL.Query.PreAlloc, defaults.URL.Query.PreAlloc),
+				PreAlloc: numOr(src.URL.Query.PreAlloc, defaults.URL.Query.PreAlloc),
 			},
 		},
 		TCP: TCP{
-			ReadBufferSize: valueOr(src.TCP.ReadBufferSize, defaults.TCP.ReadBufferSize),
-			ReadTimeout:    valueOr(src.TCP.ReadTimeout, defaults.TCP.ReadTimeout),
+			ReadBufferSize: numOr(src.TCP.ReadBufferSize, defaults.TCP.ReadBufferSize),
+			ReadTimeout:    numOr(src.TCP.ReadTimeout, defaults.TCP.ReadTimeout),
 		},
 		Body: Body{
-			MaxSize:            valueOr(src.Body.MaxSize, defaults.Body.MaxSize),
-			MaxChunkSize:       valueOr(src.Body.MaxChunkSize, defaults.Body.MaxChunkSize),
-			DecodingBufferSize: valueOr(src.Body.DecodingBufferSize, defaults.Body.DecodingBufferSize),
+			MaxSize:            numOr(src.Body.MaxSize, defaults.Body.MaxSize),
+			MaxChunkSize:       numOr(src.Body.MaxChunkSize, defaults.Body.MaxChunkSize),
+			DecodingBufferSize: numOr(src.Body.DecodingBufferSize, defaults.Body.DecodingBufferSize),
 		},
 		HTTP: HTTP{
-			ResponseBuffSize: valueOr(src.HTTP.ResponseBuffSize, defaults.HTTP.ResponseBuffSize),
-			FileBuffSize:     valueOr(src.HTTP.FileBuffSize, defaults.HTTP.FileBuffSize),
-		},
-		HTTPS: HTTPS{
-			// Addr is either defined or not. Default value - empty string - disables HTTPS
-			Addr: src.HTTPS.Addr,
-			Cert: strValueOr(src.HTTPS.Cert, defaults.HTTPS.Cert),
-			Key:  strValueOr(src.HTTPS.Key, defaults.HTTPS.Key),
+			ResponseBuffSize: numOr(src.HTTP.ResponseBuffSize, defaults.HTTP.ResponseBuffSize),
+			FileBuffSize:     numOr(src.HTTP.FileBuffSize, defaults.HTTP.FileBuffSize),
 		},
 	}
 }
 
-func valueOr[T constraint.Number](custom, defaultVal T) T {
+func numOr[T constraint.Number](custom, defaultVal T) T {
 	if custom == 0 {
 		return defaultVal
 	}
@@ -222,7 +205,15 @@ func valueOr[T constraint.Number](custom, defaultVal T) T {
 	return custom
 }
 
-func strValueOr(custom, defaultVal string) string {
+func mapOr[K comparable, V any](custom, defaultVal map[K]V) map[K]V {
+	if custom == nil {
+		return defaultVal
+	}
+
+	return custom
+}
+
+func strOr(custom, defaultVal string) string {
 	if len(custom) == 0 {
 		return defaultVal
 	}
