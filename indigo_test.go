@@ -3,7 +3,6 @@ package indigo
 import (
 	"bytes"
 	"context"
-	"errors"
 	"fmt"
 	"github.com/indigo-web/indigo/http/headers"
 	"github.com/indigo-web/indigo/http/method"
@@ -30,26 +29,6 @@ const (
 	addr = "localhost:16100"
 	URL  = "http://" + addr
 )
-
-func readN(conn net.Conn, n int) ([]byte, error) {
-	receivedBuff := make([]byte, 0, n)
-	buff := make([]byte, n)
-
-	for {
-		recvd, err := conn.Read(buff)
-		if err != nil {
-			return nil, err
-		}
-
-		receivedBuff = append(receivedBuff, buff[:recvd]...)
-
-		if len(receivedBuff) == n {
-			return receivedBuff, nil
-		} else if len(receivedBuff) > n {
-			return nil, errors.New("received too much data")
-		}
-	}
-}
 
 func getHeaders() headers.Headers {
 	return headers.New().
