@@ -79,7 +79,7 @@ func main() {
 
 	app := indigo.New(addr).
 		Tune(s).
-		AutoHTTPS(8282).
+		AutoHTTPS(8443).
 		NotifyOnStart(func() {
 			log.Println("initialized")
 		})
