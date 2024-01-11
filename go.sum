@@ -8,8 +8,6 @@ github.com/indigo-web/chunkedbody v0.1.0 h1:fZerB4rS9aufemrNTPPKOMSWsgnImfuW4g1l
 github.com/indigo-web/chunkedbody v0.1.0/go.mod h1:E3IVH0uH1ePqQO4n76M2EVPplGyqZTP88MpR3kRj/mE=
 github.com/indigo-web/iter v0.1.0 h1:3LJG319EytEULerDX6meT4xW/lqncIqTnZewsMtiPT4=
 github.com/indigo-web/iter v0.1.0/go.mod h1:hftmhzfi4hpWc715PmXsfMjE1K0FLwznr+iyLxM7wyQ=
-github.com/indigo-web/utils v0.5.2 h1:izFEOxMDayj3uGUJT4I5ttuWYL1J9BqwQqn1KCCpyZc=
-github.com/indigo-web/utils v0.5.2/go.mod h1:fBdCfyNyprkgC0FvqaLE1B43CZgByQyhjDRxz4pNt8U=
 github.com/indigo-web/utils v0.6.0 h1:rmVWFkCLMiw9sCBAvBdxTHtPCm54tOsCf+hmvuY9zxQ=
 github.com/indigo-web/utils v0.6.0/go.mod h1:Q+voOJjIRN7DV+ifWozy6RY6cDF10Ev0NPDjsuOAXfQ=
 github.com/json-iterator/go v1.1.12 h1:PV8peI4a0ysnczrg+LtxykD8LfKY9ML6u2jnxaEnrnM=
