@@ -11,8 +11,8 @@ import (
 const DefaultHost = "0.0.0.0"
 
 type Address struct {
-	Domain string
-	Port   uint16
+	Host string
+	Port uint16
 }
 
 func Parse(addr string) (address Address, err error) {
@@ -21,9 +21,9 @@ func Parse(addr string) (address Address, err error) {
 		return address, fmt.Errorf("no port given")
 	}
 
-	domain, rawPort := addr[:colon], addr[colon+1:]
-	if len(domain) == 0 {
-		domain = DefaultHost
+	host, rawPort := addr[:colon], addr[colon+1:]
+	if len(host) == 0 {
+		host = DefaultHost
 	}
 	if len(rawPort) == 0 {
 		return address, fmt.Errorf("port cannot be empty")
@@ -35,8 +35,8 @@ func Parse(addr string) (address Address, err error) {
 	}
 
 	return Address{
-		Domain: domain,
-		Port:   uint16(port),
+		Host: host,
+		Port: uint16(port),
 	}, nil
 }
 
@@ -47,11 +47,11 @@ func (a Address) SetPort(newPort uint16) Address {
 }
 
 func (a Address) IsLocalhost() bool {
-	if strings.HasPrefix(a.Domain, "127.0.") {
+	if strings.HasPrefix(a.Host, "127.0.") {
 		return true
 	}
 
-	switch a.Domain {
+	switch a.Host {
 	case "localhost", "0.0.0.0", "::1":
 		return true
 	}
@@ -60,5 +60,5 @@ func (a Address) IsLocalhost() bool {
 }
 
 func (a Address) String() string {
-	return fmt.Sprintf("%s:%d", a.Domain, a.Port)
+	return fmt.Sprintf("%s:%d", a.Host, a.Port)
 }
