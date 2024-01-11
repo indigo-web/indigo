@@ -212,11 +212,3 @@ func mapOr[K comparable, V any](custom, defaultVal map[K]V) map[K]V {
 
 	return custom
 }
-
-func strOr(custom, defaultVal string) string {
-	if len(custom) == 0 {
-		return defaultVal
-	}
-
-	return custom
-}
