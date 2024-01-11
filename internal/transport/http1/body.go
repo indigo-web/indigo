@@ -36,6 +36,7 @@ func NewBody(
 
 func (b *Body) Init(request *http.Request) {
 	b.isChunked = request.Encoding.Chunked
+	b.contentLength = request.ContentLength
 	if b.isChunked {
 		b.chunked.init(request)
 	} else {
@@ -153,6 +154,10 @@ func (p *plainBodyReader) init(request *http.Request) {
 }
 
 func (p *plainBodyReader) read() (body []byte, err error) {
+	if p.bytesLeft == 0 {
+		return nil, io.EOF
+	}
+
 	data, err := p.client.Read()
 	if err != nil {
 		return nil, err
