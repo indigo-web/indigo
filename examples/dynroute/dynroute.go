@@ -22,7 +22,7 @@ func main() {
 
 	r.Get("/hello/{world-name}", MyDynamicHandler)
 
-	app := indigo.NewApp(addr)
+	app := indigo.New(addr)
 	log.Println("Listening on", addr)
 	log.Fatal(app.Serve(r))
 }

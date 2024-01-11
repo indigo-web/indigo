@@ -22,7 +22,7 @@ func main() {
 	myRouter := inbuilt.New()
 	myRouter.Get("/", MyHandler)
 
-	app := indigo.NewApp(addr)
+	app := indigo.New(addr)
 	log.Println("Listening on", addr)
 	log.Fatal(app.Serve(myRouter))
 }
