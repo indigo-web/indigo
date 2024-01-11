@@ -28,7 +28,7 @@ func (r *registrar) Add(path string, m method.Method, handler Handler) error {
 	}
 
 	if _, ok := methodsMap[m]; ok {
-		return fmt.Errorf("route already registered: %s %s", method.ToString(m), path)
+		return fmt.Errorf("route already registered: %s %s", m, path)
 	}
 
 	methodsMap[m] = handler
@@ -93,7 +93,7 @@ func (r *registrar) AsRadixTree() radix2.Tree {
 
 		for method_, handler := range v {
 			methodsMap[method_] = handler
-			allow += method.ToString(method_) + ","
+			allow += method_.String() + ","
 		}
 
 		tree.MustInsert(radix2.MustParse(path), radix2.Payload{

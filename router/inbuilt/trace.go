@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"github.com/indigo-web/indigo/http"
 	"github.com/indigo-web/indigo/http/headers"
-	"github.com/indigo-web/indigo/http/method"
 	"github.com/indigo-web/indigo/http/proto"
 	"github.com/indigo-web/indigo/internal/httpchars"
 )
@@ -21,7 +20,7 @@ func traceResponse(respond *http.Response, messageBody []byte) *http.Response {
 }
 
 func renderHTTPRequest(request *http.Request, buff []byte) []byte {
-	buff = append(buff, method.ToString(request.Method)...)
+	buff = append(buff, request.Method.String()...)
 	buff = append(buff, httpchars.SP...)
 	buff = requestURI(request, buff)
 	buff = append(buff, httpchars.SP...)
