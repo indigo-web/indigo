@@ -59,7 +59,7 @@ func autoTLSListener(domains ...string) ListenerConstructor {
 
 		cache := cacheDir()
 		if err := mkdirIfNotExists(cache); err != nil {
-			log.Printf("WARNING: auto HTTPS: not using a cache: %v", err)
+			log.Printf("WARNING: auto HTTPS: not using a cache: %s", err)
 		} else {
 			m.Cache = autocert.DirCache(cache)
 		}
