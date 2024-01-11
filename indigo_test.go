@@ -1,10 +1,13 @@
 package indigo
 
 import (
+	"bytes"
 	"context"
 	"errors"
+	"fmt"
 	"github.com/indigo-web/indigo/http/headers"
 	"github.com/indigo-web/indigo/http/method"
+	"github.com/indigo-web/indigo/http/status"
 	"github.com/indigo-web/indigo/internal/httptest"
 	"github.com/indigo-web/indigo/router/inbuilt/middleware"
 	"github.com/stretchr/testify/assert"
@@ -12,6 +15,8 @@ import (
 	"io"
 	"net"
 	stdhttp "net/http"
+	"net/url"
+	"os"
 	"strings"
 	"testing"
 	"time"
@@ -74,7 +79,7 @@ func getInbuiltRouter() *inbuilt.Router {
 		Post(respond)
 
 	r.Get("/file/{name}", func(request *http.Request) *http.Response {
-		return request.Respond().File(request.Params.Value("name"))
+		return request.Respond().File("tests/" + request.Params.Value("name"))
 	})
 
 	r.Post("/body-reader", func(request *http.Request) *http.Response {
@@ -92,20 +97,12 @@ func getInbuiltRouter() *inbuilt.Router {
 			_ = conn.Close()
 		}(conn)
 		if err != nil {
-			return http.Error(request, err)
+			return nil
 		}
 
-		length, err := readN(conn, 1)
-		if err != nil {
-			return
+		if _, err = conn.Write([]byte("j")); err != nil {
+			return nil
 		}
-
-		data, err := readN(conn, int(length[0]))
-		if err != nil {
-			return
-		}
-
-		_, _ = conn.Write(data)
 
 		return
 	})
@@ -149,9 +146,7 @@ func TestServer(t *testing.T) {
 			_ = resp.Body.Close()
 		}()
 		require.Equal(t, stdhttp.StatusOK, resp.StatusCode)
-		body, err := io.ReadAll(resp.Body)
-		require.NoError(t, err)
-		repr, err := httptest.Parse(string(body))
+		repr, err := parseBody(resp)
 		require.NoError(t, err)
 
 		for _, err := range httptest.Compare(repr, httptest.Request{
@@ -166,6 +161,30 @@ func TestServer(t *testing.T) {
 		}
 	})
 
+	t.Run("root get with body", func(t *testing.T) {
+		r := strings.NewReader("Hello, world!")
+		req, err := stdhttp.NewRequest(stdhttp.MethodGet, URL+"/", r)
+		require.NoError(t, err)
+		resp, err := stdhttp.DefaultClient.Do(req)
+		defer func() {
+			_ = resp.Body.Close()
+		}()
+		require.Equal(t, stdhttp.StatusOK, resp.StatusCode)
+		repr, err := parseBody(resp)
+		require.NoError(t, err)
+
+		for _, err := range httptest.Compare(repr, httptest.Request{
+			Method: method.GET,
+			Path:   "/",
+			Proto:  "HTTP/1.1",
+			Headers: getHeaders().
+				Add("Content-Length", "13"),
+			Body: "Hello, world!",
+		}) {
+			assert.NoError(t, err)
+		}
+	})
+
 	t.Run("root post", func(t *testing.T) {
 		r := strings.NewReader("Hello, world!")
 		resp, err := stdhttp.DefaultClient.Post(URL+"/", "text/html", r)
@@ -174,9 +193,7 @@ func TestServer(t *testing.T) {
 			_ = resp.Body.Close()
 		}()
 		require.Equal(t, stdhttp.StatusOK, resp.StatusCode)
-		body, err := io.ReadAll(resp.Body)
-		require.NoError(t, err)
-		repr, err := httptest.Parse(string(body))
+		repr, err := parseBody(resp)
 		require.NoError(t, err)
 
 		for _, err := range httptest.Compare(repr, httptest.Request{
@@ -192,248 +209,189 @@ func TestServer(t *testing.T) {
 		}
 	})
 
-	//t.Run("/get-resp-body", func(t *testing.T) {
-	//	resp, err := stdhttp.DefaultClient.Get(URL + "/get-resp-body")
-	//	require.NoError(t, err)
-	//	defer func() {
-	//		_ = resp.Body.Close()
-	//	}()
-	//
-	//	body, err := io.ReadAll(resp.Body)
-	//	require.NoError(t, err)
-	//	require.Equal(t, testRequestBody, string(body))
-	//})
-	//
-	//t.Run("/head", func(t *testing.T) {
-	//	resp, err := stdhttp.DefaultClient.Head(URL + "/get-resp-body")
-	//	require.NoError(t, err)
-	//	defer func() {
-	//		_ = resp.Body.Close()
-	//	}()
-	//
-	//	require.Equal(t, stdhttp.StatusOK, resp.StatusCode)
-	//	require.Equal(t, "200 "+stdhttp.StatusText(stdhttp.StatusOK), resp.Status)
-	//	require.Equal(t, "HTTP/1.1", resp.Proto)
-	//
-	//	body, err := io.ReadAll(resp.Body)
-	//	require.NoError(t, err)
-	//	require.Empty(t, string(body))
-	//})
-	//
-	//t.Run("/get-read-body", func(t *testing.T) {
-	//	request := &stdhttp.Request{
-	//		Method: stdhttp.MethodGet,
-	//		URL: &url.URL{
-	//			Scheme: "http",
-	//			Host:   addr,
-	//			Path:   "/get-read-body",
-	//		},
-	//		Proto:      "HTTP/1.1",
-	//		ProtoMajor: 1,
-	//		ProtoMinor: 1,
-	//		Header: stdhttp.Header{
-	//			"Hello": {"World!"},
-	//		},
-	//		Host:       addr,
-	//		RemoteAddr: addr,
-	//	}
-	//	resp, err := stdhttp.DefaultClient.Do(request)
-	//	require.NoError(t, err)
-	//	defer func() {
-	//		_ = resp.Body.Close()
-	//	}()
-	//	require.Equal(t, stdhttp.StatusOK, resp.StatusCode)
-	//})
-	//
-	//t.Run("/with-query", func(t *testing.T) {
-	//	resp, err := stdhttp.DefaultClient.Get(URL + "/with-query?hel+lo=wor+ld")
-	//	require.NoError(t, err)
-	//	defer func() {
-	//		_ = resp.Body.Close()
-	//	}()
-	//	require.Equal(t, stdhttp.StatusOK, resp.StatusCode)
-	//})
-	//
-	//t.Run("/read-body", func(t *testing.T) {
-	//	body := strings.NewReader(testRequestBody)
-	//	resp, err := stdhttp.DefaultClient.Post(URL+"/read-body", "text/html", body)
-	//	require.NoError(t, err)
-	//	defer func() {
-	//		_ = resp.Body.Close()
-	//	}()
-	//	require.Equal(t, stdhttp.StatusOK, resp.StatusCode)
-	//})
-	//
-	//t.Run("/read-body-gzipped", func(t *testing.T) {
-	//	t.Skip("gzipped does not works correctly yet")
-	//	compressed, err := compressGZIP([]byte(testRequestBody))
-	//	require.NoError(t, err)
-	//	request := fmt.Sprintf(
-	//		"POST /read-body-gzipped HTTP/1.1\r\n"+
-	//			"Transfer-Encoding: gzip\r\n"+
-	//			"Content-Length: %d\r\n"+
-	//			"Connection: close\r\n\r\n%s",
-	//		len(compressed), string(compressed),
-	//	)
-	//
-	//	conn, err := net.Dial("tcp4", addr)
-	//	require.NoError(t, err)
-	//	_, err = conn.Write([]byte(request))
-	//	require.NoError(t, err)
-	//	buff := make([]byte, 1024)
-	//	n, err := conn.Read(buff)
-	//	code, err := checkResponseStatus(buff[:n])
-	//	require.NoError(t, err)
-	//	require.Equal(t, status.OK, code)
-	//})
-	//
-	//t.Run("/body-reader", func(t *testing.T) {
-	//	body := new(bytes.Buffer)
-	//	body.Write([]byte(testRequestBody))
-	//	resp, err := stdhttp.DefaultClient.Post(URL+"/body-reader", "text/html", body)
-	//	require.NoError(t, err)
-	//	defer func() {
-	//		_ = resp.Body.Close()
-	//	}()
-	//	require.Equal(t, stdhttp.StatusOK, resp.StatusCode)
-	//})
-	//
-	//t.Run("/do-not-read-body", func(t *testing.T) {
-	//	body := new(bytes.Buffer)
-	//	body.Write([]byte(testRequestBody))
-	//	resp, err := stdhttp.DefaultClient.Post(URL+"/read-body", "text/html", body)
-	//	require.NoError(t, err)
-	//	defer func() {
-	//		_ = resp.Body.Close()
-	//	}()
-	//	require.Equal(t, stdhttp.StatusOK, resp.StatusCode)
-	//})
-	//
-	//t.Run("/hijack-conn-no-body-read", func(t *testing.T) {
-	//	sendSimpleRequest(t, "/hijack-conn-no-body-read", addr)
-	//})
-	//
-	//t.Run("/hijack-conn-with-body-read", func(t *testing.T) {
-	//	sendSimpleRequest(t, "/hijack-conn-with-body-read", addr)
-	//})
-	//
-	//t.Run("/with-file", func(t *testing.T) {
-	//	resp, err := stdhttp.DefaultClient.Get(URL + "/with-file")
-	//	require.NoError(t, err)
-	//
-	//	data, err := io.ReadAll(resp.Body)
-	//	require.NoError(t, err)
-	//
-	//	actualContent, err := os.ReadFile(testFilename)
-	//	require.NoError(t, err)
-	//	require.Equal(t, string(actualContent), string(data))
-	//})
-	//
-	//t.Run("/with-file-notfound", func(t *testing.T) {
-	//	resp, err := stdhttp.DefaultClient.Get(URL + "/with-file-notfound")
-	//	require.NoError(t, err)
-	//
-	//	data, err := io.ReadAll(resp.Body)
-	//	require.NoError(t, err)
-	//	require.Equal(t, testFileIfNotFound, string(data))
-	//})
-	//
-	//t.Run("/trace", func(t *testing.T) {
-	//	request := &stdhttp.Request{
-	//		Method: stdhttp.MethodTrace,
-	//		URL: &url.URL{
-	//			Scheme: "http",
-	//			Host:   addr,
-	//			Path:   "/simple-get",
-	//		},
-	//		Proto:      "HTTP/1.1",
-	//		ProtoMajor: 1,
-	//		ProtoMinor: 1,
-	//		Header: stdhttp.Header{
-	//			"Hello": {"World!"},
-	//		},
-	//		Host:       addr,
-	//		RemoteAddr: addr,
-	//	}
-	//	resp, err := stdhttp.DefaultClient.Do(request)
-	//	require.NoError(t, err)
-	//
-	//	require.Contains(t, resp.Header, "Content-Type")
-	//	require.Equal(t, 1, len(resp.Header["Content-Type"]), "too many content-type values")
-	//	require.Equal(t, "message/http", resp.Header["Content-Type"][0])
-	//
-	//	dataBytes, err := io.ReadAll(resp.Body)
-	//	data := string(dataBytes)
-	//	require.NoError(t, err)
-	//
-	//	wantRequestLine := "TRACE /simple-get HTTP/1.1\r\n"
-	//	require.Greater(t, len(data), len(wantRequestLine))
-	//	require.Equal(t, wantRequestLine, data[:len(wantRequestLine)])
-	//
-	//	headerLines := strings.Split(data[len(wantRequestLine):], "\r\n")
-	//	// request is terminated with \r\n\r\n, so 2 last values in headerLines
-	//	// are empty strings. Remove them
-	//	headerLines = headerLines[:len(headerLines)-2]
-	//	wantHeaderLines := []string{
-	//		"Hello: World!",
-	//		"Host: " + addr,
-	//		"User-Agent: Go-http-client/1.1",
-	//		"Accept-Encoding: gzip",
-	//		"Content-Length: 0",
-	//	}
-	//
-	//	for _, line := range headerLines {
-	//		require.True(t, contains(wantHeaderLines, line), "unwanted header line: "+line)
-	//	}
-	//})
-	//
-	//t.Run("/method-not-allowed-allow-header", func(t *testing.T) {
-	//	request := &stdhttp.Request{
-	//		Method: stdhttp.MethodDelete,
-	//		URL: &url.URL{
-	//			Scheme: "http",
-	//			Host:   addr,
-	//			Path:   "/simple-get",
-	//		},
-	//		Proto:      "HTTP/1.1",
-	//		ProtoMajor: 1,
-	//		ProtoMinor: 1,
-	//		Host:       addr,
-	//		RemoteAddr: addr,
-	//	}
-	//	resp, err := stdhttp.DefaultClient.Do(request)
-	//	require.NoError(t, err)
-	//	require.Equal(t, int(status.MethodNotAllowed), resp.StatusCode)
-	//
-	//	require.Contains(t, resp.Header, "Allow")
-	//	require.Equal(t, "GET", resp.Header["Allow"][0])
-	//	require.Equal(t, 1, len(resp.Header["Allow"]))
-	//})
-	//
-	//// this test must ALWAYS be on the bottom as it is the longest-duration test
-	//t.Run("/test-idle-disconnect", func(t *testing.T) {
-	//	conn, err := net.Dial("tcp4", addr)
-	//	require.NoError(t, err)
-	//
-	//	response, err := io.ReadAll(conn)
-	//	require.NoError(t, err)
-	//	wantResponseLine := "HTTP/1.1 408 Request Timeout\r\n"
-	//	lf := bytes.IndexByte(response, '\n')
-	//	require.NotEqual(t, -1, lf, "http response must contain at least one LF")
-	//	require.Equal(t, wantResponseLine, string(response[:lf+1]))
-	//})
-	//
-	//t.Run("/ctx-value", func(t *testing.T) {
-	//	resp, err := stdhttp.DefaultClient.Get(URL + "/ctx-value")
-	//	require.NoError(t, err)
-	//	defer func() {
-	//		_ = resp.Body.Close()
-	//	}()
-	//	require.Equal(t, stdhttp.StatusOK, resp.StatusCode)
-	//})
-	//
-	//stdhttp.DefaultClient.CloseIdleConnections()
-	//runningServer.Wait(t, 3*time.Second)
+	t.Run("root head", func(t *testing.T) {
+		resp, err := stdhttp.DefaultClient.Head(URL + "/")
+		require.NoError(t, err)
+		defer func() {
+			_ = resp.Body.Close()
+		}()
+
+		require.Equal(t, stdhttp.StatusOK, resp.StatusCode)
+		body, err := io.ReadAll(resp.Body)
+		require.NoError(t, err)
+		require.Empty(t, body)
+	})
+
+	t.Run("with query", func(t *testing.T) {
+		// not testing url encoded parameters, as this is already tested internally,
+		// and this would also complicate the dumper logic
+		resp, err := stdhttp.DefaultClient.Get(URL + "/?hello=world")
+		require.NoError(t, err)
+		defer func() {
+			_ = resp.Body.Close()
+		}()
+		require.Equal(t, stdhttp.StatusOK, resp.StatusCode)
+		repr, err := parseBody(resp)
+		require.NoError(t, err)
+		require.Equal(t, "/?hello=world", repr.Path)
+	})
+
+	t.Run("body reader", func(t *testing.T) {
+		r := strings.NewReader("Hello, world!")
+		resp, err := stdhttp.DefaultClient.Post(URL+"/", "text/html", r)
+		require.NoError(t, err)
+		defer func() {
+			_ = resp.Body.Close()
+		}()
+		require.Equal(t, stdhttp.StatusOK, resp.StatusCode)
+		repr, err := parseBody(resp)
+		require.NoError(t, err)
+
+		for _, err := range httptest.Compare(repr, httptest.Request{
+			Method: method.POST,
+			Path:   "/",
+			Proto:  "HTTP/1.1",
+			Headers: getHeaders().
+				Add("Content-Length", "13").
+				Add("Content-Type", "text/html"),
+			Body: "Hello, world!",
+		}) {
+			assert.NoError(t, err)
+		}
+	})
+
+	t.Run("hijacking", func(t *testing.T) {
+		conn, err := sendSimpleRequest(addr, "/hijack")
+		defer func() {
+			_ = conn.Close()
+		}()
+
+		require.NoError(t, err)
+		data, err := io.ReadAll(conn)
+		require.NoError(t, err)
+		require.Equal(t, "j", string(data))
+	})
+
+	t.Run("request existing file", func(t *testing.T) {
+		resp, err := stdhttp.DefaultClient.Get(URL + "/file/index.html")
+		require.NoError(t, err)
+		require.Equal(t, stdhttp.StatusOK, resp.StatusCode)
+
+		data, err := io.ReadAll(resp.Body)
+		require.NoError(t, err)
+
+		actualContent, err := os.ReadFile("./tests/index.html")
+		require.NoError(t, err)
+		require.Equal(t, string(actualContent), string(data))
+	})
+
+	t.Run("request non-existing file", func(t *testing.T) {
+		resp, err := stdhttp.DefaultClient.Get(URL + "/file/doesntexists.html")
+		require.NoError(t, err)
+		require.Equal(t, stdhttp.StatusNotFound, resp.StatusCode)
+
+		data, err := io.ReadAll(resp.Body)
+		require.NoError(t, err)
+		require.Equal(t, "not found", string(data))
+	})
+
+	t.Run("trace", func(t *testing.T) {
+		request := &stdhttp.Request{
+			Method: stdhttp.MethodTrace,
+			URL: &url.URL{
+				Scheme: "http",
+				Host:   addr,
+				Path:   "/",
+			},
+			Proto:      "HTTP/1.1",
+			ProtoMajor: 1,
+			ProtoMinor: 1,
+			Header: stdhttp.Header{
+				"Hello": {"World!"},
+			},
+			Host:       addr,
+			RemoteAddr: addr,
+		}
+		resp, err := stdhttp.DefaultClient.Do(request)
+		require.NoError(t, err)
+		require.Equal(t, stdhttp.StatusOK, resp.StatusCode)
+		require.Contains(t, resp.Header, "Content-Type")
+		require.Equal(t, 1, len(resp.Header["Content-Type"]), "too many content-type values")
+		require.Equal(t, "message/http", resp.Header["Content-Type"][0])
+
+		dataBytes, err := io.ReadAll(resp.Body)
+		data := string(dataBytes)
+		require.NoError(t, err)
+
+		wantRequestLine := "TRACE / HTTP/1.1\r\n"
+		require.Greater(t, len(data), len(wantRequestLine))
+		require.Equal(t, wantRequestLine, data[:len(wantRequestLine)])
+
+		headerLines := strings.Split(data[len(wantRequestLine):], "\r\n")
+		// request is terminated with \r\n\r\n, so 2 last values in headerLines
+		// are empty strings. Remove them
+		headerLines = headerLines[:len(headerLines)-2]
+		wantHeaderLines := []string{
+			"Hello: World!",
+			"Host: " + addr,
+			"User-Agent: Go-http-client/1.1",
+			"Accept-Encoding: gzip",
+			"Content-Length: 0",
+		}
+
+		for _, line := range headerLines {
+			require.True(t, contains(wantHeaderLines, line), "unwanted header line: "+line)
+		}
+	})
+
+	t.Run("not allowed method", func(t *testing.T) {
+		request := &stdhttp.Request{
+			Method: stdhttp.MethodDelete,
+			URL: &url.URL{
+				Scheme: "http",
+				Host:   addr,
+				Path:   "/",
+			},
+			Proto:      "HTTP/1.1",
+			ProtoMajor: 1,
+			ProtoMinor: 1,
+			Host:       addr,
+			RemoteAddr: addr,
+		}
+		resp, err := stdhttp.DefaultClient.Do(request)
+		require.NoError(t, err)
+		require.Equal(t, int(status.MethodNotAllowed), resp.StatusCode)
+
+		require.Contains(t, resp.Header, "Allow")
+		allow := resp.Header["Allow"][0]
+		require.True(t, allow == "GET,POST" || allow == "POST,GET")
+		require.Equal(t, 1, len(resp.Header["Allow"]))
+	})
+
+	// this test must ALWAYS be on the bottom as it is the longest-duration test
+	t.Run("idle disconnect", func(t *testing.T) {
+		conn, err := net.Dial("tcp4", addr)
+		require.NoError(t, err)
+
+		response, err := io.ReadAll(conn)
+		require.NoError(t, err)
+		wantResponseLine := "HTTP/1.1 408 Request Timeout\r\n"
+		lf := bytes.IndexByte(response, '\n')
+		require.NotEqual(t, -1, lf, "http response must contain at least one LF")
+		require.Equal(t, wantResponseLine, string(response[:lf+1]))
+	})
+
+	t.Run("ctx value", func(t *testing.T) {
+		resp, err := stdhttp.DefaultClient.Get(URL + "/ctx-value")
+		require.NoError(t, err)
+		defer func() {
+			_ = resp.Body.Close()
+		}()
+		require.Equal(t, stdhttp.StatusOK, resp.StatusCode)
+		body, err := io.ReadAll(resp.Body)
+		require.NoError(t, err)
+		require.Equal(t, "egg", string(body))
+	})
 
 	t.Run("forced stop", func(t *testing.T) {
 		app.Stop()
@@ -451,23 +409,27 @@ func chanRead[T any](ch <-chan T, timeout time.Duration) (value T, ok bool) {
 	}
 }
 
-//func sendSimpleRequest(t *testing.T, path string, addr string) {
-//	conn, err := net.Dial("tcp", addr)
-//	require.NoError(t, err)
-//
-//	request := fmt.Sprintf("GET %s HTTP/1.1\r\n\r\n", path)
-//
-//	_, err = conn.Write([]byte(request))
-//	require.NoError(t, err)
-//	buff := make([]byte, 1)
-//	_, err = conn.Read(buff)
-//	require.NoError(t, err)
-//	require.Equal(t, buff, []byte{'a'})
-//	_, err = conn.Write([]byte(testRequestBody))
-//	require.NoError(t, err)
-//
-//	_ = conn.Close()
-//}
+func sendSimpleRequest(addr, path string) (net.Conn, error) {
+	conn, err := net.Dial("tcp", addr)
+	if err != nil {
+		return nil, err
+	}
+
+	request := fmt.Sprintf("GET %s HTTP/1.1\r\n\r\n", path)
+
+	_, err = conn.Write([]byte(request))
+
+	return conn, err
+}
+
+func parseBody(resp *stdhttp.Response) (httptest.Request, error) {
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return httptest.Request{}, err
+	}
+
+	return httptest.Parse(string(body))
+}
 
 func contains(strs []string, substr string) bool {
 	for _, str := range strs {
