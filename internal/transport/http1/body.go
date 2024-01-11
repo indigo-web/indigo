@@ -116,7 +116,7 @@ func (b *Body) Retrieve() ([]byte, error) {
 	return piece, err
 }
 
-func (b *Body) Reset() (err error) {
+func (b *Body) Discard() (err error) {
 	for !b.eof {
 		_, err = b.Retrieve()
 		if err != nil {

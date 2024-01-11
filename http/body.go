@@ -21,6 +21,6 @@ type Body interface {
 	// When the body is completely processed, the method will silently exit without notifying
 	// the passed function anyhow
 	Callback(cb OnBodyCallback) error
-	// Reset reads the rest of the body into the abyss
-	Reset() error
+	// Discard discards the rest of the body
+	Discard() error
 }

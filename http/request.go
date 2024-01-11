@@ -132,7 +132,7 @@ func (r *Request) Respond() *Response {
 // should read it before) all the body left. After handler exits, the connection will
 // be closed, so the connection can be hijacked only once
 func (r *Request) Hijack() (net.Conn, error) {
-	if err := r.Body.Reset(); err != nil {
+	if err := r.Body.Discard(); err != nil {
 		return nil, err
 	}
 
@@ -153,7 +153,7 @@ func (r *Request) Clear() (err error) {
 	r.Params.Clear()
 	r.Ctx = zeroContext
 
-	if err = r.Body.Reset(); err != nil {
+	if err = r.Body.Discard(); err != nil {
 		return err
 	}
 
