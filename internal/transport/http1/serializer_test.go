@@ -20,8 +20,8 @@ import (
 	"testing"
 )
 
-func getDumper(defaultHeaders map[string]string) *Dumper {
-	return NewDumper(make([]byte, 0, 1024), 1, defaultHeaders)
+func getSerializer(defaultHeaders map[string]string) *Serializer {
+	return NewSerializer(make([]byte, 0, 1024), 1, defaultHeaders)
 }
 
 func newRequest() *http.Request {
@@ -40,16 +40,16 @@ func (a *accumulativeClient) Write(b []byte) error {
 	return nil
 }
 
-func TestDumper_Write(t *testing.T) {
+func TestSerializer_Write(t *testing.T) {
 	request := newRequest()
 	request.Method = method.GET
 	stdreq, err := stdhttp.NewRequest(stdhttp.MethodGet, "/", nil)
 	require.NoError(t, err)
 
 	t.Run("default builder", func(t *testing.T) {
-		dumper := getDumper(nil)
+		serializer := getSerializer(nil)
 		writer := new(accumulativeClient)
-		require.NoError(t, dumper.Dump(proto.HTTP11, request, http.NewResponse(), writer))
+		require.NoError(t, serializer.Write(proto.HTTP11, request, http.NewResponse(), writer))
 		resp, err := stdhttp.ReadResponse(bufio.NewReader(bytes.NewBuffer(writer.Data)), stdreq)
 		require.Equal(t, 200, resp.StatusCode)
 		require.Equal(t, 2, len(resp.Header))
@@ -60,13 +60,13 @@ func TestDumper_Write(t *testing.T) {
 		require.Empty(t, body)
 	})
 
-	testWithHeaders := func(t *testing.T, dumper *Dumper) {
+	testWithHeaders := func(t *testing.T, serialiser *Serializer) {
 		response := http.NewResponse().
 			Header("Hello", "nether").
 			Header("Something", "special", "here")
 
 		writer := new(accumulativeClient)
-		require.NoError(t, dumper.Dump(proto.HTTP11, request, response, writer))
+		require.NoError(t, serialiser.Write(proto.HTTP11, request, response, writer))
 		resp, err := stdhttp.ReadResponse(bufio.NewReader(bytes.NewBuffer(writer.Data)), stdreq)
 		require.Equal(t, 200, resp.StatusCode)
 
@@ -89,20 +89,20 @@ func TestDumper_Write(t *testing.T) {
 			"Server": "indigo",
 			"Lorem":  "ipsum, something else",
 		}
-		dumper := getDumper(defHeaders)
-		testWithHeaders(t, dumper)
-		testWithHeaders(t, dumper)
+		serializer := getSerializer(defHeaders)
+		testWithHeaders(t, serializer)
+		testWithHeaders(t, serializer)
 	})
 
 	t.Run("HEAD request", func(t *testing.T) {
 		const body = "Hello, world!"
-		dumper := getDumper(nil)
+		serializer := getSerializer(nil)
 		response := http.NewResponse().String(body)
 		request := newRequest()
 		request.Method = method.HEAD
 
 		writer := new(accumulativeClient)
-		require.NoError(t, dumper.Dump(proto.HTTP11, request, response, writer))
+		require.NoError(t, serializer.Write(proto.HTTP11, request, response, writer))
 
 		r, err := stdhttp.NewRequest(stdhttp.MethodHead, "/", nil)
 		require.NoError(t, err)
@@ -115,25 +115,25 @@ func TestDumper_Write(t *testing.T) {
 	})
 
 	t.Run("HTTP/0.9", func(t *testing.T) {
-		dumper := getDumper(nil)
+		serializer := getSerializer(nil)
 		response := http.NewResponse()
-		err := dumper.Dump(proto.HTTP09, request, response, new(accumulativeClient))
+		err := serializer.Write(proto.HTTP09, request, response, new(accumulativeClient))
 		require.EqualError(t, err, status.ErrCloseConnection.Error())
 	})
 
 	t.Run("HTTP/1.0 without keep-alive", func(t *testing.T) {
-		dumper := getDumper(nil)
+		serializer := getSerializer(nil)
 		response := http.NewResponse()
-		err := dumper.Dump(proto.HTTP10, request, response, new(accumulativeClient))
+		err := serializer.Write(proto.HTTP10, request, response, new(accumulativeClient))
 		require.EqualError(t, err, status.ErrCloseConnection.Error())
 	})
 
 	t.Run("custom code and status", func(t *testing.T) {
-		dumper := getDumper(nil)
+		serializer := getSerializer(nil)
 		response := http.NewResponse().Code(600)
 
 		writer := new(accumulativeClient)
-		require.NoError(t, dumper.Dump(proto.HTTP11, request, response, writer))
+		require.NoError(t, serializer.Write(proto.HTTP11, request, response, writer))
 		require.NoError(t, err)
 		resp, err := stdhttp.ReadResponse(bufio.NewReader(bytes.NewBuffer(writer.Data)), stdreq)
 		require.NoError(t, err)
@@ -143,11 +143,11 @@ func TestDumper_Write(t *testing.T) {
 	t.Run("attachment with known size", func(t *testing.T) {
 		const body = "Hello, world!"
 		reader := strings.NewReader(body)
-		dumper := getDumper(nil)
+		serializer := getSerializer(nil)
 		response := http.NewResponse().Attachment(reader, reader.Len())
 
 		writer := new(accumulativeClient)
-		require.NoError(t, dumper.Dump(proto.HTTP11, request, response, writer))
+		require.NoError(t, serializer.Write(proto.HTTP11, request, response, writer))
 
 		resp, err := stdhttp.ReadResponse(bufio.NewReader(bytes.NewBuffer(writer.Data)), stdreq)
 		require.NoError(t, err)
@@ -161,11 +161,11 @@ func TestDumper_Write(t *testing.T) {
 	t.Run("attachment with unknown size", func(t *testing.T) {
 		const body = "Hello, world!"
 		reader := strings.NewReader(body)
-		dumper := getDumper(nil)
+		serializer := getSerializer(nil)
 		response := http.NewResponse().Attachment(reader, 0)
 
 		writer := new(accumulativeClient)
-		require.NoError(t, dumper.Dump(proto.HTTP11, request, response, writer))
+		require.NoError(t, serializer.Write(proto.HTTP11, request, response, writer))
 		resp, err := stdhttp.ReadResponse(bufio.NewReader(bytes.NewBuffer(writer.Data)), stdreq)
 		require.NoError(t, err)
 		require.Equal(t, 1, len(resp.TransferEncoding))
@@ -178,14 +178,14 @@ func TestDumper_Write(t *testing.T) {
 	t.Run("attachment in respose to a HEAD request", func(t *testing.T) {
 		const body = "Hello, world!"
 		reader := strings.NewReader(body)
-		dumper := getDumper(nil)
+		serializer := getSerializer(nil)
 		response := http.NewResponse().Attachment(reader, reader.Len())
 		request.Method = method.HEAD
 		stdreq, err := stdhttp.NewRequest(stdhttp.MethodHead, "/", nil)
 		require.NoError(t, err)
 
 		writer := new(accumulativeClient)
-		require.NoError(t, dumper.Dump(proto.HTTP11, request, response, writer))
+		require.NoError(t, serializer.Write(proto.HTTP11, request, response, writer))
 
 		resp, err := stdhttp.ReadResponse(bufio.NewReader(bytes.NewBuffer(writer.Data)), stdreq)
 		require.NoError(t, err)
@@ -197,12 +197,12 @@ func TestDumper_Write(t *testing.T) {
 	})
 }
 
-func TestDumper_PreWrite(t *testing.T) {
+func TestSerializer_PreWrite(t *testing.T) {
 	t.Run("upgrade from HTTP/1.0 to HTTP/1.1", func(t *testing.T) {
 		defHeaders := map[string]string{
 			"Hello": "world",
 		}
-		dumper := getDumper(defHeaders)
+		serializer := getSerializer(defHeaders)
 		request := newRequest()
 		request.Proto = proto.HTTP10
 		request.Upgrade = proto.HTTP11
@@ -210,10 +210,10 @@ func TestDumper_PreWrite(t *testing.T) {
 			Code(status.SwitchingProtocols).
 			Header("Connection", "upgrade").
 			Header("Upgrade", "HTTP/1.1")
-		dumper.PreDump(request.Proto, preResponse)
+		serializer.PreWrite(request.Proto, preResponse)
 
 		writer := new(accumulativeClient)
-		require.NoError(t, dumper.Dump(proto.HTTP11, request, http.NewResponse(), writer))
+		require.NoError(t, serializer.Write(proto.HTTP11, request, http.NewResponse(), writer))
 
 		r := &stdhttp.Request{
 			Method:     stdhttp.MethodGet,
@@ -242,15 +242,15 @@ func TestDumper_PreWrite(t *testing.T) {
 	})
 }
 
-func TestDumper_ChunkedTransfer(t *testing.T) {
+func TestSerializer_ChunkedTransfer(t *testing.T) {
 	t.Run("single chunk", func(t *testing.T) {
 		reader := bytes.NewBuffer([]byte("Hello, world!"))
 		wantData := "d\r\nHello, world!\r\n0\r\n\r\n"
-		dumper := getDumper(nil)
-		dumper.fileBuff = make([]byte, math.MaxUint16)
+		serializer := getSerializer(nil)
+		serializer.fileBuff = make([]byte, math.MaxUint16)
 
 		writer := new(accumulativeClient)
-		err := dumper.writeChunkedBody(reader, writer)
+		err := serializer.writeChunkedBody(reader, writer)
 		require.NoError(t, err)
 		require.Equal(t, wantData, string(writer.Data))
 	})
@@ -260,11 +260,11 @@ func TestDumper_ChunkedTransfer(t *testing.T) {
 		parser := chunkedbody.NewParser(chunkedbody.DefaultSettings())
 		payload := strings.Repeat("abcdefgh", 10*buffSize)
 		reader := bytes.NewBuffer([]byte(payload))
-		dumper := getDumper(nil)
-		dumper.fileBuff = make([]byte, buffSize)
+		serializer := getSerializer(nil)
+		serializer.fileBuff = make([]byte, buffSize)
 
 		writer := new(accumulativeClient)
-		require.NoError(t, dumper.writeChunkedBody(reader, writer))
+		require.NoError(t, serializer.writeChunkedBody(reader, writer))
 
 		var data []byte
 		for len(writer.Data) > 0 {

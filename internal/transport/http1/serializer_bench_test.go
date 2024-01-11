@@ -18,7 +18,7 @@ func (n NopClientWriter) Write([]byte) error {
 	return nil
 }
 
-func BenchmarkDumper(b *testing.B) {
+func Benchmarkserializer(b *testing.B) {
 	defaultHeadersSmall := map[string]string{
 		"Server": "indigo",
 	}
@@ -51,107 +51,107 @@ func BenchmarkDumper(b *testing.B) {
 
 	b.Run("no body no def headers", func(b *testing.B) {
 		buff := make([]byte, 0, 1024)
-		dumper := NewDumper(buff, 0, nil)
-		respSize, err := estimateResponseSize(dumper, request, response)
+		serializer := NewSerializer(buff, 0, nil)
+		respSize, err := estimateResponseSize(serializer, request, response)
 		require.NoError(b, err)
 		b.SetBytes(respSize)
 		b.ReportAllocs()
 		b.ResetTimer()
 
 		for i := 0; i < b.N; i++ {
-			_ = dumper.Dump(request.Proto, request, response, client)
+			_ = serializer.Write(request.Proto, request, response, client)
 		}
 	})
 
 	b.Run("with 4kb body", func(b *testing.B) {
 		response := http.NewResponse().String(strings.Repeat("a", 4096))
 		buff := make([]byte, 0, 8192)
-		dumper := NewDumper(buff, 0, nil)
-		respSize, err := estimateResponseSize(dumper, request, response)
+		serializer := NewSerializer(buff, 0, nil)
+		respSize, err := estimateResponseSize(serializer, request, response)
 		require.NoError(b, err)
 		b.SetBytes(respSize)
 		b.ReportAllocs()
 		b.ResetTimer()
 
 		for i := 0; i < b.N; i++ {
-			_ = dumper.Dump(request.Proto, request, response, client)
+			_ = serializer.Write(request.Proto, request, response, client)
 		}
 	})
 
 	b.Run("no body 1 def header", func(b *testing.B) {
 		buff := make([]byte, 0, 1024)
-		dumper := NewDumper(buff, 0, defaultHeadersSmall)
-		respSize, err := estimateResponseSize(dumper, request, response)
+		serializer := NewSerializer(buff, 0, defaultHeadersSmall)
+		respSize, err := estimateResponseSize(serializer, request, response)
 		require.NoError(b, err)
 		b.SetBytes(respSize)
 		b.ReportAllocs()
 		b.ResetTimer()
 
 		for i := 0; i < b.N; i++ {
-			_ = dumper.Dump(request.Proto, request, response, client)
+			_ = serializer.Write(request.Proto, request, response, client)
 		}
 	})
 
 	b.Run("no body 3 def headers", func(b *testing.B) {
 		buff := make([]byte, 0, 1024)
-		dumper := NewDumper(buff, 0, defaultHeadersMedium)
-		respSize, err := estimateResponseSize(dumper, request, response)
+		serializer := NewSerializer(buff, 0, defaultHeadersMedium)
+		respSize, err := estimateResponseSize(serializer, request, response)
 		require.NoError(b, err)
 		b.SetBytes(respSize)
 		b.ReportAllocs()
 		b.ResetTimer()
 
 		for i := 0; i < b.N; i++ {
-			_ = dumper.Dump(request.Proto, request, response, client)
+			_ = serializer.Write(request.Proto, request, response, client)
 		}
 	})
 
 	b.Run("no body 8 def headers", func(b *testing.B) {
 		buff := make([]byte, 0, 1024)
-		dumper := NewDumper(buff, 0, defaultHeadersBig)
-		respSize, err := estimateResponseSize(dumper, request, response)
+		serializer := NewSerializer(buff, 0, defaultHeadersBig)
+		respSize, err := estimateResponseSize(serializer, request, response)
 		require.NoError(b, err)
 		b.SetBytes(respSize)
 		b.ReportAllocs()
 		b.ResetTimer()
 
 		for i := 0; i < b.N; i++ {
-			_ = dumper.Dump(request.Proto, request, response, client)
+			_ = serializer.Write(request.Proto, request, response, client)
 		}
 	})
 
-	b.Run("with pre-dump", func(b *testing.B) {
+	b.Run("with pre-Serializ", func(b *testing.B) {
 		preResp := http.NewResponse().Code(status.SwitchingProtocols)
 		buff := make([]byte, 0, 128)
-		dumper := NewDumper(buff, 0, nil)
-		respSize, err := estimatePreDumpSize(dumper, request, preResp, response)
+		serializer := NewSerializer(buff, 0, nil)
+		respSize, err := estimatePreSerializSize(serializer, request, preResp, response)
 		require.NoError(b, err)
 		b.SetBytes(respSize)
 		b.ReportAllocs()
 		b.ResetTimer()
 
 		for i := 0; i < b.N; i++ {
-			dumper.PreDump(request.Proto, preResp)
-			_ = dumper.Dump(request.Proto, request, response, client)
+			serializer.PreWrite(request.Proto, preResp)
+			_ = serializer.Write(request.Proto, request, response, client)
 		}
 	})
 }
 
 func estimateResponseSize(
-	dumper *Dumper, req *http.Request, resp *http.Response,
+	serializer *Serializer, req *http.Request, resp *http.Response,
 ) (int64, error) {
 	writer := dummy.NewSinkholeWriter()
-	err := dumper.Dump(req.Proto, req, resp, writer)
+	err := serializer.Write(req.Proto, req, resp, writer)
 
 	return int64(len(writer.Data)), err
 }
 
-func estimatePreDumpSize(
-	dumper *Dumper, req *http.Request, predump, resp *http.Response,
+func estimatePreSerializSize(
+	serializer *Serializer, req *http.Request, preSerializ, resp *http.Response,
 ) (int64, error) {
 	writer := dummy.NewSinkholeWriter()
-	dumper.PreDump(req.Proto, predump)
-	err := dumper.Dump(req.Proto, req, resp, writer)
+	serializer.PreWrite(req.Proto, preSerializ)
+	err := serializer.Write(req.Proto, req, resp, writer)
 
 	return int64(len(writer.Data)), err
 }

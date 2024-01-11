@@ -22,15 +22,15 @@ type Writer interface {
 	Write([]byte) error
 }
 
-// Dumper converts an HTTP response builder into bytes and writes it
-type Dumper interface {
-	PreDump(target proto.Proto, response *http.Response)
-	Dump(target proto.Proto, request *http.Request, response *http.Response, writer Writer) error
+// Serializer converts an HTTP response builder into bytes and writes it
+type Serializer interface {
+	PreWrite(target proto.Proto, response *http.Response)
+	Write(target proto.Proto, request *http.Request, response *http.Response, writer Writer) error
 }
 
 // Transport is a general pair of a parser and a dumper. Usually consists of both belonging
 // to a same protocol major version
 type Transport interface {
 	Parser
-	Dumper
+	Serializer
 }
