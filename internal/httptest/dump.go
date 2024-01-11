@@ -1,10 +1,10 @@
 package httptest
 
 import (
-	"fmt"
 	"github.com/indigo-web/indigo/http"
 	"github.com/indigo-web/indigo/http/headers"
 	"github.com/indigo-web/indigo/http/proto"
+	"strconv"
 )
 
 func Dump(request *http.Request) (string, error) {
@@ -29,8 +29,12 @@ func Dump(request *http.Request) (string, error) {
 		buff = header(buff, h)
 	}
 
+	buff = header(buff, headers.Header{
+		Key:   "Content-Length",
+		Value: strconv.Itoa(request.ContentLength),
+	})
+
 	buff = crlf(buff)
-	fmt.Println("???")
 	body, err := request.Body.Bytes()
 	buff = append(buff, body...)
 
