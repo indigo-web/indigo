@@ -1,26 +1,28 @@
 package httptest
 
 import (
+	"errors"
 	"fmt"
-	"github.com/indigo-web/chunkedbody"
 	"github.com/indigo-web/indigo/http/headers"
-	"github.com/indigo-web/indigo/internal/datastruct"
-	"github.com/indigo-web/utils/uf"
+	"github.com/indigo-web/indigo/http/method"
+	"github.com/indigo-web/indigo/internal/keyvalue"
 	"strconv"
 	"strings"
 )
 
+var errNotPresented = errors.New("no values are presented")
+
 type Request struct {
+	Method  method.Method
+	Path    string
 	Proto   string
-	Code    int
-	Status  string
 	Headers headers.Headers
 	Body    string
 }
 
 func NewRequest() Request {
 	return Request{
-		Headers: datastruct.NewKeyValue(),
+		Headers: keyvalue.New(),
 	}
 }
 
@@ -28,25 +30,21 @@ func Parse(raw string) (request Request, err error) {
 	var found bool
 	request = NewRequest()
 
-	request.Proto, raw, found = strings.Cut(raw, " ")
+	m, rest, ok := strings.Cut(raw, " ")
+	if !ok || len(rest) == 0 {
+		return request, fmt.Errorf("bad request line: lacking method")
+	}
+	request.Method = method.Parse(m)
+	raw = rest
+
+	request.Path, raw, found = strings.Cut(raw, " ")
 	if !found || len(raw) == 0 {
-		return request, fmt.Errorf("bad request line: lacking code and status")
+		return request, fmt.Errorf("bad request line: lacking path")
 	}
 
-	var code string
-	code, raw, found = strings.Cut(raw, " ")
-	request.Code, err = strconv.Atoi(code)
-	if err != nil {
-		return request, err
-	}
-
+	request.Proto, raw, found = strings.Cut(raw, "\r\n")
 	if !found || len(raw) == 0 {
-		return request, fmt.Errorf("bad request line: lacking status code")
-	}
-
-	request.Status, raw, found = strings.Cut(raw, "\r\n")
-	if !found || len(raw) == 0 {
-		return request, fmt.Errorf("bad request: only request line is presented")
+		return request, fmt.Errorf("bad request: lacking finalizing CRLF")
 	}
 
 	for {
@@ -67,9 +65,41 @@ func Parse(raw string) (request Request, err error) {
 		request.Headers.Add(key, value)
 	}
 
-	request.Body, err = processBody(request, raw)
+	length, err := getContentLength(request.Headers.Values("content-length"))
+	switch err {
+	case nil:
+	case errNotPresented:
+		if connection := request.Headers.Value("connection"); connection == "close" {
+			length = len(raw)
+			break
+		}
 
-	return request, err
+		return request, fmt.Errorf("no content-length is presented")
+	default:
+		return request, fmt.Errorf("bad content-length: %s", err)
+	}
+
+	if length != len(raw) {
+		return request, fmt.Errorf(
+			"bad body: content-length=%d, actual=%d",
+			length, len(raw),
+		)
+	}
+
+	request.Body = raw
+
+	return request, nil
+}
+
+func getContentLength(values []string) (int, error) {
+	switch len(values) {
+	case 0:
+		return 0, errNotPresented
+	case 1:
+		return strconv.Atoi(values[0])
+	default:
+		return 0, fmt.Errorf("too many values")
+	}
 }
 
 func parseHeaderLine(line string) (key, value string, err error) {
@@ -86,65 +116,50 @@ func parseHeaderLine(line string) (key, value string, err error) {
 	return key, value, nil
 }
 
-func processBody(request Request, data string) (string, error) {
-	if request.Headers.Value("connection") == "close" {
-		return data, nil
+func Compare(got Request, want Request) (errs []error) {
+	if got.Method != want.Method {
+		errs = append(errs, fmt.Errorf("want method %s, got %s", want.Method, got.Method))
 	}
 
-	te := request.Headers.Values("transfer-encoding")
-	if len(te) > 0 {
-		if len(te) != 1 || te[0] != "chunked" {
-			return "", fmt.Errorf("httptest: cannot process encodings: %s", strings.Join(te, ","))
-		}
-
-		_, hasTrailer := request.Headers.Get("trailer")
-
-		return processChunkedBody(data, hasTrailer)
+	if got.Path != want.Path {
+		errs = append(errs, fmt.Errorf("want path %s, got %s", want.Path, got.Path))
 	}
 
-	contentLengths := request.Headers.Values("content-length")
-	switch len(contentLengths) {
-	case 0:
-		if len(data) == 0 {
-			return "", nil
-		}
-
-		return "", fmt.Errorf("bad request: neither Transfer-Encoding or Content-Length are presented")
-	case 1:
-		length, err := strconv.Atoi(contentLengths[0])
-		if err != nil {
-			return "", err
-		}
-
-		return processPlainBody(data, length)
-	default:
-		return "", fmt.Errorf(
-			"bad request: too many content-lengths: %s", strings.Join(contentLengths, ", "),
-		)
+	if got.Proto != want.Proto {
+		errs = append(errs, fmt.Errorf("want protocol %s, got %s", want.Proto, got.Proto))
 	}
+
+	if want.Headers != nil {
+		for _, key := range want.Headers.Keys() {
+			wantValues := want.Headers.Values(key)
+			gotValues := got.Headers.Values(key)
+			if !cmpSlice(wantValues, gotValues) {
+				errs = append(errs, fmt.Errorf("want %s for %s, got %s", wantValues, key, gotValues))
+			}
+		}
+
+		if len(want.Headers.Keys()) != len(got.Headers.Keys()) {
+			errs = append(errs, fmt.Errorf("got extra headers"))
+		}
+	}
+
+	if got.Body != want.Body {
+		errs = append(errs, fmt.Errorf("want body %s, got %s", want.Body, got.Body))
+	}
+
+	return errs
 }
 
-func processChunkedBody(data string, trailer bool) (string, error) {
-	var buff []byte
-	parser := chunkedbody.NewParser(chunkedbody.DefaultSettings())
+func cmpSlice(a, b []string) bool {
+	if len(a) != len(b) {
+		return false
+	}
 
-	for len(data) > 0 {
-		chunk, extra, err := parser.Parse(uf.S2B(data), trailer)
-		if err != nil {
-			return "", fmt.Errorf("bad request: bad chunked body: %s", err)
+	for i := range a {
+		if a[i] != b[i] {
+			return false
 		}
-
-		buff = append(buff, chunk...)
-		data = string(extra)
 	}
 
-	return string(buff), nil
-}
-
-func processPlainBody(data string, length int) (string, error) {
-	if len(data) > length {
-		return "", fmt.Errorf("got extra body. Please note: no pipelining is supported yet")
-	}
-
-	return data, nil
+	return true
 }
