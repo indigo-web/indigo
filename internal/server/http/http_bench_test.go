@@ -1,7 +1,7 @@
 package http
 
 import (
-	"github.com/indigo-web/indigo/internal/datastruct"
+	"github.com/indigo-web/indigo/internal/keyvalue"
 	"github.com/indigo-web/indigo/internal/server/tcp"
 	"strings"
 	"testing"
@@ -197,7 +197,7 @@ func newServer(client tcp.Client) (*Server, *http.Request, transport.Transport) 
 	// getSimpleRouter() here. It is visibly faster
 	r := getInbuiltRouter()
 	s := settings.Default()
-	q := query.NewQuery(datastruct.NewKeyValue())
+	q := query.NewQuery(keyvalue.New())
 	body := http1.NewBody(
 		client, nil, s.Body,
 	)

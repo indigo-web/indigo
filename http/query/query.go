@@ -2,24 +2,24 @@ package query
 
 import (
 	"errors"
-	"github.com/indigo-web/indigo/internal/datastruct"
+	"github.com/indigo-web/indigo/internal/keyvalue"
 
 	"github.com/indigo-web/indigo/internal/query"
 )
 
 var ErrNoSuchKey = errors.New("no entry by the key")
 
-type Params = datastruct.KeyValue
+type Params = *keyvalue.Storage
 
 // Query is a lazy structure for accessing URI parameters. Its laziness is defined
 // by the fact that parameters won't be parsed until requested
 type Query struct {
 	parsed bool
-	params *Params
+	params Params
 	raw    []byte
 }
 
-func NewQuery(underlying *datastruct.KeyValue) *Query {
+func NewQuery(underlying *keyvalue.Storage) *Query {
 	return &Query{
 		params: underlying,
 	}
@@ -56,7 +56,7 @@ func (q *Query) Get(key string) (value string, err error) {
 }
 
 // Unwrap returns all query parameters. If error occurred, nil parameters will be returned
-func (q *Query) Unwrap() (*Params, error) {
+func (q *Query) Unwrap() (Params, error) {
 	return q.params, q.parse()
 }
 

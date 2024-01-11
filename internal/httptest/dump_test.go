@@ -6,7 +6,7 @@ import (
 	"github.com/indigo-web/indigo/http/method"
 	"github.com/indigo-web/indigo/http/proto"
 	"github.com/indigo-web/indigo/http/query"
-	"github.com/indigo-web/indigo/internal/datastruct"
+	"github.com/indigo-web/indigo/internal/keyvalue"
 	"github.com/indigo-web/indigo/internal/server/tcp/dummy"
 	"github.com/indigo-web/indigo/internal/transport/http1"
 	"github.com/indigo-web/indigo/settings"
@@ -18,8 +18,7 @@ func TestDump(t *testing.T) {
 	hdrs := headers.New()
 	hdrs.Add("hello", "world")
 	hdrs.Add("foo", "bar")
-	hdrs.Add("Content-Length", "13")
-	q := query.NewQuery(datastruct.NewKeyValue())
+	q := query.NewQuery(keyvalue.New())
 	q.Set([]byte("hello=world&foo=bar"))
 	client := dummy.NewCircularClient([]byte("Hello, world!"))
 	client.OneTime()

@@ -2,7 +2,7 @@ package radix
 
 import (
 	"errors"
-	"github.com/indigo-web/indigo/internal/datastruct"
+	"github.com/indigo-web/indigo/internal/keyvalue"
 	"github.com/indigo-web/indigo/router/inbuilt/internal/types"
 )
 
@@ -10,7 +10,7 @@ var ErrNotImplemented = errors.New(
 	"different dynamic segment names are not allowed for common path prefix",
 )
 
-type Params = datastruct.KeyValue
+type Params = *keyvalue.Storage
 
 type Payload struct {
 	MethodsMap types.MethodsMap
@@ -20,7 +20,7 @@ type Payload struct {
 type Tree interface {
 	Insert(Template, Payload) error
 	MustInsert(Template, Payload)
-	Match(string, *Params) *Payload
+	Match(string, Params) *Payload
 }
 
 var _ Tree = new(Node)
@@ -90,7 +90,7 @@ func (n *Node) insertRecursively(segments []Segment, payload *Payload) error {
 	return node.insertRecursively(segments[1:], payload)
 }
 
-func (n *Node) Match(path string, params *Params) *Payload {
+func (n *Node) Match(path string, params Params) *Payload {
 	if path[0] != '/' {
 		// all http request paths MUST have a leading slash
 		return nil
@@ -126,7 +126,7 @@ func (n *Node) Match(path string, params *Params) *Payload {
 	return node.payload
 }
 
-func processSegment(params *Params, segment string, node *Node) (*Node, bool) {
+func processSegment(params Params, segment string, node *Node) (*Node, bool) {
 	if nextNode, found := node.staticSegments[segment]; found {
 		return nextNode, true
 	}

@@ -1,7 +1,7 @@
 package radix
 
 import (
-	"github.com/indigo-web/indigo/internal/datastruct"
+	"github.com/indigo-web/indigo/internal/keyvalue"
 	"github.com/indigo-web/indigo/router/inbuilt/internal/types"
 	"testing"
 
@@ -37,27 +37,27 @@ func TestNode_Match_Positive(t *testing.T) {
 	tree.MustInsert(MustParse("/"), payload)
 
 	t.Run("match static", func(t *testing.T) {
-		params := datastruct.NewKeyValue()
+		params := keyvalue.New()
 		handler := tree.Match(staticSample, params)
 		require.NotNil(t, handler)
 	})
 
 	t.Run("unnamed match", func(t *testing.T) {
-		params := datastruct.NewKeyValue()
+		params := keyvalue.New()
 		handler := tree.Match(unnamedSample, params)
 		require.Empty(t, params.Values(""))
 		require.NotNil(t, handler)
 	})
 
 	t.Run("short template", func(t *testing.T) {
-		params := datastruct.NewKeyValue()
+		params := keyvalue.New()
 		handler := tree.Match(shortSample, params)
 		require.NotNil(t, handler)
 		require.Equal(t, "some-very-long-world", params.Value("world"))
 	})
 
 	t.Run("medium template", func(t *testing.T) {
-		params := datastruct.NewKeyValue()
+		params := keyvalue.New()
 		handler := tree.Match(mediumSample, params)
 		require.NotNil(t, handler)
 		require.Equal(t, "world-finally-became", params.Value("world"))
@@ -66,7 +66,7 @@ func TestNode_Match_Positive(t *testing.T) {
 	})
 
 	t.Run("root", func(t *testing.T) {
-		params := datastruct.NewKeyValue()
+		params := keyvalue.New()
 		handler := tree.Match("/", params)
 		require.NotNil(t, handler)
 	})
@@ -83,7 +83,7 @@ func TestNode_Match_Negative(t *testing.T) {
 	tree.MustInsert(MustParse(longTemplateSample), payload)
 
 	t.Run("static prefix", func(t *testing.T) {
-		params := datastruct.NewKeyValue()
+		params := keyvalue.New()
 		handler := tree.Match("/hello", params)
 		require.Nil(t, handler)
 		handler = tree.Match("/hello/", params)
@@ -91,7 +91,7 @@ func TestNode_Match_Negative(t *testing.T) {
 	})
 
 	t.Run("empty dynamic section", func(t *testing.T) {
-		params := datastruct.NewKeyValue()
+		params := keyvalue.New()
 		handler := tree.Match("/hello//very/good/ok", params)
 		require.Nil(t, handler)
 	})

@@ -2,7 +2,7 @@ package query
 
 import (
 	"github.com/indigo-web/indigo/http/status"
-	"github.com/indigo-web/indigo/internal/datastruct"
+	"github.com/indigo-web/indigo/internal/keyvalue"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -11,7 +11,7 @@ import (
 func TestParamsParser(t *testing.T) {
 	t.Run("single pair", func(t *testing.T) {
 		query := "hello=world"
-		result := datastruct.NewKeyValue()
+		result := keyvalue.New()
 		err := Parse([]byte(query), result)
 		require.NoError(t, err)
 		require.True(t, result.Has("hello"))
@@ -20,7 +20,7 @@ func TestParamsParser(t *testing.T) {
 
 	t.Run("two pairs", func(t *testing.T) {
 		query := "hello=world&lorem=ipsum"
-		result := datastruct.NewKeyValue()
+		result := keyvalue.New()
 		err := Parse([]byte(query), result)
 		require.NoError(t, err)
 		require.True(t, result.Has("hello"))
@@ -31,7 +31,7 @@ func TestParamsParser(t *testing.T) {
 
 	t.Run("empty value before ampersand", func(t *testing.T) {
 		query := "hello=&another=pair"
-		result := datastruct.NewKeyValue()
+		result := keyvalue.New()
 		err := Parse([]byte(query), result)
 		require.NoError(t, err)
 		require.True(t, result.Has("hello"))
@@ -40,7 +40,7 @@ func TestParamsParser(t *testing.T) {
 
 	t.Run("single entry without value", func(t *testing.T) {
 		query := "hello="
-		result := datastruct.NewKeyValue()
+		result := keyvalue.New()
 		err := Parse([]byte(query), result)
 		require.NoError(t, err)
 		require.True(t, result.Has("hello"))
@@ -49,13 +49,13 @@ func TestParamsParser(t *testing.T) {
 
 	t.Run("empty key", func(t *testing.T) {
 		query := "=world"
-		err := Parse([]byte(query), datastruct.NewKeyValue())
+		err := Parse([]byte(query), keyvalue.New())
 		require.ErrorIs(t, err, status.ErrBadQuery)
 	})
 
 	t.Run("ampersand without continuation at the end", func(t *testing.T) {
 		query := "hello=world&"
-		result := datastruct.NewKeyValue()
+		result := keyvalue.New()
 		err := Parse([]byte(query), result)
 		require.NoError(t, err)
 		require.True(t, result.Has("hello"))
@@ -63,7 +63,7 @@ func TestParamsParser(t *testing.T) {
 	})
 
 	t.Run("flag", func(t *testing.T) {
-		result := datastruct.NewKeyValue()
+		result := keyvalue.New()
 
 		for _, paramsString := range []string{
 			"lorem&hello=world&foo=bar",
@@ -83,7 +83,7 @@ func TestParamsParser(t *testing.T) {
 
 	t.Run("single flag", func(t *testing.T) {
 		query := "lorem"
-		result := datastruct.NewKeyValue()
+		result := keyvalue.New()
 		err := Parse([]byte(query), result)
 		require.NoError(t, err)
 		require.True(t, result.Has("lorem"))

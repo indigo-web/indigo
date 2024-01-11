@@ -2,7 +2,7 @@ package query
 
 import (
 	"github.com/indigo-web/indigo/http/status"
-	"github.com/indigo-web/indigo/internal/datastruct"
+	"github.com/indigo-web/indigo/internal/keyvalue"
 	"github.com/indigo-web/indigo/internal/uridecode"
 	"github.com/indigo-web/utils/uf"
 )
@@ -10,7 +10,7 @@ import (
 // replace empty value (or so-called parameter without value) with the following string
 const defaultEmptyValueContent = "1"
 
-func Parse(data []byte, params *datastruct.KeyValue) (err error) {
+func Parse(data []byte, params *keyvalue.Storage) (err error) {
 	if len(data) == 0 {
 		return nil
 	}

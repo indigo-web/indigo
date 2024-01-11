@@ -1,14 +1,16 @@
 package headers
 
-import "github.com/indigo-web/indigo/internal/datastruct"
+import (
+	"github.com/indigo-web/indigo/internal/keyvalue"
+)
 
 type (
-	Header  = datastruct.Pair
-	Headers = *datastruct.KeyValue
+	Header  = keyvalue.Pair
+	Headers = *keyvalue.Storage
 )
 
 func NewPrealloc(n int) Headers {
-	return datastruct.NewKeyValuePreAlloc(n)
+	return keyvalue.NewPreAlloc(n)
 }
 
 func New() Headers {
@@ -16,5 +18,5 @@ func New() Headers {
 }
 
 func NewFromMap(m map[string][]string) Headers {
-	return datastruct.NewKeyValueFromMap(m)
+	return keyvalue.NewFromMap(m)
 }

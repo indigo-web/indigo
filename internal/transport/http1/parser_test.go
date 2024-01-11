@@ -2,7 +2,7 @@ package http1
 
 import (
 	"fmt"
-	"github.com/indigo-web/indigo/internal/datastruct"
+	"github.com/indigo-web/indigo/internal/keyvalue"
 	"github.com/indigo-web/indigo/internal/requestgen"
 	"github.com/indigo-web/indigo/internal/transport"
 	"strings"
@@ -44,7 +44,7 @@ func getParser() (*Parser, *http.Request) {
 		dummy.NewNopClient(), chunkedParser, s.Body)
 	request := http.NewRequest(
 		headers.New(), new(query.Query), http.NewResponse(),
-		dummy.NewNopConn(), body, datastruct.NewKeyValue(),
+		dummy.NewNopConn(), body, keyvalue.New(),
 	)
 
 	return NewParser(

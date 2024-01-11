@@ -1,7 +1,7 @@
 package radix
 
 import (
-	"github.com/indigo-web/indigo/internal/datastruct"
+	"github.com/indigo-web/indigo/internal/keyvalue"
 	"github.com/indigo-web/indigo/router/inbuilt/internal/types"
 	"testing"
 )
@@ -18,7 +18,7 @@ func BenchmarkTreeMatch(b *testing.B) {
 	tree.MustInsert(MustParse(mediumTemplateSample), payload)
 	tree.MustInsert(MustParse(longTemplateSample), payload)
 	const paramsPreAlloc = 5
-	params := datastruct.NewKeyValuePreAlloc(paramsPreAlloc)
+	params := keyvalue.NewPreAlloc(paramsPreAlloc)
 
 	b.Run("simple static", func(b *testing.B) {
 		for i := 0; i < b.N; i++ {

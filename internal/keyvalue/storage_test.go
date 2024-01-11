@@ -1,4 +1,4 @@
-package datastruct
+package keyvalue
 
 import (
 	"github.com/stretchr/testify/require"
@@ -6,7 +6,7 @@ import (
 )
 
 func TestKeyValueStorage(t *testing.T) {
-	testValues := func(t *testing.T, kv *KeyValue) {
+	testValues := func(t *testing.T, kv *Storage) {
 		for _, tc := range []struct {
 			Key    string
 			Values []string
@@ -34,7 +34,7 @@ func TestKeyValueStorage(t *testing.T) {
 	}
 
 	t.Run("Value with manual filling", func(t *testing.T) {
-		kv := NewKeyValue()
+		kv := New()
 		kv.Add("Hello", "world")
 		kv.Add("Some", "multiple")
 		kv.Add("Some", "values")
@@ -42,7 +42,7 @@ func TestKeyValueStorage(t *testing.T) {
 	})
 
 	t.Run("Value with map instantiation", func(t *testing.T) {
-		kv := NewKeyValueFromMap(map[string][]string{
+		kv := NewFromMap(map[string][]string{
 			"Hello": {"world"},
 			"Some":  {"multiple", "values"},
 		})
@@ -50,7 +50,7 @@ func TestKeyValueStorage(t *testing.T) {
 	})
 
 	t.Run("Has", func(t *testing.T) {
-		kv := NewKeyValue()
+		kv := New()
 		kv.Add("Hello", "world")
 		require.True(t, kv.Has("Hello"))
 		require.True(t, kv.Has("hELLO"))
@@ -58,7 +58,7 @@ func TestKeyValueStorage(t *testing.T) {
 	})
 
 	t.Run("Keys", func(t *testing.T) {
-		kv := NewKeyValue()
+		kv := New()
 		kv.Add("Hello", "world")
 		kv.Add("sOME", "multiple")
 		kv.Add("Some", "values")

@@ -9,7 +9,7 @@ import (
 	"github.com/indigo-web/indigo/http/proto"
 	"github.com/indigo-web/indigo/http/query"
 	"github.com/indigo-web/indigo/http/status"
-	"github.com/indigo-web/indigo/internal/datastruct"
+	"github.com/indigo-web/indigo/internal/keyvalue"
 	json "github.com/json-iterator/go"
 	"net"
 )
@@ -25,7 +25,7 @@ type Environment struct {
 	AliasFrom string
 }
 
-type Params = datastruct.KeyValue
+type Params = *keyvalue.Storage
 
 var zeroContext = context.Background()
 
@@ -38,7 +38,7 @@ type Request struct {
 	// Query are request's URI parameters
 	Query *query.Query
 	// Params are dynamic segment values
-	Params *Params
+	Params Params
 	// Proto is the protocol, which was used to make the request
 	Proto proto.Proto
 	// Headers are request headers. They are stored non-normalized, however lookup is
@@ -81,7 +81,7 @@ type Request struct {
 // that default method is a null-value (proto.Unknown)
 func NewRequest(
 	hdrs headers.Headers, query *query.Query, response *Response,
-	conn net.Conn, body Body, params *Params,
+	conn net.Conn, body Body, params Params,
 ) *Request {
 	request := &Request{
 		Query:    query,

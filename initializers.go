@@ -5,7 +5,7 @@ import (
 	"github.com/indigo-web/indigo/http"
 	"github.com/indigo-web/indigo/http/headers"
 	"github.com/indigo-web/indigo/http/query"
-	"github.com/indigo-web/indigo/internal/datastruct"
+	"github.com/indigo-web/indigo/internal/keyvalue"
 	"github.com/indigo-web/indigo/internal/server/tcp"
 	"github.com/indigo-web/indigo/internal/transport"
 	"github.com/indigo-web/indigo/internal/transport/http1"
@@ -45,7 +45,7 @@ func newRequest(s settings.Settings, conn net.Conn, body http.Body) *http.Reques
 	q := query.NewQuery(headers.NewPrealloc(s.URL.Query.PreAlloc))
 	hdrs := headers.NewPrealloc(s.Headers.Number.Default)
 	response := http.NewResponse()
-	params := datastruct.NewKeyValue()
+	params := keyvalue.New()
 
 	return http.NewRequest(hdrs, q, response, conn, body, params)
 }
