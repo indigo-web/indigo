@@ -105,7 +105,8 @@ func (a *App) AutoHTTPS(port uint16, domains ...string) *App {
 		cert, key, err := generateSelfSignedCert()
 		if err != nil {
 			log.Printf(
-				"WARNING: (*App).AutoHTTPS(...): can't generate self-signed certificate: %v. Disabling TLS",
+				"WARNING: (*App).AutoHTTPS(...): can't generate self-signed certificate: %s. Disabling TLS",
+				err,
 			)
 
 			return a
