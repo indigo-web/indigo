@@ -89,4 +89,22 @@ func TestParamsParser(t *testing.T) {
 		require.True(t, result.Has("lorem"))
 		require.Equal(t, defaultEmptyValueContent, result.Value("lorem"))
 	})
+
+	t.Run("encoded spaces", func(t *testing.T) {
+		query := "hel+lo=wo+rld"
+		result := keyvalue.New()
+		err := Parse([]byte(query), result)
+		require.NoError(t, err)
+		require.True(t, result.Has("hel lo"))
+		require.Equal(t, "wo rld", result.Value("hel lo"))
+	})
+
+	t.Run("url encoded", func(t *testing.T) {
+		query := "hel%20lo=wo%20rld"
+		result := keyvalue.New()
+		err := Parse([]byte(query), result)
+		require.NoError(t, err)
+		require.True(t, result.Has("hel lo"))
+		require.Equal(t, "wo rld", result.Value("hel lo"))
+	})
 }
