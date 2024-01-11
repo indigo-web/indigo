@@ -1,5 +1,6 @@
 package method
 
+//go:generate stringer -type=Method
 type Method uint8
 
 const (
@@ -19,10 +20,6 @@ const (
 	Count
 )
 
-func (m Method) String() string {
-	return ToString(m)
-}
-
 type entry struct {
 	Method Method
 	Origin string
@@ -30,7 +27,7 @@ type entry struct {
 
 func newMethodsMap(methods ...Method) (mmap [256][256]entry) {
 	for _, method := range methods {
-		str := ToString(method)
+		str := method.String()
 		mmap[str[0]][str[1]] = entry{
 			Method: method,
 			Origin: str,
@@ -49,29 +46,4 @@ func Parse(str string) Method {
 	}
 
 	return method.Method
-}
-
-func ToString(method Method) string {
-	switch method {
-	case GET:
-		return "GET"
-	case HEAD:
-		return "HEAD"
-	case POST:
-		return "POST"
-	case PUT:
-		return "PUT"
-	case DELETE:
-		return "DELETE"
-	case CONNECT:
-		return "CONNECT"
-	case OPTIONS:
-		return "OPTIONS"
-	case TRACE:
-		return "TRACE"
-	case PATCH:
-		return "PATCH"
-	}
-
-	return "???"
 }
