@@ -2,24 +2,26 @@ package query
 
 import (
 	"errors"
-	"github.com/indigo-web/indigo/http/headers"
+	"github.com/indigo-web/indigo/internal/keyvalue"
 
-	"github.com/indigo-web/indigo/internal/queryparser"
+	"github.com/indigo-web/indigo/internal/query"
 )
 
-var ErrNoSuchKey = errors.New("no such key")
+var ErrNoSuchKey = errors.New("no entry by the key")
 
-// Query is optional, it may contain rawQuery, but it will not be parsed until
-// needed
+type Params = *keyvalue.Storage
+
+// Query is a lazy structure for accessing URI parameters. Its laziness is defined
+// by the fact that parameters won't be parsed until requested
 type Query struct {
 	parsed bool
-	query  *headers.Headers
+	params Params
 	raw    []byte
 }
 
-func NewQuery(query *headers.Headers) Query {
-	return Query{
-		query: query,
+func NewQuery(underlying *keyvalue.Storage) *Query {
+	return &Query{
+		params: underlying,
 	}
 }
 
@@ -30,10 +32,9 @@ func (q *Query) Set(raw []byte) {
 	q.raw = raw
 
 	if q.parsed {
-		q.query.Clear()
+		q.parsed = false
+		q.params.Clear()
 	}
-
-	q.parsed = false
 }
 
 // Get is responsible for getting a key from query. In case this
@@ -42,16 +43,11 @@ func (q *Query) Set(raw []byte) {
 // (or ErrNoSuchKey instead). In case of invalid query bytearray,
 // ErrBadQuery will be returned
 func (q *Query) Get(key string) (value string, err error) {
-	if !q.parsed {
-		err = queryparser.Parse(q.raw, q.query)
-		if err != nil {
-			return "", err
-		}
-
-		q.parsed = true
+	if err = q.parse(); err != nil {
+		return "", err
 	}
 
-	value, found := q.query.Get(key)
+	value, found := q.params.Get(key)
 	if !found {
 		err = ErrNoSuchKey
 	}
@@ -59,7 +55,22 @@ func (q *Query) Get(key string) (value string, err error) {
 	return value, err
 }
 
+// Unwrap returns all query parameters. If error occurred, nil parameters will be returned
+func (q *Query) Unwrap() (Params, error) {
+	return q.params, q.parse()
+}
+
 // Raw just returns a raw value of query as it is
 func (q *Query) Raw() []byte {
 	return q.raw
+}
+
+func (q *Query) parse() error {
+	if q.parsed {
+		return nil
+	}
+
+	q.parsed = true
+
+	return query.Parse(q.raw, q.params)
 }

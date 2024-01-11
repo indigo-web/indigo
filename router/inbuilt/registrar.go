@@ -5,6 +5,7 @@ import (
 	"github.com/indigo-web/indigo/http/method"
 	radix2 "github.com/indigo-web/indigo/router/inbuilt/internal/radix"
 	"github.com/indigo-web/indigo/router/inbuilt/internal/types"
+	"github.com/indigo-web/indigo/router/inbuilt/uri"
 	"strings"
 )
 
@@ -20,14 +21,14 @@ func newRegistrar() *registrar {
 }
 
 func (r *registrar) Add(path string, m method.Method, handler Handler) error {
-	path = stripTrailingSlash(path)
+	path = uri.Normalize(path)
 	methodsMap := r.routes[path]
 	if methodsMap == nil {
 		methodsMap = make(map[method.Method]Handler)
 	}
 
 	if _, ok := methodsMap[m]; ok {
-		return fmt.Errorf("route already registered: %s %s", method.ToString(m), path)
+		return fmt.Errorf("route already registered: %s %s", m, path)
 	}
 
 	methodsMap[m] = handler
@@ -92,7 +93,7 @@ func (r *registrar) AsRadixTree() radix2.Tree {
 
 		for method_, handler := range v {
 			methodsMap[method_] = handler
-			allow += method.ToString(method_) + ","
+			allow += method_.String() + ","
 		}
 
 		tree.MustInsert(radix2.MustParse(path), radix2.Payload{

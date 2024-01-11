@@ -7,13 +7,12 @@ import (
 	"github.com/indigo-web/indigo/router"
 	"github.com/indigo-web/indigo/router/inbuilt/internal/radix"
 	"github.com/indigo-web/indigo/router/inbuilt/internal/types"
+	"github.com/indigo-web/indigo/router/inbuilt/uri"
 	"sort"
 	"strings"
 )
 
 var _ router.Router = &Router{}
-
-type mutator func(*http.Request)
 
 // Router is a built-in implementation of router.Router interface that provides
 // some basic router features like middlewares, groups, dynamic routing, error
@@ -22,12 +21,12 @@ type mutator func(*http.Request)
 type Router struct {
 	isRoot      bool
 	prefix      string
+	mutators    []Mutator
 	middlewares []Middleware
 	catchers    []Catcher
 	registrar   *registrar
 	routesMap   routesMap
 	tree        radix.Tree
-	aliases     map[string]string
 	isStatic    bool
 	errHandlers errorHandlers
 
@@ -70,12 +69,15 @@ func (r *Router) OnStart() error {
 
 // OnRequest processes the request
 func (r *Router) OnRequest(request *http.Request) *http.Response {
-	request.Path = stripTrailingSlash(request.Path)
+	r.runMutators(request)
 
-	if r.aliases != nil {
-		r.retrieveAlias(request)
-	}
+	// TODO: should path normalization be implemented as a mutator?
+	request.Path = uri.Normalize(request.Path)
 
+	return r.onRequest(request)
+}
+
+func (r *Router) onRequest(request *http.Request) *http.Response {
 	var methodsMap types.MethodsMap
 
 	if r.isStatic {
@@ -87,7 +89,7 @@ func (r *Router) OnRequest(request *http.Request) *http.Response {
 		methodsMap = endpoint.methodsMap
 		request.Env.AllowMethods = endpoint.allow
 	} else {
-		endpoint := r.tree.Match(request.Params, request.Path)
+		endpoint := r.tree.Match(request.Path, request.Params)
 		if endpoint == nil {
 			return r.OnError(request, status.ErrNotFound)
 		}
@@ -107,6 +109,12 @@ func (r *Router) OnRequest(request *http.Request) *http.Response {
 // OnError tries to find a handler for the error, in case it can't - simply
 // request.Respond().WithError(...) will be returned
 func (r *Router) OnError(request *http.Request, err error) *http.Response {
+	r.runMutators(request)
+
+	return r.onError(request, err)
+}
+
+func (r *Router) onError(request *http.Request, err error) *http.Response {
 	if request.Method == method.TRACE && err == status.ErrMethodNotAllowed {
 		r.traceBuff = renderHTTPRequest(request, r.traceBuff)
 
@@ -140,6 +148,12 @@ func (r *Router) OnError(request *http.Request, err error) *http.Response {
 	return handler(request)
 }
 
+func (r *Router) runMutators(request *http.Request) {
+	for _, mutator := range r.mutators {
+		mutator(request)
+	}
+}
+
 func (r *Router) retrieveErrorHandler(code status.Code) Handler {
 	handler, found := r.errHandlers[code]
 	if !found {
@@ -153,23 +167,6 @@ func (r *Router) applyErrorHandlersMiddlewares() {
 	for code, handler := range r.errHandlers {
 		r.errHandlers[code] = compose(handler, r.middlewares)
 	}
-}
-
-// stripTrailingSlash just removes a trailing slash of request path in case it is presented.
-// Note: this removes only one trailing slash. In case 2 or more are presented they'll be treated
-// as an ordinary part of the path so won't be stripped
-func stripTrailingSlash(path string) string {
-	if len(path) == 1 {
-		return path
-	}
-
-	for i := len(path) - 1; i > 1; i-- {
-		if path[i] != '/' {
-			return path[:i+1]
-		}
-	}
-
-	return path[0:1]
 }
 
 // getHandler looks up for a handler in the methodsMap. In case request method is HEAD, however

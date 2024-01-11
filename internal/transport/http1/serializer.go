@@ -11,6 +11,7 @@ import (
 	"github.com/indigo-web/utils/strcomp"
 	"github.com/indigo-web/utils/uf"
 	"io"
+	"log"
 	"strconv"
 )
 
@@ -20,26 +21,41 @@ const (
 	contentLength    = "Content-Length: "
 )
 
+// minimalFileBuffSize defines the minimal size of the file buffer. In case it's less
+// it'll be set to this value and debug log will be printed
+const minimalFileBuffSize = 16
+
 var chunkedFinalizer = []byte("0\r\n\r\n")
 
-type Dumper struct {
-	buff           []byte
+type Serializer struct {
+	buff []byte
+	// fileBuff isn't allocated until needed in order to save memory in cases,
+	// where no files are being sent
 	fileBuff       []byte
+	fileBuffSize   int
 	defaultHeaders defaultHeaders
-	buffOffset     int
 }
 
-func NewDumper(buff, fileBuff []byte, defHdrs map[string]string) *Dumper {
-	return &Dumper{
+func NewSerializer(buff []byte, fileBuffSize int, defHdrs map[string]string) *Serializer {
+	if fileBuffSize < minimalFileBuffSize {
+		log.Printf("misconfiguration: file buffer size (Settings.HTTP.FileBuffSize) is set to %d, "+
+			"however minimal possible value is %d. Setting it hard to %d\n",
+			fileBuffSize, minimalFileBuffSize, minimalFileBuffSize,
+		)
+
+		fileBuffSize = minimalFileBuffSize
+	}
+
+	return &Serializer{
 		buff:           buff[:0],
-		fileBuff:       fileBuff,
+		fileBuffSize:   fileBuffSize,
 		defaultHeaders: processDefaultHeaders(defHdrs),
 	}
 }
 
-// PreDump dumps the response into the buffer without actually sending it. Usually used
+// PreWrite writes the response into the buffer without actually sending it. Usually used
 // for informational responses
-func (d *Dumper) PreDump(protocol proto.Proto, response *http.Response) {
+func (d *Serializer) PreWrite(protocol proto.Proto, response *http.Response) {
 	d.renderProtocol(protocol)
 	fields := response.Reveal()
 	d.renderResponseLine(fields)
@@ -47,8 +63,8 @@ func (d *Dumper) PreDump(protocol proto.Proto, response *http.Response) {
 	d.crlf()
 }
 
-// Dump dumps the response, keeping in mind difference between 0.9, 1.0 and 1.1 HTTP versions
-func (d *Dumper) Dump(
+// Write writes the response, keeping in mind difference between 0.9, 1.0 and 1.1 HTTP versions
+func (d *Serializer) Write(
 	protocol proto.Proto, request *http.Request, response *http.Response, writer transport.Writer,
 ) (err error) {
 	defer d.clear()
@@ -80,7 +96,7 @@ func (d *Dumper) Dump(
 	return err
 }
 
-func (d *Dumper) renderResponseLine(fields response.Fields) {
+func (d *Serializer) renderResponseLine(fields response.Fields) {
 	codeStatus := status.CodeStatus(fields.Code)
 
 	if fields.Status == "" && codeStatus != "" {
@@ -95,7 +111,7 @@ func (d *Dumper) renderResponseLine(fields response.Fields) {
 	d.crlf()
 }
 
-func (d *Dumper) renderHeaders(fields response.Fields) {
+func (d *Serializer) renderHeaders(fields response.Fields) {
 	responseHeaders := fields.Headers
 
 	for _, header := range responseHeaders {
@@ -120,7 +136,7 @@ func (d *Dumper) renderHeaders(fields response.Fields) {
 
 // sendAttachment simply encapsulates all the logic related to rendering arbitrary
 // io.Reader implementations
-func (d *Dumper) sendAttachment(
+func (d *Serializer) sendAttachment(
 	request *http.Request, response *http.Response, writer transport.Writer,
 ) (err error) {
 	fields := response.Reveal()
@@ -150,11 +166,7 @@ func (d *Dumper) sendAttachment(
 	}
 
 	if len(d.fileBuff) == 0 {
-		// write by blocks 64kb each. Not really efficient, but in close future
-		// file distributors will be implemented, so files uploading capabilities
-		// will be extended
-		const fileBuffSize = 128 /* kilobytes */ * 1024 /* bytes */
-		d.fileBuff = make([]byte, fileBuffSize)
+		d.fileBuff = make([]byte, d.fileBuffSize)
 	}
 
 	if fields.Attachment.Size() > 0 {
@@ -168,7 +180,7 @@ func (d *Dumper) sendAttachment(
 	return err
 }
 
-func (d *Dumper) writePlainBody(r io.Reader, writer transport.Writer) error {
+func (d *Serializer) writePlainBody(r io.Reader, writer transport.Writer) error {
 	// TODO: implement checking whether r implements io.ReaderAt interfacd. In case it does
 	//       body may be transferred more efficiently. This requires implementing io.Writer
 	//       *http.ResponseWriter
@@ -189,7 +201,7 @@ func (d *Dumper) writePlainBody(r io.Reader, writer transport.Writer) error {
 	}
 }
 
-func (d *Dumper) writeChunkedBody(r io.Reader, writer transport.Writer) error {
+func (d *Serializer) writeChunkedBody(r io.Reader, writer transport.Writer) error {
 	const (
 		hexValueOffset = 8
 		crlfSize       = 1 /* CR */ + 1 /* LF */
@@ -225,41 +237,41 @@ func (d *Dumper) writeChunkedBody(r io.Reader, writer transport.Writer) error {
 }
 
 // renderHeaderInto the buffer. Appends CRLF in the end
-func (d *Dumper) renderHeader(header response.Header) {
+func (d *Serializer) renderHeader(header response.Header) {
 	d.buff = append(d.buff, header.Key...)
 	d.colonsp()
 	d.buff = append(d.buff, header.Value...)
 	d.crlf()
 }
 
-func (d *Dumper) renderContentLength(value int64) {
+func (d *Serializer) renderContentLength(value int64) {
 	d.buff = strconv.AppendInt(append(d.buff, contentLength...), value, 10)
 	d.crlf()
 }
 
-func (d *Dumper) renderKnownHeader(key, value string) {
+func (d *Serializer) renderKnownHeader(key, value string) {
 	d.buff = append(d.buff, key...)
 	d.buff = append(d.buff, value...)
 	d.crlf()
 }
 
-func (d *Dumper) renderProtocol(protocol proto.Proto) {
+func (d *Serializer) renderProtocol(protocol proto.Proto) {
 	d.buff = append(d.buff, proto.ToBytes(protocol)...)
 }
 
-func (d *Dumper) sp() {
+func (d *Serializer) sp() {
 	d.buff = append(d.buff, ' ')
 }
 
-func (d *Dumper) colonsp() {
+func (d *Serializer) colonsp() {
 	d.buff = append(d.buff, httpchars.COLONSP...)
 }
 
-func (d *Dumper) crlf() {
+func (d *Serializer) crlf() {
 	d.buff = append(d.buff, httpchars.CRLF...)
 }
 
-func (d *Dumper) clear() {
+func (d *Serializer) clear() {
 	d.buff = d.buff[:0]
 	d.defaultHeaders.Reset()
 }

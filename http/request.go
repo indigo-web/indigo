@@ -2,17 +2,17 @@ package http
 
 import (
 	"context"
+	"github.com/indigo-web/indigo/http/encryption"
 	"github.com/indigo-web/indigo/http/headers"
 	"github.com/indigo-web/indigo/http/method"
 	"github.com/indigo-web/indigo/http/mime"
 	"github.com/indigo-web/indigo/http/proto"
 	"github.com/indigo-web/indigo/http/query"
 	"github.com/indigo-web/indigo/http/status"
+	"github.com/indigo-web/indigo/internal/keyvalue"
 	json "github.com/json-iterator/go"
 	"net"
 )
-
-type Params = map[string]string
 
 type Environment struct {
 	// Error is used mostly for error handlers
@@ -20,26 +20,39 @@ type Environment struct {
 	// AllowMethods is used to pass a string containing all the allowed methods for a
 	// specific endpoint. Has non-zero-value only when 405 Method Not Allowed raises
 	AllowMethods string
-	IsTLS        bool
+	Encryption   encryption.Encryption
 	// reserved for router
 	AliasFrom string
 }
+
+type Params = *keyvalue.Storage
 
 var zeroContext = context.Background()
 
 // Request represents HTTP request
 type Request struct {
+	// Method represents the request's method
 	Method method.Method
-	Path   string
-	// Query is a key-value part of the Path
-	Query query.Query
-	// Params are dynamic segments, in case dynamic routing is enabled
-	Params        Params
-	Proto         proto.Proto
-	Headers       *headers.Headers
-	Encoding      headers.Encoding
+	// Path represents decoded request URI
+	Path string
+	// Query are request's URI parameters
+	Query *query.Query
+	// Params are dynamic segment values
+	Params Params
+	// Proto is the protocol, which was used to make the request
+	Proto proto.Proto
+	// Headers are request headers. They are stored non-normalized, however lookup is
+	// case-insensitive
+	Headers headers.Headers
+	// Encoding holds an information about encoding, that was used to make the request
+	Encoding Encoding
+	// ContentLength obtains the value from Content-Length header. It holds the value of 0
+	// if isn't presented.
+	//
+	// NOTE: if any of transfer-encodings were applied, you MUST NOT look at this value
 	ContentLength int
-	ContentType   string
+	// ContentType obtains Content-Type header value
+	ContentType string
 	// Upgrade is the protocol token, which is set by default to proto.Unknown. In
 	// case it is anything else, then Upgrade header was received
 	Upgrade proto.Proto
@@ -53,12 +66,12 @@ type Request struct {
 	// Env is a set of fixed variables passed by core. They are passed separately from Request.Ctx
 	// in order to not only distinguish user-defined values in ctx from those from core, but also
 	// to gain performance, as accessing the struct is much faster than looking up in context.Context
-	Env            Environment
-	Body           Body
-	conn           net.Conn
-	wasHijacked    bool
-	clearParamsMap bool
-	response       *Response
+	Env Environment
+	// Body accesses the request's body
+	Body        Body
+	conn        net.Conn
+	wasHijacked bool
+	response    *Response
 }
 
 // NewRequest returns a new instance of request object and body gateway
@@ -67,20 +80,19 @@ type Request struct {
 // is invalid, we need to render a response using request method, but appears
 // that default method is a null-value (proto.Unknown)
 func NewRequest(
-	hdrs *headers.Headers, query query.Query, response *Response,
-	conn net.Conn, body Body, paramsMap Params, disableParamsMapClearing bool,
+	hdrs headers.Headers, query *query.Query, response *Response,
+	conn net.Conn, body Body, params Params,
 ) *Request {
 	request := &Request{
-		Query:          query,
-		Params:         paramsMap,
-		Proto:          proto.HTTP11,
-		Headers:        hdrs,
-		Remote:         conn.RemoteAddr(),
-		Ctx:            zeroContext,
-		Body:           body,
-		conn:           conn,
-		clearParamsMap: !disableParamsMapClearing,
-		response:       response,
+		Query:    query,
+		Params:   params,
+		Proto:    proto.HTTP11,
+		Headers:  hdrs,
+		Remote:   conn.RemoteAddr(),
+		Ctx:      zeroContext,
+		Body:     body,
+		conn:     conn,
+		response: response,
 	}
 
 	return request
@@ -120,7 +132,7 @@ func (r *Request) Respond() *Response {
 // should read it before) all the body left. After handler exits, the connection will
 // be closed, so the connection can be hijacked only once
 func (r *Request) Hijack() (net.Conn, error) {
-	if err := r.Body.Reset(); err != nil {
+	if err := r.Body.Discard(); err != nil {
 		return nil, err
 	}
 
@@ -138,24 +150,19 @@ func (r *Request) WasHijacked() bool {
 // It is implemented to clear the request object between requests
 func (r *Request) Clear() (err error) {
 	r.Query.Set(nil)
+	r.Params.Clear()
 	r.Ctx = zeroContext
 
-	if err = r.Body.Reset(); err != nil {
+	if err = r.Body.Discard(); err != nil {
 		return err
 	}
 
 	r.Headers.Clear()
 	r.ContentLength = 0
-	r.Encoding = headers.Encoding{}
+	r.Encoding = Encoding{}
 	r.ContentType = ""
 	r.Upgrade = proto.Unknown
 	r.Env = Environment{}
-
-	if r.clearParamsMap && len(r.Params) > 0 {
-		for k := range r.Params {
-			delete(r.Params, k)
-		}
-	}
 
 	return nil
 }
@@ -167,10 +174,18 @@ func Respond(request *Request) *Response {
 	return request.response
 }
 
-func Error(request *Request, err error) *Response {
-	return request.Respond().Error(err)
-}
-
 func Code(request *Request, code status.Code) *Response {
 	return request.Respond().Code(code)
+}
+
+func String(request *Request, str string) *Response {
+	return request.Respond().String(str)
+}
+
+func Bytes(request *Request, b []byte) *Response {
+	return request.Respond().Bytes(b)
+}
+
+func Error(request *Request, err error) *Response {
+	return request.Respond().Error(err)
 }

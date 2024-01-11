@@ -12,7 +12,7 @@ import (
 const addr = ":8080"
 
 func MyDynamicHandler(request *http.Request) *http.Response {
-	worldName := request.Params["world-name"]
+	worldName := request.Params.Value("world-name")
 
 	return request.Respond().String("your world-name is " + worldName)
 }
@@ -22,7 +22,7 @@ func main() {
 
 	r.Get("/hello/{world-name}", MyDynamicHandler)
 
-	app := indigo.NewApp(addr)
+	app := indigo.New(addr)
 	log.Println("Listening on", addr)
 	log.Fatal(app.Serve(r))
 }

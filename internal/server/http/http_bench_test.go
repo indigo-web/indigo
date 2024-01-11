@@ -1,12 +1,12 @@
 package http
 
 import (
+	"github.com/indigo-web/indigo/internal/keyvalue"
 	"github.com/indigo-web/indigo/internal/server/tcp"
 	"strings"
 	"testing"
 
 	"github.com/indigo-web/indigo/http"
-	"github.com/indigo-web/indigo/http/coding"
 	"github.com/indigo-web/indigo/http/headers"
 	"github.com/indigo-web/indigo/http/method"
 	"github.com/indigo-web/indigo/http/query"
@@ -197,13 +197,13 @@ func newServer(client tcp.Client) (*Server, *http.Request, transport.Transport) 
 	// getSimpleRouter() here. It is visibly faster
 	r := getInbuiltRouter()
 	s := settings.Default()
-	q := query.NewQuery(headers.NewHeaders())
+	q := query.NewQuery(keyvalue.New())
 	body := http1.NewBody(
-		client, nil, coding.NewManager(0),
+		client, nil, s.Body,
 	)
-	hdrs := headers.NewPreallocHeaders(10)
+	hdrs := headers.NewPrealloc(10)
 	request := http.NewRequest(
-		hdrs, q, http.NewResponse(), dummy.NewNopConn(), body, nil, false,
+		hdrs, q, http.NewResponse(), dummy.NewNopConn(), body, nil,
 	)
 	keyBuff := buffer.New(
 		s.Headers.MaxKeyLength*s.Headers.Number.Default,
@@ -223,7 +223,7 @@ func newServer(client tcp.Client) (*Server, *http.Request, transport.Transport) 
 		*objPool,
 		s.Headers,
 		make([]byte, 0, 1024),
-		nil,
+		0,
 		defaultHeaders,
 	)
 

@@ -46,6 +46,19 @@ func (a Address) SetPort(newPort uint16) Address {
 	return a
 }
 
+func (a Address) IsLocalhost() bool {
+	if strings.HasPrefix(a.Host, "127.0.") {
+		return true
+	}
+
+	switch a.Host {
+	case "localhost", "0.0.0.0", "::1":
+		return true
+	}
+
+	return false
+}
+
 func (a Address) String() string {
 	return fmt.Sprintf("%s:%d", a.Host, a.Port)
 }

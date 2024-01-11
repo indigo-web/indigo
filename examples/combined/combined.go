@@ -77,10 +77,14 @@ func main() {
 	s := settings.Default()
 	s.TCP.ReadTimeout = time.Hour
 
-	app := indigo.NewApp(addr)
-	log.Println("Listening on", addr)
+	app := indigo.New(addr).
+		Tune(s).
+		AutoHTTPS(8443).
+		NotifyOnStart(func() {
+			log.Println("initialized")
+		})
 
-	if err := app.Serve(r, s); err != nil {
+	if err := app.Serve(r); err != nil {
 		log.Fatal(err)
 	}
 }

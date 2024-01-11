@@ -49,7 +49,7 @@ func (h *Server) HandleRequest(
 			err = status.ErrCloseConnection
 		}
 
-		_ = trans.Dump(req.Proto, req, h.router.OnError(req, err), client)
+		_ = trans.Write(req.Proto, req, h.router.OnError(req, err), client)
 		return false
 	}
 
@@ -61,7 +61,7 @@ func (h *Server) HandleRequest(
 
 		if req.Upgrade != proto.Unknown && proto.HTTP1&req.Upgrade == req.Upgrade {
 			protoToken := uf.B2S(bytes.TrimSpace(proto.ToBytes(req.Upgrade)))
-			trans.PreDump(
+			trans.PreWrite(
 				req.Proto,
 				h.upgradePreResp.
 					Code(status.SwitchingProtocols).
@@ -74,12 +74,15 @@ func (h *Server) HandleRequest(
 		client.Unread(extra)
 		req.Body.Init(req)
 		response := h.router.OnRequest(req)
+		if response == nil {
+			response = req.Respond()
+		}
 
 		if req.WasHijacked() {
 			return false
 		}
 
-		if err = trans.Dump(protocol, req, response, client); err != nil {
+		if err = trans.Write(protocol, req, response, client); err != nil {
 			// in case we failed to render the response, just close the connection silently.
 			// This may affect cases, when the error occurred during rendering an attachment,
 			// but server anyway cannot recognize them, so the only thing will be done here
@@ -98,7 +101,7 @@ func (h *Server) HandleRequest(
 	case transport.Error:
 		// as fatal error already happened and connection will anyway be closed, we don't
 		// care about any socket errors anymore
-		_ = trans.Dump(req.Proto, req, h.router.OnError(req, err), client)
+		_ = trans.Write(req.Proto, req, h.router.OnError(req, err), client)
 		return false
 	default:
 		panic(fmt.Sprintf("BUG: got unexpected parser state"))

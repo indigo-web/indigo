@@ -19,7 +19,8 @@ func (h HTTPError) Error() string {
 var (
 	ErrConnectionTimeout = NewError(RequestTimeout, "connection timed out")
 	ErrCloseConnection   = NewError(CloseConnection, "internal error as a signal")
-	ErrShutdown          = NewError(CloseConnection, "graceful shutdown")
+	ErrShutdown          = NewError(CloseConnection, "shutdown")
+	ErrGracefulShutdown  = NewError(CloseConnection, "graceful shutdown")
 
 	ErrBadRequest                    = NewError(BadRequest, "bad request")
 	ErrTooLongRequestLine            = NewError(BadRequest, "request line is too long")
@@ -32,6 +33,7 @@ var (
 	ErrMethodNotImplemented          = NewError(NotImplemented, "request method is not supported")
 	ErrMethodNotAllowed              = NewError(MethodNotAllowed, "method not allowed")
 	ErrTooLarge                      = NewError(RequestEntityTooLarge, "too large")
+	ErrBodyTooLarge                  = NewError(RequestEntityTooLarge, "request body is too large")
 	ErrRequestEntityTooLarge         = NewError(RequestEntityTooLarge, "request entity too large")
 	ErrHeaderFieldsTooLarge          = NewError(HeaderFieldsTooLarge, "too large headers section")
 	ErrHeaderKeyTooLarge             = NewError(HeaderFieldsTooLarge, "too large header key")

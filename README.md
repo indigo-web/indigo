@@ -1,6 +1,6 @@
 <img src="indigo.svg" alt="This is just a logo" title="What are you looking for?"/>
 
-Indigo is non-idiomatic, but focusing on simplicity and performance web-server
+Indigo is a web-framework, designed to be readable, handy, yet performant (blazingly fast I would even say)
 
 # Documentation
 
@@ -19,23 +19,31 @@ import (
   "github.com/indigo-web/indigo/router/inbuilt"
 )
 
-const addr = ":8080"
-
-func MyHandler(request *http.Request) *http.Response {
+func HelloWorld(request *http.Request) *http.Response {
   return request.Respond().String("Hello, world!")
+}
+
+func Log(request *http.Request) *http.Response {
+  text, err := request.Body.String()
+  if err != nil {
+    return request.Respond().Error(err)
+  }
+	
+  log.Printf("%s says: %s", request.Remote, text)
+  return http.String(request, text)
 }
 
 func main() {
   r := inbuilt.New()
   r.Resource("/").
-    Get(MyHandler).
-    Post(MyHandler)
+    Get(HelloWorld).
+    Post(Log)
 
-  app := indigo.NewApp(addr)
-  if err := app.Serve(r); err != nil {
+  err := indigo.New(":8080").Serve(r)
+  if err != nil {
     log.Fatal(err)
   }
 }
 ```
 
-More examples in [examples/](https://github.com/indigo-web/indigo/tree/master/examples) folder.
+You can find more examples in [examples/](https://github.com/indigo-web/indigo/tree/master/examples).

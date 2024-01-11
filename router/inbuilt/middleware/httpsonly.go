@@ -2,6 +2,7 @@ package middleware
 
 import (
 	"github.com/indigo-web/indigo/http"
+	"github.com/indigo-web/indigo/http/encryption"
 	"github.com/indigo-web/indigo/http/status"
 	"github.com/indigo-web/indigo/router/inbuilt"
 )
@@ -11,7 +12,7 @@ import (
 //
 // Note: it causes 1 (one) allocation
 func HTTPSOnly(next inbuilt.Handler, req *http.Request) *http.Response {
-	if req.Env.IsTLS {
+	if req.Env.Encryption != encryption.TLS {
 		return next(req)
 	}
 

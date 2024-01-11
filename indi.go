@@ -3,201 +3,231 @@ package indigo
 import (
 	"crypto/tls"
 	"fmt"
-	"github.com/indigo-web/indigo/http/coding"
+	"github.com/indigo-web/indigo/http/encryption"
+	"github.com/indigo-web/indigo/http/status"
 	"github.com/indigo-web/indigo/internal/address"
+	"github.com/indigo-web/indigo/router/inbuilt"
+	"log"
 	"net"
-	"strings"
+	"sync/atomic"
 
 	"github.com/indigo-web/indigo/internal/server/http"
 	"github.com/indigo-web/indigo/internal/server/tcp"
-	"github.com/indigo-web/utils/mapconv"
-
 	"github.com/indigo-web/indigo/router"
 	"github.com/indigo-web/indigo/settings"
 )
 
-// DefaultHeaders are headers that are going to be sent unless they were overridden by
-// user.
-//
-// WARNING: if you want to edit them, do it using Application.AddDefaultHeader or
-// Application.DeleteDefaultHeader instead
-var DefaultHeaders = map[string]string{
-	// nil here means that value will be set later, when server will be initializing
-	"Accept-Encodings": "",
-}
+type ListenerConstructor func(network, addr string) (net.Listener, error)
 
-// Application is just a struct with addr and shutdown channel that is currently
+// App is just a struct with addr and shutdown channel that is currently
 // not used. Planning to replace it with context.WithCancel()
-type Application struct {
-	codings          []coding.Constructor
-	defaultHeaders   map[string]string
-	addr             string
-	servers          []*tcp.Server
-	gracefulShutdown bool
+type App struct {
+	addr      address.Address
+	hooks     hooks
+	listeners []Listener
+	settings  settings.Settings
+	errCh     chan error
 }
 
-// NewApp returns a new application object with initialized shutdown chan
-func NewApp(addr string) *Application {
-	return &Application{
-		addr:           addr,
-		defaultHeaders: mapconv.Clone(DefaultHeaders),
-	}
-}
-
-// AddCoding adds a new content coding, available for both encoding and decoding
-func (a *Application) AddCoding(constructor coding.Constructor) {
-	a.codings = append(a.codings, constructor)
-}
-
-// SetDefaultHeaders overrides default headers to a passed ones.
-// Doing this, make sure you know what are you doing
-func (a *Application) SetDefaultHeaders(headers map[string]string) {
-	a.defaultHeaders = headers
-}
-
-func (a *Application) AddDefaultHeader(key string, value string) {
-	a.defaultHeaders[key] = value
-}
-
-func (a *Application) DeleteDefaultHeader(key string) {
-	delete(a.defaultHeaders, key)
-}
-
-// Serve takes a router and someSettings, that must be only 0 or 1 elements
-// otherwise, error is returned
-// Also, if specified, Accept-Encodings default header's value will be set here
-func (a *Application) Serve(r router.Router, optionalSettings ...settings.Settings) error {
-	addr, err := address.Parse(a.addr)
+// New returns a new App instance.
+func New(addr string) *App {
+	appAddr, err := address.Parse(addr)
 	if err != nil {
-		return fmt.Errorf("bad address: %s", err.Error())
+		panic(fmt.Errorf("indigo: listen: bad addr: %v", err))
 	}
 
-	if accept, found := a.defaultHeaders["Accept-Encodings"]; found && len(accept) == 0 {
-		// because of the special treatment of default headers by rendering engine, better to
-		// join these values manually. Otherwise, each value will be rendered individually, that
-		// still follows the standard, but brings some unnecessary networking overhead
-		acceptTokens := strings.Join(availableEncodings(a.codings...), ",")
-		a.defaultHeaders["Accept-Encodings"] = acceptTokens
+	return &App{
+		addr:     appAddr,
+		settings: settings.Default(),
+		errCh:    make(chan error),
+	}
+}
+
+// Tune replaces default settings.
+func (a *App) Tune(s settings.Settings) *App {
+	a.settings = settings.Fill(s)
+	return a
+}
+
+// NotifyOnStart calls the callback at the moment, when all the servers are started. However,
+// it isn't strongly guaranteed that they'll be able to accept new connections immediately
+func (a *App) NotifyOnStart(cb func()) *App {
+	a.hooks.OnStart = cb
+	return a
+}
+
+// NotifyOnStop calls the callback at the moment, when all the servers are down. It's guaranteed,
+// that at the moment as the callback is called, the server isn't able to accept any new connections
+// and all the clients are already disconnected
+func (a *App) NotifyOnStop(cb func()) *App {
+	a.hooks.OnStop = cb
+	return a
+}
+
+// Listen adds a new listener
+func (a *App) Listen(port uint16, enc encryption.Encryption, optionalConstructor ...ListenerConstructor) *App {
+	constructor := optional(optionalConstructor, net.Listen)
+	if constructor == nil {
+		constructor = net.Listen
+	}
+
+	a.listeners = append(a.listeners, Listener{
+		Port:        port,
+		Constructor: constructor,
+		Encryption:  enc,
+	})
+
+	return a
+}
+
+func (a *App) TLS(port uint16, constructor ListenerConstructor) *App {
+	a.Listen(port, encryption.TLS, constructor)
+	return a
+}
+
+func (a *App) HTTPS(port uint16, cert, key string) *App {
+	return a.TLS(port, func(network, addr string) (net.Listener, error) {
+		certificate, err := tls.LoadX509KeyPair(cert, key)
+		if err != nil {
+			return nil, err
+		}
+
+		return tls.Listen(network, addr, &tls.Config{
+			Certificates: []tls.Certificate{certificate},
+		})
+	})
+}
+
+// AutoHTTPS enables HTTPS-mode using autocert or generates self-signed certificates if using
+// local host
+func (a *App) AutoHTTPS(port uint16, domains ...string) *App {
+	if a.addr.IsLocalhost() {
+		cert, key, err := generateSelfSignedCert()
+		if err != nil {
+			log.Printf(
+				"WARNING: (*App).AutoHTTPS(...): can't generate self-signed certificate: %s. Disabling TLS",
+				err,
+			)
+
+			return a
+		}
+
+		return a.HTTPS(port, cert, key)
+	}
+
+	return a.TLS(port, autoTLSListener(domains...))
+}
+
+// Serve starts the web-application. If nil is passed instead of a router, empty inbuilt will
+// be used.
+func (a *App) Serve(r router.Router) error {
+	if r == nil {
+		r = inbuilt.New()
 	}
 
 	if err := r.OnStart(); err != nil {
 		return err
 	}
 
-	s := concreteSettings(optionalSettings...)
-
-	if len(s.HTTPS.Addr) > 0 {
-		httpsAddr, err := address.Parse(s.HTTPS.Addr)
-		if err != nil {
-			return err
-		}
-
-		cert, err := tls.LoadX509KeyPair(s.HTTPS.Cert, s.HTTPS.Key)
-		if err != nil {
-			return err
-		}
-
-		cfg := &tls.Config{Certificates: []tls.Certificate{cert}}
-		listener, err := tls.Listen("tcp", httpsAddr.String(), cfg)
-		if err != nil {
-			return err
-		}
-
-		a.servers = append(a.servers, tcp.NewServer(listener, a.newTCPCallback(s, r, true)))
-	}
-
-	sock, err := net.Listen("tcp", addr.String())
+	a.Listen(a.addr.Port, encryption.Plain, net.Listen)
+	servers, err := a.getServers(a.addr, r)
 	if err != nil {
 		return err
 	}
 
-	a.servers = append(a.servers, tcp.NewServer(sock, a.newTCPCallback(s, r, false)))
+	return a.run(servers)
+}
 
-	err = a.startServers()
+func (a *App) getServers(addr address.Address, r router.Router) ([]*tcp.Server, error) {
+	servers := make([]*tcp.Server, len(a.listeners))
 
-	if a.gracefulShutdown {
-		return nil
+	for i, listener := range a.listeners {
+		sock, err := listener.Constructor("tcp", addr.SetPort(listener.Port).String())
+		if err != nil {
+			return nil, err
+		}
+
+		servers[i] = tcp.NewServer(sock, a.newTCPCallback(a.settings, r, listener.Encryption))
 	}
 
-	a.stopServers()
+	return servers, nil
+}
+
+func (a *App) run(servers []*tcp.Server) error {
+	var failSilently atomic.Bool
+
+	for _, server := range servers {
+		go func(server *tcp.Server) {
+			err := server.Start()
+
+			if failSilently.Swap(true) {
+				return
+			}
+
+			a.errCh <- err
+		}(server)
+	}
+
+	callIfNotNil(a.hooks.OnStart)
+	err := <-a.errCh
+	switch err {
+	case status.ErrGracefulShutdown:
+		tcp.PauseAll(servers)
+	default:
+		// so basically, any error here (including nil) will stop all the servers. However,
+		// in order to be intuitive the best choice is to send status.ErrShutdown
+		tcp.StopAll(servers)
+	}
+
+	callIfNotNil(a.hooks.OnStop)
 
 	return err
 }
 
-func (a *Application) startServers() error {
-	// making the channel buffered isn't necessary, but in case something went wrong,
-	// no goroutines will leak, as each will write its error into the channel and die
-	// peacefully instead of being stuck for forever
-	errCh := make(chan error, len(a.servers))
-
-	for _, server := range a.servers {
-		go func(server *tcp.Server) {
-			errCh <- server.Start()
-		}(server)
-	}
-
-	return <-errCh
+// GracefulStop stops accepting new connections and waits until all the already connected clients
+// disconnects
+func (a *App) GracefulStop() {
+	a.errCh <- status.ErrGracefulShutdown
 }
 
-// GracefulShutdown stops the application peacefully. It stops a listener, so no more
-// clients will be able to connect, but all the already connected will be processed till
-// end (till the last one disconnects)
-func (a *Application) GracefulShutdown() {
-	a.gracefulShutdown = true
-	a.gracefulShutdownServers()
+// Stop stops the whole application immediately.
+func (a *App) Stop() {
+	a.errCh <- status.ErrShutdown
 }
 
-func (a *Application) Stop() {
-	a.stopServers()
-}
-
-func (a *Application) stopServers() {
-	for _, server := range a.servers {
-		_ = server.Stop()
-	}
-}
-
-func (a *Application) gracefulShutdownServers() {
-	for _, server := range a.servers {
-		_ = server.GracefulShutdown()
-	}
-}
-
-func (a *Application) newTCPCallback(s settings.Settings, r router.Router, isTLS bool) tcp.OnConn {
+func (a *App) newTCPCallback(s settings.Settings, r router.Router, enc encryption.Encryption) tcp.OnConn {
 	return func(conn net.Conn) {
-		client := newClient(s.TCP, conn)
-		body := newBody(client, s.Body, a.codings)
+		client := newClient(a.settings.TCP, conn)
+		body := newBody(client, s.Body)
 		request := newRequest(s, conn, body)
-		request.Env.IsTLS = isTLS
-		trans := newTransport(s, request, a)
+		request.Env.Encryption = enc
+		trans := newTransport(s, request)
 
 		httpServer := http.NewServer(r)
 		httpServer.Run(client, request, trans)
 	}
 }
 
-// concreteSettings converts optional settings to concrete ones
-func concreteSettings(s ...settings.Settings) settings.Settings {
-	switch len(s) {
-	case 0:
-		return settings.Default()
-	case 1:
-		return settings.Fill(s[0])
-	default:
-		panic("too many settings. None or single instance is expected")
+type hooks struct {
+	OnStart, OnStop func()
+}
+
+func callIfNotNil(f func()) {
+	if f != nil {
+		f()
 	}
 }
 
-func availableEncodings(codings ...coding.Constructor) []string {
-	if len(codings) == 0 {
-		return []string{"identity"}
+type Listener struct {
+	Port        uint16
+	Constructor ListenerConstructor
+	Encryption  encryption.Encryption
+}
+
+func optional[T any](optionals []T, otherwise T) T {
+	if len(optionals) == 0 {
+		return otherwise
 	}
 
-	available := make([]string, 0, len(codings))
-
-	for _, constructor := range codings {
-		available = append(available, constructor(nil).Token())
-	}
-
-	return available
+	return optionals[0]
 }
