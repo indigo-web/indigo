@@ -3,10 +3,16 @@ package indigo
 import (
 	"context"
 	"errors"
+	"github.com/indigo-web/indigo/http/headers"
+	"github.com/indigo-web/indigo/http/method"
 	"github.com/indigo-web/indigo/internal/httptest"
 	"github.com/indigo-web/indigo/router/inbuilt/middleware"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"io"
 	"net"
+	stdhttp "net/http"
+	"strings"
 	"testing"
 	"time"
 
@@ -38,6 +44,13 @@ func readN(conn net.Conn, n int) ([]byte, error) {
 			return nil, errors.New("received too much data")
 		}
 	}
+}
+
+func getHeaders() headers.Headers {
+	return headers.New().
+		Add("Host", "localhost:16100").
+		Add("User-Agent", "Go-http-client/1.1").
+		Add("Accept-Encoding", "gzip")
 }
 
 func respond(request *http.Request) *http.Response {
@@ -129,17 +142,56 @@ func TestServer(t *testing.T) {
 
 	<-ch
 
-	//t.Run("/simple-get", func(t *testing.T) {
-	//	resp, err := stdhttp.DefaultClient.Get(URL + "/simple-get")
-	//	require.NoError(t, err)
-	//	defer func() {
-	//		_ = resp.Body.Close()
-	//	}()
-	//	require.Equal(t, stdhttp.StatusOK, resp.StatusCode)
-	//	require.Equal(t, "200 "+stdhttp.StatusText(stdhttp.StatusOK), resp.Status)
-	//	require.Equal(t, "HTTP/1.1", resp.Proto)
-	//})
-	//
+	t.Run("root get", func(t *testing.T) {
+		resp, err := stdhttp.DefaultClient.Get(URL + "/")
+		require.NoError(t, err)
+		defer func() {
+			_ = resp.Body.Close()
+		}()
+		require.Equal(t, stdhttp.StatusOK, resp.StatusCode)
+		body, err := io.ReadAll(resp.Body)
+		require.NoError(t, err)
+		repr, err := httptest.Parse(string(body))
+		require.NoError(t, err)
+
+		for _, err := range httptest.Compare(repr, httptest.Request{
+			Method: method.GET,
+			Path:   "/",
+			Proto:  "HTTP/1.1",
+			Headers: getHeaders().
+				Add("Content-Length", "0"),
+			Body: "",
+		}) {
+			assert.NoError(t, err)
+		}
+	})
+
+	t.Run("root post", func(t *testing.T) {
+		r := strings.NewReader("Hello, world!")
+		resp, err := stdhttp.DefaultClient.Post(URL+"/", "text/html", r)
+		require.NoError(t, err)
+		defer func() {
+			_ = resp.Body.Close()
+		}()
+		require.Equal(t, stdhttp.StatusOK, resp.StatusCode)
+		body, err := io.ReadAll(resp.Body)
+		require.NoError(t, err)
+		repr, err := httptest.Parse(string(body))
+		require.NoError(t, err)
+
+		for _, err := range httptest.Compare(repr, httptest.Request{
+			Method: method.POST,
+			Path:   "/",
+			Proto:  "HTTP/1.1",
+			Headers: getHeaders().
+				Add("Content-Length", "13").
+				Add("Content-Type", "text/html"),
+			Body: "Hello, world!",
+		}) {
+			assert.NoError(t, err)
+		}
+	})
+
 	//t.Run("/get-resp-body", func(t *testing.T) {
 	//	resp, err := stdhttp.DefaultClient.Get(URL + "/get-resp-body")
 	//	require.NoError(t, err)
@@ -147,9 +199,9 @@ func TestServer(t *testing.T) {
 	//		_ = resp.Body.Close()
 	//	}()
 	//
-	//	//body, err := io.ReadAll(resp.Body)
-	//	//require.NoError(t, err)
-	//	//require.Equal(t, testRequestBody, string(body))
+	//	body, err := io.ReadAll(resp.Body)
+	//	require.NoError(t, err)
+	//	require.Equal(t, testRequestBody, string(body))
 	//})
 	//
 	//t.Run("/head", func(t *testing.T) {
@@ -382,6 +434,21 @@ func TestServer(t *testing.T) {
 	//
 	//stdhttp.DefaultClient.CloseIdleConnections()
 	//runningServer.Wait(t, 3*time.Second)
+
+	t.Run("forced stop", func(t *testing.T) {
+		app.Stop()
+		chanRead(ch, 5*time.Second)
+	})
+}
+
+func chanRead[T any](ch <-chan T, timeout time.Duration) (value T, ok bool) {
+	timer := time.NewTimer(timeout)
+	select {
+	case value = <-ch:
+		return value, true
+	case <-timer.C:
+		return value, false
+	}
 }
 
 //func sendSimpleRequest(t *testing.T, path string, addr string) {
