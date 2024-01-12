@@ -163,19 +163,27 @@ func (r *Response) Attachment(reader io.Reader, size int) *Response {
 	return r
 }
 
-// JSON receives a model (must be a pointer to the structure) and returns a new Response
+// TryJSON receives a model (must be a pointer to the structure) and returns a new Response
 // object and an error
-func (r *Response) JSON(model any) (*Response, error) {
+func (r *Response) TryJSON(model any) (*Response, error) {
 	r.fields.Body = r.fields.Body[:0]
 	stream := json.ConfigDefault.BorrowStream(r)
 	stream.WriteVal(model)
 	err := stream.Flush()
 	json.ConfigDefault.ReturnStream(stream)
+
+	return r.ContentType(mime.JSON), err
+}
+
+// JSON does the same as TryJSON does, except returned error is being implicitly wrapped
+// by Error
+func (r *Response) JSON(model any) *Response {
+	resp, err := r.TryJSON(model)
 	if err != nil {
-		return r, err
+		return r.Error(err)
 	}
 
-	return r.ContentType(mime.JSON), nil
+	return resp
 }
 
 // Error returns Response with corresponding HTTP error code, if passed error is
