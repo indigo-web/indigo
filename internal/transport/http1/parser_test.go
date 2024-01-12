@@ -28,7 +28,8 @@ func getParser() (*Parser, *http.Request) {
 	hdrs := headers.NewPrealloc(s.Headers.Number.Default)
 	response := http.NewResponse()
 	params := keyvalue.New()
-	request := http.NewRequest(hdrs, q, response, dummy.NewNopConn(), nil, params)
+	body := NewBody(dummy.NewNopClient(), nil, settings.Default().Body)
+	request := http.NewRequest(hdrs, q, response, dummy.NewNopConn(), body, params)
 	keyBuff := buffer.New(
 		s.Headers.MaxKeyLength*s.Headers.Number.Default,
 		s.Headers.MaxKeyLength*s.Headers.Number.Maximal,
