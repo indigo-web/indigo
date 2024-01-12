@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"crypto/tls"
+	"encoding/json"
 	"fmt"
 	"github.com/indigo-web/indigo/http/encryption"
 	"github.com/indigo-web/indigo/http/headers"
@@ -111,10 +112,26 @@ func getInbuiltRouter() *inbuilt.Router {
 	})
 
 	r.Get("/panic", func(request *http.Request) (_ *http.Response) {
-		panic("ich kann es nicht mehr ergragen")
+		panic("ich kann das nicht mehr ertragen")
 	}, middleware.Recover)
 
+	r.Get("/json", func(request *http.Request) (_ *http.Response) {
+		fields := request.Headers.Values("fields")
+
+		return http.JSON(request, headersToMap(request.Headers, fields))
+	})
+
 	return r
+}
+
+func headersToMap(hdrs headers.Headers, keys []string) map[string]string {
+	m := make(map[string]string, len(keys))
+
+	for _, key := range keys {
+		m[key] = strings.Join(hdrs.Values(key), ", ")
+	}
+
+	return m
 }
 
 func TestServer(t *testing.T) {
@@ -128,7 +145,7 @@ func TestServer(t *testing.T) {
 				),
 			)
 		s := settings.Default()
-		s.TCP.ReadTimeout = 1 * time.Second
+		s.TCP.ReadTimeout = 500 * time.Millisecond
 		_ = app.
 			Tune(s).
 			NotifyOnStart(func() {
@@ -410,6 +427,42 @@ func TestServer(t *testing.T) {
 
 	t.Run("alternative port", func(t *testing.T) {
 		testCtxValue(t, "http://localhost:"+strconv.Itoa(altPort))
+	})
+
+	requireField := func(t *testing.T, m map[string]any, key, value string) {
+		actual, found := m[key]
+		require.Truef(t, found, "json doesn't contain the key %s", key)
+		require.Equal(t, value, actual.(string))
+	}
+
+	t.Run("json", func(t *testing.T) {
+		request := &stdhttp.Request{
+			Method: stdhttp.MethodGet,
+			URL: &url.URL{
+				Scheme: "http",
+				Host:   addr,
+				Path:   "/json",
+			},
+			Proto:      "HTTP/1.1",
+			ProtoMajor: 1,
+			ProtoMinor: 1,
+			Header: stdhttp.Header{
+				"Fields": {"hello", "foo"},
+				"Hello":  {"world"},
+				"Foo":    {"bar", "spam"},
+			},
+			Host:       addr,
+			RemoteAddr: addr,
+		}
+		resp, err := stdhttp.DefaultClient.Do(request)
+		require.NoError(t, err)
+		require.Equal(t, stdhttp.StatusOK, resp.StatusCode)
+		result := make(map[string]any)
+		decoder := json.NewDecoder(resp.Body)
+		err = decoder.Decode(&result)
+		require.NoError(t, err)
+		requireField(t, result, "hello", "world")
+		requireField(t, result, "foo", "bar, spam")
 	})
 
 	t.Run("forced stop", func(t *testing.T) {
