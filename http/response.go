@@ -1,6 +1,7 @@
 package http
 
 import (
+	"github.com/indigo-web/indigo/http/headers"
 	"github.com/indigo-web/indigo/http/mime"
 	"github.com/indigo-web/indigo/http/status"
 	"github.com/indigo-web/indigo/internal/response"
@@ -34,7 +35,7 @@ func NewResponse() *Response {
 	return &Response{
 		response.Fields{
 			Code:        status.OK,
-			Headers:     make([]response.Header, 0, defaultHeadersNumber),
+			Headers:     make([]headers.Header, 0, defaultHeadersNumber),
 			ContentType: response.DefaultContentType,
 		},
 	}
@@ -79,7 +80,7 @@ func (r *Response) Header(key string, values ...string) *Response {
 	}
 
 	for i := range values {
-		r.fields.Headers = append(r.fields.Headers, response.Header{
+		r.fields.Headers = append(r.fields.Headers, headers.Header{
 			Key:   key,
 			Value: values[i],
 		})
@@ -215,4 +216,42 @@ func (r *Response) Clear() *Response {
 	r.fields = r.fields.Clear()
 
 	return r
+}
+
+// Respond returns a response object of request.
+//
+// NOTE: the behaviour differs from request.Respond() directly, as it doesn't clear
+// the response builder each time
+func Respond(request *Request) *Response {
+	return request.response
+}
+
+// Code is a predicate to request.Respond().Code(...)
+func Code(request *Request, code status.Code) *Response {
+	return request.Respond().Code(code)
+}
+
+// String is a predicate to request.Respond().String(...)
+func String(request *Request, str string) *Response {
+	return request.Respond().String(str)
+}
+
+// Bytes is a predicate to request.Respond().Bytes(...)
+func Bytes(request *Request, b []byte) *Response {
+	return request.Respond().Bytes(b)
+}
+
+// File is a predicate to request.Respond().File(...)
+func File(request *Request, path string) *Response {
+	return request.Respond().File(path)
+}
+
+// JSON is a predicate to request.Respond().JSON(...)
+func JSON(request *Request, model any) *Response {
+	return request.Respond().JSON(model)
+}
+
+// Error is a predicate to request.Respond().Error(...)
+func Error(request *Request, err error) *Response {
+	return request.Respond().Error(err)
 }

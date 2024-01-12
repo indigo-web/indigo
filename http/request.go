@@ -168,24 +168,3 @@ func (r *Request) Clear() (err error) {
 }
 
 // TODO: implement FormData parsing
-
-// Respond returns a response object of request
-func Respond(request *Request) *Response {
-	return request.response
-}
-
-func Code(request *Request, code status.Code) *Response {
-	return request.Respond().Code(code)
-}
-
-func String(request *Request, str string) *Response {
-	return request.Respond().String(str)
-}
-
-func Bytes(request *Request, b []byte) *Response {
-	return request.Respond().Bytes(b)
-}
-
-func Error(request *Request, err error) *Response {
-	return request.Respond().Error(err)
-}
