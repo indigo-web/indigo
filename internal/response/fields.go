@@ -1,15 +1,12 @@
 package response
 
 import (
+	"github.com/indigo-web/indigo/http/headers"
 	"github.com/indigo-web/indigo/http/status"
 	"github.com/indigo-web/indigo/internal/types"
 )
 
 const DefaultContentType = "text/html"
-
-type Header struct {
-	Key, Value string
-}
 
 type Fields struct {
 	Attachment  types.Attachment
@@ -18,7 +15,7 @@ type Fields struct {
 	// TODO: add corresponding Content-Encoding field
 	// TODO: automatically apply the encoding on a body when specified
 	TransferEncoding string
-	Headers          []Header
+	Headers          []headers.Header
 	Body             []byte
 	Code             status.Code
 }

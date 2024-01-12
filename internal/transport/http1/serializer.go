@@ -2,6 +2,7 @@ package http1
 
 import (
 	"github.com/indigo-web/indigo/http"
+	"github.com/indigo-web/indigo/http/headers"
 	"github.com/indigo-web/indigo/http/method"
 	"github.com/indigo-web/indigo/http/proto"
 	"github.com/indigo-web/indigo/http/status"
@@ -237,7 +238,7 @@ func (d *Serializer) writeChunkedBody(r io.Reader, writer transport.Writer) erro
 }
 
 // renderHeaderInto the buffer. Appends CRLF in the end
-func (d *Serializer) renderHeader(header response.Header) {
+func (d *Serializer) renderHeader(header headers.Header) {
 	d.buff = append(d.buff, header.Key...)
 	d.colonsp()
 	d.buff = append(d.buff, header.Value...)
