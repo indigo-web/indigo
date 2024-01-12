@@ -120,9 +120,8 @@ func (r *Response) Write(b []byte) (n int, err error) {
 	return len(b), nil
 }
 
-// RetrieveFile opens a file for reading and returns a new Response with attachment, set to the file
-// descriptor.fields. If error occurred during opening a file, it'll be returned
-func (r *Response) RetrieveFile(path string) (*Response, error) {
+// TryFile tries to open a file for reading and returns a new Response with attachment.
+func (r *Response) TryFile(path string) (*Response, error) {
 	fd, err := os.Open(path)
 	if err != nil {
 		// if we can't open it, it doesn't exist
@@ -149,7 +148,7 @@ func (r *Response) RetrieveFile(path string) (*Response, error) {
 // File opens a file for reading and returns a new Response with attachment, set to the file
 // descriptor.fields. If error occurred, it'll be silently returned
 func (r *Response) File(path string) *Response {
-	resp, err := r.RetrieveFile(path)
+	resp, err := r.TryFile(path)
 	if err != nil {
 		return r.Error(err)
 	}
