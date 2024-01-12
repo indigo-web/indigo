@@ -83,13 +83,17 @@ func generateSelfSignedCert() (cert, key string, err error) {
 		return certFilename, keyFilename, nil
 	}
 
+	if err := mkdirIfNotExists(cache); err != nil {
+		return "", "", err
+	}
+
 	priv, err := rsa.GenerateKey(rand.Reader, 2048)
 	if err != nil {
 		return "", "", err
 	}
 
 	notBefore := time.Now()
-	notAfter := notBefore.Add(365 * 24 * time.Hour) // 1 year validity
+	notAfter := notBefore.Add(10 * 365 * 24 * time.Hour) // 10 years validity
 
 	template := x509.Certificate{
 		SerialNumber:          big.NewInt(1),
