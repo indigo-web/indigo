@@ -2,54 +2,58 @@ package http1
 
 import (
 	"fmt"
+	"github.com/indigo-web/indigo/http/query"
 	"github.com/indigo-web/indigo/internal/keyvalue"
 	"github.com/indigo-web/indigo/internal/requestgen"
 	"github.com/indigo-web/indigo/internal/transport"
+	"github.com/indigo-web/utils/buffer"
+	"github.com/indigo-web/utils/pool"
 	"strings"
 	"testing"
 
 	"github.com/dchest/uniuri"
-	"github.com/indigo-web/chunkedbody"
 	"github.com/indigo-web/indigo/http"
 	"github.com/indigo-web/indigo/http/headers"
 	"github.com/indigo-web/indigo/http/method"
 	"github.com/indigo-web/indigo/http/proto"
-	"github.com/indigo-web/indigo/http/query"
 	"github.com/indigo-web/indigo/http/status"
 	"github.com/indigo-web/indigo/internal/server/tcp/dummy"
 	"github.com/indigo-web/indigo/settings"
-	"github.com/indigo-web/utils/buffer"
-	"github.com/indigo-web/utils/pool"
 	"github.com/stretchr/testify/require"
 )
 
 func getParser() (*Parser, *http.Request) {
 	s := settings.Default()
+	q := query.NewQuery(headers.NewPrealloc(s.URL.Query.PreAlloc))
+	hdrs := headers.NewPrealloc(s.Headers.Number.Default)
+	response := http.NewResponse()
+	params := keyvalue.New()
+	request := http.NewRequest(hdrs, q, response, dummy.NewNopConn(), nil, params)
 	keyBuff := buffer.New(
 		s.Headers.MaxKeyLength*s.Headers.Number.Default,
 		s.Headers.MaxKeyLength*s.Headers.Number.Maximal,
 	)
 	valBuff := buffer.New(
-		s.Headers.ValueSpace.Default, s.Headers.ValueSpace.Maximal,
+		s.Headers.ValueSpace.Default,
+		s.Headers.ValueSpace.Maximal,
 	)
+	objPool := pool.NewObjectPool[[]string](s.Headers.MaxValuesObjectPoolSize)
 	startLineBuff := buffer.New(
 		s.URL.BufferSize.Default,
 		s.URL.BufferSize.Maximal,
 	)
-	objPool := pool.NewObjectPool[[]string](20)
-	chunkedParserSettings := chunkedbody.DefaultSettings()
-	chunkedParserSettings.MaxChunkSize = s.Body.MaxChunkSize
-	chunkedParser := chunkedbody.NewParser(chunkedParserSettings)
-	body := NewBody(
-		dummy.NewNopClient(), chunkedParser, s.Body)
-	request := http.NewRequest(
-		headers.New(), new(query.Query), http.NewResponse(),
-		dummy.NewNopConn(), body, keyvalue.New(),
-	)
+	respBuff := make([]byte, 0, s.HTTP.ResponseBuffSize)
+	parser := New(
+		request,
+		*keyBuff, *valBuff, *startLineBuff,
+		*objPool,
+		s.Headers,
+		respBuff,
+		s.HTTP.FileBuffSize,
+		s.Headers.Default,
+	).Parser
 
-	return NewParser(
-		request, *keyBuff, *valBuff, *startLineBuff, *objPool, s.Headers,
-	), request
+	return parser, request
 }
 
 type wantedRequest struct {
