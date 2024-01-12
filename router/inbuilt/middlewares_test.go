@@ -3,15 +3,13 @@ package inbuilt
 import (
 	"github.com/indigo-web/indigo/http/method"
 	"github.com/indigo-web/indigo/http/status"
+	"github.com/indigo-web/indigo/internal/initialize"
 	"github.com/indigo-web/indigo/internal/server/tcp/dummy"
-	"github.com/indigo-web/indigo/internal/transport/http1"
 	"github.com/indigo-web/indigo/settings"
 	"github.com/stretchr/testify/require"
 	"testing"
 
 	"github.com/indigo-web/indigo/http"
-	"github.com/indigo-web/indigo/http/headers"
-	"github.com/indigo-web/indigo/http/query"
 )
 
 /*
@@ -57,13 +55,8 @@ func getMiddleware(mware middleware, stack *callstack) Middleware {
 }
 
 func getRequest(m method.Method, path string) *http.Request {
-	q := query.NewQuery(nil)
-	body := http1.NewBody(
-		dummy.NewNopClient(), nil, settings.Default().Body,
-	)
-	request := http.NewRequest(
-		headers.New(), q, http.NewResponse(), dummy.NewNopConn(), body, nil,
-	)
+	body := initialize.NewBody(dummy.NewNopClient(), settings.Default().Body)
+	request := initialize.NewRequest(settings.Default(), dummy.NewNopConn(), body)
 	request.Method = m
 	request.Path = path
 

@@ -1,4 +1,4 @@
-package indigo
+package initialize
 
 import (
 	"github.com/indigo-web/chunkedbody"
@@ -15,13 +15,13 @@ import (
 	"net"
 )
 
-func newClient(tcpSettings settings.TCP, conn net.Conn) tcp.Client {
+func NewClient(tcpSettings settings.TCP, conn net.Conn) tcp.Client {
 	readBuff := make([]byte, tcpSettings.ReadBufferSize)
 
 	return tcp.NewClient(conn, tcpSettings.ReadTimeout, readBuff)
 }
 
-func newKeyValueBuffs(s settings.Headers) (*buffer.Buffer, *buffer.Buffer) {
+func NewKeyValueBuffs(s settings.Headers) (*buffer.Buffer, *buffer.Buffer) {
 	keyBuff := buffer.New(
 		s.MaxKeyLength*s.Number.Default,
 		s.MaxKeyLength*s.Number.Maximal,
@@ -34,14 +34,14 @@ func newKeyValueBuffs(s settings.Headers) (*buffer.Buffer, *buffer.Buffer) {
 	return keyBuff, valBuff
 }
 
-func newBody(client tcp.Client, body settings.Body) http.Body {
+func NewBody(client tcp.Client, body settings.Body) http.Body {
 	chunkedBodySettings := chunkedbody.DefaultSettings()
 	chunkedBodySettings.MaxChunkSize = body.MaxChunkSize
 
 	return http1.NewBody(client, chunkedbody.NewParser(chunkedBodySettings), body)
 }
 
-func newRequest(s settings.Settings, conn net.Conn, body http.Body) *http.Request {
+func NewRequest(s settings.Settings, conn net.Conn, body http.Body) *http.Request {
 	q := query.NewQuery(headers.NewPrealloc(s.URL.Query.PreAlloc))
 	hdrs := headers.NewPrealloc(s.Headers.Number.Default)
 	response := http.NewResponse()
@@ -50,8 +50,8 @@ func newRequest(s settings.Settings, conn net.Conn, body http.Body) *http.Reques
 	return http.NewRequest(hdrs, q, response, conn, body, params)
 }
 
-func newTransport(s settings.Settings, req *http.Request) transport.Transport {
-	keyBuff, valBuff := newKeyValueBuffs(s.Headers)
+func NewTransport(s settings.Settings, req *http.Request) transport.Transport {
+	keyBuff, valBuff := NewKeyValueBuffs(s.Headers)
 	objPool := pool.NewObjectPool[[]string](s.Headers.MaxValuesObjectPoolSize)
 	startLineBuff := buffer.New(
 		s.URL.BufferSize.Default,

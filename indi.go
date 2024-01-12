@@ -6,6 +6,7 @@ import (
 	"github.com/indigo-web/indigo/http/encryption"
 	"github.com/indigo-web/indigo/http/status"
 	"github.com/indigo-web/indigo/internal/address"
+	"github.com/indigo-web/indigo/internal/initialize"
 	"github.com/indigo-web/indigo/router/inbuilt"
 	"log"
 	"net"
@@ -105,7 +106,7 @@ func (a *App) AutoHTTPS(port uint16, domains ...string) *App {
 		cert, key, err := generateSelfSignedCert()
 		if err != nil {
 			log.Printf(
-				"WARNING: (*App).AutoHTTPS(...): can't generate self-signed certificate: %s. Disabling TLS",
+				"WARNING: AutoHTTPS(...): can't generate self-signed certificate: %s. Disabling TLS",
 				err,
 			)
 
@@ -197,12 +198,11 @@ func (a *App) Stop() {
 
 func (a *App) newTCPCallback(s settings.Settings, r router.Router, enc encryption.Encryption) tcp.OnConn {
 	return func(conn net.Conn) {
-		client := newClient(a.settings.TCP, conn)
-		body := newBody(client, s.Body)
-		request := newRequest(s, conn, body)
+		client := initialize.NewClient(a.settings.TCP, conn)
+		body := initialize.NewBody(client, s.Body)
+		request := initialize.NewRequest(s, conn, body)
 		request.Env.Encryption = enc
-		trans := newTransport(s, request)
-
+		trans := initialize.NewTransport(s, request)
 		httpServer := http.NewServer(r)
 		httpServer.Run(client, request, trans)
 	}

@@ -1,26 +1,21 @@
 package http
 
 import (
-	"github.com/indigo-web/indigo/internal/keyvalue"
+	"github.com/indigo-web/indigo/internal/initialize"
 	"github.com/indigo-web/indigo/internal/server/tcp"
 	"strings"
 	"testing"
 
 	"github.com/indigo-web/indigo/http"
-	"github.com/indigo-web/indigo/http/headers"
 	"github.com/indigo-web/indigo/http/method"
-	"github.com/indigo-web/indigo/http/query"
 	"github.com/indigo-web/indigo/http/status"
 	"github.com/indigo-web/indigo/internal/requestgen"
 	"github.com/indigo-web/indigo/internal/server/tcp/dummy"
 	"github.com/indigo-web/indigo/internal/transport"
-	"github.com/indigo-web/indigo/internal/transport/http1"
 	"github.com/indigo-web/indigo/router"
 	"github.com/indigo-web/indigo/router/inbuilt"
 	"github.com/indigo-web/indigo/router/simple"
 	"github.com/indigo-web/indigo/settings"
-	"github.com/indigo-web/utils/buffer"
-	"github.com/indigo-web/utils/pool"
 )
 
 // Using default headers pasted from indi.go. Not using original ones as
@@ -193,39 +188,12 @@ func Benchmark_Post(b *testing.B) {
 }
 
 func newServer(client tcp.Client) (*Server, *http.Request, transport.Transport) {
-	// for benchmarking, using more realistic conditions. In case we want a pure performance - use
-	// getSimpleRouter() here. It is visibly faster
+	// using inbuilt router instead of simple in order to be more precise and realistic,
+	// as in wildlife simple router will be barely used
 	r := getInbuiltRouter()
-	s := settings.Default()
-	q := query.NewQuery(keyvalue.New())
-	body := http1.NewBody(
-		client, nil, s.Body,
-	)
-	hdrs := headers.NewPrealloc(10)
-	request := http.NewRequest(
-		hdrs, q, http.NewResponse(), dummy.NewNopConn(), body, nil,
-	)
-	keyBuff := buffer.New(
-		s.Headers.MaxKeyLength*s.Headers.Number.Default,
-		s.Headers.MaxKeyLength*s.Headers.Number.Maximal,
-	)
-	valBuff := buffer.New(
-		s.Headers.ValueSpace.Default, s.Headers.ValueSpace.Maximal,
-	)
-	objPool := pool.NewObjectPool[[]string](20)
-	startLineBuff := buffer.New(
-		s.URL.BufferSize.Default,
-		s.URL.BufferSize.Maximal,
-	)
-	trans := http1.New(
-		request,
-		*keyBuff, *valBuff, *startLineBuff,
-		*objPool,
-		s.Headers,
-		make([]byte, 0, 1024),
-		0,
-		defaultHeaders,
-	)
+	body := initialize.NewBody(client, settings.Default().Body)
+	request := initialize.NewRequest(settings.Default(), dummy.NewNopConn(), body)
+	trans := initialize.NewTransport(settings.Default(), request)
 
 	return NewServer(r), request, trans
 }

@@ -120,9 +120,8 @@ func (r *Response) Write(b []byte) (n int, err error) {
 	return len(b), nil
 }
 
-// RetrieveFile opens a file for reading and returns a new Response with attachment, set to the file
-// descriptor.fields. If error occurred during opening a file, it'll be returned
-func (r *Response) RetrieveFile(path string) (*Response, error) {
+// TryFile tries to open a file for reading and returns a new Response with attachment.
+func (r *Response) TryFile(path string) (*Response, error) {
 	fd, err := os.Open(path)
 	if err != nil {
 		// if we can't open it, it doesn't exist
@@ -149,7 +148,7 @@ func (r *Response) RetrieveFile(path string) (*Response, error) {
 // File opens a file for reading and returns a new Response with attachment, set to the file
 // descriptor.fields. If error occurred, it'll be silently returned
 func (r *Response) File(path string) *Response {
-	resp, err := r.RetrieveFile(path)
+	resp, err := r.TryFile(path)
 	if err != nil {
 		return r.Error(err)
 	}
@@ -164,19 +163,27 @@ func (r *Response) Attachment(reader io.Reader, size int) *Response {
 	return r
 }
 
-// JSON receives a model (must be a pointer to the structure) and returns a new Response
+// TryJSON receives a model (must be a pointer to the structure) and returns a new Response
 // object and an error
-func (r *Response) JSON(model any) (*Response, error) {
+func (r *Response) TryJSON(model any) (*Response, error) {
 	r.fields.Body = r.fields.Body[:0]
 	stream := json.ConfigDefault.BorrowStream(r)
 	stream.WriteVal(model)
 	err := stream.Flush()
 	json.ConfigDefault.ReturnStream(stream)
+
+	return r.ContentType(mime.JSON), err
+}
+
+// JSON does the same as TryJSON does, except returned error is being implicitly wrapped
+// by Error
+func (r *Response) JSON(model any) *Response {
+	resp, err := r.TryJSON(model)
 	if err != nil {
-		return r, err
+		return r.Error(err)
 	}
 
-	return r.ContentType(mime.JSON), nil
+	return resp
 }
 
 // Error returns Response with corresponding HTTP error code, if passed error is

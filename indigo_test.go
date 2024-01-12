@@ -3,8 +3,9 @@ package indigo
 import (
 	"bytes"
 	"context"
-	"errors"
+	"crypto/tls"
 	"fmt"
+	"github.com/indigo-web/indigo/http/encryption"
 	"github.com/indigo-web/indigo/http/headers"
 	"github.com/indigo-web/indigo/http/method"
 	"github.com/indigo-web/indigo/http/status"
@@ -17,6 +18,7 @@ import (
 	stdhttp "net/http"
 	"net/url"
 	"os"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -27,29 +29,11 @@ import (
 )
 
 const (
-	addr = "localhost:16100"
-	URL  = "http://" + addr
+	addr      = "localhost:16100"
+	altPort   = 16800
+	httpsPort = 16443
+	appURL    = "http://" + addr
 )
-
-func readN(conn net.Conn, n int) ([]byte, error) {
-	receivedBuff := make([]byte, 0, n)
-	buff := make([]byte, n)
-
-	for {
-		recvd, err := conn.Read(buff)
-		if err != nil {
-			return nil, err
-		}
-
-		receivedBuff = append(receivedBuff, buff[:recvd]...)
-
-		if len(receivedBuff) == n {
-			return receivedBuff, nil
-		} else if len(receivedBuff) > n {
-			return nil, errors.New("received too much data")
-		}
-	}
-}
 
 func getHeaders() headers.Headers {
 	return headers.New().
@@ -91,6 +75,21 @@ func getInbuiltRouter() *inbuilt.Router {
 		return http.Bytes(request, body)
 	})
 
+	r.Get("/query", func(request *http.Request) (_ *http.Response) {
+		params, err := request.Query.Unwrap()
+		if err != nil {
+			return http.Error(request, err)
+		}
+
+		var buff []byte
+
+		for _, pair := range params.Unwrap() {
+			buff = append(buff, pair.Key+":"+pair.Value+"."...)
+		}
+
+		return http.Bytes(request, buff)
+	})
+
 	r.Get("/hijack", func(request *http.Request) (_ *http.Response) {
 		conn, err := request.Hijack()
 		defer func(conn net.Conn) {
@@ -110,6 +109,10 @@ func getInbuiltRouter() *inbuilt.Router {
 	r.Get("/ctx-value", func(request *http.Request) *http.Response {
 		return http.String(request, request.Ctx.Value("easter").(string))
 	})
+
+	r.Get("/panic", func(request *http.Request) (_ *http.Response) {
+		panic("ich kann es nicht mehr ergragen")
+	}, middleware.Recover)
 
 	return r
 }
@@ -134,13 +137,15 @@ func TestServer(t *testing.T) {
 			NotifyOnStop(func() {
 				ch <- struct{}{}
 			}).
+			Listen(altPort, encryption.Plain).
+			AutoHTTPS(httpsPort).
 			Serve(r)
 	}(app)
 
 	<-ch
 
 	t.Run("root get", func(t *testing.T) {
-		resp, err := stdhttp.DefaultClient.Get(URL + "/")
+		resp, err := stdhttp.DefaultClient.Get(appURL + "/")
 		require.NoError(t, err)
 		defer func() {
 			_ = resp.Body.Close()
@@ -163,7 +168,7 @@ func TestServer(t *testing.T) {
 
 	t.Run("root get with body", func(t *testing.T) {
 		r := strings.NewReader("Hello, world!")
-		req, err := stdhttp.NewRequest(stdhttp.MethodGet, URL+"/", r)
+		req, err := stdhttp.NewRequest(stdhttp.MethodGet, appURL+"/", r)
 		require.NoError(t, err)
 		resp, err := stdhttp.DefaultClient.Do(req)
 		defer func() {
@@ -187,7 +192,7 @@ func TestServer(t *testing.T) {
 
 	t.Run("root post", func(t *testing.T) {
 		r := strings.NewReader("Hello, world!")
-		resp, err := stdhttp.DefaultClient.Post(URL+"/", "text/html", r)
+		resp, err := stdhttp.DefaultClient.Post(appURL+"/", "text/html", r)
 		require.NoError(t, err)
 		defer func() {
 			_ = resp.Body.Close()
@@ -210,7 +215,7 @@ func TestServer(t *testing.T) {
 	})
 
 	t.Run("root head", func(t *testing.T) {
-		resp, err := stdhttp.DefaultClient.Head(URL + "/")
+		resp, err := stdhttp.DefaultClient.Head(appURL + "/")
 		require.NoError(t, err)
 		defer func() {
 			_ = resp.Body.Close()
@@ -223,22 +228,20 @@ func TestServer(t *testing.T) {
 	})
 
 	t.Run("with query", func(t *testing.T) {
-		// not testing url encoded parameters, as this is already tested internally,
-		// and this would also complicate the dumper logic
-		resp, err := stdhttp.DefaultClient.Get(URL + "/?hello=world")
+		resp, err := stdhttp.DefaultClient.Get(appURL + "/query?hello=world&%20foo=+bar")
 		require.NoError(t, err)
 		defer func() {
 			_ = resp.Body.Close()
 		}()
 		require.Equal(t, stdhttp.StatusOK, resp.StatusCode)
-		repr, err := parseBody(resp)
+		body, err := io.ReadAll(resp.Body)
 		require.NoError(t, err)
-		require.Equal(t, "/?hello=world", repr.Path)
+		require.Equal(t, "hello:world. foo: bar.", string(body))
 	})
 
 	t.Run("body reader", func(t *testing.T) {
 		r := strings.NewReader("Hello, world!")
-		resp, err := stdhttp.DefaultClient.Post(URL+"/", "text/html", r)
+		resp, err := stdhttp.DefaultClient.Post(appURL+"/", "text/html", r)
 		require.NoError(t, err)
 		defer func() {
 			_ = resp.Body.Close()
@@ -273,7 +276,7 @@ func TestServer(t *testing.T) {
 	})
 
 	t.Run("request existing file", func(t *testing.T) {
-		resp, err := stdhttp.DefaultClient.Get(URL + "/file/index.html")
+		resp, err := stdhttp.DefaultClient.Get(appURL + "/file/index.html")
 		require.NoError(t, err)
 		require.Equal(t, stdhttp.StatusOK, resp.StatusCode)
 
@@ -286,7 +289,7 @@ func TestServer(t *testing.T) {
 	})
 
 	t.Run("request non-existing file", func(t *testing.T) {
-		resp, err := stdhttp.DefaultClient.Get(URL + "/file/doesntexists.html")
+		resp, err := stdhttp.DefaultClient.Get(appURL + "/file/doesntexists.html")
 		require.NoError(t, err)
 		require.Equal(t, stdhttp.StatusNotFound, resp.StatusCode)
 
@@ -381,8 +384,12 @@ func TestServer(t *testing.T) {
 		require.Equal(t, wantResponseLine, string(response[:lf+1]))
 	})
 
-	t.Run("ctx value", func(t *testing.T) {
-		resp, err := stdhttp.DefaultClient.Get(URL + "/ctx-value")
+	testCtxValue := func(t *testing.T, addr string) {
+		tr := &stdhttp.Transport{
+			TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
+		}
+		client := &stdhttp.Client{Transport: tr}
+		resp, err := client.Get(addr + "/ctx-value")
 		require.NoError(t, err)
 		defer func() {
 			_ = resp.Body.Close()
@@ -391,6 +398,18 @@ func TestServer(t *testing.T) {
 		body, err := io.ReadAll(resp.Body)
 		require.NoError(t, err)
 		require.Equal(t, "egg", string(body))
+	}
+
+	t.Run("ctx value", func(t *testing.T) {
+		testCtxValue(t, appURL)
+	})
+
+	t.Run("https", func(t *testing.T) {
+		testCtxValue(t, "https://localhost:"+strconv.Itoa(httpsPort))
+	})
+
+	t.Run("alternative port", func(t *testing.T) {
+		testCtxValue(t, "http://localhost:"+strconv.Itoa(altPort))
 	})
 
 	t.Run("forced stop", func(t *testing.T) {

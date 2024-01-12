@@ -1,29 +1,29 @@
 package httptest
 
 import (
-	"github.com/indigo-web/indigo/http"
 	"github.com/indigo-web/indigo/http/headers"
 	"github.com/indigo-web/indigo/http/method"
 	"github.com/indigo-web/indigo/http/proto"
 	"github.com/indigo-web/indigo/http/query"
+	"github.com/indigo-web/indigo/internal/initialize"
 	"github.com/indigo-web/indigo/internal/keyvalue"
 	"github.com/indigo-web/indigo/internal/server/tcp/dummy"
-	"github.com/indigo-web/indigo/internal/transport/http1"
 	"github.com/indigo-web/indigo/settings"
 	"github.com/stretchr/testify/require"
 	"testing"
 )
 
 func TestDump(t *testing.T) {
-	hdrs := headers.New()
-	hdrs.Add("hello", "world")
-	hdrs.Add("foo", "bar")
 	q := query.NewQuery(keyvalue.New())
 	q.Set([]byte("hello=world&foo=bar"))
-	client := dummy.NewCircularClient([]byte("Hello, world!"))
-	client.OneTime()
-	body := http1.NewBody(client, nil, settings.Default().Body)
-	request := http.NewRequest(hdrs, q, nil, dummy.NewNopConn(), body, nil)
+
+	client := dummy.NewCircularClient([]byte("Hello, world!")).OneTime()
+	body := initialize.NewBody(client, settings.Default().Body)
+	request := initialize.NewRequest(settings.Default(), dummy.NewNopConn(), body)
+	request.Headers = headers.New().
+		Add("hello", "world").
+		Add("foo", "bar")
+	request.Query = q
 	request.Method = method.GET
 	request.Path = "/"
 	request.Proto = proto.HTTP11
