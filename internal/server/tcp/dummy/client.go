@@ -66,8 +66,9 @@ func (c *CircularClient) Close() error {
 	return nil
 }
 
-func (c *CircularClient) OneTime() {
+func (c *CircularClient) OneTime() *CircularClient {
 	c.oneTime = true
+	return c
 }
 
 func NewNopClient() tcp.Client {
