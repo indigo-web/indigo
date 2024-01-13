@@ -23,24 +23,28 @@ func BenchmarkTreeMatch(b *testing.B) {
 	b.Run("simple static", func(b *testing.B) {
 		for i := 0; i < b.N; i++ {
 			tree.Match(staticSample, params)
+			params.Clear()
 		}
 	})
 
 	b.Run("short dynamic", func(b *testing.B) {
 		for i := 0; i < b.N; i++ {
 			tree.Match(shortSample, params)
+			params.Clear()
 		}
 	})
 
 	b.Run("medium dynamic", func(b *testing.B) {
 		for i := 0; i < b.N; i++ {
 			tree.Match(mediumSample, params)
+			params.Clear()
 		}
 	})
 
 	b.Run("long dynamic", func(b *testing.B) {
 		for i := 0; i < b.N; i++ {
 			tree.Match(longSample, params)
+			params.Clear()
 		}
 	})
 }
