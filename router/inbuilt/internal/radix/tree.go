@@ -4,6 +4,7 @@ import (
 	"errors"
 	"github.com/indigo-web/indigo/internal/keyvalue"
 	"github.com/indigo-web/indigo/router/inbuilt/internal/types"
+	"strings"
 )
 
 var ErrNotImplemented = errors.New(
@@ -25,8 +26,13 @@ type Tree interface {
 
 var _ Tree = new(Node)
 
+type staticSegmentEntry struct {
+	Key  string
+	Node *Node
+}
+
 type Node struct {
-	staticSegments map[string]*Node
+	staticSegments []staticSegmentEntry
 	next           *Node
 	payload        *Payload
 	dynamicName    string
@@ -39,10 +45,9 @@ func NewTree() *Node {
 
 func newNode(payload *Payload, isDyn bool, dynName string) *Node {
 	return &Node{
-		staticSegments: make(map[string]*Node),
-		isDynamic:      isDyn,
-		dynamicName:    dynName,
-		payload:        payload,
+		isDynamic:   isDyn,
+		dynamicName: dynName,
+		payload:     payload,
 	}
 }
 
@@ -80,12 +85,17 @@ func (n *Node) insertRecursively(segments []Segment, payload *Payload) error {
 		return n.next.insertRecursively(segments[1:], payload)
 	}
 
-	if node, found := n.staticSegments[segment.Payload]; found {
-		return node.insertRecursively(segments[1:], payload)
+	for _, staticSegment := range n.staticSegments {
+		if staticSegment.Key == segment.Payload {
+			return staticSegment.Node.insertRecursively(segments[1:], payload)
+		}
 	}
 
 	node := newNode(nil, false, "")
-	n.staticSegments[segment.Payload] = node
+	n.staticSegments = append(n.staticSegments, staticSegmentEntry{
+		Key:  segment.Payload,
+		Node: node,
+	})
 
 	return node.insertRecursively(segments[1:], payload)
 }
@@ -97,38 +107,33 @@ func (n *Node) Match(path string, params Params) *Payload {
 	}
 
 	path = path[1:]
+	node := n
 
-	var (
-		offset int
-		node   = n
-	)
-
-	for i := range path {
-		if path[i] == '/' {
-			var ok bool
-			node, ok = processSegment(params, path[offset:i], node)
-			if !ok {
-				return nil
-			}
-
-			offset = i + 1
+	for len(path) > 0 {
+		slash := strings.IndexByte(path, '/')
+		var segment string
+		if slash == -1 {
+			segment, path = path, ""
+		} else {
+			segment, path = path[:slash], path[slash+1:]
 		}
-	}
 
-	if offset < len(path) {
-		var ok bool
-		node, ok = processSegment(params, path[offset:], node)
+		next, ok := processSegment(params, segment, node)
 		if !ok {
 			return nil
 		}
+
+		node = next
 	}
 
 	return node.payload
 }
 
 func processSegment(params Params, segment string, node *Node) (*Node, bool) {
-	if nextNode, found := node.staticSegments[segment]; found {
-		return nextNode, true
+	for _, staticSegment := range node.staticSegments {
+		if staticSegment.Key == segment {
+			return staticSegment.Node, true
+		}
 	}
 
 	if !node.isDynamic || len(segment) == 0 {
