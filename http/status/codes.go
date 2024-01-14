@@ -7,8 +7,8 @@ of unwanted name collisions between indigo/http and net/http
 */
 
 type (
-	Code   uint16
-	Status string
+	Code   = uint16
+	Status = string
 )
 
 // HTTP status codes as registered with IANA.
