@@ -26,17 +26,12 @@ type Tree interface {
 
 var _ Tree = new(Node)
 
-type staticSegmentEntry struct {
-	Key  string
-	Node *Node
-}
-
 type Node struct {
-	staticSegments []staticSegmentEntry
-	next           *Node
-	payload        *Payload
-	dynamicName    string
-	isDynamic      bool
+	statics     arrMap
+	next        *Node
+	payload     *Payload
+	dynamicName string
+	isDynamic   bool
 }
 
 func NewTree() *Node {
@@ -85,17 +80,12 @@ func (n *Node) insertRecursively(segments []Segment, payload *Payload) error {
 		return n.next.insertRecursively(segments[1:], payload)
 	}
 
-	for _, staticSegment := range n.staticSegments {
-		if staticSegment.Key == segment.Payload {
-			return staticSegment.Node.insertRecursively(segments[1:], payload)
-		}
+	if node := n.statics.Lookup(segment.Payload); node != nil {
+		return node.insertRecursively(segments[1:], payload)
 	}
 
 	node := newNode(nil, false, "")
-	n.staticSegments = append(n.staticSegments, staticSegmentEntry{
-		Key:  segment.Payload,
-		Node: node,
-	})
+	n.statics.Add(segment.Payload, node)
 
 	return node.insertRecursively(segments[1:], payload)
 }
@@ -130,10 +120,15 @@ func (n *Node) Match(path string, params Params) *Payload {
 }
 
 func processSegment(params Params, segment string, node *Node) (*Node, bool) {
-	for _, staticSegment := range node.staticSegments {
-		if staticSegment.Key == segment {
-			return staticSegment.Node, true
+	// manually inlined arrMap.Lookup(segment)
+	if !node.statics.arrOverflow {
+		for _, entry := range node.statics.arr {
+			if entry.Key == segment {
+				return entry.Node, true
+			}
 		}
+	} else if n := node.statics.m[segment]; n != nil {
+		return n, true
 	}
 
 	if !node.isDynamic || len(segment) == 0 {
