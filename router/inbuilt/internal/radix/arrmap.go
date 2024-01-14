@@ -7,7 +7,7 @@ type segmentEntry struct {
 
 // loadfactor defines threshold, exceeding which one results in fallback to
 // hashmap
-const loadfactor = 40
+const loadfactor = 30
 
 // arrMap is a wrapper of standard hashmap, however on small amount of entries (usually <40)
 // it uses an array instead. This is related to the constant lookup time by a hashmap, that
