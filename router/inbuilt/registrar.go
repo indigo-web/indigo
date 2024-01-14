@@ -3,7 +3,7 @@ package inbuilt
 import (
 	"fmt"
 	"github.com/indigo-web/indigo/http/method"
-	radix2 "github.com/indigo-web/indigo/router/inbuilt/internal/radix"
+	"github.com/indigo-web/indigo/router/inbuilt/internal/radix"
 	"github.com/indigo-web/indigo/router/inbuilt/internal/types"
 	"github.com/indigo-web/indigo/router/inbuilt/uri"
 	"strings"
@@ -33,7 +33,7 @@ func (r *registrar) Add(path string, m method.Method, handler Handler) error {
 
 	methodsMap[m] = handler
 	r.routes[path] = methodsMap
-	r.isDynamic = r.isDynamic || !radix2.MustParse(path).IsStatic()
+	r.isDynamic = r.isDynamic || !radix.MustParse(path).IsStatic()
 
 	return nil
 }
@@ -82,8 +82,8 @@ func (r *registrar) AsMap() routesMap {
 	return rmap
 }
 
-func (r *registrar) AsRadixTree() radix2.Tree {
-	tree := radix2.NewTree()
+func (r *registrar) AsRadixTree() radix.Tree {
+	tree := radix.NewTree()
 
 	for path, v := range r.routes {
 		var (
@@ -96,7 +96,7 @@ func (r *registrar) AsRadixTree() radix2.Tree {
 			allow += method_.String() + ","
 		}
 
-		tree.MustInsert(radix2.MustParse(path), radix2.Payload{
+		tree.MustInsert(radix.MustParse(path), radix.Payload{
 			MethodsMap: methodsMap,
 			Allow:      strings.TrimSuffix(allow, ","),
 		})

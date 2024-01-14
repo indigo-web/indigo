@@ -4,6 +4,7 @@ import (
 	"errors"
 	"github.com/indigo-web/indigo/internal/keyvalue"
 	"github.com/indigo-web/indigo/router/inbuilt/internal/types"
+	"strings"
 )
 
 var ErrNotImplemented = errors.New(
@@ -26,11 +27,11 @@ type Tree interface {
 var _ Tree = new(Node)
 
 type Node struct {
-	staticSegments map[string]*Node
-	next           *Node
-	payload        *Payload
-	dynamicName    string
-	isDynamic      bool
+	statics     arrMap
+	next        *Node
+	payload     *Payload
+	dynamicName string
+	isDynamic   bool
 }
 
 func NewTree() *Node {
@@ -39,10 +40,9 @@ func NewTree() *Node {
 
 func newNode(payload *Payload, isDyn bool, dynName string) *Node {
 	return &Node{
-		staticSegments: make(map[string]*Node),
-		isDynamic:      isDyn,
-		dynamicName:    dynName,
-		payload:        payload,
+		isDynamic:   isDyn,
+		dynamicName: dynName,
+		payload:     payload,
 	}
 }
 
@@ -80,12 +80,12 @@ func (n *Node) insertRecursively(segments []Segment, payload *Payload) error {
 		return n.next.insertRecursively(segments[1:], payload)
 	}
 
-	if node, found := n.staticSegments[segment.Payload]; found {
+	if node := n.statics.Lookup(segment.Payload); node != nil {
 		return node.insertRecursively(segments[1:], payload)
 	}
 
 	node := newNode(nil, false, "")
-	n.staticSegments[segment.Payload] = node
+	n.statics.Add(segment.Payload, node)
 
 	return node.insertRecursively(segments[1:], payload)
 }
@@ -97,38 +97,38 @@ func (n *Node) Match(path string, params Params) *Payload {
 	}
 
 	path = path[1:]
+	node := n
 
-	var (
-		offset int
-		node   = n
-	)
-
-	for i := range path {
-		if path[i] == '/' {
-			var ok bool
-			node, ok = processSegment(params, path[offset:i], node)
-			if !ok {
-				return nil
-			}
-
-			offset = i + 1
+	for len(path) > 0 {
+		slash := strings.IndexByte(path, '/')
+		var segment string
+		if slash == -1 {
+			segment, path = path, ""
+		} else {
+			segment, path = path[:slash], path[slash+1:]
 		}
-	}
 
-	if offset < len(path) {
-		var ok bool
-		node, ok = processSegment(params, path[offset:], node)
+		next, ok := processSegment(params, segment, node)
 		if !ok {
 			return nil
 		}
+
+		node = next
 	}
 
 	return node.payload
 }
 
 func processSegment(params Params, segment string, node *Node) (*Node, bool) {
-	if nextNode, found := node.staticSegments[segment]; found {
-		return nextNode, true
+	// manually inlined arrMap.Lookup(segment)
+	if !node.statics.arrOverflow {
+		for _, entry := range node.statics.arr {
+			if entry.Key == segment {
+				return entry.Node, true
+			}
+		}
+	} else if n := node.statics.m[segment]; n != nil {
+		return n, true
 	}
 
 	if !node.isDynamic || len(segment) == 0 {
