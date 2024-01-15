@@ -3,19 +3,18 @@ package http1
 import (
 	"bytes"
 	"fmt"
+	"github.com/indigo-web/indigo/http"
 	"github.com/indigo-web/indigo/http/method"
 	"github.com/indigo-web/indigo/http/proto"
 	"github.com/indigo-web/indigo/http/status"
 	"github.com/indigo-web/indigo/internal/transport"
 	"github.com/indigo-web/indigo/internal/uridecode"
-	"github.com/indigo-web/utils/strcomp"
-	"github.com/indigo-web/utils/uf"
-	"strings"
-
-	"github.com/indigo-web/indigo/http"
 	"github.com/indigo-web/indigo/settings"
 	"github.com/indigo-web/utils/buffer"
 	"github.com/indigo-web/utils/pool"
+	"github.com/indigo-web/utils/strcomp"
+	"github.com/indigo-web/utils/uf"
+	"strings"
 )
 
 type parserState uint8
@@ -40,6 +39,7 @@ type Parser struct {
 	request           *http.Request
 	startLineBuff     buffer.Buffer
 	encToksBuff       []string
+	contEncToksBuff   []string
 	headerKey         string
 	headersValuesPool pool.ObjectPool[[]string]
 	headerKeyBuff     buffer.Buffer
@@ -61,6 +61,7 @@ func NewParser(
 		headersSettings:   headersSettings,
 		startLineBuff:     startLineBuff,
 		encToksBuff:       make([]string, 0, headersSettings.MaxEncodingTokens),
+		contEncToksBuff:   make([]string, 0, headersSettings.MaxEncodingTokens),
 		headerKeyBuff:     keyBuff,
 		headerValueBuff:   valBuff,
 		headersValuesPool: valuesPool,
@@ -313,9 +314,9 @@ headerValue:
 		case strcomp.EqualFold(p.headerKey, "upgrade"):
 			p.request.Upgrade = proto.ChooseUpgrade(value)
 		case strcomp.EqualFold(p.headerKey, "transfer-encoding"):
-			p.request.Encoding.Transfer = parseEncodingString(p.encToksBuff, value, cap(p.encToksBuff))
+			p.request.Encoding.Transfer, p.request.Encoding.Chunked = parseEncodingString(p.encToksBuff, value, cap(p.encToksBuff))
 		case strcomp.EqualFold(p.headerKey, "content-encoding"):
-			p.request.Encoding.Content = parseEncodingString(p.encToksBuff, value, cap(p.encToksBuff))
+			p.request.Encoding.Content, _ = parseEncodingString(p.contEncToksBuff, value, cap(p.contEncToksBuff))
 		case strcomp.EqualFold(p.headerKey, "trailer"):
 			p.request.Encoding.HasTrailer = true
 		}
@@ -340,40 +341,42 @@ headerValueCRLFCR:
 
 func (p *Parser) reset() {
 	p.headersNumber = 0
+	p.startLineBuff.Clear()
 	p.headerKeyBuff.Clear()
 	p.headerValueBuff.Clear()
-	p.startLineBuff.Clear()
 	p.contentLength = 0
 	p.encToksBuff = p.encToksBuff[:0]
+	p.contEncToksBuff = p.contEncToksBuff[:0]
 	p.state = eMethod
 }
 
-func parseEncodingString(buff []string, value string, maxTokens int) (toks []string) {
-	var offset int
-
-	for i := 0; i < len(value); i++ {
-		if value[i] == ',' {
-			token := strings.TrimSpace(value[offset:i])
-			offset = i + 1
-
-			if len(token) == 0 {
-				continue
-			}
-
-			if len(buff)+1 > maxTokens {
-				return nil
-			}
-
-			buff = append(buff, token)
+func parseEncodingString(buff []string, value string, maxTokens int) (toks []string, chunked bool) {
+	for len(value) > 0 {
+		var token string
+		comma := strings.IndexByte(value, ',')
+		if comma == -1 {
+			token, value = value, ""
+		} else {
+			token, value = value[:comma], value[comma+1:]
 		}
-	}
 
-	token := strings.TrimSpace(value[offset:])
-	if len(token) > 0 {
+		token = strings.TrimSpace(token)
+		if len(token) == 0 {
+			continue
+		}
+
+		if len(buff)+1 > maxTokens {
+			return nil, false
+		}
+
+		if strcomp.EqualFold(token, "chunked") {
+			chunked = true
+		}
+
 		buff = append(buff, token)
 	}
 
-	return buff
+	return buff, chunked
 }
 
 func trimPrefixSpaces(b []byte) []byte {
