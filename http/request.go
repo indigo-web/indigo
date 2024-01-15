@@ -149,19 +149,18 @@ func (r *Request) WasHijacked() bool {
 // Clear resets request headers and reads body into nowhere until completed.
 // It is implemented to clear the request object between requests
 func (r *Request) Clear() (err error) {
-	r.Query.Set(nil)
-	r.Params.Clear()
-	r.Ctx = zeroContext
-
 	if err = r.Body.Discard(); err != nil {
 		return err
 	}
 
+	r.Query.Set(nil)
+	r.Params.Clear()
 	r.Headers.Clear()
 	r.ContentLength = 0
 	r.Encoding = Encoding{}
 	r.ContentType = ""
 	r.Upgrade = proto.Unknown
+	r.Ctx = zeroContext
 	r.Env = Environment{}
 
 	return nil
