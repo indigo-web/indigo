@@ -17,7 +17,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func getRequestWithBody(chunked bool, body ...[]byte) (*http.Request, http.Body) {
+func getRequestWithBody(chunked bool, body ...[]byte) (*http.Request, *Body) {
 	client := dummy.NewCircularClient(body...)
 	chunkedParser := chunkedbody.NewParser(chunkedbody.DefaultSettings())
 	reqBody := NewBody(client, chunkedParser, settings.Default().Body)
