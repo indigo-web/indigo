@@ -19,9 +19,8 @@ func MyHandler(request *http.Request) *http.Response {
 }
 
 func main() {
-	myRouter := simple.New(MyHandler, http.Error)
-
+	r := simple.New(MyHandler, http.Error)
 	app := indigo.New(addr)
 	log.Println("Listening on", addr)
-	log.Fatal(app.Serve(myRouter))
+	log.Fatal(app.Serve(r))
 }
