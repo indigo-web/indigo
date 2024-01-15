@@ -19,7 +19,7 @@ func MyHandler(request *http.Request) *http.Response {
 }
 
 func main() {
-	myRouter := simple.NewRouter(MyHandler, http.Error)
+	myRouter := simple.New(MyHandler, http.Error)
 
 	app := indigo.New(addr)
 	log.Println("Listening on", addr)
