@@ -7,24 +7,13 @@ import (
 	"testing"
 
 	"github.com/indigo-web/indigo/http"
-	"github.com/indigo-web/indigo/http/method"
-	"github.com/indigo-web/indigo/http/status"
 	"github.com/indigo-web/indigo/internal/requestgen"
 	"github.com/indigo-web/indigo/internal/server/tcp/dummy"
 	"github.com/indigo-web/indigo/internal/transport"
 	"github.com/indigo-web/indigo/router"
 	"github.com/indigo-web/indigo/router/inbuilt"
-	"github.com/indigo-web/indigo/router/simple"
 	"github.com/indigo-web/indigo/settings"
 )
-
-// Using default headers pasted from indi.go. Not using original ones as
-// this leads to cycle import (why cannot compiler handle such situations?)
-var defaultHeaders = map[string]string{
-	"Content-Type": "text/html",
-	// nil here means that value will be set later, when server will be initializing
-	"Accept-Encodings": "",
-}
 
 var longPath = strings.Repeat("a", 500)
 
@@ -52,67 +41,10 @@ func getInbuiltRouter() router.Router {
 	return r
 }
 
-func getSimpleRouter() router.Router {
-	longpath := "/" + longPath
-
-	r := simple.NewRouter(func(request *http.Request) *http.Response {
-		switch request.Path {
-		case "/":
-			switch request.Method {
-			case method.GET:
-				return request.Respond()
-			case method.POST:
-				_ = request.Body.Callback(func([]byte) error {
-					return nil
-				})
-
-				return request.Respond()
-			default:
-				return http.Error(request, status.ErrMethodNotAllowed)
-			}
-		case "/with-header":
-			return request.Respond().Header("Hello", "World")
-		case longpath:
-			return request.Respond()
-		default:
-			return http.Error(request, status.ErrNotFound)
-		}
-	}, http.Error)
-
-	return r
-}
-
 func Benchmark_Get(b *testing.B) {
-	server, request, trans := newServer(dummy.NewNopClient())
-
 	b.Run("simple get", func(b *testing.B) {
-		raw := []byte(
-			"GET / HTTP/1.1\r\n" +
-				"Hello: world\r\n" +
-				"One: ok\r\n" +
-				"Content-Type: nothing but true;q=0.9\r\n" +
-				"Four: lorem ipsum\r\n" +
-				"Mistake: is made here\r\n" +
-				"Lorem: ipsum\r\n" +
-				"tired: of all this shit\r\n" +
-				"Eight: finally only two left\r\n" +
-				"my-brain: is not so creative\r\n" +
-				"to-create: ten random headers from scratch\r\n" +
-				"\r\n",
-		)
-
-		client := dummy.NewCircularClient(raw)
-		b.SetBytes(int64(len(raw)))
-		b.ReportAllocs()
-		b.ResetTimer()
-
-		for i := 0; i < b.N; i++ {
-			server.HandleRequest(client, request, trans)
-		}
-	})
-
-	b.Run("with resp header", func(b *testing.B) {
-		raw := []byte("GET /with-header HTTP/1.1\r\n\r\n")
+		server, request, trans := newServer(dummy.NewNopClient())
+		raw := []byte("GET / HTTP/1.1\r\nAccept-Encoding: identity\r\n")
 		client := dummy.NewCircularClient(raw)
 		b.SetBytes(int64(len(raw)))
 		b.ReportAllocs()
@@ -124,7 +56,8 @@ func Benchmark_Get(b *testing.B) {
 	})
 
 	b.Run("5 headers", func(b *testing.B) {
-		data := requestgen.Generate(longPath, 5)
+		server, request, trans := newServer(dummy.NewNopClient())
+		data := requestgen.Generate(longPath, requestgen.Headers(5))
 		client := dummy.NewCircularClient(data)
 		b.SetBytes(int64(len(data)))
 		b.ReportAllocs()
@@ -136,46 +69,89 @@ func Benchmark_Get(b *testing.B) {
 	})
 
 	b.Run("10 headers", func(b *testing.B) {
-		data := requestgen.Generate(longPath, 10)
-		client := dummy.NewCircularClient(data)
-		b.SetBytes(int64(len(data)))
+		server, request, trans := newServer(dummy.NewNopClient())
+		raw := requestgen.Generate(longPath, requestgen.Headers(10))
+		dispersed := disperse(raw, settings.Default().TCP.ReadBufferSize)
+		client := dummy.NewCircularClient(dispersed...)
+		b.SetBytes(int64(len(raw)))
 		b.ReportAllocs()
 		b.ResetTimer()
 
 		for i := 0; i < b.N; i++ {
-			server.HandleRequest(client, request, trans)
+			for j := 0; j < len(dispersed); j++ {
+				server.HandleRequest(client, request, trans)
+			}
 		}
 	})
 
 	b.Run("50 headers", func(b *testing.B) {
-		data := requestgen.Generate(longPath, 50)
-		client := dummy.NewCircularClient(data)
-		b.SetBytes(int64(len(data)))
+		server, request, trans := newServer(dummy.NewNopClient())
+		raw := requestgen.Generate(longPath, requestgen.Headers(50))
+		dispersed := disperse(raw, settings.Default().TCP.ReadBufferSize)
+		client := dummy.NewCircularClient(dispersed...)
+		b.SetBytes(int64(len(raw)))
 		b.ReportAllocs()
 		b.ResetTimer()
 
 		for i := 0; i < b.N; i++ {
-			server.HandleRequest(client, request, trans)
+			for j := 0; j < len(dispersed); j++ {
+				server.HandleRequest(client, request, trans)
+			}
 		}
 	})
 
 	b.Run("heavily escaped", func(b *testing.B) {
-		data := requestgen.Generate(strings.Repeat("%20", 500), 20)
-		client := dummy.NewCircularClient(data)
-		b.SetBytes(int64(len(data)))
+		server, request, trans := newServer(dummy.NewNopClient())
+		raw := requestgen.Generate(strings.Repeat("%20", 500), requestgen.Headers(10))
+		dispersed := disperse(raw, settings.Default().TCP.ReadBufferSize)
+		client := dummy.NewCircularClient(dispersed...)
+		b.SetBytes(int64(len(raw)))
 		b.ReportAllocs()
 		b.ResetTimer()
 
 		for i := 0; i < b.N; i++ {
-			server.HandleRequest(client, request, trans)
+			for j := 0; j < len(dispersed); j++ {
+				server.HandleRequest(client, request, trans)
+			}
 		}
 	})
 }
 
 func Benchmark_Post(b *testing.B) {
-	b.Run("simple POST", func(b *testing.B) {
+	b.Run("POST hello world", func(b *testing.B) {
 		raw := []byte("POST / HTTP/1.1\r\nContent-Length: 13\r\n\r\nHello, world!")
-		client := dummy.NewCircularClient(raw)
+		client := dummy.NewCircularClient(disperse(raw, settings.Default().TCP.ReadBufferSize)...)
+		server, request, trans := newServer(client)
+		b.SetBytes(int64(len(raw)))
+		b.ReportAllocs()
+		b.ResetTimer()
+
+		for i := 0; i < b.N; i++ {
+			server.HandleRequest(client, request, trans)
+		}
+	})
+
+	b.Run("discard POST 10mib", func(b *testing.B) {
+		body := strings.Repeat("a", 10_000_000)
+		raw := []byte("POST / HTTP/1.1\r\nContent-Length: 10000000\r\n\r\n" + body)
+		client := dummy.NewCircularClient(disperse(raw, settings.Default().TCP.ReadBufferSize)...)
+		server, request, trans := newServer(client)
+		b.SetBytes(int64(len(raw)))
+		b.ReportAllocs()
+		b.ResetTimer()
+
+		for i := 0; i < b.N; i++ {
+			server.HandleRequest(client, request, trans)
+		}
+	})
+
+	b.Run("discard chunked 10mib", func(b *testing.B) {
+		const chunkSize = 0xfffe
+		const numberOfChunks = 10_000_000 / chunkSize
+		chunk := "fffe\r\n" + strings.Repeat("a", chunkSize) + "\r\n"
+		chunked := strings.Repeat(chunk, numberOfChunks) + "0\r\n\r\n"
+		raw := []byte("POST / HTTP/1.1\r\nTransfer-Encoding: chunked\r\n\r\n" + chunked)
+		client := dummy.NewCircularClient(disperse(raw, settings.Default().TCP.ReadBufferSize)...)
 		server, request, trans := newServer(client)
 		b.SetBytes(int64(len(raw)))
 		b.ReportAllocs()
@@ -196,4 +172,23 @@ func newServer(client tcp.Client) (*Server, *http.Request, transport.Transport) 
 	trans := initialize.NewTransport(settings.Default(), request)
 
 	return NewServer(r), request, trans
+}
+
+func disperse(data []byte, n int) (parts [][]byte) {
+	for len(data) > 0 {
+		end := min(len(data), n)
+		part := data[:end]
+		parts = append(parts, part)
+		data = data[end:]
+	}
+
+	return parts
+}
+
+func min(a, b int) int {
+	if a < b {
+		return a
+	}
+
+	return b
 }
