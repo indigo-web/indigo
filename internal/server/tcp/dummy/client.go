@@ -21,7 +21,7 @@ type CircularClient struct {
 func NewCircularClient(data ...[]byte) *CircularClient {
 	return &CircularClient{
 		data:    data,
-		pointer: -1,
+		pointer: 0,
 	}
 }
 
@@ -40,13 +40,13 @@ func (c *CircularClient) Read() (data []byte, err error) {
 		return data, nil
 	}
 
-	c.pointer++
-
 	if c.pointer >= len(c.data) {
 		c.pointer = 0
 	}
+	piece := c.data[c.pointer]
+	c.pointer++
 
-	return c.data[c.pointer], nil
+	return piece, nil
 }
 
 func (c *CircularClient) Unread(takeback []byte) {

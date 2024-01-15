@@ -34,7 +34,7 @@ func NewKeyValueBuffs(s settings.Headers) (*buffer.Buffer, *buffer.Buffer) {
 	return keyBuff, valBuff
 }
 
-func NewBody(client tcp.Client, body settings.Body) http.Body {
+func NewBody(client tcp.Client, body settings.Body) *http1.Body {
 	chunkedBodySettings := chunkedbody.DefaultSettings()
 	chunkedBodySettings.MaxChunkSize = body.MaxChunkSize
 

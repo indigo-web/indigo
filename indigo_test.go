@@ -465,6 +465,37 @@ func TestServer(t *testing.T) {
 		requireField(t, result, "foo", "bar, spam")
 	})
 
+	t.Run("HTTP/1.0 no explicit keep-alive", func(t *testing.T) {
+		raw := "GET /ctx-value HTTP/1.0\r\n\r\n"
+		conn, err := net.Dial("tcp", addr)
+		require.NoError(t, err)
+		defer conn.Close()
+		_, err = conn.Write([]byte(raw))
+		require.NoError(t, err)
+		require.NoError(t, conn.SetReadDeadline(time.Now().Add(time.Second)))
+		_, err = io.ReadAll(conn)
+		require.NoError(t, err)
+	})
+
+	t.Run("HTTP/1.0 with keep-alive", func(t *testing.T) {
+		raw := "GET /ctx-value HTTP/1.0\r\nConnection: keep-alive\r\n\r\n"
+		const pipelinedRequests = 10
+		requests := strings.Repeat(raw, pipelinedRequests)
+		conn, err := net.Dial("tcp", addr)
+		require.NoError(t, err)
+		defer conn.Close()
+		_, err = conn.Write([]byte(requests))
+		require.NoError(t, err)
+		require.NoError(t, conn.SetReadDeadline(time.Now().Add(time.Second)))
+		data, err := io.ReadAll(conn)
+		require.NoError(t, err)
+		fmt.Println("data:", strconv.Quote(string(data)))
+		n := bytes.Count(data, []byte("\r\n\r\n"))
+		// pipelinedRequests+1 because we're reading till io.EOF. So by that, the server
+		// sends us 408 Request Timeout before closing the connection
+		require.Equal(t, pipelinedRequests+1, n, "got less pipelined responses as expected")
+	})
+
 	t.Run("forced stop", func(t *testing.T) {
 		app.Stop()
 		chanRead(ch, 5*time.Second)

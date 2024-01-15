@@ -1,15 +1,12 @@
 package stash
 
-import "io"
-
-// Source is a function that returns new data on demand
-type Source func() ([]byte, error)
-
-var _ io.Reader = &Reader{}
+type Retriever interface {
+	Retrieve() ([]byte, error)
+}
 
 // Reader covers Source function in the manner, so it implements the io.Reader
 type Reader struct {
-	source  Source
+	source  Retriever
 	pending []byte
 	error   error
 }
@@ -34,10 +31,10 @@ func (r *Reader) Read(b []byte) (n int, err error) {
 }
 
 func (r *Reader) refill() {
-	r.pending, r.error = r.source()
+	r.pending, r.error = r.source.Retrieve()
 }
 
-func (r *Reader) Reset(src Source) {
+func (r *Reader) Reset(src Retriever) {
 	r.source = src
 	r.pending = nil
 	r.error = nil

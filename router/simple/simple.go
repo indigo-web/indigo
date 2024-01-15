@@ -5,7 +5,7 @@ import (
 	"github.com/indigo-web/indigo/router"
 )
 
-var _ router.Router = Router{}
+var _ router.Router = new(Router)
 
 type (
 	Handler      func(*http.Request) *http.Response
@@ -17,8 +17,8 @@ type Router struct {
 	errHandler ErrorHandler
 }
 
-func NewRouter(handler Handler, errHandler ErrorHandler) Router {
-	return Router{
+func New(handler Handler, errHandler ErrorHandler) *Router {
+	return &Router{
 		handler:    handler,
 		errHandler: errHandler,
 	}

@@ -44,7 +44,7 @@ func (b *Body) Init(request *http.Request) {
 	}
 
 	b.eof = false
-	b.Reader.Reset(b.Retrieve)
+	b.Reader.Reset(b)
 }
 
 func (b *Body) String() (string, error) {

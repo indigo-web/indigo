@@ -5,6 +5,7 @@ import (
 	"github.com/indigo-web/utils/uf"
 )
 
+//go:generate stringer -type=Proto
 type Proto uint8
 
 const (

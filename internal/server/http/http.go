@@ -26,21 +26,13 @@ func NewServer(router router.Router) *Server {
 	}
 }
 
-func (h *Server) Run(
-	client tcp.Client, req *http.Request, trans transport.Transport,
-) {
-	for {
-		if !h.HandleRequest(client, req, trans) {
-			break
-		}
+func (h *Server) Run(client tcp.Client, req *http.Request, trans transport.Transport) {
+	for h.HandleRequest(client, req, trans) {
 	}
-
 	_ = client.Close()
 }
 
-func (h *Server) HandleRequest(
-	client tcp.Client, req *http.Request, trans transport.Transport,
-) (continue_ bool) {
+func (h *Server) HandleRequest(client tcp.Client, req *http.Request, trans transport.Transport) (ok bool) {
 	data, err := client.Read()
 	if err != nil {
 		if errors.Is(err, os.ErrDeadlineExceeded) {

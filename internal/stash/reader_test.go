@@ -6,12 +6,18 @@ import (
 	"testing"
 )
 
+type retriever struct {
+	data string
+}
+
+func (r retriever) Retrieve() ([]byte, error) {
+	return []byte(r.data), io.EOF
+}
+
 func TestReader(t *testing.T) {
 	t.Run("both data and error simultaneously", func(t *testing.T) {
 		r := New()
-		r.Reset(func() ([]byte, error) {
-			return []byte("hello, world"), io.EOF
-		})
+		r.Reset(retriever{"hello, world"})
 
 		buff := make([]byte, 64)
 		n, err := r.Read(buff)
@@ -22,9 +28,7 @@ func TestReader(t *testing.T) {
 
 	t.Run("multiple reads", func(t *testing.T) {
 		r := New()
-		r.Reset(func() ([]byte, error) {
-			return []byte("hello, world"), io.EOF
-		})
+		r.Reset(retriever{"hello, world"})
 
 		buff := make([]byte, 2)
 		data, err := readfull(r, buff)
