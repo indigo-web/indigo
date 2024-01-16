@@ -45,9 +45,6 @@ type (
 		// Maximal value is a hard limit, reaching which one client triggers server
 		// to response with 431 Header Fields Too Large
 		ValueSpace HeadersValuesSpace
-		// MaxValuesObjectPoolSize is responsible for a maximal size of string slices object
-		// pool
-		MaxValuesObjectPoolSize int
 		// MaxEncodingTokens is a limit of how many encodings can be applied at the body
 		// for a single request
 		MaxEncodingTokens int
@@ -168,9 +165,8 @@ func Fill(src Settings) (new Settings) {
 				Default: numOr(src.Headers.ValueSpace.Default, defaults.Headers.ValueSpace.Default),
 				Maximal: numOr(src.Headers.ValueSpace.Maximal, defaults.Headers.ValueSpace.Maximal),
 			},
-			MaxValuesObjectPoolSize: numOr(src.Headers.MaxValuesObjectPoolSize, defaults.Headers.MaxValuesObjectPoolSize),
-			MaxEncodingTokens:       numOr(src.Headers.MaxEncodingTokens, defaults.Headers.MaxEncodingTokens),
-			Default:                 mapOr(src.Headers.Default, defaults.Headers.Default),
+			MaxEncodingTokens: numOr(src.Headers.MaxEncodingTokens, defaults.Headers.MaxEncodingTokens),
+			Default:           mapOr(src.Headers.Default, defaults.Headers.Default),
 		},
 		URL: URL{
 			BufferSize: URLBufferSize{
