@@ -20,13 +20,13 @@ import (
 )
 
 func HelloWorld(request *http.Request) *http.Response {
-  return request.Respond().String("Hello, world!")
+  return http.String(request, "Hello, world!")
 }
 
 func Log(request *http.Request) *http.Response {
   text, err := request.Body.String()
   if err != nil {
-    return request.Respond().Error(err)
+    return http.Error(request, err)
   }
 	
   log.Printf("%s says: %s", request.Remote, text)
