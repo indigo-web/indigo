@@ -18,12 +18,11 @@ func _() {
 	_ = x[OPTIONS-7]
 	_ = x[TRACE-8]
 	_ = x[PATCH-9]
-	_ = x[Count-10]
 }
 
-const _Method_name = "UnknownGETHEADPOSTPUTDELETECONNECTOPTIONSTRACEPATCHCount"
+const _Method_name = "UnknownGETHEADPOSTPUTDELETECONNECTOPTIONSTRACEPATCH"
 
-var _Method_index = [...]uint8{0, 7, 10, 14, 18, 21, 27, 34, 41, 46, 51, 56}
+var _Method_index = [...]uint8{0, 7, 10, 14, 18, 21, 27, 34, 41, 46, 51}
 
 func (i Method) String() string {
 	if i >= Method(len(_Method_index)-1) {
