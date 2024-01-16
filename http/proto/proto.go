@@ -1,10 +1,5 @@
 package proto
 
-import (
-	"github.com/indigo-web/utils/strcomp"
-	"github.com/indigo-web/utils/uf"
-)
-
 //go:generate stringer -type=Proto
 type Proto uint8
 
@@ -27,15 +22,19 @@ var (
 )
 
 const (
-	minimalProtoStringVersion = len("HTTP/x.x")
-	httpProtoPrefix           = "HTTP/"
-	majorVersionOffset        = len("HTTP/x") - 1
-	minorVersionOffset        = len("HTTP/x.x") - 1
+	protoTokenLength   = len("HTTP/x.x")
+	majorVersionOffset = len("HTTP/x") - 1
+	minorVersionOffset = len("HTTP/x.x") - 1
 )
 
+var majorMinorVersionLUT = [10][10]Proto{
+	0: {9: HTTP09},
+	1: {0: HTTP10, 1: HTTP11},
+}
+
 func FromBytes(raw []byte) Proto {
-	if len(raw) != minimalProtoStringVersion ||
-		!strcomp.EqualFold(uf.B2S(raw[:len(httpProtoPrefix)]), httpProtoPrefix) {
+	if len(raw) != protoTokenLength ||
+		!(raw[0]|0x20 == 'h' && raw[1]|0x20 == 't' && raw[2]|0x20 == 't' && raw[3]|0x20 == 'p' && raw[4] == '/') {
 		return Unknown
 	}
 
@@ -43,16 +42,11 @@ func FromBytes(raw []byte) Proto {
 }
 
 func Parse(major, minor uint8) Proto {
-	switch {
-	case major == 1 && minor == 1:
-		return HTTP11
-	case major == 1 && minor == 0:
-		return HTTP10
-	case major == 0 && minor == 9:
-		return HTTP09
+	if major > 9 || minor > 9 {
+		return Unknown
 	}
 
-	return Unknown
+	return majorMinorVersionLUT[major][minor]
 }
 
 func ToBytes(proto Proto) []byte {
