@@ -2,6 +2,9 @@ package inbuilt
 
 import (
 	"errors"
+	"github.com/indigo-web/indigo/internal/initialize"
+	"github.com/indigo-web/indigo/internal/server/tcp/dummy"
+	"github.com/indigo-web/indigo/settings"
 	"github.com/stretchr/testify/assert"
 	"testing"
 
@@ -350,4 +353,33 @@ func TestCatchers(t *testing.T) {
 		require.Equal(t, status.OK, resp.Reveal().Code)
 		require.Equal(t, "double magic", string(resp.Reveal().Body))
 	})
+}
+
+func TestMutators(t *testing.T) {
+	var timesCalled int
+
+	r := New().
+		Get("/", http.Respond).
+		Mutator(func(request *http.Request) {
+			timesCalled++
+		})
+
+	require.NoError(t, r.OnStart())
+	request := initialize.NewRequest(settings.Default(), dummy.NewNopConn(), nil)
+	request.Method = method.GET
+	request.Path = "/"
+	resp := r.OnRequest(request)
+	require.Equal(t, status.OK, resp.Reveal().Code)
+
+	request.Method = method.POST
+	request.Path = "/"
+	resp = r.OnRequest(request)
+	require.Equal(t, status.MethodNotAllowed, resp.Reveal().Code)
+
+	request.Method = method.GET
+	request.Path = "/foo"
+	resp = r.OnRequest(request)
+	require.Equal(t, status.NotFound, resp.Reveal().Code)
+
+	require.Equal(t, 3, timesCalled)
 }
