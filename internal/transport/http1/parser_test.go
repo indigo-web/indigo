@@ -46,8 +46,8 @@ func getParser() (*Parser, *http.Request) {
 	respBuff := make([]byte, 0, s.HTTP.ResponseBuffSize)
 	parser := New(
 		request,
-		*keyBuff, *valBuff, *startLineBuff,
-		*objPool,
+		keyBuff, valBuff, startLineBuff,
+		objPool,
 		s.Headers,
 		respBuff,
 		s.HTTP.FileBuffSize,

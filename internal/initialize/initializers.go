@@ -61,8 +61,8 @@ func NewTransport(s settings.Settings, req *http.Request) transport.Transport {
 
 	return http1.New(
 		req,
-		*keyBuff, *valBuff, *startLineBuff,
-		*objPool,
+		keyBuff, valBuff, startLineBuff,
+		objPool,
 		s.Headers,
 		respBuff,
 		s.HTTP.FileBuffSize,

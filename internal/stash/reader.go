@@ -1,8 +1,6 @@
 package stash
 
-type Retriever interface {
-	Retrieve() ([]byte, error)
-}
+type Retriever func() ([]byte, error)
 
 // Reader covers Source function in the manner, so it implements the io.Reader
 type Reader struct {
@@ -11,8 +9,10 @@ type Reader struct {
 	error   error
 }
 
-func New() *Reader {
-	return new(Reader)
+func New(source Retriever) *Reader {
+	return &Reader{
+		source: source,
+	}
 }
 
 func (r *Reader) Read(b []byte) (n int, err error) {
@@ -31,11 +31,10 @@ func (r *Reader) Read(b []byte) (n int, err error) {
 }
 
 func (r *Reader) refill() {
-	r.pending, r.error = r.source.Retrieve()
+	r.pending, r.error = r.source()
 }
 
-func (r *Reader) Reset(src Retriever) {
-	r.source = src
+func (r *Reader) Reset() {
 	r.pending = nil
 	r.error = nil
 }

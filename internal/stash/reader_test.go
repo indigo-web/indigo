@@ -16,9 +16,7 @@ func (r retriever) Retrieve() ([]byte, error) {
 
 func TestReader(t *testing.T) {
 	t.Run("both data and error simultaneously", func(t *testing.T) {
-		r := New()
-		r.Reset(retriever{"hello, world"})
-
+		r := New(retriever{"hello, world"}.Retrieve)
 		buff := make([]byte, 64)
 		n, err := r.Read(buff)
 		require.Equal(t, 12, n)
@@ -27,9 +25,7 @@ func TestReader(t *testing.T) {
 	})
 
 	t.Run("multiple reads", func(t *testing.T) {
-		r := New()
-		r.Reset(retriever{"hello, world"})
-
+		r := New(retriever{"hello, world"}.Retrieve)
 		buff := make([]byte, 2)
 		data, err := readfull(r, buff)
 		require.NoError(t, err)
