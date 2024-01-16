@@ -11,7 +11,6 @@ import (
 	"github.com/indigo-web/indigo/internal/transport/http1"
 	"github.com/indigo-web/indigo/settings"
 	"github.com/indigo-web/utils/buffer"
-	"github.com/indigo-web/utils/pool"
 	"net"
 )
 
@@ -52,7 +51,6 @@ func NewRequest(s settings.Settings, conn net.Conn, body http.Body) *http.Reques
 
 func NewTransport(s settings.Settings, req *http.Request) transport.Transport {
 	keyBuff, valBuff := NewKeyValueBuffs(s.Headers)
-	objPool := pool.NewObjectPool[[]string](s.Headers.MaxValuesObjectPoolSize)
 	startLineBuff := buffer.New(
 		s.URL.BufferSize.Default,
 		s.URL.BufferSize.Maximal,
@@ -62,7 +60,6 @@ func NewTransport(s settings.Settings, req *http.Request) transport.Transport {
 	return http1.New(
 		req,
 		keyBuff, valBuff, startLineBuff,
-		objPool,
 		s.Headers,
 		respBuff,
 		s.HTTP.FileBuffSize,

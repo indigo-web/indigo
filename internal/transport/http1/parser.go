@@ -11,7 +11,6 @@ import (
 	"github.com/indigo-web/indigo/internal/uridecode"
 	"github.com/indigo-web/indigo/settings"
 	"github.com/indigo-web/utils/buffer"
-	"github.com/indigo-web/utils/pool"
 	"github.com/indigo-web/utils/strcomp"
 	"github.com/indigo-web/utils/uf"
 	"strings"
@@ -36,41 +35,40 @@ const (
 // transport.HeadersCompleted to notify http server about this, attaching all
 // the pending data as an extra. Body must be processed separately
 type Parser struct {
-	request           *http.Request
-	startLineBuff     *buffer.Buffer
-	encToksBuff       []string
-	contEncToksBuff   []string
-	headerKey         string
-	headersValuesPool *pool.ObjectPool[[]string]
-	headerKeyBuff     *buffer.Buffer
-	headerValueBuff   *buffer.Buffer
-	headersSettings   *settings.Headers
-	headersNumber     int
-	contentLength     int
-	urlEncodedChar    uint8
-	state             parserState
+	request         *http.Request
+	startLineBuff   *buffer.Buffer
+	headerKeyBuff   *buffer.Buffer
+	headerValueBuff *buffer.Buffer
+	encToksBuff     []string
+	contEncToksBuff []string
+	headerKey       string
+	headersSettings *settings.Headers
+	headersNumber   int
+	contentLength   int
+	urlEncodedChar  uint8
+	state           parserState
 }
 
 func NewParser(
-	request *http.Request, keyBuff, valBuff, startLineBuff *buffer.Buffer,
-	valuesPool *pool.ObjectPool[[]string], headersSettings settings.Headers,
+	request *http.Request, keyBuff, valBuff, startLineBuff *buffer.Buffer, headersSettings settings.Headers,
 ) *Parser {
 	return &Parser{
-		state:             eMethod,
-		request:           request,
-		headersSettings:   &headersSettings,
-		startLineBuff:     startLineBuff,
-		encToksBuff:       make([]string, 0, headersSettings.MaxEncodingTokens),
-		contEncToksBuff:   make([]string, 0, headersSettings.MaxEncodingTokens),
-		headerKeyBuff:     keyBuff,
-		headerValueBuff:   valBuff,
-		headersValuesPool: valuesPool,
+		state:           eMethod,
+		request:         request,
+		headersSettings: &headersSettings,
+		startLineBuff:   startLineBuff,
+		encToksBuff:     make([]string, 0, headersSettings.MaxEncodingTokens),
+		contEncToksBuff: make([]string, 0, headersSettings.MaxEncodingTokens),
+		headerKeyBuff:   keyBuff,
+		headerValueBuff: valBuff,
 	}
 }
 
 func (p *Parser) Parse(data []byte) (state transport.RequestState, extra []byte, err error) {
 	_ = *p.request
-	requestHeaders := p.request.Headers
+	request := p.request
+	headerKeyBuff := p.headerKeyBuff
+	headerValueBuff := p.headerValueBuff
 
 	switch p.state {
 	case eMethod:
@@ -117,8 +115,8 @@ method:
 			return transport.Error, nil, status.ErrBadRequest
 		}
 
-		p.request.Method = method.Parse(uf.B2S(methodValue))
-		if p.request.Method == method.Unknown {
+		request.Method = method.Parse(uf.B2S(methodValue))
+		if request.Method == method.Unknown {
 			return transport.Error, nil, status.ErrMethodNotImplemented
 		}
 
@@ -155,7 +153,7 @@ path:
 
 		query := bytes.IndexByte(reqPath, '?')
 		if query != -1 {
-			p.request.Query.Set(reqPath[query+1:])
+			request.Query.Set(reqPath[query+1:])
 			reqPath = reqPath[:query]
 		}
 
@@ -168,9 +166,9 @@ path:
 			return transport.Error, nil, err
 		}
 
-		p.request.Path = uf.B2S(reqPath)
-		p.request.Proto = proto.FromBytes(reqProto)
-		if p.request.Proto == proto.Unknown {
+		request.Path = uf.B2S(reqPath)
+		request.Proto = proto.FromBytes(reqProto)
+		if request.Proto == proto.Unknown {
 			return transport.Error, nil, status.ErrUnsupportedProtocol
 		}
 
@@ -200,18 +198,18 @@ headerKey:
 
 		colon := bytes.IndexByte(data, ':')
 		if colon == -1 {
-			if !p.headerKeyBuff.Append(data) {
+			if !headerKeyBuff.Append(data) {
 				return transport.Error, nil, status.ErrHeaderFieldsTooLarge
 			}
 
 			return transport.Pending, nil, nil
 		}
 
-		if !p.headerKeyBuff.Append(data[:colon]) {
+		if !headerKeyBuff.Append(data[:colon]) {
 			return transport.Error, nil, status.ErrHeaderFieldsTooLarge
 		}
 
-		p.headerKey = uf.B2S(p.headerKeyBuff.Finish())
+		p.headerKey = uf.B2S(headerKeyBuff.Finish())
 		data = data[colon+1:]
 
 		if p.headersNumber++; p.headersNumber > p.headersSettings.Number.Maximal {
@@ -248,7 +246,7 @@ contentLengthEnd:
 	// The proof is, that this code is reachable ONLY if loop has reached a non-digit
 	// ascii symbol. In case loop has finished peacefully, as no more data left, but also no
 	// character found to satisfy the exit condition, this code will never be reached
-	p.request.ContentLength = p.contentLength
+	request.ContentLength = p.contentLength
 
 	switch data[0] {
 	case ' ':
@@ -281,44 +279,73 @@ headerValue:
 	{
 		lf := bytes.IndexByte(data, '\n')
 		if lf == -1 {
-			if !p.headerValueBuff.Append(data) {
+			if !headerValueBuff.Append(data) {
 				return transport.Error, nil, status.ErrHeaderFieldsTooLarge
 			}
 
-			if p.headerValueBuff.SegmentLength() > p.headersSettings.MaxValueLength {
+			if headerValueBuff.SegmentLength() > p.headersSettings.MaxValueLength {
 				return transport.Error, nil, status.ErrHeaderFieldsTooLarge
 			}
 
 			return transport.Pending, nil, nil
 		}
 
-		if !p.headerValueBuff.Append(data[:lf]) {
+		if !headerValueBuff.Append(data[:lf]) {
 			return transport.Error, nil, status.ErrHeaderFieldsTooLarge
 		}
 
-		if p.headerValueBuff.SegmentLength() > p.headersSettings.MaxValueLength {
+		if headerValueBuff.SegmentLength() > p.headersSettings.MaxValueLength {
 			return transport.Error, nil, status.ErrHeaderFieldsTooLarge
 		}
 
 		data = data[lf+1:]
-		value := uf.B2S(trimPrefixSpaces(p.headerValueBuff.Finish()))
+		value := uf.B2S(trimPrefixSpaces(headerValueBuff.Finish()))
 		if value[len(value)-1] == '\r' {
 			value = value[:len(value)-1]
 		}
 
-		requestHeaders.Add(p.headerKey, value)
+		request.Headers.Add(p.headerKey, value)
 
-		switch {
-		case strcomp.EqualFold(p.headerKey, "content-type"):
-			p.request.ContentType = value
-		case strcomp.EqualFold(p.headerKey, "upgrade"):
-			p.request.Upgrade = proto.ChooseUpgrade(value)
-		case strcomp.EqualFold(p.headerKey, "transfer-encoding"):
-			p.request.Encoding.Transfer, p.request.Encoding.Chunked = parseEncodingString(p.encToksBuff, value, cap(p.encToksBuff))
-		case strcomp.EqualFold(p.headerKey, "content-encoding"):
-			p.request.Encoding.Content, _ = parseEncodingString(p.contEncToksBuff, value, cap(p.contEncToksBuff))
-		case strcomp.EqualFold(p.headerKey, "trailer"):
-			p.request.Encoding.HasTrailer = true
+		switch len(p.headerKey) {
+		case 7:
+			if p.headerKey[0]|0x20 == 'u' && p.headerKey[1]|0x20 == 'p' && p.headerKey[2]|0x20 == 'g' &&
+				p.headerKey[3]|0x20 == 'r' && p.headerKey[4]|0x20 == 'a' && p.headerKey[5]|0x20 == 'd' &&
+				p.headerKey[6]|0x20 == 'e' {
+				request.Upgrade = proto.ChooseUpgrade(value)
+			}
+
+			if p.headerKey[0]|0x20 == 't' && p.headerKey[1]|0x20 == 'r' && p.headerKey[2]|0x20 == 'a' &&
+				p.headerKey[3]|0x20 == 'i' && p.headerKey[4]|0x20 == 'l' && p.headerKey[5]|0x20 == 'e' &&
+				p.headerKey[6]|0x20 == 'r' {
+				request.Encoding.HasTrailer = true
+			}
+		case 12:
+			if p.headerKey[0]|0x20 == 'c' && p.headerKey[1]|0x20 == 'o' && p.headerKey[2]|0x20 == 'n' &&
+				p.headerKey[3]|0x20 == 't' && p.headerKey[4]|0x20 == 'e' && p.headerKey[5]|0x20 == 'n' &&
+				p.headerKey[6]|0x20 == 't' && p.headerKey[7] == '-' && p.headerKey[8]|0x20 == 't' &&
+				p.headerKey[9]|0x20 == 'y' && p.headerKey[10]|0x20 == 'p' && p.headerKey[11]|0x20 == 'e' {
+				request.ContentType = value
+			}
+		case 16:
+			if p.headerKey[0]|0x20 == 'c' && p.headerKey[1]|0x20 == 'o' && p.headerKey[2]|0x20 == 'n' &&
+				p.headerKey[3]|0x20 == 't' && p.headerKey[4]|0x20 == 'e' && p.headerKey[5]|0x20 == 'n' &&
+				p.headerKey[6]|0x20 == 't' && p.headerKey[7] == '-' && p.headerKey[8]|0x20 == 'e' &&
+				p.headerKey[9]|0x20 == 'n' && p.headerKey[10]|0x20 == 'c' && p.headerKey[11]|0x20 == 'o' &&
+				p.headerKey[12]|0x20 == 'd' && p.headerKey[13]|0x20 == 'i' && p.headerKey[14]|0x20 == 'n' &&
+				p.headerKey[15]|0x20 == 'g' {
+				request.Encoding.Content, _ = parseEncodingString(p.contEncToksBuff, value, cap(p.contEncToksBuff))
+			}
+		case 17:
+			if p.headerKey[0]|0x20 == 't' && p.headerKey[1]|0x20 == 'r' && p.headerKey[2]|0x20 == 'a' &&
+				p.headerKey[3]|0x20 == 'n' && p.headerKey[4]|0x20 == 's' && p.headerKey[5]|0x20 == 'f' &&
+				p.headerKey[6]|0x20 == 'e' && p.headerKey[7]|0x20 == 'r' && p.headerKey[8] == '-' &&
+				p.headerKey[9]|0x20 == 'e' && p.headerKey[10]|0x20 == 'n' && p.headerKey[11]|0x20 == 'c' &&
+				p.headerKey[12]|0x20 == 'o' && p.headerKey[13]|0x20 == 'd' && p.headerKey[14]|0x20 == 'i' &&
+				p.headerKey[15]|0x20 == 'n' && p.headerKey[16]|0x20 == 'g' {
+				request.Encoding.Transfer, request.Encoding.Chunked = parseEncodingString(
+					p.encToksBuff, value, cap(p.encToksBuff),
+				)
+			}
 		}
 
 		p.state = eHeaderKey

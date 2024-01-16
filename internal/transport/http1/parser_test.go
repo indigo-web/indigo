@@ -7,7 +7,6 @@ import (
 	"github.com/indigo-web/indigo/internal/requestgen"
 	"github.com/indigo-web/indigo/internal/transport"
 	"github.com/indigo-web/utils/buffer"
-	"github.com/indigo-web/utils/pool"
 	"strings"
 	"testing"
 
@@ -38,7 +37,6 @@ func getParser() (*Parser, *http.Request) {
 		s.Headers.ValueSpace.Default,
 		s.Headers.ValueSpace.Maximal,
 	)
-	objPool := pool.NewObjectPool[[]string](s.Headers.MaxValuesObjectPoolSize)
 	startLineBuff := buffer.New(
 		s.URL.BufferSize.Default,
 		s.URL.BufferSize.Maximal,
@@ -47,7 +45,6 @@ func getParser() (*Parser, *http.Request) {
 	parser := New(
 		request,
 		keyBuff, valBuff, startLineBuff,
-		objPool,
 		s.Headers,
 		respBuff,
 		s.HTTP.FileBuffSize,

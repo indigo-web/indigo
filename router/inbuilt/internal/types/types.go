@@ -9,6 +9,6 @@ type (
 	// Handler is a function for processing a request. Using named return as
 	// underscore just in order to be able to make an empty return
 	Handler    func(*http.Request) (_ *http.Response)
-	MethodsMap [method.Count]Handler
+	MethodsMap [method.Count + 1]Handler
 	Mutator    func(request *http.Request)
 )
