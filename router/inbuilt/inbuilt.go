@@ -83,7 +83,7 @@ func (r *Router) onRequest(request *http.Request) *http.Response {
 	if r.isStatic {
 		endpoint, found := r.routesMap[request.Path]
 		if !found {
-			return r.OnError(request, status.ErrNotFound)
+			return r.onError(request, status.ErrNotFound)
 		}
 
 		methodsMap = endpoint.methodsMap
@@ -91,7 +91,7 @@ func (r *Router) onRequest(request *http.Request) *http.Response {
 	} else {
 		endpoint := r.tree.Match(request.Path, request.Params)
 		if endpoint == nil {
-			return r.OnError(request, status.ErrNotFound)
+			return r.onError(request, status.ErrNotFound)
 		}
 
 		methodsMap = endpoint.MethodsMap
@@ -100,7 +100,7 @@ func (r *Router) onRequest(request *http.Request) *http.Response {
 
 	handler := getHandler(request.Method, methodsMap)
 	if handler == nil {
-		return r.OnError(request, status.ErrMethodNotAllowed)
+		return r.onError(request, status.ErrMethodNotAllowed)
 	}
 
 	return handler(request)

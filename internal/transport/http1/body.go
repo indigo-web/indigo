@@ -27,11 +27,13 @@ type Body struct {
 func NewBody(
 	client tcp.Client, chunkedParser *chunkedbody.Parser, s settings.Body,
 ) *Body {
-	return &Body{
-		Reader:  stash.New(),
+	body := &Body{
 		plain:   newPlainBodyReader(client, s.MaxSize),
 		chunked: newChunkedBodyReader(client, s.MaxSize, chunkedParser),
 	}
+	body.Reader = stash.New(body.Retrieve)
+
+	return body
 }
 
 func (b *Body) Init(request *http.Request) {
@@ -44,7 +46,7 @@ func (b *Body) Init(request *http.Request) {
 	}
 
 	b.eof = false
-	b.Reader.Reset(b)
+	b.Reader.Reset()
 }
 
 func (b *Body) String() (string, error) {

@@ -37,14 +37,14 @@ const (
 // the pending data as an extra. Body must be processed separately
 type Parser struct {
 	request           *http.Request
-	startLineBuff     buffer.Buffer
+	startLineBuff     *buffer.Buffer
 	encToksBuff       []string
 	contEncToksBuff   []string
 	headerKey         string
-	headersValuesPool pool.ObjectPool[[]string]
-	headerKeyBuff     buffer.Buffer
-	headerValueBuff   buffer.Buffer
-	headersSettings   settings.Headers
+	headersValuesPool *pool.ObjectPool[[]string]
+	headerKeyBuff     *buffer.Buffer
+	headerValueBuff   *buffer.Buffer
+	headersSettings   *settings.Headers
 	headersNumber     int
 	contentLength     int
 	urlEncodedChar    uint8
@@ -52,13 +52,13 @@ type Parser struct {
 }
 
 func NewParser(
-	request *http.Request, keyBuff, valBuff, startLineBuff buffer.Buffer,
-	valuesPool pool.ObjectPool[[]string], headersSettings settings.Headers,
+	request *http.Request, keyBuff, valBuff, startLineBuff *buffer.Buffer,
+	valuesPool *pool.ObjectPool[[]string], headersSettings settings.Headers,
 ) *Parser {
 	return &Parser{
 		state:             eMethod,
 		request:           request,
-		headersSettings:   headersSettings,
+		headersSettings:   &headersSettings,
 		startLineBuff:     startLineBuff,
 		encToksBuff:       make([]string, 0, headersSettings.MaxEncodingTokens),
 		contEncToksBuff:   make([]string, 0, headersSettings.MaxEncodingTokens),

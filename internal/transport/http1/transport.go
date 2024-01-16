@@ -17,8 +17,8 @@ type Transport struct {
 
 func New(
 	request *http.Request,
-	keyBuff, valBuff, startLineBuff buffer.Buffer,
-	valuesPool pool.ObjectPool[[]string],
+	keyBuff, valBuff, startLineBuff *buffer.Buffer,
+	valuesPool *pool.ObjectPool[[]string],
 	headersSettings settings.Headers,
 	respBuff []byte,
 	respFileBuffSize int,
