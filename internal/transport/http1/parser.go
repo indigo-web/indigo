@@ -121,7 +121,6 @@ method:
 		}
 
 		data = data[sp+1:]
-		p.state = ePath
 		goto path
 	}
 
@@ -133,6 +132,7 @@ path:
 				return transport.Error, nil, status.ErrURITooLong
 			}
 
+			p.state = ePath
 			return transport.Pending, nil, nil
 		}
 
@@ -173,15 +173,13 @@ path:
 		}
 
 		data = data[lf+1:]
-		p.state = eHeaderKey
 		goto headerKey
 	}
-
-	return transport.Pending, nil, nil
 
 headerKey:
 	{
 		if len(data) == 0 {
+			p.state = eHeaderKey
 			return transport.Pending, nil, err
 		}
 
@@ -192,7 +190,6 @@ headerKey:
 			return transport.HeadersCompleted, data[1:], nil
 		case '\r':
 			data = data[1:]
-			p.state = eHeaderValueCRLFCR
 			goto headerValueCRLFCR
 		}
 
@@ -202,6 +199,7 @@ headerKey:
 				return transport.Error, nil, status.ErrHeaderFieldsTooLarge
 			}
 
+			p.state = eHeaderKey
 			return transport.Pending, nil, nil
 		}
 
@@ -217,11 +215,9 @@ headerKey:
 		}
 
 		if strcomp.EqualFold(p.headerKey, "content-length") {
-			p.state = eContentLength
 			goto contentLength
 		}
 
-		p.state = eHeaderValue
 		goto headerValue
 	}
 
@@ -239,6 +235,7 @@ contentLength:
 		p.contentLength = p.contentLength*10 + int(char-'0')
 	}
 
+	p.state = eContentLength
 	return transport.Pending, nil, nil
 
 contentLengthEnd:
@@ -249,14 +246,11 @@ contentLengthEnd:
 	request.ContentLength = p.contentLength
 
 	switch data[0] {
-	case ' ':
 	case '\r':
 		data = data[1:]
-		p.state = eContentLengthCR
 		goto contentLengthCR
 	case '\n':
 		data = data[1:]
-		p.state = eHeaderKey
 		goto headerKey
 	default:
 		return transport.Error, nil, status.ErrBadRequest
@@ -264,6 +258,7 @@ contentLengthEnd:
 
 contentLengthCR:
 	if len(data) == 0 {
+		p.state = eContentLengthCR
 		return transport.Pending, nil, nil
 	}
 
@@ -272,7 +267,6 @@ contentLengthCR:
 	}
 
 	data = data[1:]
-	p.state = eHeaderKey
 	goto headerKey
 
 headerValue:
@@ -287,6 +281,7 @@ headerValue:
 				return transport.Error, nil, status.ErrHeaderFieldsTooLarge
 			}
 
+			p.state = eHeaderValue
 			return transport.Pending, nil, nil
 		}
 
@@ -348,12 +343,12 @@ headerValue:
 			}
 		}
 
-		p.state = eHeaderKey
 		goto headerKey
 	}
 
 headerValueCRLFCR:
 	if len(data) == 0 {
+		p.state = eHeaderValueCRLFCR
 		return transport.Pending, nil, nil
 	}
 
