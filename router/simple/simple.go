@@ -7,17 +7,13 @@ import (
 
 var _ router.Router = new(Router)
 
-type (
-	Handler      func(*http.Request) *http.Response
-	ErrorHandler func(*http.Request, error) *http.Response
-)
+type Handler func(*http.Request) *http.Response
 
 type Router struct {
-	handler    Handler
-	errHandler ErrorHandler
+	handler, errHandler Handler
 }
 
-func New(handler Handler, errHandler ErrorHandler) *Router {
+func New(handler, errHandler Handler) *Router {
 	return &Router{
 		handler:    handler,
 		errHandler: errHandler,
@@ -33,5 +29,7 @@ func (r Router) OnRequest(request *http.Request) *http.Response {
 }
 
 func (r Router) OnError(request *http.Request, err error) *http.Response {
-	return r.errHandler(request, err)
+	request.Env.Error = err
+
+	return r.errHandler(request)
 }
