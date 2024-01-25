@@ -16,8 +16,8 @@ func newComparingRouter(t *testing.T, want headers.Headers) *simple.Router {
 	return simple.New(func(request *http.Request) *http.Response {
 		require.True(t, compareHeaders(want, request.Headers))
 		return http.Respond(request)
-	}, func(request *http.Request, err error) *http.Response {
-		require.Failf(t, "unexpected error", "unexpected error: %s", err.Error())
+	}, func(request *http.Request) *http.Response {
+		require.Failf(t, "unexpected error", "unexpected error: %s", request.Env.Error.Error())
 		return nil
 	})
 }
