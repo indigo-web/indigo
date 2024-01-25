@@ -218,12 +218,9 @@ func (r *Response) Clear() *Response {
 	return r
 }
 
-// Respond returns a response object of request.
-//
-// NOTE: the behaviour differs from request.Respond() directly, as it doesn't clear
-// the response builder each time
+// Respond is a predicate to request.Respond(). May be used as a dummy handler
 func Respond(request *Request) *Response {
-	return request.response
+	return request.Respond()
 }
 
 // Code is a predicate to request.Respond().Code(...)
