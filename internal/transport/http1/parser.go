@@ -305,9 +305,10 @@ headerValue:
 			value = value[:len(value)-1]
 		}
 
-		request.Headers.Add(p.headerKey, value)
+		key := p.headerKey
+		request.Headers.Add(key, value)
 
-		switch key := p.headerKey; len(p.headerKey) {
+		switch len(key) {
 		case 7:
 			encoded := encodeU64(
 				key[0]|0x20, key[1]|0x20, key[2]|0x20, key[3]|0x20, key[4]|0x20, key[5]|0x20, key[6]|0x20, 0,
