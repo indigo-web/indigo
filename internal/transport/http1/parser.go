@@ -121,7 +121,6 @@ method:
 		}
 
 		data = data[sp+1:]
-		p.state = ePath
 		goto path
 	}
 
@@ -133,6 +132,7 @@ path:
 				return transport.Error, nil, status.ErrURITooLong
 			}
 
+			p.state = ePath
 			return transport.Pending, nil, nil
 		}
 
@@ -173,15 +173,13 @@ path:
 		}
 
 		data = data[lf+1:]
-		p.state = eHeaderKey
 		goto headerKey
 	}
-
-	return transport.Pending, nil, nil
 
 headerKey:
 	{
 		if len(data) == 0 {
+			p.state = eHeaderKey
 			return transport.Pending, nil, err
 		}
 
@@ -192,7 +190,6 @@ headerKey:
 			return transport.HeadersCompleted, data[1:], nil
 		case '\r':
 			data = data[1:]
-			p.state = eHeaderValueCRLFCR
 			goto headerValueCRLFCR
 		}
 
@@ -202,6 +199,7 @@ headerKey:
 				return transport.Error, nil, status.ErrHeaderFieldsTooLarge
 			}
 
+			p.state = eHeaderKey
 			return transport.Pending, nil, nil
 		}
 
@@ -209,19 +207,23 @@ headerKey:
 			return transport.Error, nil, status.ErrHeaderFieldsTooLarge
 		}
 
-		p.headerKey = uf.B2S(headerKeyBuff.Finish())
+		key := uf.B2S(headerKeyBuff.Finish())
+		p.headerKey = key
 		data = data[colon+1:]
 
 		if p.headersNumber++; p.headersNumber > p.headersSettings.Number.Maximal {
 			return transport.Error, nil, status.ErrTooManyHeaders
 		}
 
-		if strcomp.EqualFold(p.headerKey, "content-length") {
-			p.state = eContentLength
+		if len(key) == len("content-length") &&
+			cContent == encodeU64(
+				key[0]|0x20, key[1]|0x20, key[2]|0x20, key[3]|0x20, key[4]|0x20, key[5]|0x20, key[6]|0x20, key[7]|0x20,
+			) && cLength == encodeU64(
+			key[8]|0x20, key[9]|0x20, key[10]|0x20, key[11]|0x20, key[12]|0x20, key[13]|0x20, 0, 0,
+		) {
 			goto contentLength
 		}
 
-		p.state = eHeaderValue
 		goto headerValue
 	}
 
@@ -239,6 +241,7 @@ contentLength:
 		p.contentLength = p.contentLength*10 + int(char-'0')
 	}
 
+	p.state = eContentLength
 	return transport.Pending, nil, nil
 
 contentLengthEnd:
@@ -249,14 +252,11 @@ contentLengthEnd:
 	request.ContentLength = p.contentLength
 
 	switch data[0] {
-	case ' ':
 	case '\r':
 		data = data[1:]
-		p.state = eContentLengthCR
 		goto contentLengthCR
 	case '\n':
 		data = data[1:]
-		p.state = eHeaderKey
 		goto headerKey
 	default:
 		return transport.Error, nil, status.ErrBadRequest
@@ -264,6 +264,7 @@ contentLengthEnd:
 
 contentLengthCR:
 	if len(data) == 0 {
+		p.state = eContentLengthCR
 		return transport.Pending, nil, nil
 	}
 
@@ -272,7 +273,6 @@ contentLengthCR:
 	}
 
 	data = data[1:]
-	p.state = eHeaderKey
 	goto headerKey
 
 headerValue:
@@ -287,6 +287,7 @@ headerValue:
 				return transport.Error, nil, status.ErrHeaderFieldsTooLarge
 			}
 
+			p.state = eHeaderValue
 			return transport.Pending, nil, nil
 		}
 
@@ -304,56 +305,55 @@ headerValue:
 			value = value[:len(value)-1]
 		}
 
-		request.Headers.Add(p.headerKey, value)
+		key := p.headerKey
+		request.Headers.Add(key, value)
 
-		switch len(p.headerKey) {
+		switch len(key) {
 		case 7:
-			if p.headerKey[0]|0x20 == 'u' && p.headerKey[1]|0x20 == 'p' && p.headerKey[2]|0x20 == 'g' &&
-				p.headerKey[3]|0x20 == 'r' && p.headerKey[4]|0x20 == 'a' && p.headerKey[5]|0x20 == 'd' &&
-				p.headerKey[6]|0x20 == 'e' {
-				request.Upgrade = proto.ChooseUpgrade(value)
-			}
+			encoded := encodeU64(
+				key[0]|0x20, key[1]|0x20, key[2]|0x20, key[3]|0x20, key[4]|0x20, key[5]|0x20, key[6]|0x20, 0,
+			)
 
-			if p.headerKey[0]|0x20 == 't' && p.headerKey[1]|0x20 == 'r' && p.headerKey[2]|0x20 == 'a' &&
-				p.headerKey[3]|0x20 == 'i' && p.headerKey[4]|0x20 == 'l' && p.headerKey[5]|0x20 == 'e' &&
-				p.headerKey[6]|0x20 == 'r' {
+			switch encoded {
+			case cUpgrade:
+				request.Upgrade = proto.ChooseUpgrade(value)
+			case cTrailer:
 				request.Encoding.HasTrailer = true
 			}
 		case 12:
-			if p.headerKey[0]|0x20 == 'c' && p.headerKey[1]|0x20 == 'o' && p.headerKey[2]|0x20 == 'n' &&
-				p.headerKey[3]|0x20 == 't' && p.headerKey[4]|0x20 == 'e' && p.headerKey[5]|0x20 == 'n' &&
-				p.headerKey[6]|0x20 == 't' && p.headerKey[7] == '-' && p.headerKey[8]|0x20 == 't' &&
-				p.headerKey[9]|0x20 == 'y' && p.headerKey[10]|0x20 == 'p' && p.headerKey[11]|0x20 == 'e' {
+			if cContent == encodeU64(
+				key[0]|0x20, key[1]|0x20, key[2]|0x20, key[3]|0x20, key[4]|0x20, key[5]|0x20, key[6]|0x20, key[7]|0x20,
+			) && cType == encodeU32(
+				key[8]|0x20, key[9]|0x20, key[10]|0x20, key[11]|0x20,
+			) {
 				request.ContentType = value
 			}
 		case 16:
-			if p.headerKey[0]|0x20 == 'c' && p.headerKey[1]|0x20 == 'o' && p.headerKey[2]|0x20 == 'n' &&
-				p.headerKey[3]|0x20 == 't' && p.headerKey[4]|0x20 == 'e' && p.headerKey[5]|0x20 == 'n' &&
-				p.headerKey[6]|0x20 == 't' && p.headerKey[7] == '-' && p.headerKey[8]|0x20 == 'e' &&
-				p.headerKey[9]|0x20 == 'n' && p.headerKey[10]|0x20 == 'c' && p.headerKey[11]|0x20 == 'o' &&
-				p.headerKey[12]|0x20 == 'd' && p.headerKey[13]|0x20 == 'i' && p.headerKey[14]|0x20 == 'n' &&
-				p.headerKey[15]|0x20 == 'g' {
+			if cContent == encodeU64(
+				key[0]|0x20, key[1]|0x20, key[2]|0x20, key[3]|0x20, key[4]|0x20, key[5]|0x20, key[6]|0x20, key[7]|0x20,
+			) && cEncoding == encodeU64(
+				key[8]|0x20, key[9]|0x20, key[10]|0x20, key[11]|0x20, key[12]|0x20, key[13]|0x20, key[14]|0x20, key[15]|0x20,
+			) {
 				request.Encoding.Content, _ = parseEncodingString(p.contEncToksBuff, value, cap(p.contEncToksBuff))
 			}
 		case 17:
-			if p.headerKey[0]|0x20 == 't' && p.headerKey[1]|0x20 == 'r' && p.headerKey[2]|0x20 == 'a' &&
-				p.headerKey[3]|0x20 == 'n' && p.headerKey[4]|0x20 == 's' && p.headerKey[5]|0x20 == 'f' &&
-				p.headerKey[6]|0x20 == 'e' && p.headerKey[7]|0x20 == 'r' && p.headerKey[8] == '-' &&
-				p.headerKey[9]|0x20 == 'e' && p.headerKey[10]|0x20 == 'n' && p.headerKey[11]|0x20 == 'c' &&
-				p.headerKey[12]|0x20 == 'o' && p.headerKey[13]|0x20 == 'd' && p.headerKey[14]|0x20 == 'i' &&
-				p.headerKey[15]|0x20 == 'n' && p.headerKey[16]|0x20 == 'g' {
+			if cTransfer == encodeU64(
+				key[0]|0x20, key[1]|0x20, key[2]|0x20, key[3]|0x20, key[4]|0x20, key[5]|0x20, key[6]|0x20, key[7]|0x20,
+			) && cEncodin == encodeU64(
+				key[8]|0x20, key[9]|0x20, key[10]|0x20, key[11]|0x20, key[12]|0x20, key[13]|0x20, key[14]|0x20, key[15]|0x20,
+			) && key[16]|0x20 == 'g' {
 				request.Encoding.Transfer, request.Encoding.Chunked = parseEncodingString(
 					p.encToksBuff, value, cap(p.encToksBuff),
 				)
 			}
 		}
 
-		p.state = eHeaderKey
 		goto headerKey
 	}
 
 headerValueCRLFCR:
 	if len(data) == 0 {
+		p.state = eHeaderValueCRLFCR
 		return transport.Pending, nil, nil
 	}
 
@@ -414,4 +414,24 @@ func trimPrefixSpaces(b []byte) []byte {
 	}
 
 	return b[:0]
+}
+
+var (
+	cUpgrade  = encodeU64('u', 'p', 'g', 'r', 'a', 'd', 'e', 0)
+	cTrailer  = encodeU64('t', 'r', 'a', 'i', 'l', 'e', 'r', 0)
+	cContent  = encodeU64('c', 'o', 'n', 't', 'e', 'n', 't', '-')
+	cLength   = encodeU64('l', 'e', 'n', 'g', 't', 'h', 0, 0)
+	cType     = encodeU32('t', 'y', 'p', 'e')
+	cEncoding = encodeU64('e', 'n', 'c', 'o', 'd', 'i', 'n', 'g')
+	cTransfer = encodeU64('t', 'r', 'a', 'n', 's', 'f', 'e', 'r')
+	cEncodin  = encodeU64('-', 'e', 'n', 'c', 'o', 'd', 'i', 'n')
+)
+
+func encodeU64(a, b, c, d, e, f, g, h uint8) uint64 {
+	return (uint64(h) << 56) | (uint64(g) << 48) | (uint64(f) << 40) | (uint64(e) << 32) |
+		(uint64(d) << 24) | (uint64(c) << 16) | (uint64(b) << 8) | uint64(a)
+}
+
+func encodeU32(a, b, c, d uint8) uint32 {
+	return (uint32(d) << 24) | (uint32(c) << 16) | (uint32(b) << 8) | uint32(a)
 }

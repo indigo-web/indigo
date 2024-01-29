@@ -231,6 +231,19 @@ func TestServer(t *testing.T) {
 		}
 	})
 
+	t.Run("body reader", func(t *testing.T) {
+		r := strings.NewReader("Hello, world!")
+		resp, err := stdhttp.DefaultClient.Post(appURL+"/body-reader", "text/html", r)
+		require.NoError(t, err)
+		defer func() {
+			_ = resp.Body.Close()
+		}()
+		require.Equal(t, stdhttp.StatusOK, resp.StatusCode)
+		body, err := io.ReadAll(resp.Body)
+		require.NoError(t, err)
+		require.Equal(t, "Hello, world!", string(body))
+	})
+
 	t.Run("root head", func(t *testing.T) {
 		resp, err := stdhttp.DefaultClient.Head(appURL + "/")
 		require.NoError(t, err)
@@ -489,11 +502,23 @@ func TestServer(t *testing.T) {
 		require.NoError(t, conn.SetReadDeadline(time.Now().Add(time.Second)))
 		data, err := io.ReadAll(conn)
 		require.NoError(t, err)
-		fmt.Println("data:", strconv.Quote(string(data)))
 		n := bytes.Count(data, []byte("\r\n\r\n"))
 		// pipelinedRequests+1 because we're reading till io.EOF. So by that, the server
 		// sends us 408 Request Timeout before closing the connection
 		require.Equal(t, pipelinedRequests+1, n, "got less pipelined responses as expected")
+	})
+
+	t.Run("chunked body", func(t *testing.T) {
+		request := "POST /body-reader HTTP/1.1\r\n" +
+			"Connection: close\r\n" +
+			"Transfer-Encoding: chunked\r\n" +
+			"\r\n" +
+			"7\r\nMozilla\r\n1\r\n \r\n11\r\nDeveloper Network\r\n0\r\n\r\n"
+		resp, err := send(addr, []byte(request))
+		require.NoError(t, err)
+		repr, err := httptest.Parse(string(resp))
+		require.NoError(t, err)
+		require.Equal(t, "Mozilla Developer Network", repr.Body)
 	})
 
 	t.Run("forced stop", func(t *testing.T) {
@@ -523,6 +548,21 @@ func sendSimpleRequest(addr, path string) (net.Conn, error) {
 	_, err = conn.Write([]byte(request))
 
 	return conn, err
+}
+
+func send(addr string, req []byte) ([]byte, error) {
+	conn, err := net.Dial("tcp", addr)
+	defer conn.Close()
+	if err != nil {
+		return nil, err
+	}
+
+	_, err = conn.Write(req)
+	if err != nil {
+		return nil, err
+	}
+
+	return io.ReadAll(conn)
 }
 
 func parseBody(resp *stdhttp.Response) (httptest.Request, error) {

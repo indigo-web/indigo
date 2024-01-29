@@ -19,7 +19,9 @@ func MyHandler(request *http.Request) *http.Response {
 }
 
 func main() {
-	r := simple.New(MyHandler, http.Error)
+	r := simple.New(MyHandler, func(request *http.Request) *http.Response {
+		return http.Error(request, request.Env.Error)
+	})
 	app := indigo.New(addr)
 	log.Println("Listening on", addr)
 	log.Fatal(app.Serve(r))
