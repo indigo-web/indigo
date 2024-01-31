@@ -28,38 +28,28 @@ func Parse(str string) Method {
 		} else if str == "PUT" {
 			return PUT
 		}
-
-		return Unknown
 	case 4:
 		if str == "POST" {
 			return POST
 		} else if str == "HEAD" {
 			return HEAD
 		}
-
-		return Unknown
 	case 5:
 		if str == "PATCH" {
 			return PATCH
 		} else if str == "TRACE" {
 			return TRACE
 		}
-
-		return Unknown
 	case 6:
 		if str == "DELETE" {
 			return DELETE
 		}
-
-		return Unknown
 	case 7:
 		if str == "CONNECT" {
 			return CONNECT
 		} else if str == "OPTIONS" {
 			return OPTIONS
 		}
-
-		return Unknown
 	}
 
 	return Unknown
