@@ -12,38 +12,39 @@ Documentation is available [here](https://floordiv.gitbook.io/indigo/). However,
 package main
 
 import (
-  "log"
-  
-  "github.com/indigo-web/indigo"
-  "github.com/indigo-web/indigo/http"
-  "github.com/indigo-web/indigo/router/inbuilt"
+	"log"
+
+	"github.com/indigo-web/indigo"
+	"github.com/indigo-web/indigo/http"
+	"github.com/indigo-web/indigo/router/inbuilt"
 )
 
 func HelloWorld(request *http.Request) *http.Response {
-  return http.String(request, "Hello, world!")
+	return http.String(request, "Hello, world!")
 }
 
 func Log(request *http.Request) *http.Response {
-  text, err := request.Body.String()
-  if err != nil {
-    return http.Error(request, err)
-  }
-	
-  log.Printf("%s says: %s", request.Remote, text)
-  return http.String(request, text)
+	text, err := request.Body.String()
+	if err != nil {
+		return http.Error(request, err)
+	}
+
+	log.Printf("%s says: %s", request.Remote, text)
+	return http.String(request, text)
 }
 
 func main() {
-  r := inbuilt.New()
-  r.Resource("/").
-    Get(HelloWorld).
-    Post(Log)
+	r := inbuilt.New()
+	r.Resource("/").
+		Get(HelloWorld).
+		Post(Log)
 
-  err := indigo.New(":8080").Serve(r)
-  if err != nil {
-    log.Fatal(err)
-  }
+	err := indigo.New(":8080").Serve(r)
+	if err != nil {
+		log.Fatal(err)
+	}
 }
+
 ```
 
 You can find more examples in [examples/](https://github.com/indigo-web/indigo/tree/master/examples).
