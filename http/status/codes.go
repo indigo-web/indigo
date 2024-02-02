@@ -217,10 +217,9 @@ func Text(code Code) Status {
 	}
 }
 
-// CodeStatus returns a pre-defined line with code and status text (including
-// terminating CRLF sequence) in case code is known to server, otherwise empty
-// line is returned
-func CodeStatus(code Code) string {
+// Line returns the whole status line with code included. Be aware, that the returned string also
+// has CRLF in the end
+func Line(code Code) string {
 	switch code {
 	case Continue:
 		return "100 Continue\r\n"

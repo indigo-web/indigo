@@ -196,9 +196,7 @@ func (r *Response) Error(err error) *Response {
 	}
 
 	if http, ok := err.(status.HTTPError); ok {
-		return r.
-			Code(http.Code).
-			String(http.Message)
+		return r.Code(http.Code)
 	}
 
 	return r.

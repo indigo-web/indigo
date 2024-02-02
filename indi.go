@@ -148,7 +148,7 @@ func (a *App) getServers(addr address.Address, r router.Router) ([]*tcp.Server, 
 			return nil, err
 		}
 
-		servers[i] = tcp.NewServer(sock, a.newTCPCallback(a.settings, r, listener.Encryption))
+		servers[i] = tcp.NewServer(sock, a.newTCPCallback(r, listener.Encryption))
 	}
 
 	return servers, nil
@@ -171,39 +171,41 @@ func (a *App) run(servers []*tcp.Server) error {
 
 	callIfNotNil(a.hooks.OnStart)
 	err := <-a.errCh
-	switch err {
-	case status.ErrGracefulShutdown:
+	if err == status.ErrGracefulShutdown {
+		// stop listening to new clients and process till the end all the old ones
 		tcp.PauseAll(servers)
-	default:
-		// so basically, any error here (including nil) will stop all the servers. However,
-		// in order to be intuitive the best choice is to send status.ErrShutdown
-		tcp.StopAll(servers)
 	}
 
+	tcp.StopAll(servers)
 	callIfNotNil(a.hooks.OnStop)
 
 	return err
 }
 
-// GracefulStop stops accepting new connections and waits until all the already connected clients
-// disconnects
+// GracefulStop stops accepting new connections, but keeps serving old ones.
+//
+// NOTE: the call isn't blocking. So by that, after the method returned, the server
+// will be still working
 func (a *App) GracefulStop() {
 	a.errCh <- status.ErrGracefulShutdown
 }
 
 // Stop stops the whole application immediately.
+//
+// NOTE: the call isn't blocking. So by that, after the method returned, the server
+// will still be working
 func (a *App) Stop() {
 	a.errCh <- status.ErrShutdown
 }
 
-func (a *App) newTCPCallback(s settings.Settings, r router.Router, enc encryption.Encryption) tcp.OnConn {
+func (a *App) newTCPCallback(r router.Router, enc encryption.Encryption) tcp.OnConn {
 	return func(conn net.Conn) {
 		client := initialize.NewClient(a.settings.TCP, conn)
-		body := initialize.NewBody(client, s.Body)
-		request := initialize.NewRequest(s, conn, body)
+		body := initialize.NewBody(client, a.settings.Body)
+		request := initialize.NewRequest(a.settings, conn, body)
 		request.Env.Encryption = enc
-		trans := initialize.NewTransport(s, request)
-		httpServer := http.NewServer(r)
+		trans := initialize.NewTransport(a.settings, request)
+		httpServer := http.NewServer(r, a.settings.HTTP.OnDisconnect)
 		httpServer.Run(client, request, trans)
 	}
 }

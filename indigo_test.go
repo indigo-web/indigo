@@ -134,7 +134,7 @@ func headersToMap(hdrs headers.Headers, keys []string) map[string]string {
 	return m
 }
 
-func TestServer(t *testing.T) {
+func TestFirstPhase(t *testing.T) {
 	ch := make(chan struct{})
 	app := New(addr)
 	go func(app *App) {
@@ -325,7 +325,7 @@ func TestServer(t *testing.T) {
 
 		data, err := io.ReadAll(resp.Body)
 		require.NoError(t, err)
-		require.Equal(t, "not found", string(data))
+		require.Empty(t, string(data))
 	})
 
 	t.Run("trace", func(t *testing.T) {
@@ -405,13 +405,11 @@ func TestServer(t *testing.T) {
 	t.Run("idle disconnect", func(t *testing.T) {
 		conn, err := net.Dial("tcp4", addr)
 		require.NoError(t, err)
+		defer conn.Close()
 
 		response, err := io.ReadAll(conn)
 		require.NoError(t, err)
-		wantResponseLine := "HTTP/1.1 408 Request Timeout\r\n"
-		lf := bytes.IndexByte(response, '\n')
-		require.NotEqual(t, -1, lf, "http response must contain at least one LF")
-		require.Equal(t, wantResponseLine, string(response[:lf+1]))
+		require.Empty(t, response, "must no data be transmitted")
 	})
 
 	testCtxValue := func(t *testing.T, addr string) {
@@ -502,10 +500,8 @@ func TestServer(t *testing.T) {
 		require.NoError(t, conn.SetReadDeadline(time.Now().Add(time.Second)))
 		data, err := io.ReadAll(conn)
 		require.NoError(t, err)
-		n := bytes.Count(data, []byte("\r\n\r\n"))
-		// pipelinedRequests+1 because we're reading till io.EOF. So by that, the server
-		// sends us 408 Request Timeout before closing the connection
-		require.Equal(t, pipelinedRequests+1, n, "got less pipelined responses as expected")
+		n := bytes.Count(data, []byte("HTTP/1.0 200 OK\r\n"))
+		require.Equal(t, pipelinedRequests, n, "got less successful responses as expected")
 	})
 
 	t.Run("chunked body", func(t *testing.T) {
@@ -523,7 +519,94 @@ func TestServer(t *testing.T) {
 
 	t.Run("forced stop", func(t *testing.T) {
 		app.Stop()
-		chanRead(ch, 5*time.Second)
+		_, ok := chanRead(ch, 5*time.Second)
+		require.True(t, ok, "server did not shut down correctly")
+	})
+}
+
+func TestSecondPhase(t *testing.T) {
+	// second phase starts a new server instance with different configuration in order
+	// to cover cases, that could not be covered in the first phase
+
+	ch := make(chan struct{})
+	app := New(addr)
+	go func(app *App) {
+		r := getInbuiltRouter()
+		s := settings.Default()
+		s.TCP.ReadTimeout = 500 * time.Millisecond
+		s.HTTP.OnDisconnect = func(request *http.Request) *http.Response {
+			return http.Error(request, status.ErrRequestTimeout)
+		}
+		_ = app.
+			Tune(s).
+			NotifyOnStart(func() {
+				ch <- struct{}{}
+			}).
+			NotifyOnStop(func() {
+				ch <- struct{}{}
+			}).
+			Listen(altPort, encryption.Plain).
+			AutoHTTPS(httpsPort).
+			Serve(r)
+	}(app)
+
+	<-ch
+
+	t.Run("idle disconnect", func(t *testing.T) {
+		conn, err := net.Dial("tcp4", addr)
+		require.NoError(t, err)
+		defer conn.Close()
+
+		response, err := io.ReadAll(conn)
+		require.NoError(t, err)
+		wantResponseLine := "HTTP/1.1 408 Request Timeout\r\n"
+		lf := bytes.IndexByte(response, '\n')
+		require.NotEqual(t, -1, lf, "http response must contain at least one LF")
+		require.Equal(t, wantResponseLine, string(response[:lf+1]))
+	})
+
+	doRequest := func(conn net.Conn) error {
+		_, _ = conn.Write([]byte("GET / HTTP/1.1\r\n\r\n"))
+		buff := make([]byte, 4096)
+		_, err := conn.Read(buff)
+		return err
+	}
+
+	t.Run("graceful shutdown", func(t *testing.T) {
+		client := func(ch chan<- error) {
+			conn, err := net.Dial("tcp", addr)
+			ch <- err
+			if err != nil {
+				return
+			}
+
+			for i := 0; i < 20; i++ {
+				if err := doRequest(conn); err != nil {
+					ch <- err
+					return
+				}
+
+				time.Sleep(100 * time.Millisecond)
+			}
+
+			ch <- nil
+		}
+
+		first := make(chan error)
+		go client(first)
+		require.NoError(t, <-first)
+
+		// as in main test-case there is no way to combine this test with forced shutdown
+		app.GracefulStop()
+		time.Sleep(100 * time.Millisecond)
+		second := make(chan error)
+		go client(second)
+		// the socket on graceful shutdown isn't closed, it just stops accepting new connections.
+		// So by that, we are able to connect freely
+		<-second
+		// ...the thing is, that we'll get the read-tcp error on a try to send something
+		require.Error(t, <-second)
+		require.NoError(t, <-first)
 	})
 }
 

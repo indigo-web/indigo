@@ -1,6 +1,7 @@
 package settings
 
 import (
+	"github.com/indigo-web/indigo/http"
 	"math"
 	"time"
 
@@ -10,6 +11,8 @@ import (
 var DefaultHeaders = map[string]string{
 	"Accept-Encodings": "identity",
 }
+
+type OnDisconnectCallback func(request *http.Request) *http.Response
 
 type (
 	HeadersNumber struct {
@@ -85,6 +88,8 @@ type (
 		ResponseBuffSize int
 		// FileBuffSize defines the size of the read buffer when reading a file
 		FileBuffSize int
+		// OnDisconnect is a function, that'll be called on client's disconnection
+		OnDisconnect OnDisconnectCallback
 	}
 )
 
@@ -145,6 +150,7 @@ func Default() Settings {
 		HTTP: HTTP{
 			ResponseBuffSize: 1024,
 			FileBuffSize:     64 * 1024, // 64kb read buffer for files is pretty much sufficient
+			OnDisconnect:     nil,
 		},
 	}
 }
@@ -189,6 +195,7 @@ func Fill(src Settings) (new Settings) {
 		HTTP: HTTP{
 			ResponseBuffSize: numOr(src.HTTP.ResponseBuffSize, defaults.HTTP.ResponseBuffSize),
 			FileBuffSize:     numOr(src.HTTP.FileBuffSize, defaults.HTTP.FileBuffSize),
+			OnDisconnect:     nilOr[OnDisconnectCallback](src.HTTP.OnDisconnect, defaults.HTTP.OnDisconnect),
 		},
 	}
 }
@@ -207,4 +214,12 @@ func mapOr[K comparable, V any](custom, defaultVal map[K]V) map[K]V {
 	}
 
 	return custom
+}
+
+func nilOr[T any](custom, defaultVal any) T {
+	if custom == nil {
+		return defaultVal.(T)
+	}
+
+	return custom.(T)
 }

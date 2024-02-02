@@ -98,10 +98,10 @@ func (d *Serializer) Write(
 }
 
 func (d *Serializer) renderResponseLine(fields response.Fields) {
-	codeStatus := status.CodeStatus(fields.Code)
+	statusLine := status.Line(fields.Code)
 
-	if fields.Status == "" && codeStatus != "" {
-		d.buff = append(d.buff, codeStatus...)
+	if fields.Status == "" && statusLine != "" {
+		d.buff = append(d.buff, statusLine...)
 		return
 	}
 
