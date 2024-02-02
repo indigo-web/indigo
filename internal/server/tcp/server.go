@@ -31,6 +31,10 @@ func NewServer(sock net.Listener, onConn OnConn) *Server {
 // Start runs the accept-loop until an error during accepting the connection happens
 // or graceful shutdown invokes
 func (s *Server) Start() error {
+	// we still need the shutdown atomic here, because not every net.Listener
+	// is the Deadliner, too. So by that, in such cases we can't interrupt the
+	// accept-loop via SetDeadline() method. In this case, just wait till the
+	// next client
 	for !s.shutdown.Load() {
 		conn, err := s.sock.Accept()
 		if err != nil {
