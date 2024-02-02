@@ -4,9 +4,14 @@ import (
 	"net"
 	"sync"
 	"sync/atomic"
+	"time"
 )
 
 type OnConn func(net.Conn)
+
+type Deadliner interface {
+	SetDeadline(t time.Time) error
+}
 
 type Server struct {
 	wg       *sync.WaitGroup
@@ -46,10 +51,13 @@ func (s *Server) Stop() error {
 }
 
 // Pause stops listening to new connections, however doesn't close the socket.
-//
-// NOTE: it doesn't stop the accept-loop immediately, however it waits until the next client connects
 func (s *Server) Pause() {
 	s.shutdown.Store(true)
+
+	if listener, ok := s.sock.(Deadliner); ok {
+		// interrupt the listener RIGHT NOW
+		_ = listener.SetDeadline(time.Now())
+	}
 }
 
 // Wait blocks the caller until all the connections are closed
