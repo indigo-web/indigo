@@ -171,15 +171,12 @@ func (a *App) run(servers []*tcp.Server) error {
 
 	callIfNotNil(a.hooks.OnStart)
 	err := <-a.errCh
-	switch err {
-	case status.ErrGracefulShutdown:
+	if err == status.ErrGracefulShutdown {
+		// stop listening to new clients and process till the end all the old ones
 		tcp.PauseAll(servers)
-	default:
-		// so basically, any error here (including nil) will stop all the servers. However,
-		// in order to be intuitive the best choice is to send status.ErrShutdown
-		tcp.StopAll(servers)
 	}
 
+	tcp.StopAll(servers)
 	callIfNotNil(a.hooks.OnStop)
 
 	return err
@@ -188,8 +185,7 @@ func (a *App) run(servers []*tcp.Server) error {
 // GracefulStop stops accepting new connections, but keeps serving old ones.
 //
 // NOTE: the call isn't blocking. So by that, after the method returned, the server
-//
-//	will be still working
+// will be still working
 func (a *App) GracefulStop() {
 	a.errCh <- status.ErrGracefulShutdown
 }
@@ -197,8 +193,7 @@ func (a *App) GracefulStop() {
 // Stop stops the whole application immediately.
 //
 // NOTE: the call isn't blocking. So by that, after the method returned, the server
-//
-//	will still be working
+// will still be working
 func (a *App) Stop() {
 	a.errCh <- status.ErrShutdown
 }
