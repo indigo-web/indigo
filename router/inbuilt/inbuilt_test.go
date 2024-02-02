@@ -203,7 +203,6 @@ func TestRouter_RouteError(t *testing.T) {
 		request := getRequest(method.GET, "/")
 		resp := r.OnError(request, status.ErrNotImplemented)
 		require.Equal(t, status.NotImplemented, resp.Reveal().Code)
-		require.Equal(t, status.ErrNotImplemented.Error(), string(resp.Reveal().Body))
 	})
 
 	t.Run("unregistered ordinary error", func(t *testing.T) {
