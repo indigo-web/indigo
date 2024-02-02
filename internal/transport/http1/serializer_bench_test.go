@@ -18,7 +18,7 @@ func (n NopClientWriter) Write([]byte) error {
 	return nil
 }
 
-func Benchmarkserializer(b *testing.B) {
+func BenchmarkSerializer(b *testing.B) {
 	defaultHeadersSmall := map[string]string{
 		"Server": "indigo",
 	}
@@ -51,7 +51,7 @@ func Benchmarkserializer(b *testing.B) {
 
 	b.Run("no body no def headers", func(b *testing.B) {
 		buff := make([]byte, 0, 1024)
-		serializer := NewSerializer(buff, 0, nil)
+		serializer := NewSerializer(buff, 128, nil)
 		respSize, err := estimateResponseSize(serializer, request, response)
 		require.NoError(b, err)
 		b.SetBytes(respSize)
@@ -66,7 +66,7 @@ func Benchmarkserializer(b *testing.B) {
 	b.Run("with 4kb body", func(b *testing.B) {
 		response := http.NewResponse().String(strings.Repeat("a", 4096))
 		buff := make([]byte, 0, 8192)
-		serializer := NewSerializer(buff, 0, nil)
+		serializer := NewSerializer(buff, 128, nil)
 		respSize, err := estimateResponseSize(serializer, request, response)
 		require.NoError(b, err)
 		b.SetBytes(respSize)
@@ -80,7 +80,7 @@ func Benchmarkserializer(b *testing.B) {
 
 	b.Run("no body 1 def header", func(b *testing.B) {
 		buff := make([]byte, 0, 1024)
-		serializer := NewSerializer(buff, 0, defaultHeadersSmall)
+		serializer := NewSerializer(buff, 128, defaultHeadersSmall)
 		respSize, err := estimateResponseSize(serializer, request, response)
 		require.NoError(b, err)
 		b.SetBytes(respSize)
@@ -94,7 +94,7 @@ func Benchmarkserializer(b *testing.B) {
 
 	b.Run("no body 3 def headers", func(b *testing.B) {
 		buff := make([]byte, 0, 1024)
-		serializer := NewSerializer(buff, 0, defaultHeadersMedium)
+		serializer := NewSerializer(buff, 128, defaultHeadersMedium)
 		respSize, err := estimateResponseSize(serializer, request, response)
 		require.NoError(b, err)
 		b.SetBytes(respSize)
@@ -108,7 +108,7 @@ func Benchmarkserializer(b *testing.B) {
 
 	b.Run("no body 8 def headers", func(b *testing.B) {
 		buff := make([]byte, 0, 1024)
-		serializer := NewSerializer(buff, 0, defaultHeadersBig)
+		serializer := NewSerializer(buff, 128, defaultHeadersBig)
 		respSize, err := estimateResponseSize(serializer, request, response)
 		require.NoError(b, err)
 		b.SetBytes(respSize)
@@ -120,11 +120,11 @@ func Benchmarkserializer(b *testing.B) {
 		}
 	})
 
-	b.Run("with pre-Serializ", func(b *testing.B) {
+	b.Run("pre-write", func(b *testing.B) {
 		preResp := http.NewResponse().Code(status.SwitchingProtocols)
 		buff := make([]byte, 0, 128)
-		serializer := NewSerializer(buff, 0, nil)
-		respSize, err := estimatePreSerializSize(serializer, request, preResp, response)
+		serializer := NewSerializer(buff, 128, nil)
+		respSize, err := estimatePreWriteSize(serializer, request, preResp, response)
 		require.NoError(b, err)
 		b.SetBytes(respSize)
 		b.ReportAllocs()
@@ -135,6 +135,8 @@ func Benchmarkserializer(b *testing.B) {
 			_ = serializer.Write(request.Proto, request, response, client)
 		}
 	})
+
+	// TODO: add benchmarking chunked body
 }
 
 func estimateResponseSize(
