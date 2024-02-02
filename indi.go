@@ -148,7 +148,7 @@ func (a *App) getServers(addr address.Address, r router.Router) ([]*tcp.Server, 
 			return nil, err
 		}
 
-		servers[i] = tcp.NewServer(sock, a.newTCPCallback(a.settings, r, listener.Encryption))
+		servers[i] = tcp.NewServer(sock, a.newTCPCallback(r, listener.Encryption))
 	}
 
 	return servers, nil
@@ -196,14 +196,14 @@ func (a *App) Stop() {
 	a.errCh <- status.ErrShutdown
 }
 
-func (a *App) newTCPCallback(s settings.Settings, r router.Router, enc encryption.Encryption) tcp.OnConn {
+func (a *App) newTCPCallback(r router.Router, enc encryption.Encryption) tcp.OnConn {
 	return func(conn net.Conn) {
 		client := initialize.NewClient(a.settings.TCP, conn)
-		body := initialize.NewBody(client, s.Body)
-		request := initialize.NewRequest(s, conn, body)
+		body := initialize.NewBody(client, a.settings.Body)
+		request := initialize.NewRequest(a.settings, conn, body)
 		request.Env.Encryption = enc
-		trans := initialize.NewTransport(s, request)
-		httpServer := http.NewServer(r)
+		trans := initialize.NewTransport(a.settings, request)
+		httpServer := http.NewServer(r, a.settings.HTTP.OnDisconnect)
 		httpServer.Run(client, request, trans)
 	}
 }

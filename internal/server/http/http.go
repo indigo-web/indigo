@@ -10,6 +10,7 @@ import (
 	"github.com/indigo-web/indigo/internal/server/tcp"
 	"github.com/indigo-web/indigo/internal/transport"
 	"github.com/indigo-web/indigo/router"
+	"github.com/indigo-web/indigo/settings"
 	"github.com/indigo-web/utils/uf"
 	"os"
 )
@@ -17,18 +18,25 @@ import (
 type Server struct {
 	router         router.Router
 	upgradePreResp *http.Response
+	onDisconnect   settings.OnDisconnectCallback
 }
 
-func NewServer(router router.Router) *Server {
+func NewServer(router router.Router, onDisconnect settings.OnDisconnectCallback) *Server {
 	return &Server{
 		router:         router,
 		upgradePreResp: http.NewResponse(),
+		onDisconnect:   onDisconnect,
 	}
 }
 
 func (h *Server) Run(client tcp.Client, req *http.Request, trans transport.Transport) {
 	for h.HandleRequest(client, req, trans) {
 	}
+
+	if h.onDisconnect != nil {
+		_ = trans.Write(req.Proto, req, h.onDisconnect(req), client)
+	}
+
 	_ = client.Close()
 }
 
@@ -36,12 +44,12 @@ func (h *Server) HandleRequest(client tcp.Client, req *http.Request, trans trans
 	data, err := client.Read()
 	if err != nil {
 		if errors.Is(err, os.ErrDeadlineExceeded) {
-			err = status.ErrConnectionTimeout
-		} else {
-			err = status.ErrCloseConnection
+			return false
 		}
 
-		_ = trans.Write(req.Proto, req, h.router.OnError(req, err), client)
+		// TODO: maybe, passing the err as-is would be a better solution? However, in this case it'll
+		//  be more difficult to recognize what exact kind of error that is.
+		_ = trans.Write(req.Proto, req, h.router.OnError(req, status.ErrCloseConnection), client)
 		return false
 	}
 

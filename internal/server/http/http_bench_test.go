@@ -171,7 +171,7 @@ func newServer(client tcp.Client) (*Server, *http.Request, transport.Transport) 
 	request := initialize.NewRequest(settings.Default(), dummy.NewNopConn(), body)
 	trans := initialize.NewTransport(settings.Default(), request)
 
-	return NewServer(r), request, trans
+	return NewServer(r, nil), request, trans
 }
 
 func disperse(data []byte, n int) (parts [][]byte) {
