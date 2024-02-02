@@ -148,11 +148,11 @@ func estimateResponseSize(
 	return int64(len(writer.Data)), err
 }
 
-func estimatePreSerializSize(
-	serializer *Serializer, req *http.Request, preSerializ, resp *http.Response,
+func estimatePreWriteSize(
+	serializer *Serializer, req *http.Request, preWrite, resp *http.Response,
 ) (int64, error) {
 	writer := dummy.NewSinkholeWriter()
-	serializer.PreWrite(req.Proto, preSerializ)
+	serializer.PreWrite(req.Proto, preWrite)
 	err := serializer.Write(req.Proto, req, resp, writer)
 
 	return int64(len(writer.Data)), err
