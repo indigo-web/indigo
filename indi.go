@@ -185,13 +185,20 @@ func (a *App) run(servers []*tcp.Server) error {
 	return err
 }
 
-// GracefulStop stops accepting new connections and waits until all the already connected clients
-// disconnects
+// GracefulStop stops accepting new connections, but keeps serving old ones.
+//
+// NOTE: the call isn't blocking. So by that, after the method returned, the server
+//
+//	will be still working
 func (a *App) GracefulStop() {
 	a.errCh <- status.ErrGracefulShutdown
 }
 
 // Stop stops the whole application immediately.
+//
+// NOTE: the call isn't blocking. So by that, after the method returned, the server
+//
+//	will still be working
 func (a *App) Stop() {
 	a.errCh <- status.ErrShutdown
 }
