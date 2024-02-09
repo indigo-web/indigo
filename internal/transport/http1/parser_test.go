@@ -7,10 +7,10 @@ import (
 	"github.com/indigo-web/indigo/internal/requestgen"
 	"github.com/indigo-web/indigo/internal/transport"
 	"github.com/indigo-web/utils/buffer"
+	"math/rand"
 	"strings"
 	"testing"
 
-	"github.com/dchest/uniuri"
 	"github.com/indigo-web/indigo/http"
 	"github.com/indigo-web/indigo/http/headers"
 	"github.com/indigo-web/indigo/http/method"
@@ -557,8 +557,22 @@ func TestParseEncoding(t *testing.T) {
 
 func genHeaders(n int) (out []string) {
 	for i := 0; i < n; i++ {
-		out = append(out, fmt.Sprintf("%s: some value", uniuri.New()))
+		out = append(out, genHeader())
 	}
 
 	return out
+}
+
+func genHeader() string {
+	return fmt.Sprintf("%s: some value", generateRandomString(16))
+}
+
+// generateRandomString generates random string of given length
+func generateRandomString(length int) string {
+	const charset = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
+	b := make([]byte, length)
+	for i := range b {
+		b[i] = charset[rand.Intn(len(charset))]
+	}
+	return string(b)
 }
