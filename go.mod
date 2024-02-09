@@ -3,7 +3,6 @@ module github.com/indigo-web/indigo
 go 1.20
 
 require (
-	github.com/dchest/uniuri v1.2.0
 	github.com/indigo-web/chunkedbody v0.1.0
 	github.com/indigo-web/iter v0.1.0
 	github.com/indigo-web/utils v0.6.1
