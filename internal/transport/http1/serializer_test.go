@@ -21,7 +21,7 @@ import (
 )
 
 func getSerializer(defaultHeaders map[string]string) *Serializer {
-	return NewSerializer(make([]byte, 0, 1024), 1, defaultHeaders)
+	return NewSerializer(make([]byte, 0, 1024), 128, defaultHeaders)
 }
 
 func newRequest() *http.Request {
@@ -60,13 +60,13 @@ func TestSerializer_Write(t *testing.T) {
 		require.Empty(t, body)
 	})
 
-	testWithHeaders := func(t *testing.T, serialiser *Serializer) {
+	testWithHeaders := func(t *testing.T, serializer *Serializer) {
 		response := http.NewResponse().
 			Header("Hello", "nether").
 			Header("Something", "special", "here")
 
 		writer := new(accumulativeClient)
-		require.NoError(t, serialiser.Write(proto.HTTP11, request, response, writer))
+		require.NoError(t, serializer.Write(proto.HTTP11, request, response, writer))
 		resp, err := stdhttp.ReadResponse(bufio.NewReader(bytes.NewBuffer(writer.Data)), stdreq)
 		require.Equal(t, 200, resp.StatusCode)
 

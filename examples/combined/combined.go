@@ -59,6 +59,16 @@ func Stressful(request *http.Request) *http.Response {
 }
 
 func main() {
+	s := settings.Default()
+	s.TCP.ReadTimeout = time.Hour
+
+	app := indigo.New(addr).
+		Tune(s).
+		AutoHTTPS(8443).
+		NotifyOnStart(func() {
+			log.Println("initialized")
+		})
+
 	r := inbuilt.New().
 		Use(middleware.LogRequests()).
 		Alias("/", "/static/index.html").
@@ -70,19 +80,15 @@ func main() {
 	r.Resource("/").
 		Post(IndexSay)
 
+	r.Post("/shutdown", func(request *http.Request) (_ *http.Response) {
+		app.GracefulStop()
+
+		return http.Code(request, status.Teapot)
+	})
+
 	r.Group("/hello").
 		Get("/world", World).
 		Get("/easter", Easter)
-
-	s := settings.Default()
-	s.TCP.ReadTimeout = time.Hour
-
-	app := indigo.New(addr).
-		Tune(s).
-		AutoHTTPS(8443).
-		NotifyOnStart(func() {
-			log.Println("initialized")
-		})
 
 	if err := app.Serve(r); err != nil {
 		log.Fatal(err)
