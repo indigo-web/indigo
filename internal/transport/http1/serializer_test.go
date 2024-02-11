@@ -114,13 +114,6 @@ func TestSerializer_Write(t *testing.T) {
 		require.Empty(t, fullBody)
 	})
 
-	t.Run("HTTP/0.9", func(t *testing.T) {
-		serializer := getSerializer(nil)
-		response := http.NewResponse()
-		err := serializer.Write(proto.HTTP09, request, response, new(accumulativeClient))
-		require.EqualError(t, err, status.ErrCloseConnection.Error())
-	})
-
 	t.Run("HTTP/1.0 without keep-alive", func(t *testing.T) {
 		serializer := getSerializer(nil)
 		response := http.NewResponse()

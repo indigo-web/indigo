@@ -22,8 +22,6 @@ func ChooseUpgrade(line string) Proto {
 // parseUpgradeToken simply parses an upgrade-token to the respective protocol enum
 func parseUpgradeToken(token string) Proto {
 	switch token {
-	case "http/0.9", "HTTP/0.9":
-		return HTTP09
 	case "http/1.0", "HTTP/1.0":
 		return HTTP10
 	case "http/1.1", "HTTP/1.1":

@@ -5,18 +5,16 @@ type Proto uint8
 
 const (
 	Unknown Proto = 0
-	HTTP09  Proto = 1 << iota
-	HTTP10
+	HTTP10  Proto = 1 << iota
 	HTTP11
 	HTTP2
 
 	WebSocket
 
-	HTTP1 = HTTP09 | HTTP10 | HTTP11
+	HTTP1 = HTTP10 | HTTP11
 )
 
 var (
-	http09 = []byte("HTTP/0.9 ")
 	http10 = []byte("HTTP/1.0 ")
 	http11 = []byte("HTTP/1.1 ")
 )
@@ -28,7 +26,6 @@ const (
 )
 
 var majorMinorVersionLUT = [10][10]Proto{
-	0: {9: HTTP09},
 	1: {0: HTTP10, 1: HTTP11},
 }
 
@@ -51,8 +48,6 @@ func Parse(major, minor uint8) Proto {
 
 func ToBytes(proto Proto) []byte {
 	switch proto {
-	case HTTP09:
-		return http09
 	case HTTP10:
 		return http10
 	case HTTP11:

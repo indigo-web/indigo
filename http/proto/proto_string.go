@@ -9,20 +9,18 @@ func _() {
 	// Re-run the stringer command to generate them again.
 	var x [1]struct{}
 	_ = x[Unknown-0]
-	_ = x[HTTP09-2]
-	_ = x[HTTP10-4]
-	_ = x[HTTP11-8]
-	_ = x[HTTP2-16]
-	_ = x[WebSocket-32]
+	_ = x[HTTP10-2]
+	_ = x[HTTP11-4]
+	_ = x[HTTP2-8]
+	_ = x[WebSocket-16]
 }
 
 const (
 	_Proto_name_0 = "Unknown"
-	_Proto_name_1 = "HTTP09"
-	_Proto_name_2 = "HTTP10"
-	_Proto_name_3 = "HTTP11"
-	_Proto_name_4 = "HTTP2"
-	_Proto_name_5 = "WebSocket"
+	_Proto_name_1 = "HTTP10"
+	_Proto_name_2 = "HTTP11"
+	_Proto_name_3 = "HTTP2"
+	_Proto_name_4 = "WebSocket"
 )
 
 func (i Proto) String() string {
@@ -37,8 +35,6 @@ func (i Proto) String() string {
 		return _Proto_name_3
 	case i == 16:
 		return _Proto_name_4
-	case i == 32:
-		return _Proto_name_5
 	default:
 		return "Proto(" + strconv.FormatInt(int64(i), 10) + ")"
 	}

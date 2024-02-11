@@ -64,7 +64,7 @@ func (d *Serializer) PreWrite(protocol proto.Proto, response *http.Response) {
 	d.crlf()
 }
 
-// Write writes the response, keeping in mind difference between 0.9, 1.0 and 1.1 HTTP versions
+// Write writes the response, keeping in mind difference between 1.0 and 1.1 HTTP versions
 func (d *Serializer) Write(
 	protocol proto.Proto, request *http.Request, response *http.Response, writer transport.Writer,
 ) (err error) {
@@ -279,9 +279,7 @@ func (d *Serializer) clear() {
 
 func isKeepAlive(protocol proto.Proto, req *http.Request) bool {
 	switch protocol {
-	case proto.HTTP09, proto.HTTP10:
-		// actually, HTTP/0.9 doesn't even have a Connection: keep-alive header,
-		// but who knows - let it be
+	case proto.HTTP10:
 		return strcomp.EqualFold(req.Headers.Value("connection"), "keep-alive")
 	case proto.HTTP11:
 		// in case of HTTP/1.1, keep-alive may be only disabled
