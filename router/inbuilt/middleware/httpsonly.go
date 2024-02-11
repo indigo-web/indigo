@@ -9,8 +9,6 @@ import (
 
 // HTTPSOnly redirects all http requests to https. In case no Host header is provided,
 // 400 Bad Request will be returned without calling the actual handler.
-//
-// Note: it causes 1 (one) allocation
 func HTTPSOnly(next inbuilt.Handler, req *http.Request) *http.Response {
 	if req.Env.Encryption != encryption.TLS {
 		return next(req)
