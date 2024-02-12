@@ -20,7 +20,7 @@ type Environment struct {
 	// AllowMethods is used to pass a string containing all the allowed methods for a
 	// specific endpoint. Has non-zero-value only when 405 Method Not Allowed raises
 	AllowMethods string
-	Encryption   encryption.Encryption
+	Encryption   encryption.Token
 	// reserved for router
 	AliasFrom string
 }
