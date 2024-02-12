@@ -34,3 +34,9 @@ func (r *Router) Catch(prefix string, handler Handler, middlewares ...Middleware
 
 	return r
 }
+
+func (r *Router) applyCatchersMiddlewares() {
+	for i := range r.catchers {
+		r.catchers[i].Handler = compose(r.catchers[i].Handler, r.middlewares)
+	}
+}
