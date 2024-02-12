@@ -65,25 +65,35 @@ func getRequest(m method.Method, path string) *http.Request {
 
 func TestMiddlewares(t *testing.T) {
 	stack := new(callstack)
-	r := New()
-	r.Use(getMiddleware(m1, stack))
-	r.Get("/", http.Respond, getMiddleware(m2, stack))
+	r := New().
+		Use(getMiddleware(m1, stack)).
+		Get("/", http.Respond, getMiddleware(m2, stack)).
+		Catch("/he", http.Respond, getMiddleware(m2, stack))
 
-	api := r.Group("/api")
-	api.Use(getMiddleware(m3, stack))
+	api := r.Group("/api").
+		Use(getMiddleware(m3, stack))
 
-	v1 := api.Group("/v1")
-	v1.Get("/hello", http.Respond, getMiddleware(m6, stack))
-	v1.Use(getMiddleware(m4, stack))
+	api.Group("/v1").
+		Get("/hello", http.Respond, getMiddleware(m6, stack)).
+		Use(getMiddleware(m4, stack))
 
-	v2 := api.Group("/v2")
-	v2.Use(getMiddleware(m5, stack))
-	v2.Get("/world", http.Respond, getMiddleware(m7, stack))
+	api.Group("/v2").
+		Catch("/any", http.Respond).
+		Use(getMiddleware(m5, stack)).
+		Get("/world", http.Respond, getMiddleware(m7, stack))
 
 	require.NoError(t, r.OnStart())
 
 	t.Run("/", func(t *testing.T) {
 		request := getRequest(method.GET, "/")
+		response := r.OnRequest(request)
+		require.Equal(t, status.OK, response.Reveal().Code)
+		require.Equal(t, []middleware{m1, m2}, stack.Chain())
+		stack.Clear()
+	})
+
+	t.Run("/hello", func(t *testing.T) {
+		request := getRequest(method.GET, "/hello")
 		response := r.OnRequest(request)
 		require.Equal(t, status.OK, response.Reveal().Code)
 		require.Equal(t, []middleware{m1, m2}, stack.Chain())
@@ -103,6 +113,14 @@ func TestMiddlewares(t *testing.T) {
 		response := r.OnRequest(request)
 		require.Equal(t, status.OK, response.Reveal().Code)
 		require.Equal(t, []middleware{m1, m3, m5, m7}, stack.Chain())
+		stack.Clear()
+	})
+
+	t.Run("/api/v2/anything", func(t *testing.T) {
+		request := getRequest(method.GET, "/api/v2/anything")
+		response := r.OnRequest(request)
+		require.Equal(t, status.OK, response.Reveal().Code)
+		require.Equal(t, []middleware{m1, m3, m5}, stack.Chain())
 		stack.Clear()
 	})
 }
