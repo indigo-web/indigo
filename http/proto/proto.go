@@ -1,5 +1,7 @@
 package proto
 
+import "github.com/indigo-web/utils/uf"
+
 //go:generate stringer -type=Proto
 type Proto uint8
 
@@ -23,15 +25,16 @@ const (
 	protoTokenLength   = len("HTTP/x.x")
 	majorVersionOffset = len("HTTP/x") - 1
 	minorVersionOffset = len("HTTP/x.x") - 1
+	httpScheme         = "HTTP/"
 )
 
 var majorMinorVersionLUT = [10][10]Proto{
 	1: {0: HTTP10, 1: HTTP11},
+	2: {0: HTTP2},
 }
 
 func FromBytes(raw []byte) Proto {
-	if len(raw) != protoTokenLength ||
-		!(raw[0]|0x20 == 'h' && raw[1]|0x20 == 't' && raw[2]|0x20 == 't' && raw[3]|0x20 == 'p' && raw[4] == '/') {
+	if len(raw) != protoTokenLength || uf.B2S(raw[:majorVersionOffset]) != httpScheme {
 		return Unknown
 	}
 
