@@ -6,7 +6,6 @@ import (
 	"crypto/tls"
 	"encoding/json"
 	"fmt"
-	"github.com/indigo-web/indigo/http/encryption"
 	"github.com/indigo-web/indigo/http/headers"
 	"github.com/indigo-web/indigo/http/method"
 	"github.com/indigo-web/indigo/http/status"
@@ -19,7 +18,6 @@ import (
 	stdhttp "net/http"
 	"net/url"
 	"os"
-	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -31,8 +29,8 @@ import (
 
 const (
 	addr      = "localhost:16100"
-	altPort   = 16800
-	httpsPort = 16443
+	altAddr   = "localhost:16800"
+	httpsAddr = "localhost:16443"
 	appURL    = "http://" + addr
 )
 
@@ -148,14 +146,14 @@ func TestFirstPhase(t *testing.T) {
 		s.TCP.ReadTimeout = 500 * time.Millisecond
 		_ = app.
 			Tune(s).
-			NotifyOnStart(func() {
+			OnStart(func() {
 				ch <- struct{}{}
 			}).
-			NotifyOnStop(func() {
+			OnStop(func() {
 				ch <- struct{}{}
 			}).
-			Listen(altPort, encryption.Plain).
-			AutoHTTPS(httpsPort).
+			Listen(altAddr).
+			AutoHTTPS(httpsAddr).
 			Serve(r)
 	}(app)
 
@@ -433,11 +431,11 @@ func TestFirstPhase(t *testing.T) {
 	})
 
 	t.Run("https", func(t *testing.T) {
-		testCtxValue(t, "https://localhost:"+strconv.Itoa(httpsPort))
+		testCtxValue(t, "https://"+httpsAddr)
 	})
 
 	t.Run("alternative port", func(t *testing.T) {
-		testCtxValue(t, "http://localhost:"+strconv.Itoa(altPort))
+		testCtxValue(t, "http://"+altAddr)
 	})
 
 	requireField := func(t *testing.T, m map[string]any, key, value string) {
@@ -539,14 +537,13 @@ func TestSecondPhase(t *testing.T) {
 		}
 		_ = app.
 			Tune(s).
-			NotifyOnStart(func() {
+			OnStart(func() {
 				ch <- struct{}{}
 			}).
-			NotifyOnStop(func() {
+			OnStop(func() {
 				ch <- struct{}{}
 			}).
-			Listen(altPort, encryption.Plain).
-			AutoHTTPS(httpsPort).
+			AutoHTTPS(httpsAddr).
 			Serve(r)
 	}(app)
 
