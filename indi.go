@@ -2,7 +2,6 @@ package indigo
 
 import (
 	"crypto/tls"
-	"fmt"
 	"github.com/indigo-web/indigo/http/encryption"
 	"github.com/indigo-web/indigo/http/status"
 	"github.com/indigo-web/indigo/internal/address"
@@ -18,12 +17,17 @@ import (
 	"github.com/indigo-web/indigo/settings"
 )
 
-type ListenerConstructor func(network, addr string) (net.Listener, error)
+type (
+	// ListenerConstructor constructs the listener by itself. It's made net.Listen compatible
+	// on a reason
+	ListenerConstructor func(network, addr string) (net.Listener, error)
+	// MakeListener returns the listener constructor and the encryption token
+	MakeListener func() (encryption.Token, ListenerConstructor)
+)
 
 // App is just a struct with addr and shutdown channel that is currently
 // not used. Planning to replace it with context.WithCancel()
 type App struct {
-	addr      address.Address
 	hooks     hooks
 	listeners []Listener
 	settings  settings.Settings
@@ -32,13 +36,10 @@ type App struct {
 
 // New returns a new App instance.
 func New(addr string) *App {
-	appAddr, err := address.Parse(addr)
-	if err != nil {
-		panic(fmt.Errorf("indigo: listen: bad addr: %v", err))
-	}
-
 	return &App{
-		addr:     appAddr,
+		listeners: []Listener{
+			newListener(addr, makeNetListener),
+		},
 		settings: settings.Default(),
 		errCh:    make(chan error),
 	}
@@ -50,44 +51,47 @@ func (a *App) Tune(s settings.Settings) *App {
 	return a
 }
 
-// NotifyOnStart calls the callback at the moment, when all the servers are started. However,
+// OnStart calls the callback at the moment, when all the servers are started. However,
 // it isn't strongly guaranteed that they'll be able to accept new connections immediately
-func (a *App) NotifyOnStart(cb func()) *App {
+func (a *App) OnStart(cb func()) *App {
 	a.hooks.OnStart = cb
 	return a
 }
 
-// NotifyOnStop calls the callback at the moment, when all the servers are down. It's guaranteed,
+func (a *App) OnListenerStart(cb func(Listener)) *App {
+	a.hooks.OnListenerStart = cb
+	return a
+}
+
+// OnStop calls the callback at the moment, when all the servers are down. It's guaranteed,
 // that at the moment as the callback is called, the server isn't able to accept any new connections
 // and all the clients are already disconnected
-func (a *App) NotifyOnStop(cb func()) *App {
+func (a *App) OnStop(cb func()) *App {
 	a.hooks.OnStop = cb
 	return a
 }
 
 // Listen adds a new listener
-func (a *App) Listen(port uint16, enc encryption.Encryption, optionalConstructor ...ListenerConstructor) *App {
-	constructor := optional(optionalConstructor, net.Listen)
+func (a *App) Listen(addr string, optMaker ...MakeListener) *App {
+	constructor := optional(optMaker, makeNetListener)
 	if constructor == nil {
-		constructor = net.Listen
+		constructor = makeNetListener
 	}
 
-	a.listeners = append(a.listeners, Listener{
-		Port:        port,
-		Constructor: constructor,
-		Encryption:  enc,
+	a.listeners = append(a.listeners, newListener(addr, constructor))
+
+	return a
+}
+
+func (a *App) TLS(addr string, constructor ListenerConstructor) *App {
+	a.Listen(addr, func() (encryption.Token, ListenerConstructor) {
+		return encryption.TLS, constructor
 	})
-
 	return a
 }
 
-func (a *App) TLS(port uint16, constructor ListenerConstructor) *App {
-	a.Listen(port, encryption.TLS, constructor)
-	return a
-}
-
-func (a *App) HTTPS(port uint16, cert, key string) *App {
-	return a.TLS(port, func(network, addr string) (net.Listener, error) {
+func (a *App) HTTPS(addr string, cert, key string) *App {
+	return a.TLS(addr, func(network, addr string) (net.Listener, error) {
 		certificate, err := tls.LoadX509KeyPair(cert, key)
 		if err != nil {
 			return nil, err
@@ -101,8 +105,8 @@ func (a *App) HTTPS(port uint16, cert, key string) *App {
 
 // AutoHTTPS enables HTTPS-mode using autocert or generates self-signed certificates if using
 // local host
-func (a *App) AutoHTTPS(port uint16, domains ...string) *App {
-	if a.addr.IsLocalhost() {
+func (a *App) AutoHTTPS(addr string, domains ...string) *App {
+	if address.IsLocalhost(addr) || address.IsIP(addr) {
 		cert, key, err := generateSelfSignedCert()
 		if err != nil {
 			log.Printf(
@@ -113,10 +117,10 @@ func (a *App) AutoHTTPS(port uint16, domains ...string) *App {
 			return a
 		}
 
-		return a.HTTPS(port, cert, key)
+		return a.HTTPS(addr, cert, key)
 	}
 
-	return a.TLS(port, autoTLSListener(domains...))
+	return a.TLS(addr, autoTLSListener(domains...))
 }
 
 // Serve starts the web-application. If nil is passed instead of a router, empty inbuilt will
@@ -130,8 +134,7 @@ func (a *App) Serve(r router.Router) error {
 		return err
 	}
 
-	a.Listen(a.addr.Port, encryption.Plain, net.Listen)
-	servers, err := a.getServers(a.addr, r)
+	servers, err := a.getServers(r)
 	if err != nil {
 		return err
 	}
@@ -139,16 +142,21 @@ func (a *App) Serve(r router.Router) error {
 	return a.run(servers)
 }
 
-func (a *App) getServers(addr address.Address, r router.Router) ([]*tcp.Server, error) {
+func (a *App) getServers(r router.Router) ([]*tcp.Server, error) {
 	servers := make([]*tcp.Server, len(a.listeners))
 
 	for i, listener := range a.listeners {
-		sock, err := listener.Constructor("tcp", addr.SetPort(listener.Port).String())
+		enc, l := listener.Make()
+		sock, err := l("tcp", listener.Addr)
 		if err != nil {
 			return nil, err
 		}
 
-		servers[i] = tcp.NewServer(sock, a.newTCPCallback(r, listener.Encryption))
+		servers[i] = tcp.NewServer(sock, a.newTCPCallback(r, enc))
+
+		if cb := a.hooks.OnListenerStart; cb != nil {
+			cb(listener)
+		}
 	}
 
 	return servers, nil
@@ -198,7 +206,7 @@ func (a *App) Stop() {
 	a.errCh <- status.ErrShutdown
 }
 
-func (a *App) newTCPCallback(r router.Router, enc encryption.Encryption) tcp.OnConn {
+func (a *App) newTCPCallback(r router.Router, enc encryption.Token) tcp.OnConn {
 	return func(conn net.Conn) {
 		client := initialize.NewClient(a.settings.TCP, conn)
 		body := initialize.NewBody(client, a.settings.Body)
@@ -211,7 +219,9 @@ func (a *App) newTCPCallback(r router.Router, enc encryption.Encryption) tcp.OnC
 }
 
 type hooks struct {
-	OnStart, OnStop func()
+	OnStart         func()
+	OnListenerStart func(Listener)
+	OnStop          func()
 }
 
 func callIfNotNil(f func()) {
@@ -221,9 +231,19 @@ func callIfNotNil(f func()) {
 }
 
 type Listener struct {
-	Port        uint16
-	Constructor ListenerConstructor
-	Encryption  encryption.Encryption
+	Addr string
+	Make MakeListener
+}
+
+func newListener(addr string, constructor MakeListener) Listener {
+	return Listener{
+		Addr: addr,
+		Make: constructor,
+	}
+}
+
+func makeNetListener() (encryption.Token, ListenerConstructor) {
+	return encryption.Plain, net.Listen
 }
 
 func optional[T any](optionals []T, otherwise T) T {
