@@ -22,7 +22,10 @@ func main() {
 	myRouter := inbuilt.New()
 	myRouter.Get("/", MyHandler)
 
-	app := indigo.New(addr)
-	log.Println("Listening on", addr)
+	app := indigo.New(addr).
+		OnListenerStart(func(listener indigo.Listener) {
+			log.Printf("running on %s\n", listener.Addr)
+		})
+
 	log.Fatal(app.Serve(myRouter))
 }

@@ -14,7 +14,10 @@ import (
 	"github.com/indigo-web/indigo/router/inbuilt"
 )
 
-const addr = ":8080"
+const (
+	addr      = ":8080"
+	httpsAddr = ":8443"
+)
 
 func IndexSay(request *http.Request) *http.Response {
 	if request.Headers.Value("talking") != "allowed" {
@@ -64,9 +67,9 @@ func main() {
 
 	app := indigo.New(addr).
 		Tune(s).
-		AutoHTTPS(8443).
-		NotifyOnStart(func() {
-			log.Println("initialized")
+		AutoHTTPS(httpsAddr).
+		OnListenerStart(func(listener indigo.Listener) {
+			log.Printf("running on %s\n", listener.Addr)
 		})
 
 	r := inbuilt.New().
