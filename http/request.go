@@ -15,13 +15,16 @@ import (
 )
 
 type Environment struct {
-	// Error is used mostly for error handlers
+	// Error contains an error, if occurred
 	Error error
 	// AllowMethods is used to pass a string containing all the allowed methods for a
 	// specific endpoint. Has non-zero-value only when 405 Method Not Allowed raises
 	AllowMethods string
-	Encryption   encryption.Token
-	// reserved for router
+	// Encryption is a token that corresponds to the used encryption method. May be
+	// extended by custom values
+	Encryption encryption.Token
+	// AliasFrom contains the original request path, in case it was replaced via alias
+	// aka implicit redirect
 	AliasFrom string
 }
 
