@@ -36,13 +36,12 @@ type App struct {
 
 // New returns a new App instance.
 func New(addr string) *App {
-	return &App{
-		listeners: []Listener{
-			newListener(addr, makeNetListener),
-		},
+	app := &App{
 		settings: settings.Default(),
 		errCh:    make(chan error),
 	}
+
+	return app.Listen(addr)
 }
 
 // Tune replaces default settings.
@@ -73,6 +72,7 @@ func (a *App) OnStop(cb func()) *App {
 
 // Listen adds a new listener
 func (a *App) Listen(addr string, optMaker ...MakeListener) *App {
+	addr = address.Format(addr)
 	constructor := optional(optMaker, makeNetListener)
 	if constructor == nil {
 		constructor = makeNetListener
@@ -106,6 +106,8 @@ func (a *App) HTTPS(addr string, cert, key string) *App {
 // AutoHTTPS enables HTTPS-mode using autocert or generates self-signed certificates if using
 // local host
 func (a *App) AutoHTTPS(addr string, domains ...string) *App {
+	addr = address.Format(addr)
+
 	if address.IsLocalhost(addr) || address.IsIP(addr) {
 		cert, key, err := generateSelfSignedCert()
 		if err != nil {
