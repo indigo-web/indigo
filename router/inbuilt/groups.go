@@ -36,6 +36,7 @@ func (r *Router) prepare() error {
 	}
 
 	r.applyMiddlewares()
+	r.applyCatchersMiddlewares()
 
 	return nil
 }

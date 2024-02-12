@@ -56,7 +56,6 @@ func (r *Router) OnStart() error {
 	sort.Slice(r.catchers, func(i, j int) bool {
 		return len(r.catchers[i].Prefix) > len(r.catchers[j].Prefix)
 	})
-	r.applyCatchersMiddlewares()
 
 	r.isStatic = !r.registrar.IsDynamic()
 	if r.isStatic {
