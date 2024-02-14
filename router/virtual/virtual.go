@@ -25,17 +25,16 @@ func New() *Router {
 	return &Router{}
 }
 
-// Host adds a new virtual router. If 0.0.0.0 or its IPv6 alternative :: is passed,
+// Host adds a new virtual router. If 0.0.0.0 is passed,
 // the router will be set as a default one
 func (r *Router) Host(host string, other router.Router) *Router {
 	host = domain.Normalize(host)
-	switch domain.TrimPort(host) {
-	case "0.0.0.0", "::":
+	if domain.TrimPort(host) == "0.0.0.0" {
 		return r.Default(other)
 	}
 
 	r.routers = append(r.routers, virtualRouter{
-		Domain: domain.Normalize(host),
+		Domain: host,
 		Router: other,
 	})
 	return r
@@ -55,6 +54,10 @@ func (r *Router) OnStart() error {
 		if err := host.Router.OnStart(); err != nil {
 			return err
 		}
+	}
+
+	if r.defaultRouter != nil {
+		return r.defaultRouter.OnStart()
 	}
 
 	return nil

@@ -7,14 +7,14 @@ func Normalize(domain string) string {
 		domain = domain[len("www."):]
 	}
 
-	for i := len(domain); i >= 0; i-- {
+	for i := len(domain) - 1; i >= 0; i-- {
 		if domain[i] == '.' {
 			break
 		} else if domain[i] == ':' {
 			switch port := domain[i+1:]; port {
 			case "80", "443":
 				// trim only default ports. Non-default must always be presented
-				domain = domain[:len(port)-1]
+				domain = domain[:i]
 			}
 
 			break
