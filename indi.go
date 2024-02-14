@@ -72,7 +72,7 @@ func (a *App) OnStop(cb func()) *App {
 
 // Listen adds a new listener
 func (a *App) Listen(addr string, optMaker ...MakeListener) *App {
-	addr = address.Format(addr)
+	addr = address.Normalize(addr)
 	constructor := optional(optMaker, makeNetListener)
 	if constructor == nil {
 		constructor = makeNetListener
@@ -106,7 +106,7 @@ func (a *App) HTTPS(addr string, cert, key string) *App {
 // AutoHTTPS enables HTTPS-mode using autocert or generates self-signed certificates if using
 // local host
 func (a *App) AutoHTTPS(addr string, domains ...string) *App {
-	addr = address.Format(addr)
+	addr = address.Normalize(addr)
 
 	if address.IsLocalhost(addr) || address.IsIP(addr) {
 		cert, key, err := generateSelfSignedCert()

@@ -7,7 +7,7 @@ import (
 
 const DefaultAddr = "0.0.0.0"
 
-func Format(addr string) string {
+func Normalize(addr string) string {
 	if len(removePort(addr)) == 0 {
 		// only port is presented
 		return DefaultAddr + addr
