@@ -13,7 +13,9 @@ import (
 
 func newRequest(hosts ...string) *http.Request {
 	request := initialize.NewRequest(settings.Default(), dummy.NewNopConn(), nil)
-	request.Headers.Add("Host", hosts...)
+	for _, host := range hosts {
+		request.Headers.Add("Host", host)
+	}
 
 	return request
 }
