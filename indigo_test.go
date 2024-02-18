@@ -18,6 +18,7 @@ import (
 	stdhttp "net/http"
 	"net/url"
 	"os"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -401,13 +402,18 @@ func TestFirstPhase(t *testing.T) {
 
 	// this test must ALWAYS be on the bottom as it is the longest-duration test
 	t.Run("idle disconnect", func(t *testing.T) {
-		conn, err := net.Dial("tcp4", addr)
+		conn, err := net.Dial("tcp", addr)
 		require.NoError(t, err)
 		defer conn.Close()
 
 		response, err := io.ReadAll(conn)
 		require.NoError(t, err)
-		require.Empty(t, response, "must no data be transmitted")
+		if len(response) > 0 {
+			require.Failf(
+				t, "wanted silent connection close, got response:\n%s",
+				strconv.Quote(string(response)),
+			)
+		}
 	})
 
 	testCtxValue := func(t *testing.T, addr string) {
