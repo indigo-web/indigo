@@ -209,13 +209,7 @@ func (a *App) Stop() {
 
 func (a *App) newTCPCallback(r router.Router, enc encryption.Token) tcp.OnConn {
 	return func(conn net.Conn) {
-		client := initialize.NewClient(a.settings.TCP, conn)
-		body := initialize.NewBody(client, a.settings.Body)
-		request := initialize.NewRequest(a.settings, conn, body)
-		request.Env.Encryption = enc
-		trans := initialize.NewTransport(a.settings, request)
-		httpServer := http.NewServer(r, a.settings.HTTP.OnDisconnect)
-		httpServer.Run(client, request, trans)
+		core.ServeHTTP1(a.cfg, conn, enc, r)
 	}
 }
 
