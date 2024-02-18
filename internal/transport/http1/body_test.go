@@ -1,8 +1,8 @@
 package http1
 
 import (
+	"github.com/indigo-web/indigo/config"
 	"github.com/indigo-web/indigo/http/status"
-	"github.com/indigo-web/indigo/settings"
 	"io"
 	"strconv"
 	"strings"
@@ -20,7 +20,7 @@ import (
 func getRequestWithBody(chunked bool, body ...[]byte) (*http.Request, *Body) {
 	client := dummy.NewCircularClient(body...)
 	chunkedParser := chunkedbody.NewParser(chunkedbody.DefaultSettings())
-	reqBody := NewBody(client, chunkedParser, settings.Default().Body)
+	reqBody := NewBody(client, chunkedParser, config.Default().Body)
 
 	var (
 		contentLength int
@@ -98,7 +98,7 @@ func TestBodyReader_Plain(t *testing.T) {
 		)
 		request.ContentLength = buffSize
 		chunkedParser := chunkedbody.NewParser(chunkedbody.DefaultSettings())
-		body := NewBody(client, chunkedParser, settings.Default().Body)
+		body := NewBody(client, chunkedParser, config.Default().Body)
 		body.Init(request)
 
 		data, err := body.Retrieve()
@@ -138,7 +138,7 @@ func TestBodyReader_Plain(t *testing.T) {
 		request, _ := getRequestWithBody(false, []byte(data))
 		client := dummy.NewCircularClient([]byte(data))
 		chunkedParser := chunkedbody.NewParser(chunkedbody.DefaultSettings())
-		s := settings.Default().Body
+		s := config.Default().Body
 		s.MaxSize = 9
 		body := NewBody(client, chunkedParser, s)
 		body.Init(request)

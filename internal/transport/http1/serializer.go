@@ -39,7 +39,7 @@ type Serializer struct {
 
 func NewSerializer(buff []byte, fileBuffSize int, defHdrs map[string]string) *Serializer {
 	if fileBuffSize < minimalFileBuffSize {
-		log.Printf("misconfiguration: file buffer size (Settings.HTTP.FileBuffSize) is set to %d, "+
+		log.Printf("misconfiguration: file buffer size (Config.HTTP.FileBuffSize) is set to %d, "+
 			"however minimal possible value is %d. Setting it hard to %d\n",
 			fileBuffSize, minimalFileBuffSize, minimalFileBuffSize,
 		)

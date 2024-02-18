@@ -2,9 +2,9 @@ package inbuilt
 
 import (
 	"errors"
+	"github.com/indigo-web/indigo/config"
 	"github.com/indigo-web/indigo/internal/initialize"
 	"github.com/indigo-web/indigo/internal/server/tcp/dummy"
-	"github.com/indigo-web/indigo/settings"
 	"github.com/stretchr/testify/assert"
 	"testing"
 
@@ -364,7 +364,7 @@ func TestMutators(t *testing.T) {
 		})
 
 	require.NoError(t, r.OnStart())
-	request := initialize.NewRequest(settings.Default(), dummy.NewNopConn(), nil)
+	request := initialize.NewRequest(config.Default(), dummy.NewNopConn(), nil)
 	request.Method = method.GET
 	request.Path = "/"
 	resp := r.OnRequest(request)

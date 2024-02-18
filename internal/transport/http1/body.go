@@ -2,11 +2,11 @@ package http1
 
 import (
 	"github.com/indigo-web/chunkedbody"
+	"github.com/indigo-web/indigo/config"
 	"github.com/indigo-web/indigo/http"
 	"github.com/indigo-web/indigo/http/status"
 	"github.com/indigo-web/indigo/internal/server/tcp"
 	"github.com/indigo-web/indigo/internal/stash"
-	"github.com/indigo-web/indigo/settings"
 	"github.com/indigo-web/utils/uf"
 	"io"
 	"math"
@@ -25,7 +25,7 @@ type Body struct {
 }
 
 func NewBody(
-	client tcp.Client, chunkedParser *chunkedbody.Parser, s settings.Body,
+	client tcp.Client, chunkedParser *chunkedbody.Parser, s config.Body,
 ) *Body {
 	body := &Body{
 		plain:   newPlainBodyReader(client, s.MaxSize),

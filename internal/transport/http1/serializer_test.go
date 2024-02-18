@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"bytes"
 	"github.com/indigo-web/chunkedbody"
+	"github.com/indigo-web/indigo/config"
 	"github.com/indigo-web/indigo/http"
 	"github.com/indigo-web/indigo/http/headers"
 	"github.com/indigo-web/indigo/http/method"
@@ -11,7 +12,6 @@ import (
 	"github.com/indigo-web/indigo/http/query"
 	"github.com/indigo-web/indigo/http/status"
 	"github.com/indigo-web/indigo/internal/server/tcp/dummy"
-	"github.com/indigo-web/indigo/settings"
 	"github.com/stretchr/testify/require"
 	"io"
 	"math"
@@ -27,7 +27,7 @@ func getSerializer(defaultHeaders map[string]string) *Serializer {
 func newRequest() *http.Request {
 	return http.NewRequest(
 		headers.New(), new(query.Query), http.NewResponse(), dummy.NewNopConn(),
-		NewBody(dummy.NewNopClient(), nil, settings.Default().Body), nil,
+		NewBody(dummy.NewNopClient(), nil, config.Default().Body), nil,
 	)
 }
 

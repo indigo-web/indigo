@@ -1,18 +1,18 @@
 package virtual
 
 import (
+	"github.com/indigo-web/indigo/config"
 	"github.com/indigo-web/indigo/http"
 	"github.com/indigo-web/indigo/http/status"
 	"github.com/indigo-web/indigo/internal/initialize"
 	"github.com/indigo-web/indigo/internal/server/tcp/dummy"
 	"github.com/indigo-web/indigo/router/inbuilt"
-	"github.com/indigo-web/indigo/settings"
 	"github.com/stretchr/testify/require"
 	"testing"
 )
 
 func newRequest(hosts ...string) *http.Request {
-	request := initialize.NewRequest(settings.Default(), dummy.NewNopConn(), nil)
+	request := initialize.NewRequest(config.Default(), dummy.NewNopConn(), nil)
 	for _, host := range hosts {
 		request.Headers.Add("Host", host)
 	}

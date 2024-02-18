@@ -22,9 +22,9 @@ import (
 	"testing"
 	"time"
 
+	"github.com/indigo-web/indigo/config"
 	"github.com/indigo-web/indigo/http"
 	"github.com/indigo-web/indigo/router/inbuilt"
-	"github.com/indigo-web/indigo/settings"
 )
 
 const (
@@ -142,7 +142,7 @@ func TestFirstPhase(t *testing.T) {
 					context.WithValue(context.Background(), "easter", "egg"),
 				),
 			)
-		s := settings.Default()
+		s := config.Default()
 		s.TCP.ReadTimeout = 500 * time.Millisecond
 		_ = app.
 			Tune(s).
@@ -530,7 +530,7 @@ func TestSecondPhase(t *testing.T) {
 	app := New(addr)
 	go func(app *App) {
 		r := getInbuiltRouter()
-		s := settings.Default()
+		s := config.Default()
 		s.TCP.ReadTimeout = 500 * time.Millisecond
 		s.HTTP.OnDisconnect = func(request *http.Request) *http.Response {
 			return http.Error(request, status.ErrRequestTimeout)

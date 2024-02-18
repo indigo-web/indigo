@@ -3,13 +3,13 @@ package http1
 import (
 	"bytes"
 	"fmt"
+	"github.com/indigo-web/indigo/config"
 	"github.com/indigo-web/indigo/http"
 	"github.com/indigo-web/indigo/http/method"
 	"github.com/indigo-web/indigo/http/proto"
 	"github.com/indigo-web/indigo/http/status"
 	"github.com/indigo-web/indigo/internal/transport"
 	"github.com/indigo-web/indigo/internal/uridecode"
-	"github.com/indigo-web/indigo/settings"
 	"github.com/indigo-web/utils/buffer"
 	"github.com/indigo-web/utils/strcomp"
 	"github.com/indigo-web/utils/uf"
@@ -42,7 +42,7 @@ type Parser struct {
 	encToksBuff     []string
 	contEncToksBuff []string
 	headerKey       string
-	headersSettings *settings.Headers
+	headersCfg      *config.Headers
 	headersNumber   int
 	contentLength   int
 	urlEncodedChar  uint8
@@ -50,15 +50,15 @@ type Parser struct {
 }
 
 func NewParser(
-	request *http.Request, keyBuff, valBuff, startLineBuff *buffer.Buffer, headersSettings settings.Headers,
+	request *http.Request, keyBuff, valBuff, startLineBuff *buffer.Buffer, hdrsCfg config.Headers,
 ) *Parser {
 	return &Parser{
 		state:           eMethod,
 		request:         request,
-		headersSettings: &headersSettings,
+		headersCfg:      &hdrsCfg,
 		startLineBuff:   startLineBuff,
-		encToksBuff:     make([]string, 0, headersSettings.MaxEncodingTokens),
-		contEncToksBuff: make([]string, 0, headersSettings.MaxEncodingTokens),
+		encToksBuff:     make([]string, 0, hdrsCfg.MaxEncodingTokens),
+		contEncToksBuff: make([]string, 0, hdrsCfg.MaxEncodingTokens),
 		headerKeyBuff:   keyBuff,
 		headerValueBuff: valBuff,
 	}
@@ -211,7 +211,7 @@ headerKey:
 		p.headerKey = key
 		data = data[colon+1:]
 
-		if p.headersNumber++; p.headersNumber > p.headersSettings.Number.Maximal {
+		if p.headersNumber++; p.headersNumber > p.headersCfg.Number.Maximal {
 			return transport.Error, nil, status.ErrTooManyHeaders
 		}
 
@@ -283,7 +283,7 @@ headerValue:
 				return transport.Error, nil, status.ErrHeaderFieldsTooLarge
 			}
 
-			if headerValueBuff.SegmentLength() > p.headersSettings.MaxValueLength {
+			if headerValueBuff.SegmentLength() > p.headersCfg.MaxValueLength {
 				return transport.Error, nil, status.ErrHeaderFieldsTooLarge
 			}
 
@@ -295,7 +295,7 @@ headerValue:
 			return transport.Error, nil, status.ErrHeaderFieldsTooLarge
 		}
 
-		if headerValueBuff.SegmentLength() > p.headersSettings.MaxValueLength {
+		if headerValueBuff.SegmentLength() > p.headersCfg.MaxValueLength {
 			return transport.Error, nil, status.ErrHeaderFieldsTooLarge
 		}
 

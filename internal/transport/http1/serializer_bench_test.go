@@ -1,12 +1,12 @@
 package http1
 
 import (
+	"github.com/indigo-web/indigo/config"
 	"github.com/indigo-web/indigo/http"
 	"github.com/indigo-web/indigo/http/headers"
 	"github.com/indigo-web/indigo/http/query"
 	"github.com/indigo-web/indigo/http/status"
 	"github.com/indigo-web/indigo/internal/server/tcp/dummy"
-	"github.com/indigo-web/indigo/settings"
 	"github.com/stretchr/testify/require"
 	"strings"
 	"testing"
@@ -41,7 +41,7 @@ func BenchmarkSerializer(b *testing.B) {
 	hdrs := headers.New()
 	response := http.NewResponse()
 	body := NewBody(
-		dummy.NewNopClient(), nil, settings.Default().Body,
+		dummy.NewNopClient(), nil, config.Default().Body,
 	)
 	request := http.NewRequest(
 		hdrs, query.NewQuery(nil), http.NewResponse(), dummy.NewNopConn(),

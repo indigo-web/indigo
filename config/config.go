@@ -1,4 +1,4 @@
-package settings
+package config
 
 import (
 	"github.com/indigo-web/indigo/http"
@@ -93,7 +93,7 @@ type (
 	}
 )
 
-type Settings struct {
+type Config struct {
 	Headers Headers
 	URL     URL
 	TCP     TCP
@@ -101,10 +101,10 @@ type Settings struct {
 	HTTP    HTTP
 }
 
-// Default returns default settings. Those are initially well-balanced, however maximal defaults
+// Default returns default config. Those are initially well-balanced, however maximal defaults
 // are pretty permitting
-func Default() Settings {
-	return Settings{
+func Default() Config {
+	return Config{
 		Headers: Headers{
 			Number: HeadersNumber{
 				Default: 10,
@@ -155,11 +155,11 @@ func Default() Settings {
 	}
 }
 
-// Fill fills zero-values from partially-filled Settings instance with default ones
-func Fill(src Settings) (new Settings) {
+// Fill fills zero-values from partially-filled Config instance with default ones
+func Fill(src Config) (new Config) {
 	defaults := Default()
 
-	return Settings{
+	return Config{
 		Headers: Headers{
 			Number: HeadersNumber{
 				Default: numOr(src.Headers.Number.Default, defaults.Headers.Number.Default),

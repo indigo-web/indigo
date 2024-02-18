@@ -1,8 +1,8 @@
 package main
 
 import (
+	"github.com/indigo-web/indigo/config"
 	"github.com/indigo-web/indigo/router/inbuilt/middleware"
-	"github.com/indigo-web/indigo/settings"
 	"log"
 	"strconv"
 	"time"
@@ -62,7 +62,7 @@ func Stressful(request *http.Request) *http.Response {
 }
 
 func main() {
-	s := settings.Default()
+	s := config.Default()
 	s.TCP.ReadTimeout = time.Hour
 
 	app := indigo.New(addr).

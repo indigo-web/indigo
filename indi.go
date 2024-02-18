@@ -2,19 +2,18 @@ package indigo
 
 import (
 	"crypto/tls"
+	"github.com/indigo-web/indigo/http/core"
 	"github.com/indigo-web/indigo/http/encryption"
 	"github.com/indigo-web/indigo/http/status"
 	"github.com/indigo-web/indigo/internal/address"
-	"github.com/indigo-web/indigo/internal/initialize"
 	"github.com/indigo-web/indigo/router/inbuilt"
 	"log"
 	"net"
 	"sync/atomic"
 
-	"github.com/indigo-web/indigo/internal/server/http"
+	"github.com/indigo-web/indigo/config"
 	"github.com/indigo-web/indigo/internal/server/tcp"
 	"github.com/indigo-web/indigo/router"
-	"github.com/indigo-web/indigo/settings"
 )
 
 type (
@@ -30,23 +29,23 @@ type (
 type App struct {
 	hooks     hooks
 	listeners []Listener
-	settings  settings.Settings
+	cfg       config.Config
 	errCh     chan error
 }
 
 // New returns a new App instance.
 func New(addr string) *App {
 	app := &App{
-		settings: settings.Default(),
-		errCh:    make(chan error),
+		cfg:   config.Default(),
+		errCh: make(chan error),
 	}
 
 	return app.Listen(addr)
 }
 
-// Tune replaces default settings.
-func (a *App) Tune(s settings.Settings) *App {
-	a.settings = settings.Fill(s)
+// Tune replaces default config.
+func (a *App) Tune(cfg config.Config) *App {
+	a.cfg = config.Fill(cfg)
 	return a
 }
 

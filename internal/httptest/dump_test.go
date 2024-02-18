@@ -1,6 +1,7 @@
 package httptest
 
 import (
+	"github.com/indigo-web/indigo/config"
 	"github.com/indigo-web/indigo/http/headers"
 	"github.com/indigo-web/indigo/http/method"
 	"github.com/indigo-web/indigo/http/proto"
@@ -8,7 +9,6 @@ import (
 	"github.com/indigo-web/indigo/internal/initialize"
 	"github.com/indigo-web/indigo/internal/keyvalue"
 	"github.com/indigo-web/indigo/internal/server/tcp/dummy"
-	"github.com/indigo-web/indigo/settings"
 	"github.com/stretchr/testify/require"
 	"testing"
 )
@@ -18,8 +18,8 @@ func TestDump(t *testing.T) {
 	q.Set([]byte("hello=world&foo=bar"))
 
 	client := dummy.NewCircularClient([]byte("Hello, world!")).OneTime()
-	body := initialize.NewBody(client, settings.Default().Body)
-	request := initialize.NewRequest(settings.Default(), dummy.NewNopConn(), body)
+	body := initialize.NewBody(client, config.Default().Body)
+	request := initialize.NewRequest(config.Default(), dummy.NewNopConn(), body)
 	request.Headers = headers.New().
 		Add("hello", "world").
 		Add("foo", "bar")

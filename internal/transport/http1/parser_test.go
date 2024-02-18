@@ -11,23 +11,23 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/indigo-web/indigo/config"
 	"github.com/indigo-web/indigo/http"
 	"github.com/indigo-web/indigo/http/headers"
 	"github.com/indigo-web/indigo/http/method"
 	"github.com/indigo-web/indigo/http/proto"
 	"github.com/indigo-web/indigo/http/status"
 	"github.com/indigo-web/indigo/internal/server/tcp/dummy"
-	"github.com/indigo-web/indigo/settings"
 	"github.com/stretchr/testify/require"
 )
 
 func getParser() (*Parser, *http.Request) {
-	s := settings.Default()
+	s := config.Default()
 	q := query.NewQuery(headers.NewPrealloc(s.URL.Query.PreAlloc))
 	hdrs := headers.NewPrealloc(s.Headers.Number.Default)
 	response := http.NewResponse()
 	params := keyvalue.New()
-	body := NewBody(dummy.NewNopClient(), nil, settings.Default().Body)
+	body := NewBody(dummy.NewNopClient(), nil, config.Default().Body)
 	request := http.NewRequest(hdrs, q, response, dummy.NewNopConn(), body, params)
 	keyBuff := buffer.New(
 		s.Headers.MaxKeyLength*s.Headers.Number.Default,
@@ -471,7 +471,7 @@ func TestHttpRequestsParser_Parse_Negative(t *testing.T) {
 
 	t.Run("too long header key", func(t *testing.T) {
 		parser, _ := getParser()
-		s := settings.Default().Headers
+		s := config.Default().Headers
 		raw := fmt.Sprintf(
 			"GET / HTTP/1.1\r\n%s: some value\r\n\r\n",
 			strings.Repeat("a", s.MaxKeyLength*s.Number.Maximal+1),
@@ -484,7 +484,7 @@ func TestHttpRequestsParser_Parse_Negative(t *testing.T) {
 		parser, _ := getParser()
 		raw := fmt.Sprintf(
 			"GET / HTTP/1.1\r\nSome-Header: %s\r\n\r\n",
-			strings.Repeat("a", settings.Default().Headers.MaxValueLength+1),
+			strings.Repeat("a", config.Default().Headers.MaxValueLength+1),
 		)
 		_, _, err := parser.Parse([]byte(raw))
 		require.EqualError(t, err, status.ErrHeaderFieldsTooLarge.Error())
@@ -492,7 +492,7 @@ func TestHttpRequestsParser_Parse_Negative(t *testing.T) {
 
 	t.Run("too many headers", func(t *testing.T) {
 		parser, _ := getParser()
-		hdrs := genHeaders(settings.Default().Headers.Number.Maximal + 1)
+		hdrs := genHeaders(config.Default().Headers.Number.Maximal + 1)
 		raw := fmt.Sprintf(
 			"GET / HTTP/1.1\r\n%s\r\n\r\n",
 			strings.Join(hdrs, "\r\n"),
