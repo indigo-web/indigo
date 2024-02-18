@@ -41,7 +41,9 @@ func (s *Server) Run(client tcp.Client, req *http.Request, trans transport.Trans
 func (s *Server) HandleRequest(client tcp.Client, req *http.Request, trans transport.Transport) (ok bool) {
 	data, err := client.Read()
 	if err != nil {
-		_ = trans.Write(req.Proto, req, s.onError(req, err), client)
+		// read-error most probably means deadline exceeding. Just notify the user in
+		// this case and return. If
+		s.onError(req, status.ErrCloseConnection)
 		return false
 	}
 
