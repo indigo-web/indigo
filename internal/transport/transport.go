@@ -10,6 +10,8 @@ type Parser interface {
 }
 
 // RequestState represents the state of the request's parsing
+//
+//go:generate stringer -type=RequestState -output=transport_string.go
 type RequestState uint8
 
 const (

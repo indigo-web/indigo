@@ -86,7 +86,7 @@ func (p *Parser) Parse(data []byte) (state transport.RequestState, extra []byte,
 	case eHeaderValueCRLFCR:
 		goto headerValueCRLFCR
 	default:
-		panic(fmt.Sprintf("BUG: unexpected state: %v", p.state))
+		panic(fmt.Sprintf("BUG: http1/parser: unexpected state: %v", p.state))
 	}
 
 method:
@@ -185,7 +185,7 @@ headerKey:
 
 		switch data[0] {
 		case '\n':
-			p.reset()
+			p.cleanup()
 
 			return transport.HeadersCompleted, data[1:], nil
 		case '\r':
@@ -358,7 +358,7 @@ headerValueCRLFCR:
 	}
 
 	if data[0] == '\n' {
-		p.reset()
+		p.cleanup()
 
 		return transport.HeadersCompleted, data[1:], nil
 	}
@@ -366,7 +366,7 @@ headerValueCRLFCR:
 	return transport.Error, nil, status.ErrBadRequest
 }
 
-func (p *Parser) reset() {
+func (p *Parser) cleanup() {
 	p.headersNumber = 0
 	p.startLineBuff.Clear()
 	p.headerKeyBuff.Clear()
