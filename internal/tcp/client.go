@@ -1,7 +1,6 @@
 package tcp
 
 import (
-	"github.com/indigo-web/utils/unreader"
 	"net"
 	"time"
 )
@@ -10,40 +9,49 @@ type Client interface {
 	Read() ([]byte, error)
 	Unread([]byte)
 	Write([]byte) error
+	Conn() net.Conn
 	Remote() net.Addr
 	Close() error
 }
 
 type client struct {
-	conn     net.Conn
-	unreader *unreader.Unreader
-	buff     []byte
-	timeout  time.Duration
+	conn    net.Conn
+	buff    []byte
+	pending []byte
+	timeout time.Duration
 }
 
 func NewClient(conn net.Conn, timeout time.Duration, buff []byte) Client {
 	return &client{
-		unreader: new(unreader.Unreader),
-		buff:     buff,
-		conn:     conn,
-		timeout:  timeout,
+		buff:    buff,
+		conn:    conn,
+		timeout: timeout,
 	}
 }
 
 func (c *client) Read() ([]byte, error) {
-	return c.unreader.PendingOr(func() ([]byte, error) {
-		if err := c.conn.SetReadDeadline(time.Now().Add(c.timeout)); err != nil {
-			return nil, err
-		}
+	if len(c.pending) > 0 {
+		pending := c.pending
+		c.pending = nil
 
-		n, err := c.conn.Read(c.buff)
+		return pending, nil
+	}
 
-		return c.buff[:n], err
-	})
+	if err := c.conn.SetReadDeadline(time.Now().Add(c.timeout)); err != nil {
+		return nil, err
+	}
+
+	n, err := c.conn.Read(c.buff)
+
+	return c.buff[:n], err
 }
 
 func (c *client) Unread(b []byte) {
-	c.unreader.Unread(b)
+	c.pending = b
+}
+
+func (c *client) Conn() net.Conn {
+	return c.conn
 }
 
 func (c *client) Write(b []byte) error {
