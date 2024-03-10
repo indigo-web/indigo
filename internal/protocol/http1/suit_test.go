@@ -1,18 +1,18 @@
-package http
+package http1
 
 import (
 	"github.com/indigo-web/indigo/config"
 	"github.com/indigo-web/indigo/http"
 	"github.com/indigo-web/indigo/http/headers"
 	"github.com/indigo-web/indigo/internal/requestgen"
-	"github.com/indigo-web/indigo/internal/server/tcp/dummy"
+	"github.com/indigo-web/indigo/internal/tcp/dummy"
 	"github.com/indigo-web/indigo/router/simple"
 	"github.com/stretchr/testify/require"
 	"strings"
 	"testing"
 )
 
-func newComparingRouter(t *testing.T, want headers.Headers) *simple.Router {
+func newSimpleRouter(t *testing.T, want headers.Headers) *simple.Router {
 	return simple.New(func(request *http.Request) *http.Response {
 		require.True(t, compareHeaders(want, request.Headers))
 		return http.Respond(request)
@@ -26,69 +26,69 @@ func TestServer(t *testing.T) {
 	const N = 10
 
 	t.Run("simple get", func(t *testing.T) {
-		server, request, trans := newServer(dummy.NewNopClient())
-		wantHeaders := headers.New().Add("Accept-Encoding", "identity")
-		server.router = newComparingRouter(t, wantHeaders)
 		raw := []byte("GET / HTTP/1.1\r\nAccept-Encoding: identity\r\n\r\n")
 		client := dummy.NewCircularClient(raw)
+		server, _ := newSuit(client)
+		wantHeaders := headers.New().Add("Accept-Encoding", "identity")
+		server.router = newSimpleRouter(t, wantHeaders)
 
 		for i := 0; i < N; i++ {
-			require.True(t, server.HandleRequest(client, request, trans))
+			require.True(t, server.ServeOnce())
 		}
 	})
 
 	t.Run("5 headers", func(t *testing.T) {
-		server, request, trans := newServer(dummy.NewNopClient())
 		wantHeaders := requestgen.Headers(5)
-		server.router = newComparingRouter(t, wantHeaders)
 		raw := requestgen.Generate(longPath, wantHeaders)
 		dispersed := disperse(raw, config.Default().TCP.ReadBufferSize)
 		client := dummy.NewCircularClient(dispersed...)
+		server, _ := newSuit(client)
+		server.router = newSimpleRouter(t, wantHeaders)
 
 		for i := 0; i < N; i++ {
-			require.True(t, server.HandleRequest(client, request, trans))
+			require.True(t, server.ServeOnce())
 		}
 	})
 
 	t.Run("10 headers", func(t *testing.T) {
-		server, request, trans := newServer(dummy.NewNopClient())
 		wantHeaders := requestgen.Headers(10)
-		server.router = newComparingRouter(t, wantHeaders)
 		raw := requestgen.Generate(longPath, wantHeaders)
 		dispersed := disperse(raw, config.Default().TCP.ReadBufferSize)
 		client := dummy.NewCircularClient(dispersed...)
+		server, _ := newSuit(client)
+		server.router = newSimpleRouter(t, wantHeaders)
 
 		for i := 0; i < N; i++ {
-			require.True(t, server.HandleRequest(client, request, trans))
+			require.True(t, server.ServeOnce())
 		}
 	})
 
 	t.Run("50 headers", func(t *testing.T) {
-		server, request, trans := newServer(dummy.NewNopClient())
 		wantHeaders := requestgen.Headers(50)
-		server.router = newComparingRouter(t, wantHeaders)
 		raw := requestgen.Generate(longPath, wantHeaders)
 		dispersed := disperse(raw, config.Default().TCP.ReadBufferSize)
 		client := dummy.NewCircularClient(dispersed...)
+		server, _ := newSuit(client)
+		server.router = newSimpleRouter(t, wantHeaders)
 
 		for i := 0; i < N; i++ {
 			for j := 0; j < len(dispersed); j++ {
-				require.True(t, server.HandleRequest(client, request, trans))
+				require.True(t, server.ServeOnce())
 			}
 		}
 	})
 
 	t.Run("heavily escaped", func(t *testing.T) {
-		server, request, trans := newServer(dummy.NewNopClient())
 		wantHeaders := requestgen.Headers(20)
 		raw := requestgen.Generate(strings.Repeat("%20", 500), wantHeaders)
-		server.router = newComparingRouter(t, wantHeaders)
 		dispersed := disperse(raw, config.Default().TCP.ReadBufferSize)
 		client := dummy.NewCircularClient(dispersed...)
+		server, _ := newSuit(client)
+		server.router = newSimpleRouter(t, wantHeaders)
 
 		for i := 0; i < N; i++ {
 			for j := 0; j < len(dispersed); j++ {
-				require.True(t, server.HandleRequest(client, request, trans))
+				require.True(t, server.ServeOnce())
 			}
 		}
 	})
@@ -100,10 +100,10 @@ func TestPOST(t *testing.T) {
 	t.Run("POST hello world", func(t *testing.T) {
 		raw := []byte("POST / HTTP/1.1\r\nContent-Length: 13\r\n\r\nHello, world!")
 		client := dummy.NewCircularClient(disperse(raw, config.Default().TCP.ReadBufferSize)...)
-		server, request, trans := newServer(client)
+		server, _ := newSuit(client)
 
 		for i := 0; i < N; i++ {
-			require.True(t, server.HandleRequest(client, request, trans))
+			require.True(t, server.ServeOnce())
 		}
 	})
 
@@ -112,11 +112,11 @@ func TestPOST(t *testing.T) {
 		raw := []byte("POST / HTTP/1.1\r\nContent-Length: 10000000\r\n\r\n" + body)
 		dispersed := disperse(raw, config.Default().TCP.ReadBufferSize)
 		client := dummy.NewCircularClient(dispersed...)
-		server, request, trans := newServer(client)
+		server, _ := newSuit(client)
 
 		for i := 0; i < N; i++ {
 			for j := 0; j < len(dispersed); j++ {
-				require.True(t, server.HandleRequest(client, request, trans))
+				require.True(t, server.ServeOnce())
 			}
 		}
 	})
@@ -129,11 +129,11 @@ func TestPOST(t *testing.T) {
 		raw := []byte("POST / HTTP/1.1\r\nTransfer-Encoding: chunked\r\n\r\n" + chunked)
 		dispersed := disperse(raw, config.Default().TCP.ReadBufferSize)
 		client := dummy.NewCircularClient(dispersed...)
-		server, request, trans := newServer(client)
+		server, _ := newSuit(client)
 
 		for i := 0; i < N; i++ {
 			for j := 0; j < len(dispersed); j++ {
-				require.True(t, server.HandleRequest(client, request, trans))
+				require.True(t, server.ServeOnce())
 			}
 		}
 	})
