@@ -400,7 +400,6 @@ func TestFirstPhase(t *testing.T) {
 		require.Equal(t, 1, len(resp.Header["Allow"]))
 	})
 
-	// this test must ALWAYS be on the bottom as it is the longest-duration test
 	t.Run("idle disconnect", func(t *testing.T) {
 		conn, err := net.Dial("tcp", addr)
 		require.NoError(t, err)
