@@ -3,30 +3,25 @@ package uridecode
 import (
 	"bytes"
 	"github.com/indigo-web/indigo/http/status"
-	"github.com/indigo-web/utils/hex"
+	"github.com/indigo-web/indigo/internal/hexconv"
 )
 
+// Decode normalizes the URI by translating escaped characters into their
+// true form
 func Decode(src, buff []byte) ([]byte, error) {
-	for {
-		separator := bytes.IndexByte(src, '%')
-		if separator == -1 {
-			if len(buff) == 0 {
-				return src, nil
-			}
-
-			if len(buff) == 0 {
-				return src, nil
-			}
-
-			return append(buff, src...), nil
-		}
-
-		if len(src[separator+1:]) < 2 || !hex.Is(src[separator+1]) || !hex.Is(src[separator+2]) {
+	for i := bytes.IndexByte(src, '%'); i != -1; i = bytes.IndexByte(src, '%') {
+		if i >= len(src)-2 {
 			return nil, status.ErrURIDecoding
 		}
 
-		buff = append(buff, src[:separator]...)
-		buff = append(buff, (hex.Un(src[separator+1])<<4)|hex.Un(src[separator+2]))
-		src = src[separator+3:]
+		buff = append(buff, src[:i]...)
+		buff = append(buff, hexconv.Parse(src[i+1])<<4|hexconv.Parse(src[i+2]))
+		src = src[i+3:]
 	}
+
+	if len(buff) == 0 {
+		return src, nil
+	}
+
+	return append(buff, src...), nil
 }
