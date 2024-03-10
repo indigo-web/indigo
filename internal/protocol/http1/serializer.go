@@ -7,8 +7,8 @@ import (
 	"github.com/indigo-web/indigo/http/proto"
 	"github.com/indigo-web/indigo/http/status"
 	"github.com/indigo-web/indigo/internal/httpchars"
+	"github.com/indigo-web/indigo/internal/protocol"
 	"github.com/indigo-web/indigo/internal/response"
-	"github.com/indigo-web/indigo/internal/transport"
 	"github.com/indigo-web/utils/strcomp"
 	"github.com/indigo-web/utils/uf"
 	"io"
@@ -29,7 +29,9 @@ const minimalFileBuffSize = 16
 var chunkedFinalizer = []byte("0\r\n\r\n")
 
 type Serializer struct {
-	buff []byte
+	request *http.Request
+	writer  protocol.Writer
+	buff    []byte
 	// fileBuff isn't allocated until needed in order to save memory in cases,
 	// where no files are being sent
 	fileBuff       []byte
@@ -37,10 +39,16 @@ type Serializer struct {
 	defaultHeaders defaultHeaders
 }
 
-func NewSerializer(buff []byte, fileBuffSize int, defHdrs map[string]string) *Serializer {
+func NewSerializer(
+	buff []byte,
+	fileBuffSize int,
+	defHdrs map[string]string,
+	request *http.Request,
+	writer protocol.Writer,
+) *Serializer {
 	if fileBuffSize < minimalFileBuffSize {
-		log.Printf("misconfiguration: file buffer size (Config.HTTP.FileBuffSize) is set to %d, "+
-			"however minimal possible value is %d. Setting it hard to %d\n",
+		log.Printf("misconfiguration: file buffer size (Config.HTTP.FileBuffSize) is %d, "+
+			"which is below minimal (%d). The value is forcefully set to %d\n",
 			fileBuffSize, minimalFileBuffSize, minimalFileBuffSize,
 		)
 
@@ -48,6 +56,8 @@ func NewSerializer(buff []byte, fileBuffSize int, defHdrs map[string]string) *Se
 	}
 
 	return &Serializer{
+		request:        request,
+		writer:         writer,
 		buff:           buff[:0],
 		fileBuffSize:   fileBuffSize,
 		defaultHeaders: processDefaultHeaders(defHdrs),
@@ -66,7 +76,7 @@ func (d *Serializer) PreWrite(protocol proto.Proto, response *http.Response) {
 
 // Write writes the response, keeping in mind difference between 1.0 and 1.1 HTTP versions
 func (d *Serializer) Write(
-	protocol proto.Proto, request *http.Request, response *http.Response, writer transport.Writer,
+	protocol proto.Proto, response *http.Response,
 ) (err error) {
 	defer d.clear()
 
@@ -75,22 +85,22 @@ func (d *Serializer) Write(
 	d.renderResponseLine(fields)
 
 	if fields.Attachment.Content() != nil {
-		return d.sendAttachment(request, response, writer)
+		return d.sendAttachment(d.request, response, d.writer)
 	}
 
 	d.renderHeaders(fields)
 	d.renderContentLength(int64(len(fields.Body)))
 	d.crlf()
 
-	if request.Method != method.HEAD {
+	if d.request.Method != method.HEAD {
 		// HEAD request responses must be similar to GET request responses, except
 		// forced lack of body, even if Content-Length is specified
 		d.buff = append(d.buff, fields.Body...)
 	}
 
-	err = writer.Write(d.buff)
+	err = d.writer.Write(d.buff)
 
-	if !isKeepAlive(protocol, request) && request.Upgrade == proto.Unknown {
+	if !isKeepAlive(protocol, d.request) && d.request.Upgrade == proto.Unknown {
 		err = status.ErrCloseConnection
 	}
 
@@ -138,7 +148,7 @@ func (d *Serializer) renderHeaders(fields response.Fields) {
 // sendAttachment simply encapsulates all the logic related to rendering arbitrary
 // io.Reader implementations
 func (d *Serializer) sendAttachment(
-	request *http.Request, response *http.Response, writer transport.Writer,
+	request *http.Request, response *http.Response, writer protocol.Writer,
 ) (err error) {
 	fields := response.Reveal()
 	size := fields.Attachment.Size()
@@ -181,7 +191,7 @@ func (d *Serializer) sendAttachment(
 	return err
 }
 
-func (d *Serializer) writePlainBody(r io.Reader, writer transport.Writer) error {
+func (d *Serializer) writePlainBody(r io.Reader, writer protocol.Writer) error {
 	// TODO: implement checking whether r implements io.ReaderAt interfacd. In case it does
 	//       body may be transferred more efficiently. This requires implementing io.Writer
 	//       *http.ResponseWriter
@@ -202,7 +212,7 @@ func (d *Serializer) writePlainBody(r io.Reader, writer transport.Writer) error 
 	}
 }
 
-func (d *Serializer) writeChunkedBody(r io.Reader, writer transport.Writer) error {
+func (d *Serializer) writeChunkedBody(r io.Reader, writer protocol.Writer) error {
 	const (
 		hexValueOffset = 8
 		crlfSize       = 1 /* CR */ + 1 /* LF */
