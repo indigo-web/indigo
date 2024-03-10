@@ -2,17 +2,17 @@ package indigo
 
 import (
 	"crypto/tls"
-	"github.com/indigo-web/indigo/http/core"
 	"github.com/indigo-web/indigo/http/encryption"
+	"github.com/indigo-web/indigo/http/serve"
 	"github.com/indigo-web/indigo/http/status"
 	"github.com/indigo-web/indigo/internal/address"
+	"github.com/indigo-web/indigo/internal/tcp"
 	"github.com/indigo-web/indigo/router/inbuilt"
 	"log"
 	"net"
 	"sync/atomic"
 
 	"github.com/indigo-web/indigo/config"
-	"github.com/indigo-web/indigo/internal/server/tcp"
 	"github.com/indigo-web/indigo/router"
 )
 
@@ -209,7 +209,11 @@ func (a *App) Stop() {
 
 func (a *App) newTCPCallback(r router.Router, enc encryption.Token) tcp.OnConn {
 	return func(conn net.Conn) {
-		core.ServeHTTP1(a.cfg, conn, enc, r)
+		defer func() {
+			_ = conn.Close()
+		}()
+
+		serve.HTTP1(a.cfg, conn, enc, r)
 	}
 }
 
