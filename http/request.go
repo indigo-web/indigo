@@ -14,22 +14,6 @@ import (
 	"net"
 )
 
-type Environment struct {
-	// Error contains an error, if occurred
-	Error error
-	// AllowMethods is used to pass a string containing all the allowed methods for a
-	// specific endpoint. Has non-zero-value only when 405 Method Not Allowed raises
-	AllowMethods string
-	// Encryption is a token that corresponds to the used encryption method. May be
-	// extended by custom values
-	Encryption encryption.Token
-	// AliasFrom contains the original request path, in case it was replaced via alias
-	// aka implicit redirect
-	AliasFrom string
-}
-
-type Params = *keyvalue.Storage
-
 var zeroContext = context.Background()
 
 // Request represents HTTP request
@@ -37,7 +21,7 @@ type Request struct {
 	// Method represents the request's method
 	Method method.Method
 	// Path represents decoded request URI
-	Path string
+	Path Path
 	// Query are request's URI parameters
 	Query *query.Query
 	// Params are dynamic segment values
@@ -170,3 +154,19 @@ func (r *Request) Clear() (err error) {
 }
 
 // TODO: implement FormData parsing
+
+type Environment struct {
+	// Error contains an error, if occurred
+	Error error
+	// AllowMethods is used to pass a string containing all the allowed methods for a
+	// specific endpoint. Has non-zero-value only when 405 Method Not Allowed raises
+	AllowMethods string
+	// Encryption is a token that corresponds to the used encryption method. May be
+	// extended by custom values
+	Encryption encryption.Token
+	// AliasFrom contains the original request path, in case it was replaced via alias
+	// aka implicit redirect
+	AliasFrom string
+}
+
+type Params = *keyvalue.Storage
