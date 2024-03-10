@@ -15,7 +15,7 @@ func MyHandler(request *http.Request) *http.Response {
 	return request.Respond().
 		Code(status.OK).
 		Header("Hello", "world").
-		String("<h1>How are you doing?</h1>")
+		String("<h1>Hello, world!</h1>")
 }
 
 func main() {
