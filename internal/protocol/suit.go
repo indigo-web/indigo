@@ -1,4 +1,4 @@
-package transport
+package protocol
 
 import (
 	"github.com/indigo-web/indigo/http"
@@ -11,7 +11,7 @@ type Parser interface {
 
 // RequestState represents the state of the request's parsing
 //
-//go:generate stringer -type=RequestState -output=transport_string.go
+//go:generate stringer -type=RequestState -output=suit_string.go
 type RequestState uint8
 
 const (
@@ -27,12 +27,17 @@ type Writer interface {
 // Serializer converts an HTTP response builder into bytes and writes it
 type Serializer interface {
 	PreWrite(target proto.Proto, response *http.Response)
-	Write(target proto.Proto, request *http.Request, response *http.Response, writer Writer) error
+	Write(target proto.Proto, response *http.Response) error
 }
 
-// Transport is a general pair of a parser and a dumper. Usually consists of both belonging
+type Server interface {
+	Serve()
+}
+
+// Suit is a general pair of a parser and a dumper. Usually consists of both belonging
 // to a same protocol major version
-type Transport interface {
+type Suit interface {
+	Server
 	Parser
 	Serializer
 }
