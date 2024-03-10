@@ -4,9 +4,9 @@ import (
 	"encoding/binary"
 	"fmt"
 	"github.com/indigo-web/indigo/http/status"
-	"github.com/indigo-web/indigo/internal/transport"
-	"github.com/indigo-web/indigo/internal/transport/http2/internal/flags"
-	"github.com/indigo-web/indigo/internal/transport/http2/internal/frames"
+	"github.com/indigo-web/indigo/internal/protocol"
+	"github.com/indigo-web/indigo/internal/protocol/http2/internal/flags"
+	"github.com/indigo-web/indigo/internal/protocol/http2/internal/frames"
 	"github.com/indigo-web/utils/uf"
 )
 
@@ -39,7 +39,7 @@ func NewParser() *Parser {
 	}
 }
 
-func (p *Parser) Parse(data []byte) (state transport.RequestState, extra []byte, err error) {
+func (p *Parser) Parse(data []byte) (state protocol.RequestState, extra []byte, err error) {
 	switch p.state {
 	case ePreface:
 		goto preface
@@ -57,7 +57,7 @@ preface:
 		p.offset += uint8(n)
 		if int(p.offset) == len(preface) {
 			if uf.B2S(p.buff[:len(preface)]) != preface {
-				return transport.Error, nil, status.ErrBadRequest
+				return protocol.Error, nil, status.ErrBadRequest
 			}
 
 			data = data[n:]
@@ -65,7 +65,7 @@ preface:
 			goto frameHeaders
 		}
 
-		return transport.Pending, nil, nil
+		return protocol.Pending, nil, nil
 	}
 
 frameHeaders:
@@ -93,14 +93,14 @@ frameHeaders:
 		}
 
 		p.state = eFrameHeaders
-		return transport.Pending, nil, nil
+		return protocol.Pending, nil, nil
 	}
 
 dispatchFrame:
 	switch p.frameType {
 	case frames.Settings:
 		if p.length%6 != 0 {
-			return transport.Error, nil, status.ErrBadRequest
+			return protocol.Error, nil, status.ErrBadRequest
 		}
 
 		goto settings
@@ -117,10 +117,18 @@ settings:
 		p.offset += uint8(n)
 		if p.offset < pair {
 			p.state = eSettings
-			return transport.Pending, nil, nil
+			return protocol.Pending, nil, nil
 		}
 
+		p.offset = 0
+
+		fmt.Printf(
+			"setting: %x=%d\n",
+			binary.BigEndian.Uint16(p.buff[:2]), binary.BigEndian.Uint32(p.buff[2:pair]),
+		)
 	}
+
+	panic("request completed")
 }
 
 func (p *Parser) cleanup() {

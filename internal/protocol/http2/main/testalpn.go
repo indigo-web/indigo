@@ -8,7 +8,7 @@ import (
 	"crypto/x509/pkix"
 	"encoding/pem"
 	"fmt"
-	"github.com/indigo-web/indigo/internal/transport/http2"
+	"github.com/indigo-web/indigo/internal/protocol/http2"
 	"math/big"
 	"os"
 	"strconv"
@@ -103,6 +103,7 @@ func runTLSServer() error {
 
 func handleTLSConn(conn *tls.Conn) {
 	defer conn.Close()
+	fmt.Printf("%s: proto=\"%s\"\n", conn.RemoteAddr().String(), conn.ConnectionState().NegotiatedProtocol)
 
 	buff := make([]byte, 2048)
 	parser := http2.NewParser()
@@ -121,11 +122,6 @@ func handleTLSConn(conn *tls.Conn) {
 			return
 		}
 	}
-
-	//fmt.Println(strconv.Quote(string(buff[:n])))
-	//
-	//fmt.Printf("%s: err=\"%s\" proto=\"%s\"\n", conn.RemoteAddr().String(), err, conn.ConnectionState().NegotiatedProtocol)
-	//conn.Close()
 }
 
 func main() {
