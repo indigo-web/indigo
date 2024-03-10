@@ -19,6 +19,10 @@ type (
 		Default, Maximal int
 	}
 
+	HeadersKeysSpace struct {
+		Default, Maximal int
+	}
+
 	HeadersValuesSpace struct {
 		Default, Maximal int
 	}
@@ -42,6 +46,10 @@ type (
 		MaxKeyLength int
 		// MaxValueLength is responsible for maximal header value length restriction.
 		MaxValueLength int
+		// KeySpace is responsible for limitation of how much space can headers' keys
+		// consume. Default value is how many bytes to pre-allocate, and maximal is
+		// how many bytes can be stored maximally
+		KeySpace HeadersKeysSpace
 		// HeadersValuesSpace is responsible for a maximal space in bytes available for
 		// keeping header values in memory.
 		// Default value is initial space allocated when client connects.
@@ -112,6 +120,10 @@ func Default() Config {
 			},
 			MaxKeyLength:   100,      // basically 100 bytes
 			MaxValueLength: 8 * 1024, // 8 kilobytes (just like nginx)
+			KeySpace: HeadersKeysSpace{
+				Default: 1 * 1024,
+				Maximal: 4 * 1024,
+			},
 			ValueSpace: HeadersValuesSpace{
 				// for simple requests without many heavy-weighted headers must be enough
 				// to avoid a relatively big amount of re-allocations
@@ -167,6 +179,10 @@ func Fill(src Config) (new Config) {
 			},
 			MaxKeyLength:   numOr(src.Headers.MaxKeyLength, defaults.Headers.MaxKeyLength),
 			MaxValueLength: numOr(src.Headers.MaxValueLength, defaults.Headers.MaxValueLength),
+			KeySpace: HeadersKeysSpace{
+				Default: numOr(src.Headers.KeySpace.Default, defaults.Headers.KeySpace.Default),
+				Maximal: numOr(src.Headers.KeySpace.Maximal, defaults.Headers.KeySpace.Maximal),
+			},
 			ValueSpace: HeadersValuesSpace{
 				Default: numOr(src.Headers.ValueSpace.Default, defaults.Headers.ValueSpace.Default),
 				Maximal: numOr(src.Headers.ValueSpace.Maximal, defaults.Headers.ValueSpace.Maximal),
