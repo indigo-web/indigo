@@ -4,15 +4,15 @@ import (
 	"github.com/indigo-web/indigo/config"
 	"github.com/indigo-web/indigo/http"
 	"github.com/indigo-web/indigo/http/status"
-	"github.com/indigo-web/indigo/internal/initialize"
-	"github.com/indigo-web/indigo/internal/server/tcp/dummy"
+	"github.com/indigo-web/indigo/internal/construct"
+	"github.com/indigo-web/indigo/internal/tcp/dummy"
 	"github.com/indigo-web/indigo/router/inbuilt"
 	"github.com/stretchr/testify/require"
 	"testing"
 )
 
 func newRequest(hosts ...string) *http.Request {
-	request := initialize.NewRequest(config.Default(), dummy.NewNopConn(), nil)
+	request := construct.Request(config.Default(), dummy.NewNopClient(), nil)
 	for _, host := range hosts {
 		request.Headers.Add("Host", host)
 	}
