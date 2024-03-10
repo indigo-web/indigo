@@ -1,13 +1,12 @@
 package dummy
 
 import (
-	"github.com/indigo-web/indigo/internal/server/tcp"
-)
-
-import (
+	"github.com/indigo-web/indigo/internal/tcp"
 	"io"
 	"net"
 )
+
+var _ tcp.Client = new(CircularClient)
 
 // CircularClient is a client that on every read-operation returns the same data as it
 // was initialised with. This is used mainly for benchmarking
@@ -55,6 +54,10 @@ func (c *CircularClient) Unread(takeback []byte) {
 
 func (*CircularClient) Write([]byte) error {
 	return nil
+}
+
+func (c *CircularClient) Conn() net.Conn {
+	return NewNopConn()
 }
 
 func (*CircularClient) Remote() net.Addr {

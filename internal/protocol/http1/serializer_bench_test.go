@@ -6,7 +6,7 @@ import (
 	"github.com/indigo-web/indigo/http/headers"
 	"github.com/indigo-web/indigo/http/query"
 	"github.com/indigo-web/indigo/http/status"
-	"github.com/indigo-web/indigo/internal/server/tcp/dummy"
+	"github.com/indigo-web/indigo/internal/tcp/dummy"
 	"github.com/stretchr/testify/require"
 	"strings"
 	"testing"
@@ -51,7 +51,7 @@ func BenchmarkSerializer(b *testing.B) {
 
 	b.Run("no body no def headers", func(b *testing.B) {
 		buff := make([]byte, 0, 1024)
-		serializer := NewSerializer(buff, 128, nil)
+		serializer := NewSerializer(buff, 128, nil, request, client)
 		respSize, err := estimateResponseSize(serializer, request, response)
 		require.NoError(b, err)
 		b.SetBytes(respSize)
@@ -59,14 +59,14 @@ func BenchmarkSerializer(b *testing.B) {
 		b.ResetTimer()
 
 		for i := 0; i < b.N; i++ {
-			_ = serializer.Write(request.Proto, request, response, client)
+			_ = serializer.Write(request.Proto, response)
 		}
 	})
 
 	b.Run("with 4kb body", func(b *testing.B) {
 		response := http.NewResponse().String(strings.Repeat("a", 4096))
 		buff := make([]byte, 0, 8192)
-		serializer := NewSerializer(buff, 128, nil)
+		serializer := NewSerializer(buff, 128, nil, request, client)
 		respSize, err := estimateResponseSize(serializer, request, response)
 		require.NoError(b, err)
 		b.SetBytes(respSize)
@@ -74,13 +74,13 @@ func BenchmarkSerializer(b *testing.B) {
 		b.ResetTimer()
 
 		for i := 0; i < b.N; i++ {
-			_ = serializer.Write(request.Proto, request, response, client)
+			_ = serializer.Write(request.Proto, response)
 		}
 	})
 
 	b.Run("no body 1 def header", func(b *testing.B) {
 		buff := make([]byte, 0, 1024)
-		serializer := NewSerializer(buff, 128, defaultHeadersSmall)
+		serializer := NewSerializer(buff, 128, defaultHeadersSmall, request, client)
 		respSize, err := estimateResponseSize(serializer, request, response)
 		require.NoError(b, err)
 		b.SetBytes(respSize)
@@ -88,13 +88,13 @@ func BenchmarkSerializer(b *testing.B) {
 		b.ResetTimer()
 
 		for i := 0; i < b.N; i++ {
-			_ = serializer.Write(request.Proto, request, response, client)
+			_ = serializer.Write(request.Proto, response)
 		}
 	})
 
 	b.Run("no body 3 def headers", func(b *testing.B) {
 		buff := make([]byte, 0, 1024)
-		serializer := NewSerializer(buff, 128, defaultHeadersMedium)
+		serializer := NewSerializer(buff, 128, defaultHeadersMedium, request, client)
 		respSize, err := estimateResponseSize(serializer, request, response)
 		require.NoError(b, err)
 		b.SetBytes(respSize)
@@ -102,13 +102,13 @@ func BenchmarkSerializer(b *testing.B) {
 		b.ResetTimer()
 
 		for i := 0; i < b.N; i++ {
-			_ = serializer.Write(request.Proto, request, response, client)
+			_ = serializer.Write(request.Proto, response)
 		}
 	})
 
 	b.Run("no body 8 def headers", func(b *testing.B) {
 		buff := make([]byte, 0, 1024)
-		serializer := NewSerializer(buff, 128, defaultHeadersBig)
+		serializer := NewSerializer(buff, 128, defaultHeadersBig, request, client)
 		respSize, err := estimateResponseSize(serializer, request, response)
 		require.NoError(b, err)
 		b.SetBytes(respSize)
@@ -116,14 +116,14 @@ func BenchmarkSerializer(b *testing.B) {
 		b.ResetTimer()
 
 		for i := 0; i < b.N; i++ {
-			_ = serializer.Write(request.Proto, request, response, client)
+			_ = serializer.Write(request.Proto, response)
 		}
 	})
 
 	b.Run("pre-write", func(b *testing.B) {
 		preResp := http.NewResponse().Code(status.SwitchingProtocols)
 		buff := make([]byte, 0, 128)
-		serializer := NewSerializer(buff, 128, nil)
+		serializer := NewSerializer(buff, 128, nil, request, client)
 		respSize, err := estimatePreWriteSize(serializer, request, preResp, response)
 		require.NoError(b, err)
 		b.SetBytes(respSize)
@@ -132,7 +132,7 @@ func BenchmarkSerializer(b *testing.B) {
 
 		for i := 0; i < b.N; i++ {
 			serializer.PreWrite(request.Proto, preResp)
-			_ = serializer.Write(request.Proto, request, response, client)
+			_ = serializer.Write(request.Proto, response)
 		}
 	})
 
@@ -143,7 +143,7 @@ func estimateResponseSize(
 	serializer *Serializer, req *http.Request, resp *http.Response,
 ) (int64, error) {
 	writer := dummy.NewSinkholeWriter()
-	err := serializer.Write(req.Proto, req, resp, writer)
+	err := serializer.Write(req.Proto, resp)
 
 	return int64(len(writer.Data)), err
 }
@@ -153,7 +153,7 @@ func estimatePreWriteSize(
 ) (int64, error) {
 	writer := dummy.NewSinkholeWriter()
 	serializer.PreWrite(req.Proto, preWrite)
-	err := serializer.Write(req.Proto, req, resp, writer)
+	err := serializer.Write(req.Proto, resp)
 
 	return int64(len(writer.Data)), err
 }

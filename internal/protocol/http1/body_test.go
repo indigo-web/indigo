@@ -3,6 +3,7 @@ package http1
 import (
 	"github.com/indigo-web/indigo/config"
 	"github.com/indigo-web/indigo/http/status"
+	"github.com/indigo-web/indigo/internal/tcp/dummy"
 	"io"
 	"strconv"
 	"strings"
@@ -12,7 +13,6 @@ import (
 	"github.com/indigo-web/indigo/http"
 	"github.com/indigo-web/indigo/http/headers"
 	"github.com/indigo-web/indigo/http/query"
-	"github.com/indigo-web/indigo/internal/server/tcp/dummy"
 	"github.com/indigo-web/utils/ft"
 	"github.com/stretchr/testify/require"
 )
