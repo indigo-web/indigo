@@ -12,7 +12,7 @@ const (
 	MaxHeaderListSize    Setting = 0x06
 )
 
-type Settings [...]uint32
+type Settings [7]uint32
 
 var Default = Settings{
 	HeaderTableSize:      4096,
