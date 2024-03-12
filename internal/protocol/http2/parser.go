@@ -3,10 +3,10 @@ package http2
 import (
 	"encoding/binary"
 	"fmt"
-	"github.com/indigo-web/indigo/http/status"
-	"github.com/indigo-web/indigo/internal/protocol"
 	"github.com/indigo-web/indigo/internal/protocol/http2/internal/flags"
 	"github.com/indigo-web/indigo/internal/protocol/http2/internal/frames"
+	"github.com/indigo-web/indigo/internal/protocol/http2/internal/settings"
+	"github.com/indigo-web/indigo/internal/tcp"
 	"github.com/indigo-web/utils/uf"
 )
 
@@ -15,120 +15,96 @@ import (
 // corporations' users data. In early drafts FOO method and BA body were used instead
 const preface = "PRI * HTTP/2.0\r\n\r\nSM\r\n\r\n"
 
-type parserState uint8
-
-const (
-	ePreface parserState = iota + 1
-	eFrameHeaders
-	eSettings
-)
-
 type Parser struct {
-	state     parserState
-	frameType frames.Frame
-	flags     flags.Flag
-	offset    uint8
-	buff      [24]byte
-	length    uint32
-	streamId  uint32
+	buff   [24]byte
+	client tcp.Client
+	frame  frames.Frame
+	offset uint8
 }
 
-func NewParser() *Parser {
+func NewParser(client tcp.Client) *Parser {
 	return &Parser{
-		state: ePreface,
+		client: client,
 	}
 }
 
-func (p *Parser) Parse(data []byte) (state protocol.RequestState, extra []byte, err error) {
-	switch p.state {
-	case ePreface:
-		goto preface
-	case eFrameHeaders:
-		goto frameHeaders
-	case eSettings:
-		goto settings
-	default:
-		panic(fmt.Sprintf("BUG: http2/parser: unexpected state: %v", p.state))
+func (p *Parser) SkipPreface() error {
+	got, err := p.readN(uint8(len(preface)))
+	if err != nil {
+		return err
 	}
 
-preface:
-	{
-		n := copy(p.buff[p.offset:len(preface)], data)
-		p.offset += uint8(n)
-		if int(p.offset) == len(preface) {
-			if uf.B2S(p.buff[:len(preface)]) != preface {
-				return protocol.Error, nil, status.ErrBadRequest
+	if uf.B2S(got) != preface {
+		return fmt.Errorf("bad preface")
+	}
+
+	return nil
+}
+
+func (p *Parser) Parse() (frame frames.Frame, err error) {
+	const frameHeadersOctets = 9
+	hdrs, err := p.readN(frameHeadersOctets)
+	if err != nil {
+		return frame, err
+	}
+
+	frame = frames.Frame{
+		Length:   uint32(hdrs[2]) | uint32(hdrs[1])<<8 | uint32(hdrs[0])<<16,
+		Type:     frames.Type(hdrs[3]),
+		Flags:    flags.Flag(hdrs[4]),
+		StreamID: binary.BigEndian.Uint32(hdrs[5:9]),
+	}
+
+	fmt.Printf(
+		"request (%s): len=%d type=%s flags=%s streamID=%d\n",
+		p.client.Remote().String(), frame.Length, frame.Type, frame.Flags, frame.StreamID,
+	)
+
+	switch frame.Type {
+	case frames.Data:
+	case frames.Headers:
+	case frames.Priority:
+	case frames.RstStream:
+	case frames.Settings:
+		if frame.Length%6 != 0 {
+			return frame, fmt.Errorf("settings payload isn't a multiple of 6")
+		}
+
+		for i := uint32(0); i < frame.Length; i += 6 {
+			pair, err := p.readN(6)
+			if err != nil {
+				return frame, err
 			}
 
-			data = data[n:]
-			p.offset = 0
-			goto frameHeaders
+			key := settings.Setting(binary.BigEndian.Uint16(pair[0:2]))
+			value := binary.BigEndian.Uint32(pair[2:6])
+			fmt.Printf("setting %s=%d\n", key, value)
 		}
-
-		return protocol.Pending, nil, nil
-	}
-
-frameHeaders:
-	{
-		// frame headers are exactly 9 octets
-		const frameHeaders = 9
-		n := copy(p.buff[p.offset:frameHeaders], data)
-		p.offset += uint8(n)
-		if p.offset == frameHeaders {
-			headers := p.buff
-			p.length = uint32(headers[2]) | uint32(headers[1])<<8 | uint32(headers[0])<<16
-			p.frameType = frames.Frame(headers[3])
-			p.flags = flags.Flag(headers[4])
-			// FIXME: upper-bit must be explicitly set to 0 in order to avoid confusions
-			p.streamId = binary.BigEndian.Uint32(headers[5:9])
-			data = data[n:]
-			p.offset = 0
-
-			fmt.Printf(
-				"frame: len=%d type=%s flags=%s streamID=%d\n",
-				p.length, p.frameType.String(), p.flags.String(), p.streamId,
-			)
-
-			goto dispatchFrame
-		}
-
-		p.state = eFrameHeaders
-		return protocol.Pending, nil, nil
-	}
-
-dispatchFrame:
-	switch p.frameType {
-	case frames.Settings:
-		if p.length%6 != 0 {
-			return protocol.Error, nil, status.ErrBadRequest
-		}
-
-		goto settings
-	}
-
-settings:
-	// identifier-value pair in settings are exactly 6 octets each.
-	const pair = 6
-
-	for p.length > 0 {
-		n := copy(p.buff[p.offset:pair], data)
-		data = data[n:]
-		p.length -= uint32(n)
-		p.offset += uint8(n)
-		if p.offset < pair {
-			p.state = eSettings
-			return protocol.Pending, nil, nil
-		}
-
-		p.offset = 0
-
-		fmt.Printf(
-			"setting: %x=%d\n",
-			binary.BigEndian.Uint16(p.buff[:2]), binary.BigEndian.Uint32(p.buff[2:pair]),
-		)
+	case frames.PushPromise:
+	case frames.Ping:
+	case frames.GoAway:
+	case frames.WindowUpdate:
+	case frames.Continuation:
+	case frames.Origin:
 	}
 
 	panic("request completed")
+}
+
+func (p *Parser) readN(n uint8) ([]byte, error) {
+	p.offset = 0
+	buff := p.buff[:n]
+	for p.offset < n {
+		data, err := p.client.Read()
+		if err != nil {
+			return nil, err
+		}
+
+		p.offset += uint8(copy(buff[p.offset:], data))
+		p.client.Unread(data[p.offset:])
+	}
+
+	return buff, nil
 }
 
 func (p *Parser) cleanup() {
