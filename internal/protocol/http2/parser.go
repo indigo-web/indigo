@@ -7,6 +7,7 @@ import (
 	"github.com/indigo-web/indigo/internal/protocol"
 	"github.com/indigo-web/indigo/internal/protocol/http2/internal/flags"
 	"github.com/indigo-web/indigo/internal/protocol/http2/internal/frames"
+	"github.com/indigo-web/indigo/internal/protocol/http2/internal/settings"
 	"github.com/indigo-web/utils/uf"
 )
 
@@ -31,6 +32,7 @@ type Parser struct {
 	buff      [24]byte
 	length    uint32
 	streamId  uint32
+	settings  settings.Settings
 }
 
 func NewParser() *Parser {
@@ -121,14 +123,20 @@ settings:
 		}
 
 		p.offset = 0
+		key := binary.BigEndian.Uint16(p.buff[:2])
+		value := binary.BigEndian.Uint32(p.buff[2:pair])
+
+		if int(key) < len(p.settings) {
+			p.settings[key] = value
+		}
 
 		fmt.Printf(
-			"setting: %x=%d\n",
-			binary.BigEndian.Uint16(p.buff[:2]), binary.BigEndian.Uint32(p.buff[2:pair]),
+			"setting: %s=%d\n",
+			settings.Setting(key), value,
 		)
 	}
 
-	panic("request completed")
+	return protocol.HeadersCompleted, nil, nil
 }
 
 func (p *Parser) cleanup() {
