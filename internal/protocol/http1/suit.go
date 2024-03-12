@@ -8,14 +8,11 @@ import (
 	"github.com/indigo-web/indigo/http/proto"
 	"github.com/indigo-web/indigo/http/status"
 	"github.com/indigo-web/indigo/internal/construct"
-	"github.com/indigo-web/indigo/internal/protocol"
 	"github.com/indigo-web/indigo/internal/tcp"
 	"github.com/indigo-web/indigo/router"
 	"github.com/indigo-web/utils/buffer"
 	"github.com/indigo-web/utils/uf"
 )
-
-var _ protocol.Suit = new(Suit)
 
 type Suit struct {
 	*Parser
@@ -83,8 +80,8 @@ func (s *Suit) serve(once bool) (ok bool) {
 
 		state, extra, err := s.Parse(data)
 		switch state {
-		case protocol.Pending:
-		case protocol.HeadersCompleted:
+		case Pending:
+		case HeadersCompleted:
 			version := req.Proto
 
 			if req.Upgrade != proto.Unknown && proto.HTTP1&req.Upgrade == req.Upgrade {
@@ -118,7 +115,7 @@ func (s *Suit) serve(once bool) (ok bool) {
 				s.onError(req, status.ErrCloseConnection)
 				return false
 			}
-		case protocol.Error:
+		case Error:
 			// as fatal error already happened and connection will anyway be closed, we don't
 			// care about any socket errors anymore
 			_ = s.Write(req.Proto, s.onError(req, err))

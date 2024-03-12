@@ -8,12 +8,19 @@ import (
 	"github.com/indigo-web/indigo/http/method"
 	"github.com/indigo-web/indigo/http/proto"
 	"github.com/indigo-web/indigo/http/status"
-	"github.com/indigo-web/indigo/internal/protocol"
 	"github.com/indigo-web/indigo/internal/uridecode"
 	"github.com/indigo-web/utils/buffer"
 	"github.com/indigo-web/utils/strcomp"
 	"github.com/indigo-web/utils/uf"
 	"strings"
+)
+
+type requestState uint8
+
+const (
+	Pending requestState = iota + 1
+	HeadersCompleted
+	Error
 )
 
 type parserState uint8
@@ -32,7 +39,7 @@ const (
 // request object by pointer in performance purposes. Decodes query-encoded
 // values by its own, you can see that by presented states ePathDecode1Char,
 // ePathDecode2Char, etc. When headers are parsed, parser returns state
-// protocol.HeadersCompleted to notify http server about this, attaching all
+// HeadersCompleted to notify http server about this, attaching all
 // the pending data as an extra. Body must be processed separately
 type Parser struct {
 	request         *http.Request
@@ -64,7 +71,7 @@ func NewParser(
 	}
 }
 
-func (p *Parser) Parse(data []byte) (state protocol.RequestState, extra []byte, err error) {
+func (p *Parser) Parse(data []byte) (state requestState, extra []byte, err error) {
 	_ = *p.request
 	request := p.request
 	headerKeyBuff := p.headerKeyBuff
@@ -94,10 +101,10 @@ method:
 		sp := bytes.IndexByte(data, ' ')
 		if sp == -1 {
 			if !p.startLineBuff.Append(data) {
-				return protocol.Error, nil, status.ErrTooLongRequestLine
+				return Error, nil, status.ErrTooLongRequestLine
 			}
 
-			return protocol.Pending, nil, nil
+			return Pending, nil, nil
 		}
 
 		var methodValue []byte
@@ -105,19 +112,19 @@ method:
 			methodValue = data[:sp]
 		} else {
 			if !p.startLineBuff.Append(data[:sp]) {
-				return protocol.Error, nil, status.ErrTooLongRequestLine
+				return Error, nil, status.ErrTooLongRequestLine
 			}
 
 			methodValue = p.startLineBuff.Finish()
 		}
 
 		if len(methodValue) == 0 {
-			return protocol.Error, nil, status.ErrBadRequest
+			return Error, nil, status.ErrBadRequest
 		}
 
 		request.Method = method.Parse(uf.B2S(methodValue))
 		if request.Method == method.Unknown {
-			return protocol.Error, nil, status.ErrMethodNotImplemented
+			return Error, nil, status.ErrMethodNotImplemented
 		}
 
 		data = data[sp+1:]
@@ -129,21 +136,21 @@ path:
 		lf := bytes.IndexByte(data, '\n')
 		if lf == -1 {
 			if !p.startLineBuff.Append(data) {
-				return protocol.Error, nil, status.ErrURITooLong
+				return Error, nil, status.ErrURITooLong
 			}
 
 			p.state = ePath
-			return protocol.Pending, nil, nil
+			return Pending, nil, nil
 		}
 
 		if !p.startLineBuff.Append(data[:lf]) {
-			return protocol.Error, nil, status.ErrURITooLong
+			return Error, nil, status.ErrURITooLong
 		}
 
 		pathAndProto := p.startLineBuff.Finish()
 		sp := bytes.LastIndexByte(pathAndProto, ' ')
 		if sp == -1 {
-			return protocol.Error, nil, status.ErrBadRequest
+			return Error, nil, status.ErrBadRequest
 		}
 
 		reqPath, reqProto := pathAndProto[:sp], pathAndProto[sp+1:]
@@ -158,18 +165,18 @@ path:
 		}
 
 		if len(reqPath) == 0 {
-			return protocol.Error, nil, status.ErrBadRequest
+			return Error, nil, status.ErrBadRequest
 		}
 
 		reqPath, err = uridecode.Decode(reqPath, reqPath[:0])
 		if err != nil {
-			return protocol.Error, nil, err
+			return Error, nil, err
 		}
 
 		request.Path = uf.B2S(reqPath)
 		request.Proto = proto.FromBytes(reqProto)
 		if request.Proto == proto.Unknown {
-			return protocol.Error, nil, status.ErrUnsupportedProtocol
+			return Error, nil, status.ErrUnsupportedProtocol
 		}
 
 		data = data[lf+1:]
@@ -180,14 +187,14 @@ headerKey:
 	{
 		if len(data) == 0 {
 			p.state = eHeaderKey
-			return protocol.Pending, nil, err
+			return Pending, nil, err
 		}
 
 		switch data[0] {
 		case '\n':
 			p.cleanup()
 
-			return protocol.HeadersCompleted, data[1:], nil
+			return HeadersCompleted, data[1:], nil
 		case '\r':
 			data = data[1:]
 			goto headerValueCRLFCR
@@ -196,15 +203,15 @@ headerKey:
 		colon := bytes.IndexByte(data, ':')
 		if colon == -1 {
 			if !headerKeyBuff.Append(data) {
-				return protocol.Error, nil, status.ErrHeaderFieldsTooLarge
+				return Error, nil, status.ErrHeaderFieldsTooLarge
 			}
 
 			p.state = eHeaderKey
-			return protocol.Pending, nil, nil
+			return Pending, nil, nil
 		}
 
 		if !headerKeyBuff.Append(data[:colon]) {
-			return protocol.Error, nil, status.ErrHeaderFieldsTooLarge
+			return Error, nil, status.ErrHeaderFieldsTooLarge
 		}
 
 		key := uf.B2S(headerKeyBuff.Finish())
@@ -212,7 +219,7 @@ headerKey:
 		data = data[colon+1:]
 
 		if p.headersNumber++; p.headersNumber > p.headersCfg.Number.Maximal {
-			return protocol.Error, nil, status.ErrTooManyHeaders
+			return Error, nil, status.ErrTooManyHeaders
 		}
 
 		if len(key) == len("content-length") &&
@@ -242,7 +249,7 @@ contentLength:
 	}
 
 	p.state = eContentLength
-	return protocol.Pending, nil, nil
+	return Pending, nil, nil
 
 contentLengthEnd:
 	// guaranteed, that data at this point contains AT LEAST 1 byte.
@@ -259,17 +266,17 @@ contentLengthEnd:
 		data = data[1:]
 		goto headerKey
 	default:
-		return protocol.Error, nil, status.ErrBadRequest
+		return Error, nil, status.ErrBadRequest
 	}
 
 contentLengthCR:
 	if len(data) == 0 {
 		p.state = eContentLengthCR
-		return protocol.Pending, nil, nil
+		return Pending, nil, nil
 	}
 
 	if data[0] != '\n' {
-		return protocol.Error, nil, status.ErrBadRequest
+		return Error, nil, status.ErrBadRequest
 	}
 
 	data = data[1:]
@@ -280,23 +287,23 @@ headerValue:
 		lf := bytes.IndexByte(data, '\n')
 		if lf == -1 {
 			if !headerValueBuff.Append(data) {
-				return protocol.Error, nil, status.ErrHeaderFieldsTooLarge
+				return Error, nil, status.ErrHeaderFieldsTooLarge
 			}
 
 			if headerValueBuff.SegmentLength() > p.headersCfg.MaxValueLength {
-				return protocol.Error, nil, status.ErrHeaderFieldsTooLarge
+				return Error, nil, status.ErrHeaderFieldsTooLarge
 			}
 
 			p.state = eHeaderValue
-			return protocol.Pending, nil, nil
+			return Pending, nil, nil
 		}
 
 		if !headerValueBuff.Append(data[:lf]) {
-			return protocol.Error, nil, status.ErrHeaderFieldsTooLarge
+			return Error, nil, status.ErrHeaderFieldsTooLarge
 		}
 
 		if headerValueBuff.SegmentLength() > p.headersCfg.MaxValueLength {
-			return protocol.Error, nil, status.ErrHeaderFieldsTooLarge
+			return Error, nil, status.ErrHeaderFieldsTooLarge
 		}
 
 		data = data[lf+1:]
@@ -354,16 +361,16 @@ headerValue:
 headerValueCRLFCR:
 	if len(data) == 0 {
 		p.state = eHeaderValueCRLFCR
-		return protocol.Pending, nil, nil
+		return Pending, nil, nil
 	}
 
 	if data[0] == '\n' {
 		p.cleanup()
 
-		return protocol.HeadersCompleted, data[1:], nil
+		return HeadersCompleted, data[1:], nil
 	}
 
-	return protocol.Error, nil, status.ErrBadRequest
+	return Error, nil, status.ErrBadRequest
 }
 
 func (p *Parser) cleanup() {

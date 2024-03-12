@@ -7,7 +7,6 @@ import (
 	"github.com/indigo-web/indigo/http/proto"
 	"github.com/indigo-web/indigo/http/status"
 	"github.com/indigo-web/indigo/internal/httpchars"
-	"github.com/indigo-web/indigo/internal/protocol"
 	"github.com/indigo-web/indigo/internal/response"
 	"github.com/indigo-web/utils/strcomp"
 	"github.com/indigo-web/utils/uf"
@@ -28,9 +27,13 @@ const minimalFileBuffSize = 16
 
 var chunkedFinalizer = []byte("0\r\n\r\n")
 
+type Writer interface {
+	Write([]byte) error
+}
+
 type Serializer struct {
 	request *http.Request
-	writer  protocol.Writer
+	writer  Writer
 	buff    []byte
 	// fileBuff isn't allocated until needed in order to save memory in cases,
 	// where no files are being sent
@@ -44,7 +47,7 @@ func NewSerializer(
 	fileBuffSize int,
 	defHdrs map[string]string,
 	request *http.Request,
-	writer protocol.Writer,
+	writer Writer,
 ) *Serializer {
 	if fileBuffSize < minimalFileBuffSize {
 		log.Printf("misconfiguration: file buffer size (Config.HTTP.FileBuffSize) is %d, "+
@@ -148,7 +151,7 @@ func (d *Serializer) renderHeaders(fields response.Fields) {
 // sendAttachment simply encapsulates all the logic related to rendering arbitrary
 // io.Reader implementations
 func (d *Serializer) sendAttachment(
-	request *http.Request, response *http.Response, writer protocol.Writer,
+	request *http.Request, response *http.Response, writer Writer,
 ) (err error) {
 	fields := response.Reveal()
 	size := fields.Attachment.Size()
@@ -191,7 +194,7 @@ func (d *Serializer) sendAttachment(
 	return err
 }
 
-func (d *Serializer) writePlainBody(r io.Reader, writer protocol.Writer) error {
+func (d *Serializer) writePlainBody(r io.Reader, writer Writer) error {
 	// TODO: implement checking whether r implements io.ReaderAt interfacd. In case it does
 	//       body may be transferred more efficiently. This requires implementing io.Writer
 	//       *http.ResponseWriter
@@ -212,7 +215,7 @@ func (d *Serializer) writePlainBody(r io.Reader, writer protocol.Writer) error {
 	}
 }
 
-func (d *Serializer) writeChunkedBody(r io.Reader, writer protocol.Writer) error {
+func (d *Serializer) writeChunkedBody(r io.Reader, writer Writer) error {
 	const (
 		hexValueOffset = 8
 		crlfSize       = 1 /* CR */ + 1 /* LF */

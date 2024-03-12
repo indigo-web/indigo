@@ -12,7 +12,6 @@ import (
 	"github.com/indigo-web/indigo/http/query"
 	"github.com/indigo-web/indigo/http/status"
 	"github.com/indigo-web/indigo/internal/construct"
-	"github.com/indigo-web/indigo/internal/protocol"
 	"github.com/indigo-web/indigo/internal/tcp/dummy"
 	"github.com/stretchr/testify/require"
 	"io"
@@ -22,7 +21,7 @@ import (
 	"testing"
 )
 
-func newSerializer(defaultHeaders map[string]string, request *http.Request, writer protocol.Writer) *Serializer {
+func newSerializer(defaultHeaders map[string]string, request *http.Request, writer Writer) *Serializer {
 	return NewSerializer(make([]byte, 0, 1024), 128, defaultHeaders, request, writer)
 }
 
