@@ -31,5 +31,5 @@ func (f Flag) String() string {
 		flags = append(flags, "PRIORITY")
 	}
 
-	return strings.Join(flags, "|")
+	return strings.Join(flags, ",")
 }
