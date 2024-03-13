@@ -1,10 +1,46 @@
 package huffman
 
+import "unsafe"
+
 type Symbol struct {
 	Code uint32
 	Bits uint8
 }
 
+func Compress(str string, out []byte) []byte {
+	var batch uint64
+	const batchSize = uint8(unsafe.Sizeof(batch) * 8)
+	offset := batchSize
+
+	for i := 0; i < len(str); i++ {
+		char := Table[str[i]]
+
+		if char.Bits < offset {
+			batch |= uint64(char.Code) << (offset - char.Bits)
+			offset -= char.Bits
+			continue
+		}
+
+		leftover := char.Bits - offset
+		out = appendBatch(out, batch|uint64(char.Code>>leftover))
+		batch = uint64(char.Code) << (batchSize - char.Bits + offset)
+		offset = batchSize - leftover
+	}
+
+	out = appendBatch(out, batch|(0xffffffffffffffff>>(batchSize-offset)))
+
+	return out[:len(out)-int(offset/8)]
+}
+
+func appendBatch(to []byte, batch uint64) []byte {
+	return append(to,
+		byte(batch>>56), byte(batch>>48), byte(batch>>40), byte(batch>>32),
+		byte(batch>>24), byte(batch>>16), byte(batch>>8), byte(batch),
+	)
+}
+
+// Table is the official Huffman table. Index of each element represents its ASCII
+// code
 var Table = [0xff + 1]Symbol{
 	{0b1111111111000, 13},
 	{0b11111111111111111011000, 23},
