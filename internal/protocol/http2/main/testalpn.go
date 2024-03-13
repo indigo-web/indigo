@@ -8,6 +8,8 @@ import (
 	"crypto/x509/pkix"
 	"encoding/pem"
 	"fmt"
+	"github.com/indigo-web/indigo/config"
+	"github.com/indigo-web/indigo/internal/construct"
 	"github.com/indigo-web/indigo/internal/protocol/http2"
 	"math/big"
 	"os"
@@ -103,22 +105,22 @@ func runTLSServer() error {
 
 func handleTLSConn(conn *tls.Conn) {
 	defer conn.Close()
-	fmt.Printf("%s: proto=\"%s\"\n", conn.RemoteAddr().String(), conn.ConnectionState().NegotiatedProtocol)
+	client := construct.Client(config.Default().TCP, conn)
+	fmt.Printf(
+		"%s: proto=%s\n",
+		client.Remote().String(), strconv.Quote(conn.ConnectionState().NegotiatedProtocol),
+	)
 
-	buff := make([]byte, 2048)
-	parser := http2.NewParser()
+	parser := http2.NewParser(client)
+	if err := parser.SkipPreface(); err != nil {
+		fmt.Println(conn.RemoteAddr().String(), "error (skip preface):", err)
+		return
+	}
 
 	for {
-		n, err := conn.Read(buff)
+		_, err := parser.Parse()
 		if err != nil {
-			fmt.Println(conn.RemoteAddr(), "error:", err)
-			return
-		}
-
-		fmt.Println(conn.RemoteAddr(), "data:", strconv.Quote(string(buff[:n])))
-		state, extra, err := parser.Parse(buff[:n])
-		fmt.Println(conn.RemoteAddr(), "parser:", state, extra, err)
-		if err != nil {
+			fmt.Println(conn.RemoteAddr().String(), "error:", err)
 			return
 		}
 	}

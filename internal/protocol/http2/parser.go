@@ -56,12 +56,13 @@ func (p *Parser) Parse() (frame frames.Frame, err error) {
 	}
 
 	fmt.Printf(
-		"request (%s): len=%d type=%s flags=%s streamID=%d\n",
+		"frame (%s): len=%d type=%s flags=%s streamID=%d\n",
 		p.client.Remote().String(), frame.Length, frame.Type, frame.Flags, frame.StreamID,
 	)
 
 	switch frame.Type {
 	case frames.Data:
+		panic("no way the data frame to be here")
 	case frames.Headers:
 	case frames.Priority:
 	case frames.RstStream:
@@ -80,15 +81,24 @@ func (p *Parser) Parse() (frame frames.Frame, err error) {
 			value := binary.BigEndian.Uint32(pair[2:6])
 			fmt.Printf("setting %s=%d\n", key, value)
 		}
+
+		return frame, nil
 	case frames.PushPromise:
 	case frames.Ping:
 	case frames.GoAway:
 	case frames.WindowUpdate:
+		increment, err := p.readN(4)
+		if err != nil {
+			return frame, err
+		}
+
+		inc := binary.BigEndian.Uint32(increment)
+		fmt.Printf("WINDOW_UPDATE: increment=%d\n", inc)
 	case frames.Continuation:
 	case frames.Origin:
 	}
 
-	panic("request completed")
+	return frame, nil
 }
 
 func (p *Parser) readN(n uint8) ([]byte, error) {
@@ -105,6 +115,15 @@ func (p *Parser) readN(n uint8) ([]byte, error) {
 	}
 
 	return buff, nil
+}
+
+func (p *Parser) readByte() (byte, error) {
+	b, err := p.readN(1)
+	if len(b) > 0 {
+		return b[0], err
+	}
+
+	return 0, err
 }
 
 func (p *Parser) cleanup() {
