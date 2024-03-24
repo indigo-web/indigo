@@ -1,5 +1,4 @@
-<img src="https://gist.github.com/assets/97134096/796a80b7-1564-43d9-9d07-2fcd30ac730f.png" alt="This is just a logo" title="What are you looking for?"/>
-![logo](https://gist.github.com/assets/97134096/796a80b7-1564-43d9-9d07-2fcd30ac730f.png)
+<script src="https://gist.github.com/flrdv/08395567a602992be0c72f445589cb90.js"></script>
 
 
 Indigo is a web-framework, designed to be readable, handy, yet performant (blazingly fast I would even say)
