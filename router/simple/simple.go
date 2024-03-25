@@ -5,7 +5,7 @@ import (
 	"github.com/indigo-web/indigo/router"
 )
 
-var _ router.Router = new(Router)
+var _ router.Fabric = new(Router)
 
 type Handler func(*http.Request) *http.Response
 
@@ -20,8 +20,8 @@ func New(handler, errHandler Handler) *Router {
 	}
 }
 
-func (r Router) OnStart() error {
-	return nil
+func (r Router) Initialize() router.Router {
+	return r
 }
 
 func (r Router) OnRequest(request *http.Request) *http.Response {

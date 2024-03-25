@@ -1,5 +1,7 @@
 package inbuilt
 
+import "fmt"
+
 /*
 This file is responsible for endpoint groups
 */
@@ -10,19 +12,20 @@ This file is responsible for endpoint groups
 // be called in the first order. Registering new error handlers will result in affecting error
 // handlers among ALL the existing groups, including head router
 func (r *Router) Group(prefix string) *Router {
-	router := &Router{
+	subrouter := &Router{
 		prefix:      r.prefix + prefix,
 		registrar:   newRegistrar(),
 		errHandlers: r.errHandlers,
 	}
 
-	r.children = append(r.children, router)
+	r.children = append(r.children, subrouter)
 
-	return router
+	return subrouter
 }
 
 func (r *Router) prepare() error {
 	for _, child := range r.children {
+		fmt.Println("preparing group")
 		if err := child.prepare(); err != nil {
 			return err
 		}

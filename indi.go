@@ -126,16 +126,12 @@ func (a *App) AutoHTTPS(addr string, domains ...string) *App {
 
 // Serve starts the web-application. If nil is passed instead of a router, empty inbuilt will
 // be used.
-func (a *App) Serve(r router.Router) error {
+func (a *App) Serve(r router.Fabric) error {
 	if r == nil {
 		r = inbuilt.New()
 	}
 
-	if err := r.OnStart(); err != nil {
-		return err
-	}
-
-	servers, err := a.getServers(r)
+	servers, err := a.makeServers(r.Initialize())
 	if err != nil {
 		return err
 	}
@@ -143,7 +139,7 @@ func (a *App) Serve(r router.Router) error {
 	return a.run(servers)
 }
 
-func (a *App) getServers(r router.Router) ([]*tcp.Server, error) {
+func (a *App) makeServers(r router.Router) ([]*tcp.Server, error) {
 	servers := make([]*tcp.Server, len(a.listeners))
 
 	for i, listener := range a.listeners {

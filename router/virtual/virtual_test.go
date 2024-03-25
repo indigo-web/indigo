@@ -26,25 +26,24 @@ func TestVirtualRouter(t *testing.T) {
 	const OK = status.NotFound
 
 	t.Run("no hosts", func(t *testing.T) {
-		r := New()
-		require.NoError(t, r.OnStart())
+		r := New().Initialize()
 		require.True(t, requestIs(r.OnRequest(newRequest("localhost")), status.MisdirectedRequest))
 	})
 
 	t.Run("default router", func(t *testing.T) {
 		{
 			r := New().
-				Default(inbuilt.New())
+				Default(inbuilt.New()).
+				Initialize()
 
-			require.NoError(t, r.OnStart())
 			require.True(t, requestIs(r.OnRequest(newRequest("localhost")), OK))
 			require.True(t, requestIs(r.OnRequest(newRequest("127.0.0.1")), OK))
 		}
 		{
 			r := New().
-				Host("0.0.0.0", inbuilt.New())
+				Host("0.0.0.0", inbuilt.New()).
+				Initialize()
 
-			require.NoError(t, r.OnStart())
 			require.True(t, requestIs(r.OnRequest(newRequest("localhost")), OK))
 			require.True(t, requestIs(r.OnRequest(newRequest("127.0.0.1")), OK))
 		}
@@ -52,9 +51,9 @@ func TestVirtualRouter(t *testing.T) {
 
 	t.Run("single host", func(t *testing.T) {
 		r := New().
-			Host("pavlo.gay", inbuilt.New())
+			Host("pavlo.gay", inbuilt.New()).
+			Initialize()
 
-		require.NoError(t, r.OnStart())
 		require.True(t, requestIs(r.OnRequest(newRequest("pavlo.gay")), OK))
 		require.True(t, requestIs(r.OnRequest(newRequest("localhost")), status.MisdirectedRequest))
 		require.True(t, requestIs(r.OnRequest(newRequest("pavlo.gay", "localhost")), status.BadRequest))

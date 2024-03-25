@@ -64,12 +64,12 @@ func getRequest(m method.Method, path string) *http.Request {
 
 func TestMiddlewares(t *testing.T) {
 	stack := new(callstack)
-	r := New().
+	raw := New().
 		Use(getMiddleware(m1, stack)).
 		Get("/", http.Respond, getMiddleware(m2, stack)).
 		Catch("/he", http.Respond, getMiddleware(m2, stack))
 
-	api := r.Group("/api").
+	api := raw.Group("/api").
 		Use(getMiddleware(m3, stack))
 
 	api.Group("/v1").
@@ -81,7 +81,7 @@ func TestMiddlewares(t *testing.T) {
 		Use(getMiddleware(m5, stack)).
 		Get("/world", http.Respond, getMiddleware(m7, stack))
 
-	require.NoError(t, r.OnStart())
+	r := raw.Initialize()
 
 	t.Run("/", func(t *testing.T) {
 		request := getRequest(method.GET, "/")

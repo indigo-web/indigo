@@ -8,16 +8,16 @@ import (
 	"github.com/indigo-web/utils/strcomp"
 )
 
-type virtualRouter struct {
+type virtualFabric struct {
 	Domain string
-	Router router.Router
+	Router router.Fabric
 }
 
-var _ router.Router = new(Router)
+var _ router.Fabric = new(Router)
 
 type Router struct {
-	routers       []virtualRouter
-	defaultRouter router.Router
+	routers       []virtualFabric
+	defaultRouter router.Fabric
 }
 
 // New returns a new instance of the virtual Router
@@ -27,13 +27,13 @@ func New() *Router {
 
 // Host adds a new virtual router. If 0.0.0.0 is passed,
 // the router will be set as a default one
-func (r *Router) Host(host string, other router.Router) *Router {
+func (r *Router) Host(host string, other router.Fabric) *Router {
 	host = domain.Normalize(host)
 	if domain.TrimPort(host) == "0.0.0.0" {
 		return r.Default(other)
 	}
 
-	r.routers = append(r.routers, virtualRouter{
+	r.routers = append(r.routers, virtualFabric{
 		Domain: host,
 		Router: other,
 	})
@@ -44,26 +44,44 @@ func (r *Router) Host(host string, other router.Router) *Router {
 // matched.
 // Note: only requests with 0 or 1 Host header values may be passed into the default router.
 // If there are more than 1 value, the request will be refused
-func (r *Router) Default(def router.Router) *Router {
+func (r *Router) Default(def router.Fabric) *Router {
 	r.defaultRouter = def
 	return r
 }
 
-func (r *Router) OnStart() error {
-	for _, host := range r.routers {
-		if err := host.Router.OnStart(); err != nil {
-			return err
+func (r *Router) Initialize() router.Router {
+	routers := make([]virtualRouter, len(r.routers))
+	for i, fabric := range r.routers {
+		routers[i] = virtualRouter{
+			Domain: fabric.Domain,
+			Router: fabric.Router.Initialize(),
 		}
 	}
 
+	var defaultRouter router.Router
 	if r.defaultRouter != nil {
-		return r.defaultRouter.OnStart()
+		defaultRouter = r.defaultRouter.Initialize()
 	}
 
-	return nil
+	return &runtimeRouter{
+		routers:       routers,
+		defaultRouter: defaultRouter,
+	}
 }
 
-func (r *Router) OnRequest(request *http.Request) *http.Response {
+type virtualRouter struct {
+	Domain string
+	Router router.Router
+}
+
+var _ router.Router = new(runtimeRouter)
+
+type runtimeRouter struct {
+	routers       []virtualRouter
+	defaultRouter router.Router
+}
+
+func (r *runtimeRouter) OnRequest(request *http.Request) *http.Response {
 	virtRouter, resp := r.getRouter(request)
 	if virtRouter == nil {
 		return resp
@@ -72,7 +90,7 @@ func (r *Router) OnRequest(request *http.Request) *http.Response {
 	return virtRouter.OnRequest(request)
 }
 
-func (r *Router) OnError(request *http.Request, err error) *http.Response {
+func (r *runtimeRouter) OnError(request *http.Request, err error) *http.Response {
 	virtRouter, resp := r.getRouter(request)
 	if virtRouter == nil {
 		return resp
@@ -86,7 +104,7 @@ func (r *Router) OnError(request *http.Request, err error) *http.Response {
 // If the request is misdirected, default router is returned. Note: it's being returned with
 // the error response all together. So be careful to always check the nilness of the returned
 // router first
-func (r *Router) getRouter(request *http.Request) (router.Router, *http.Response) {
+func (r *runtimeRouter) getRouter(request *http.Request) (router.Router, *http.Response) {
 	hosts := request.Headers.Values("host")
 	switch len(hosts) {
 	case 0:
