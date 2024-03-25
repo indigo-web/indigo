@@ -25,7 +25,7 @@ var (
 )
 
 func TestNode_Match_Positive(t *testing.T) {
-	tree := NewTree()
+	tree := New()
 	payload := Payload{
 		MethodsMap: types.MethodsMap{},
 	}
@@ -73,7 +73,7 @@ func TestNode_Match_Positive(t *testing.T) {
 }
 
 func TestNode_Match_Negative(t *testing.T) {
-	tree := NewTree()
+	tree := New()
 	payload := Payload{
 		MethodsMap: types.MethodsMap{},
 	}

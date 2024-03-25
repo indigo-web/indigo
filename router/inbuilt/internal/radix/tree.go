@@ -18,13 +18,7 @@ type Payload struct {
 	Allow      string
 }
 
-type Tree interface {
-	Insert(Template, Payload) error
-	MustInsert(Template, Payload)
-	Match(string, Params) *Payload
-}
-
-var _ Tree = new(Node)
+type Tree = *Node
 
 type Node struct {
 	statics     arrMap
@@ -34,7 +28,7 @@ type Node struct {
 	isDynamic   bool
 }
 
-func NewTree() *Node {
+func New() *Node {
 	return newNode(new(Payload), false, "")
 }
 
