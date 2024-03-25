@@ -20,6 +20,10 @@ const (
 	Count = iota - 1
 )
 
+// List contains all the supported HTTP methods. They are sorted by their integer value, however
+// Unknown method is not included. So in order to index the List, you must subtract 1 first.
+var List = []Method{GET, HEAD, POST, PUT, DELETE, CONNECT, OPTIONS, TRACE, PATCH}
+
 func Parse(str string) Method {
 	switch len(str) {
 	case 3:
