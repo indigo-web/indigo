@@ -1,7 +1,5 @@
 package inbuilt
 
-import "fmt"
-
 /*
 This file is responsible for endpoint groups
 */
@@ -25,7 +23,6 @@ func (r *Router) Group(prefix string) *Router {
 
 func (r *Router) prepare() error {
 	for _, child := range r.children {
-		fmt.Println("preparing group")
 		if err := child.prepare(); err != nil {
 			return err
 		}
