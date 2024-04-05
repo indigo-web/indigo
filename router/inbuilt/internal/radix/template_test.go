@@ -13,10 +13,10 @@ func TestParse(t *testing.T) {
 		require.NoError(t, err)
 		require.Equal(t, 2, len(template.segments), "2 segments are expected")
 
-		require.False(t, template.segments[0].IsDynamic)
+		require.False(t, template.segments[0].IsWildcard)
 		require.Equal(t, "hello", template.segments[0].Payload)
 
-		require.False(t, template.segments[1].IsDynamic)
+		require.False(t, template.segments[1].IsWildcard)
 		require.Equal(t, "world", template.segments[1].Payload)
 	})
 
@@ -26,10 +26,10 @@ func TestParse(t *testing.T) {
 		require.NoError(t, err)
 		require.Equal(t, 2, len(template.segments), "2 segments are expected")
 
-		require.False(t, template.segments[0].IsDynamic)
+		require.False(t, template.segments[0].IsWildcard)
 		require.Equal(t, "hello", template.segments[0].Payload)
 
-		require.True(t, template.segments[1].IsDynamic)
+		require.True(t, template.segments[1].IsWildcard)
 		require.Equal(t, "world", template.segments[1].Payload)
 	})
 
@@ -39,13 +39,13 @@ func TestParse(t *testing.T) {
 		require.NoError(t, err)
 		require.Equal(t, 3, len(template.segments), "3 segments are expected")
 
-		require.False(t, template.segments[0].IsDynamic)
+		require.False(t, template.segments[0].IsWildcard)
 		require.Equal(t, "hello", template.segments[0].Payload)
 
-		require.True(t, template.segments[1].IsDynamic)
+		require.True(t, template.segments[1].IsWildcard)
 		require.Equal(t, "world", template.segments[1].Payload)
 
-		require.False(t, template.segments[2].IsDynamic)
+		require.False(t, template.segments[2].IsWildcard)
 		require.Equal(t, "greet", template.segments[2].Payload)
 	})
 
@@ -55,16 +55,16 @@ func TestParse(t *testing.T) {
 		require.NoError(t, err)
 		require.Equal(t, 4, len(template.segments), "4 segments are expected")
 
-		require.False(t, template.segments[0].IsDynamic)
+		require.False(t, template.segments[0].IsWildcard)
 		require.Equal(t, "hello", template.segments[0].Payload)
 
-		require.True(t, template.segments[1].IsDynamic)
+		require.True(t, template.segments[1].IsWildcard)
 		require.Equal(t, "world", template.segments[1].Payload)
 
-		require.False(t, template.segments[2].IsDynamic)
+		require.False(t, template.segments[2].IsWildcard)
 		require.Equal(t, "greet", template.segments[2].Payload)
 
-		require.True(t, template.segments[3].IsDynamic)
+		require.True(t, template.segments[3].IsWildcard)
 		require.Equal(t, "name", template.segments[3].Payload)
 	})
 }

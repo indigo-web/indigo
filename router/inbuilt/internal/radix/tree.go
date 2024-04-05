@@ -21,11 +21,11 @@ type Payload struct {
 type Tree = *Node
 
 type Node struct {
-	statics     arrMap
-	next        *Node
-	payload     *Payload
-	dynamicName string
-	isDynamic   bool
+	statics    arrMap
+	next       *Node
+	payload    *Payload
+	wildcard   string
+	isWildcard bool
 }
 
 func New() *Node {
@@ -34,9 +34,9 @@ func New() *Node {
 
 func newNode(payload *Payload, isDyn bool, dynName string) *Node {
 	return &Node{
-		isDynamic:   isDyn,
-		dynamicName: dynName,
-		payload:     payload,
+		isWildcard: isDyn,
+		wildcard:   dynName,
+		payload:    payload,
 	}
 }
 
@@ -59,13 +59,13 @@ func (n *Node) insertRecursively(segments []Segment, payload *Payload) error {
 
 	segment := segments[0]
 
-	if segment.IsDynamic {
-		if n.isDynamic && segment.Payload != n.dynamicName {
+	if segment.IsWildcard {
+		if n.isWildcard && segment.Payload != n.wildcard {
 			return ErrNotImplemented
 		}
 
-		n.isDynamic = true
-		n.dynamicName = segment.Payload
+		n.isWildcard = true
+		n.wildcard = segment.Payload
 
 		if n.next == nil {
 			n.next = newNode(nil, false, "")
@@ -125,12 +125,12 @@ func processSegment(params Params, segment string, node *Node) (*Node, bool) {
 		return n, true
 	}
 
-	if !node.isDynamic || len(segment) == 0 {
+	if !node.isWildcard || len(segment) == 0 {
 		return nil, false
 	}
 
-	if len(node.dynamicName) > 0 {
-		params.Add(node.dynamicName, segment)
+	if len(node.wildcard) > 0 {
+		params.Add(node.wildcard, segment)
 	}
 
 	return node.next, true
