@@ -90,7 +90,7 @@ func (r *Router) Initialize() router.Router {
 // OnRequest processes the request
 func (r *runtimeRouter) OnRequest(request *http.Request) *http.Response {
 	r.runMutators(request)
-	
+
 	// TODO: should path normalization be implemented as a mutator?
 	request.Path = uri.Normalize(request.Path)
 
@@ -126,8 +126,7 @@ func (r *runtimeRouter) onRequest(request *http.Request) *http.Response {
 	return handler(request)
 }
 
-// OnError tries to find a handler for the error, in case it can't - simply
-// request.Respond().WithError(...) will be returned
+// OnError uses a user-defined error handler, otherwise default http.Error
 func (r *runtimeRouter) OnError(request *http.Request, err error) *http.Response {
 	r.runMutators(request)
 
