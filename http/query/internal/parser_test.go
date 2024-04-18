@@ -1,4 +1,4 @@
-package query
+package internal
 
 import (
 	"github.com/indigo-web/indigo/http/status"
