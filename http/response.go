@@ -1,6 +1,7 @@
 package http
 
 import (
+	"github.com/indigo-web/indigo/http/cookie"
 	"github.com/indigo-web/indigo/http/headers"
 	"github.com/indigo-web/indigo/http/mime"
 	"github.com/indigo-web/indigo/http/status"
@@ -161,6 +162,12 @@ func (r *Response) File(path string) *Response {
 // If size <= 0, then Transfer-Encoding: chunked will be used
 func (r *Response) Attachment(reader io.Reader, size int) *Response {
 	r.fields.Attachment = types.NewAttachment(reader, size)
+	return r
+}
+
+// Cookie adds cookies. They'll be later rendered as a set of Set-Cookie headers
+func (r *Response) Cookie(cookies ...cookie.Cookie) *Response {
+	r.fields.Cookies = append(r.fields.Cookies, cookies...)
 	return r
 }
 
