@@ -18,7 +18,7 @@ type Query struct {
 	raw    []byte
 }
 
-func NewQuery(underlying *keyvalue.Storage) *Query {
+func New(underlying *keyvalue.Storage) *Query {
 	return &Query{
 		params: underlying,
 	}
