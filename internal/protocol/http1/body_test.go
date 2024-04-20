@@ -3,6 +3,7 @@ package http1
 import (
 	"github.com/indigo-web/indigo/config"
 	"github.com/indigo-web/indigo/http/status"
+	"github.com/indigo-web/indigo/internal/construct"
 	"github.com/indigo-web/indigo/internal/tcp/dummy"
 	"io"
 	"strconv"
@@ -12,7 +13,6 @@ import (
 	"github.com/indigo-web/chunkedbody"
 	"github.com/indigo-web/indigo/http"
 	"github.com/indigo-web/indigo/http/headers"
-	"github.com/indigo-web/indigo/http/query"
 	"github.com/indigo-web/utils/ft"
 	"github.com/stretchr/testify/require"
 )
@@ -42,9 +42,8 @@ func getRequestWithBody(chunked bool, body ...[]byte) (*http.Request, *Body) {
 		})
 	}
 
-	request := http.NewRequest(
-		hdrs, new(query.Query), http.NewResponse(), dummy.NewNopConn(), reqBody, nil,
-	)
+	request := construct.Request(config.Default(), dummy.NewNopClient(), reqBody)
+	request.Headers = hdrs
 	request.ContentLength = contentLength
 	request.Encoding.Chunked = chunked
 	reqBody.Init(request)
@@ -91,11 +90,7 @@ func TestBodyReader_Plain(t *testing.T) {
 		)
 
 		client := dummy.NewCircularClient([]byte(first + second))
-
-		hdrs := headers.New()
-		request := http.NewRequest(
-			hdrs, new(query.Query), http.NewResponse(), dummy.NewNopConn(), nil, nil,
-		)
+		request := construct.Request(config.Default(), dummy.NewNopClient(), nil)
 		request.ContentLength = buffSize
 		chunkedParser := chunkedbody.NewParser(chunkedbody.DefaultSettings())
 		body := NewBody(client, chunkedParser, config.Default().Body)

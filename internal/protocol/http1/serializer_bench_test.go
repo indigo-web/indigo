@@ -3,9 +3,8 @@ package http1
 import (
 	"github.com/indigo-web/indigo/config"
 	"github.com/indigo-web/indigo/http"
-	"github.com/indigo-web/indigo/http/headers"
-	"github.com/indigo-web/indigo/http/query"
 	"github.com/indigo-web/indigo/http/status"
+	"github.com/indigo-web/indigo/internal/construct"
 	"github.com/indigo-web/indigo/internal/tcp/dummy"
 	"github.com/stretchr/testify/require"
 	"strings"
@@ -38,15 +37,10 @@ func BenchmarkSerializer(b *testing.B) {
 		"Lorem":            "ipsum, doremi",
 	}
 
-	hdrs := headers.New()
 	response := http.NewResponse()
-	body := NewBody(
+	request := construct.Request(config.Default(), dummy.NewNopClient(), NewBody(
 		dummy.NewNopClient(), nil, config.Default().Body,
-	)
-	request := http.NewRequest(
-		hdrs, query.NewQuery(nil), http.NewResponse(), dummy.NewNopConn(),
-		body, nil,
-	)
+	))
 	client := NopClientWriter{}
 
 	b.Run("no body no def headers", func(b *testing.B) {

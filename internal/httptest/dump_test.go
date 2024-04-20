@@ -15,7 +15,7 @@ import (
 )
 
 func TestDump(t *testing.T) {
-	q := query.NewQuery(keyvalue.New())
+	q := query.New(keyvalue.New())
 	q.Set([]byte("hello=world&foo=bar"))
 
 	cfg := config.Default()

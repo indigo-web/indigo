@@ -6,10 +6,8 @@ import (
 	"github.com/indigo-web/chunkedbody"
 	"github.com/indigo-web/indigo/config"
 	"github.com/indigo-web/indigo/http"
-	"github.com/indigo-web/indigo/http/headers"
 	"github.com/indigo-web/indigo/http/method"
 	"github.com/indigo-web/indigo/http/proto"
-	"github.com/indigo-web/indigo/http/query"
 	"github.com/indigo-web/indigo/http/status"
 	"github.com/indigo-web/indigo/internal/construct"
 	"github.com/indigo-web/indigo/internal/tcp/dummy"
@@ -26,10 +24,7 @@ func newSerializer(defaultHeaders map[string]string, request *http.Request, writ
 }
 
 func newRequest() *http.Request {
-	return http.NewRequest(
-		headers.New(), new(query.Query), http.NewResponse(), dummy.NewNopConn(),
-		NewBody(dummy.NewNopClient(), nil, config.Default().Body), nil,
-	)
+	return construct.Request(config.Default(), dummy.NewNopClient(), nil)
 }
 
 type accumulativeWriter struct {
