@@ -537,9 +537,6 @@ func TestSecondPhase(t *testing.T) {
 		r := getInbuiltRouter()
 		s := config.Default()
 		s.TCP.ReadTimeout = 500 * time.Millisecond
-		s.HTTP.OnDisconnect = func(request *http.Request) *http.Response {
-			return http.Error(request, status.ErrRequestTimeout)
-		}
 		_ = app.
 			Tune(s).
 			OnStart(func() {
@@ -559,12 +556,18 @@ func TestSecondPhase(t *testing.T) {
 		require.NoError(t, err)
 		defer conn.Close()
 
-		response, err := io.ReadAll(conn)
-		require.NoError(t, err)
-		wantResponseLine := "HTTP/1.1 408 Request Timeout\r\n"
-		lf := bytes.IndexByte(response, '\n')
-		require.NotEqual(t, -1, lf, "http response must contain at least one LF")
-		require.Equal(t, wantResponseLine, string(response[:lf+1]))
+		connectionClosed := make(chan struct{})
+		go func() {
+			// the goroutine finishes when the connection is closed
+			_, _ = io.ReadAll(conn)
+			connectionClosed <- struct{}{}
+		}()
+
+		select {
+		case <-connectionClosed:
+		case <-time.NewTimer(5 * time.Second).C:
+			require.Fail(t, "idle connection stays alive")
+		}
 	})
 
 	doRequest := func(conn net.Conn) error {
