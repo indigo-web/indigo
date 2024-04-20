@@ -23,6 +23,7 @@ func main() {
 	myRouter.Get("/", MyHandler)
 
 	app := indigo.New(addr).
+		AutoHTTPS(":8443").
 		OnListenerStart(func(listener indigo.Listener) {
 			log.Printf("running on %s\n", listener.Addr)
 		})
