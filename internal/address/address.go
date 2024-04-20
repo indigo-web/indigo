@@ -8,7 +8,7 @@ import (
 const DefaultAddr = "0.0.0.0"
 
 func Normalize(addr string) string {
-	if len(removePort(addr)) == 0 {
+	if len(stripPort(addr)) == 0 {
 		// only port is presented
 		return DefaultAddr + addr
 	}
@@ -17,14 +17,14 @@ func Normalize(addr string) string {
 }
 
 func IsLocalhost(addr string) bool {
-	return strings.EqualFold(removePort(addr), "localhost")
+	return strings.EqualFold(stripPort(addr), "localhost")
 }
 
 func IsIP(addr string) bool {
-	return net.ParseIP(removePort(addr)) != nil
+	return net.ParseIP(stripPort(addr)) != nil
 }
 
-func removePort(addr string) string {
+func stripPort(addr string) string {
 	colon := strings.IndexByte(addr, ':')
 	if colon != -1 {
 		return addr[:colon]
