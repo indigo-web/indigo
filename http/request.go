@@ -2,6 +2,8 @@ package http
 
 import (
 	"context"
+	"github.com/indigo-web/indigo/config"
+	"github.com/indigo-web/indigo/http/cookie"
 	"github.com/indigo-web/indigo/http/encryption"
 	"github.com/indigo-web/indigo/http/headers"
 	"github.com/indigo-web/indigo/http/method"
@@ -59,6 +61,8 @@ type Request struct {
 	conn        net.Conn
 	wasHijacked bool
 	response    *Response
+	jar         cookie.Jar
+	cfg         *config.Config
 }
 
 // NewRequest returns a new instance of request object and body gateway
@@ -67,7 +71,7 @@ type Request struct {
 // is invalid, we need to render a response using request method, but appears
 // that default method is a null-value (proto.Unknown)
 func NewRequest(
-	hdrs headers.Headers, query *query.Query, response *Response,
+	cfg config.Config, hdrs headers.Headers, query *query.Query, response *Response,
 	conn net.Conn, body Body, params Params,
 ) *Request {
 	request := &Request{
@@ -80,6 +84,7 @@ func NewRequest(
 		Body:     body,
 		conn:     conn,
 		response: response,
+		cfg:      &cfg,
 	}
 
 	return request
@@ -105,6 +110,28 @@ func (r *Request) JSON(model any) error {
 	json.ConfigDefault.ReturnIterator(iterator)
 
 	return err
+}
+
+// Cookies returns a cookie jar with parsed cookies key-value pairs, and an error
+// if the syntax is malformed. The returned jar should be re-used, as this method
+// doesn't cache the parsed result across calls and may be pretty expensive
+func (r *Request) Cookies() (cookie.Jar, error) {
+	if r.jar == nil {
+		r.jar = cookie.NewJarPreAlloc(r.cfg.Headers.CookiesPreAllocate)
+	}
+
+	r.jar.Clear()
+
+	// in RFC 6265, 5.4 cookies are explicitly prohibited from being split into
+	// list, yet in HTTP/2 it's allowed. I have concerns of some user-agents may
+	// despite sending them as a list, even via HTTP/1.1
+	for _, value := range r.Headers.Values("cookie") {
+		if err := cookie.Parse(r.jar, value); err != nil {
+			return nil, err
+		}
+	}
+
+	return r.jar, nil
 }
 
 // Respond returns Response object.
