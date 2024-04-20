@@ -6,6 +6,7 @@ import (
 	"github.com/indigo-web/chunkedbody"
 	"github.com/indigo-web/indigo/config"
 	"github.com/indigo-web/indigo/http"
+	"github.com/indigo-web/indigo/http/cookie"
 	"github.com/indigo-web/indigo/http/method"
 	"github.com/indigo-web/indigo/http/proto"
 	"github.com/indigo-web/indigo/http/status"
@@ -17,6 +18,7 @@ import (
 	stdhttp "net/http"
 	"strings"
 	"testing"
+	"time"
 )
 
 func newSerializer(defaultHeaders map[string]string, request *http.Request, writer Writer) *Serializer {
@@ -182,6 +184,58 @@ func TestSerializer_Write(t *testing.T) {
 		fullBody, err := io.ReadAll(resp.Body)
 		require.NoError(t, err)
 		require.Empty(t, string(fullBody))
+	})
+
+	t.Run("cookies", func(t *testing.T) {
+		t.Run("single pair no params", func(t *testing.T) {
+			writer := new(accumulativeWriter)
+			serializer := newSerializer(nil, request, writer)
+			response := http.NewResponse().
+				Cookie(cookie.New("hello", "world"))
+
+			require.NoError(t, serializer.Write(proto.HTTP11, response))
+			stdreq, err := stdhttp.NewRequest(stdhttp.MethodHead, "/", nil)
+			require.NoError(t, err)
+			resp, err := stdhttp.ReadResponse(bufio.NewReader(bytes.NewBuffer(writer.Data)), stdreq)
+			require.NoError(t, err)
+			c := resp.Header.Get("Set-Cookie")
+			require.Equal(t, "hello=world", c)
+		})
+
+		t.Run("multiple pairs with parameters", func(t *testing.T) {
+			writer := new(accumulativeWriter)
+			serializer := newSerializer(nil, request, writer)
+			base := cookie.Build("hello", "world").
+				Path("/").
+				Domain("pavlo.gay").
+				Expires(time.Date(
+					2010, 5, 27, 16, 10, 32, 22,
+					time.FixedZone("CEST", 0),
+				)).
+				SameSite(cookie.SameSiteLax).
+				Secure(true).
+				HttpOnly(true)
+
+			response := http.NewResponse().
+				Cookie(
+					base.MaxAge(3600).Cookie(),
+					base.MaxAge(-1).Cookie(),
+				)
+
+			require.NoError(t, serializer.Write(proto.HTTP11, response))
+			stdreq, err := stdhttp.NewRequest(stdhttp.MethodHead, "/", nil)
+			require.NoError(t, err)
+			resp, err := stdhttp.ReadResponse(bufio.NewReader(bytes.NewBuffer(writer.Data)), stdreq)
+			require.NoError(t, err)
+			cookies := resp.Header.Values("Set-Cookie")
+			require.Equal(t, 2, len(cookies), "must be only 2 cookies")
+			wantCookie1 := "hello=world; Path=/; Domain=pavlo.gay; Expires=Thu, 27 May 2010 16:10:32 GMT; " +
+				"MaxAge=3600; SameSite=Lax; Secure; HttpOnly"
+			wantCookie2 := "hello=world; Path=/; Domain=pavlo.gay; Expires=Thu, 27 May 2010 16:10:32 GMT; " +
+				"MaxAge=0; SameSite=Lax; Secure; HttpOnly"
+			require.Equal(t, wantCookie1, cookies[0])
+			require.Equal(t, wantCookie2, cookies[1])
+		})
 	})
 }
 

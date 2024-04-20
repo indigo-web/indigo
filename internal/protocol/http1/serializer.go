@@ -2,6 +2,7 @@ package http1
 
 import (
 	"github.com/indigo-web/indigo/http"
+	"github.com/indigo-web/indigo/http/cookie"
 	"github.com/indigo-web/indigo/http/headers"
 	"github.com/indigo-web/indigo/http/method"
 	"github.com/indigo-web/indigo/http/proto"
@@ -13,19 +14,24 @@ import (
 	"io"
 	"log"
 	"strconv"
+	"time"
 )
 
 const (
 	contentType      = "Content-Type: "
 	transferEncoding = "Transfer-Encoding: "
 	contentLength    = "Content-Length: "
+	setCookie        = "Set-Cookie: "
 )
 
 // minimalFileBuffSize defines the minimal size of the file buffer. In case it's less
 // it'll be set to this value and debug log will be printed
 const minimalFileBuffSize = 16
 
-var chunkedFinalizer = []byte("0\r\n\r\n")
+var (
+	chunkedFinalizer = []byte("0\r\n\r\n")
+	gmt              = time.FixedZone("GMT", 0)
+)
 
 type Writer interface {
 	Write([]byte) error
@@ -92,6 +98,11 @@ func (d *Serializer) Write(
 	}
 
 	d.renderHeaders(fields)
+
+	for _, c := range fields.Cookies {
+		d.renderCookie(c)
+	}
+
 	d.renderContentLength(int64(len(fields.Body)))
 	d.crlf()
 
@@ -255,6 +266,63 @@ func (d *Serializer) renderHeader(header headers.Header) {
 	d.buff = append(d.buff, header.Key...)
 	d.colonsp()
 	d.buff = append(d.buff, header.Value...)
+	d.crlf()
+}
+
+func (d *Serializer) renderCookie(c cookie.Cookie) {
+	d.buff = append(d.buff, setCookie...)
+	d.buff = append(d.buff, c.Name...)
+	d.buff = append(d.buff, '=')
+	d.buff = append(d.buff, c.Value...)
+	d.buff = append(d.buff, ';', ' ')
+
+	if len(c.Path) > 0 {
+		d.buff = append(d.buff, "Path="...)
+		d.buff = append(d.buff, c.Path...)
+		d.buff = append(d.buff, ';', ' ')
+	}
+
+	if len(c.Domain) > 0 {
+		d.buff = append(d.buff, "Domain="...)
+		d.buff = append(d.buff, c.Domain...)
+		d.buff = append(d.buff, ';', ' ')
+	}
+
+	if !c.Expires.IsZero() {
+		d.buff = append(d.buff, "Expires="...)
+		// TODO: this will probably be slow. Can be optimized via rendering it manually
+		//  directly into the d.buff
+		d.buff = append(d.buff, c.Expires.In(gmt).Format(time.RFC1123)...)
+		d.buff = append(d.buff, ';', ' ')
+	}
+
+	if c.MaxAge != 0 {
+		maxage := "0"
+		if c.MaxAge > 0 {
+			maxage = strconv.Itoa(c.MaxAge)
+		}
+
+		d.buff = append(d.buff, "MaxAge="...)
+		d.buff = append(d.buff, maxage...)
+		d.buff = append(d.buff, ';', ' ')
+	}
+
+	if len(c.SameSite) > 0 {
+		d.buff = append(d.buff, "SameSite="...)
+		d.buff = append(d.buff, c.SameSite...)
+		d.buff = append(d.buff, ';', ' ')
+	}
+
+	if c.Secure {
+		d.buff = append(d.buff, "Secure; "...)
+	}
+
+	if c.HttpOnly {
+		d.buff = append(d.buff, "HttpOnly; "...)
+	}
+
+	// strip last 2 bytes, which are always a semicolon and a space
+	d.buff = d.buff[:len(d.buff)-2]
 	d.crlf()
 }
 
