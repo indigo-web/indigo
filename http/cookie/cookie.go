@@ -15,14 +15,12 @@ type Cookie struct {
 	Secure   bool
 	HttpOnly bool
 	SameSite SameSite
-	Raw      string
 }
 
-type SameSite int
+type SameSite = string
 
 const (
-	SameSiteDefault SameSite = iota + 1
-	SameSiteLaxM
-	SameSiteStrict
-	SameSiteNone
+	SameSiteLax    SameSite = "Lax"
+	SameSiteStrict SameSite = "Strict"
+	SameSiteNone   SameSite = "None"
 )
