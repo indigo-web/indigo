@@ -39,7 +39,6 @@ func New(
 		router:         r,
 		client:         client,
 		upgradePreResp: http.NewResponse(),
-		onDisconnect:   cfg.HTTP.OnDisconnect,
 	}
 }
 
