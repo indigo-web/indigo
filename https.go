@@ -47,7 +47,20 @@ func cacheDir() string {
 	return filepath.Join(homeDir(), ".cache", base)
 }
 
-func autoTLSListener(domains ...string) ListenerConstructor {
+func tlsListener(cert, key string) listenerFactory {
+	return func(network, addr string) (net.Listener, error) {
+		certificate, err := tls.LoadX509KeyPair(cert, key)
+		if err != nil {
+			return nil, err
+		}
+
+		return tls.Listen(network, addr, &tls.Config{
+			Certificates: []tls.Certificate{certificate},
+		})
+	}
+}
+
+func autoTLSListener(domains ...string) listenerFactory {
 	return func(network, addr string) (net.Listener, error) {
 		m := &autocert.Manager{
 			Prompt: autocert.AcceptTOS,

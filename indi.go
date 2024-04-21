@@ -1,7 +1,6 @@
 package indigo
 
 import (
-	"crypto/tls"
 	"github.com/indigo-web/indigo/http/encryption"
 	"github.com/indigo-web/indigo/http/serve"
 	"github.com/indigo-web/indigo/http/status"
@@ -16,21 +15,13 @@ import (
 	"github.com/indigo-web/indigo/router"
 )
 
-type (
-	// ListenerConstructor constructs the listener by itself. It's made net.Listen compatible
-	// on a reason
-	ListenerConstructor func(network, addr string) (net.Listener, error)
-	// MakeListener returns the listener constructor and the encryption token
-	MakeListener func() (encryption.Token, ListenerConstructor)
-)
-
 // App is just a struct with addr and shutdown channel that is currently
 // not used. Planning to replace it with context.WithCancel()
 type App struct {
-	hooks     hooks
-	listeners []Listener
-	cfg       config.Config
-	errCh     chan error
+	cfg     config.Config
+	hooks   hooks
+	sources []source
+	errCh   chan error
 }
 
 // New returns a new App instance.
@@ -56,7 +47,7 @@ func (a *App) OnStart(cb func()) *App {
 	return a
 }
 
-func (a *App) OnListenerStart(cb func(Listener)) *App {
+func (a *App) OnListenerStart(cb func(addr string)) *App {
 	a.hooks.OnListenerStart = cb
 	return a
 }
@@ -70,35 +61,24 @@ func (a *App) OnStop(cb func()) *App {
 }
 
 // Listen adds a new listener
-func (a *App) Listen(addr string, optMaker ...MakeListener) *App {
+func (a *App) Listen(addr string, optListener ...Listener) *App {
 	addr = address.Normalize(addr)
-	constructor := optional(optMaker, makeNetListener)
-	if constructor == nil {
-		constructor = makeNetListener
+	listener := optional(optListener, Listener{})
+	if listener.Listen == nil {
+		listener.Listen = net.Listen
 	}
 
-	a.listeners = append(a.listeners, newListener(addr, constructor))
-
-	return a
-}
-
-func (a *App) TLS(addr string, constructor ListenerConstructor) *App {
-	a.Listen(addr, func() (encryption.Token, ListenerConstructor) {
-		return encryption.TLS, constructor
+	a.sources = append(a.sources, source{
+		Addr:     addr,
+		Listener: listener,
 	})
 	return a
 }
 
 func (a *App) HTTPS(addr string, cert, key string) *App {
-	return a.TLS(addr, func(network, addr string) (net.Listener, error) {
-		certificate, err := tls.LoadX509KeyPair(cert, key)
-		if err != nil {
-			return nil, err
-		}
-
-		return tls.Listen(network, addr, &tls.Config{
-			Certificates: []tls.Certificate{certificate},
-		})
+	return a.Listen(addr, Listener{
+		Listen:  tlsListener(cert, key),
+		Handler: a.newHTTPHandler(encryption.TLS),
 	})
 }
 
@@ -121,7 +101,10 @@ func (a *App) AutoHTTPS(addr string, domains ...string) *App {
 		return a.HTTPS(addr, cert, key)
 	}
 
-	return a.TLS(addr, autoTLSListener(domains...))
+	return a.Listen(addr, Listener{
+		Listen:  autoTLSListener(domains...),
+		Handler: a.newHTTPHandler(encryption.TLS),
+	})
 }
 
 // Serve starts the web-application. If nil is passed instead of a router, empty inbuilt will
@@ -131,7 +114,7 @@ func (a *App) Serve(r router.Fabric) error {
 		r = inbuilt.New()
 	}
 
-	servers, err := a.makeServers(r.Initialize())
+	servers, err := a.bind(r.Initialize())
 	if err != nil {
 		return err
 	}
@@ -139,21 +122,22 @@ func (a *App) Serve(r router.Fabric) error {
 	return a.run(servers)
 }
 
-func (a *App) makeServers(r router.Router) ([]*tcp.Server, error) {
-	servers := make([]*tcp.Server, len(a.listeners))
+func (a *App) bind(r router.Router) ([]*tcp.Server, error) {
+	servers := make([]*tcp.Server, 0, len(a.sources))
 
-	for i, listener := range a.listeners {
-		enc, l := listener.Make()
-		sock, err := l("tcp", listener.Addr)
+	for _, src := range a.sources {
+		listener, err := src.Listen("tcp", src.Addr)
 		if err != nil {
 			return nil, err
 		}
 
-		servers[i] = tcp.NewServer(sock, a.newTCPCallback(r, enc))
-
-		if cb := a.hooks.OnListenerStart; cb != nil {
-			cb(listener)
+		if src.Handler == nil {
+			src.Handler = a.newHTTPHandler(encryption.Plain)
 		}
+
+		servers = append(servers, tcp.NewServer(listener, func(conn net.Conn) {
+			src.Handler(conn, r)
+		}))
 	}
 
 	return servers, nil
@@ -203,8 +187,8 @@ func (a *App) Stop() {
 	a.errCh <- status.ErrShutdown
 }
 
-func (a *App) newTCPCallback(r router.Router, enc encryption.Token) tcp.OnConn {
-	return func(conn net.Conn) {
+func (a *App) newHTTPHandler(enc encryption.Token) listenerHandler {
+	return func(conn net.Conn, r router.Router) {
 		defer func() {
 			_ = conn.Close()
 		}()
@@ -215,7 +199,7 @@ func (a *App) newTCPCallback(r router.Router, enc encryption.Token) tcp.OnConn {
 
 type hooks struct {
 	OnStart         func()
-	OnListenerStart func(Listener)
+	OnListenerStart func(addr string)
 	OnStop          func()
 }
 
@@ -225,20 +209,20 @@ func callIfNotNil(f func()) {
 	}
 }
 
+type (
+	// listenerFactory is net.Listen-compatible on purpose
+	listenerFactory func(network, addr string) (net.Listener, error)
+	listenerHandler func(conn net.Conn, r router.Router)
+)
+
 type Listener struct {
+	Listen  listenerFactory
+	Handler listenerHandler
+}
+
+type source struct {
 	Addr string
-	Make MakeListener
-}
-
-func newListener(addr string, constructor MakeListener) Listener {
-	return Listener{
-		Addr: addr,
-		Make: constructor,
-	}
-}
-
-func makeNetListener() (encryption.Token, ListenerConstructor) {
-	return encryption.Plain, net.Listen
+	Listener
 }
 
 func optional[T any](optionals []T, otherwise T) T {

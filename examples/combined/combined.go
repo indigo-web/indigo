@@ -68,8 +68,8 @@ func main() {
 	app := indigo.New(addr).
 		Tune(s).
 		AutoHTTPS(httpsAddr).
-		OnListenerStart(func(listener indigo.Listener) {
-			log.Printf("running on %s\n", listener.Addr)
+		OnListenerStart(func(addr string) {
+			log.Printf("running on %s\n", addr)
 		})
 
 	r := inbuilt.New().

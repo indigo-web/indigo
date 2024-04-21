@@ -24,8 +24,8 @@ func main() {
 
 	app := indigo.New(addr).
 		AutoHTTPS(":8443").
-		OnListenerStart(func(listener indigo.Listener) {
-			log.Printf("running on %s\n", listener.Addr)
+		OnListenerStart(func(addr string) {
+			log.Printf("running on %s\n", addr)
 		})
 
 	log.Fatal(app.Serve(myRouter))
