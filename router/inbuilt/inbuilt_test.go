@@ -2,10 +2,10 @@ package inbuilt
 
 import (
 	"errors"
-	"github.com/indigo-web/indigo/internal/initialize"
-	"github.com/indigo-web/indigo/internal/server/tcp/dummy"
-	"github.com/indigo-web/indigo/settings"
-	"github.com/stretchr/testify/assert"
+	"github.com/indigo-web/indigo/config"
+	"github.com/indigo-web/indigo/internal/construct"
+	"github.com/indigo-web/indigo/internal/tcp/dummy"
+	"github.com/indigo-web/indigo/router"
 	"testing"
 
 	"github.com/indigo-web/indigo/http"
@@ -17,31 +17,25 @@ import (
 )
 
 func TestRoute(t *testing.T) {
-	r := New()
-	r.Route(method.GET, "/", http.Respond)
-	r.Route(method.POST, "/", http.Respond)
-	r.Route(method.POST, "/hello", http.Respond)
-	require.NoError(t, r.OnStart())
+	raw := New()
+	raw.Route(method.GET, "/", http.Respond)
+	raw.Route(method.POST, "/", http.Respond)
+	raw.Route(method.POST, "/hello", http.Respond)
+	r := raw.Initialize()
 
 	t.Run("GET /", func(t *testing.T) {
-		require.Contains(t, r.registrar.routes, "/")
-		require.NotNil(t, r.registrar.routes["/"][method.GET])
 		request := getRequest(method.GET, "/")
 		resp := r.OnRequest(request)
 		require.Equal(t, status.OK, resp.Reveal().Code)
 	})
 
 	t.Run("POST /", func(t *testing.T) {
-		require.Contains(t, r.registrar.routes, "/")
-		require.NotNil(t, r.registrar.routes["/"][method.POST])
 		request := getRequest(method.POST, "/")
 		resp := r.OnRequest(request)
 		require.Equal(t, status.OK, resp.Reveal().Code)
 	})
 
 	t.Run("POST /hello", func(t *testing.T) {
-		require.Contains(t, r.registrar.routes, "/hello")
-		require.NotNil(t, r.registrar.routes["/hello"][method.POST])
 		request := getRequest(method.POST, "/hello")
 		resp := r.OnRequest(request)
 		require.Equal(t, status.OK, resp.Reveal().Code)
@@ -100,10 +94,10 @@ func TestMethodShorthands(t *testing.T) {
 }
 
 func TestGroups(t *testing.T) {
-	r := New().
+	raw := New().
 		Get("/", http.Respond)
 
-	api := r.Group("/api")
+	api := raw.Group("/api")
 
 	api.Group("/v1").
 		Get("/hello", http.Respond)
@@ -111,45 +105,40 @@ func TestGroups(t *testing.T) {
 	api.Group("/v2").
 		Get("/world", http.Respond)
 
-	require.NoError(t, r.OnStart())
+	r := raw.Initialize()
 
-	require.Contains(t, r.registrar.routes, "/")
-	require.Contains(t, r.registrar.routes, "/api/v1/hello")
-	require.Contains(t, r.registrar.routes, "/api/v2/world")
-	require.Equal(t, 3, len(r.registrar.routes))
+	require.Equal(t, status.OK, r.OnRequest(getRequest(method.GET, "/")).Reveal().Code)
+	require.Equal(t, status.OK, r.OnRequest(getRequest(method.GET, "/api/v1/hello")).Reveal().Code)
+	require.Equal(t, status.OK, r.OnRequest(getRequest(method.GET, "/api/v2/world")).Reveal().Code)
 }
 
 func TestResource(t *testing.T) {
-	r := New()
-	r.Resource("/").
+	raw := New()
+	raw.Resource("/").
 		Get(http.Respond).
 		Post(http.Respond)
 
-	api := r.Group("/api")
+	api := raw.Group("/api")
 	api.Resource("/stat").
 		Get(http.Respond).
 		Post(http.Respond)
 
-	require.NoError(t, r.OnStart())
+	r := raw.Initialize()
 
 	t.Run("Root", func(t *testing.T) {
-		require.Contains(t, r.registrar.routes, "/")
-		rootMethods := r.registrar.routes["/"]
-		require.NotNil(t, rootMethods[method.GET])
-		require.NotNil(t, rootMethods[method.POST])
+		require.Equal(t, status.OK, r.OnRequest(getRequest(method.GET, "/")).Reveal().Code)
+		require.Equal(t, status.OK, r.OnRequest(getRequest(method.POST, "/")).Reveal().Code)
 	})
 
 	t.Run("Group", func(t *testing.T) {
-		require.Contains(t, r.registrar.routes, "/api/stat")
-		apiMethods := r.registrar.routes["/api/stat"]
-		require.NotNil(t, apiMethods[method.GET])
-		require.NotNil(t, apiMethods[method.POST])
+		require.Equal(t, status.OK, r.OnRequest(getRequest(method.GET, "/api/stat")).Reveal().Code)
+		require.Equal(t, status.OK, r.OnRequest(getRequest(method.POST, "/api/stat")).Reveal().Code)
 	})
 }
 
 func TestResource_Methods(t *testing.T) {
-	r := New()
-	r.Resource("/").
+	raw := New()
+	raw.Resource("/").
 		Get(http.Respond).
 		Head(http.Respond).
 		Post(http.Respond).
@@ -159,18 +148,18 @@ func TestResource_Methods(t *testing.T) {
 		Options(http.Respond).
 		Trace(http.Respond).
 		Patch(http.Respond)
-	require.NoError(t, r.OnStart())
-	require.Contains(t, r.registrar.routes, "/")
 
-	for _, handlerObject := range r.registrar.routes["/"] {
-		assert.NotNil(t, handlerObject)
+	r := raw.Initialize()
+
+	for _, m := range method.List {
+		require.Equal(t, status.OK, r.OnRequest(getRequest(m, "/")).Reveal().Code)
 	}
 }
 
 func TestRouter_MethodNotAllowed(t *testing.T) {
 	r := New().
-		Get("/", http.Respond)
-	require.NoError(t, r.OnStart())
+		Get("/", http.Respond).
+		Initialize()
 
 	request := getRequest(method.POST, "/")
 	response := r.OnRequest(request)
@@ -178,12 +167,13 @@ func TestRouter_MethodNotAllowed(t *testing.T) {
 }
 
 func TestRouter_RouteError(t *testing.T) {
-	r := New()
-	r.RouteError(func(req *http.Request) *http.Response {
-		return req.Respond().
-			Code(status.Teapot).
-			String(req.Env.Error.Error())
-	}, status.BadRequest)
+	r := New().
+		RouteError(func(req *http.Request) *http.Response {
+			return req.Respond().
+				Code(status.Teapot).
+				String(req.Env.Error.Error())
+		}, status.BadRequest).
+		Initialize()
 
 	t.Run("status.ErrBadRequest", func(t *testing.T) {
 		request := getRequest(method.GET, "/")
@@ -215,12 +205,13 @@ func TestRouter_RouteError(t *testing.T) {
 	t.Run("universal handler", func(t *testing.T) {
 		const fromUniversal = "from universal handler with love"
 
-		r := New()
-		r.RouteError(func(req *http.Request) *http.Response {
-			return req.Respond().
-				Code(status.Teapot).
-				String(fromUniversal)
-		}, AllErrors)
+		r := New().
+			RouteError(func(req *http.Request) *http.Response {
+				return req.Respond().
+					Code(status.Teapot).
+					String(fromUniversal)
+			}, AllErrors).
+			Initialize()
 
 		request := getRequest(method.GET, "/")
 		resp := r.OnError(request, status.ErrNotImplemented)
@@ -230,7 +221,7 @@ func TestRouter_RouteError(t *testing.T) {
 }
 
 func TestAliases(t *testing.T) {
-	testRootAlias := func(t *testing.T, r *Router) {
+	testRootAlias := func(t *testing.T, r router.Router) {
 		request := getRequest(method.GET, "/")
 		response := r.OnRequest(request)
 		require.Equal(t, status.OK, response.Reveal().Code)
@@ -247,9 +238,7 @@ func TestAliases(t *testing.T) {
 			}).
 			Alias("/", "/hello")
 
-		require.NoError(t, r.OnStart())
-
-		testRootAlias(t, r)
+		testRootAlias(t, r.Initialize())
 	})
 
 	t.Run("override normal handler", func(t *testing.T) {
@@ -266,12 +255,10 @@ func TestAliases(t *testing.T) {
 			}).
 			Alias("/", "/hello")
 
-		require.NoError(t, r.OnStart())
-
-		testRootAlias(t, r)
+		testRootAlias(t, r.Initialize())
 	})
 
-	testOrdinaryRequest := func(t *testing.T, r *Router) {
+	testOrdinaryRequest := func(t *testing.T, r router.Router) {
 		request := getRequest(method.GET, "/hello")
 		response := r.OnRequest(request)
 		require.Equal(t, status.OK, response.Reveal().Code)
@@ -305,24 +292,22 @@ func TestAliases(t *testing.T) {
 			}).
 			Alias("/", "/hello")
 
-		require.NoError(t, r.OnStart())
-
-		testRootAlias(t, r)
-		testOrdinaryRequest(t, r)
-		testRootAlias(t, r)
-		testOrdinaryRequest(t, r)
+		testRootAlias(t, r.Initialize())
+		testOrdinaryRequest(t, r.Initialize())
+		testRootAlias(t, r.Initialize())
+		testOrdinaryRequest(t, r.Initialize())
 	})
 
 	t.Run("aliases on groups", func(t *testing.T) {
-		r := New()
-		r.Get("/heaven", http.Respond)
+		r := New().
+			Get("/heaven", http.Respond)
+
 		r.Group("/hello").
 			Alias("/world", "/heaven")
-		require.NoError(t, r.OnStart())
 
 		request := getRequest(method.GET, "/hello/world")
-		response := r.OnRequest(request)
-		require.Equal(t, status.OK, response.Reveal().Code)
+		response := r.Initialize().OnRequest(request)
+		require.Equal(t, int(status.OK), int(response.Reveal().Code))
 	})
 }
 
@@ -336,8 +321,8 @@ func TestCatchers(t *testing.T) {
 			}).
 			Catch("/hello", func(req *http.Request) *http.Response {
 				return req.Respond().String("double magic")
-			})
-		require.NoError(t, r.OnStart())
+			}).
+			Initialize()
 
 		resp := r.OnRequest(getRequest(method.GET, "/"))
 		require.Equal(t, status.OK, resp.Reveal().Code)
@@ -361,10 +346,10 @@ func TestMutators(t *testing.T) {
 		Get("/", http.Respond).
 		Mutator(func(request *http.Request) {
 			timesCalled++
-		})
+		}).
+		Initialize()
 
-	require.NoError(t, r.OnStart())
-	request := initialize.NewRequest(settings.Default(), dummy.NewNopConn(), nil)
+	request := construct.Request(config.Default(), dummy.NewNopClient(), nil)
 	request.Method = method.GET
 	request.Path = "/"
 	resp := r.OnRequest(request)

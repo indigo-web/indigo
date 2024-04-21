@@ -6,29 +6,23 @@ import (
 )
 
 func TestParse(t *testing.T) {
-	t.Run("valid ip and port", func(t *testing.T) {
-		addr, err := Parse("localhost:8080")
-		require.NoError(t, err)
-		require.Equal(t, "localhost", addr.Host)
-		require.Equal(t, 8080, int(addr.Port))
+	t.Run("localhost", func(t *testing.T) {
+		require.True(t, IsLocalhost("localhost"))
 	})
 
-	t.Run("no ip but port", func(t *testing.T) {
-		addr, err := Parse(":8080")
-		require.NoError(t, err)
-		require.Equal(t, DefaultHost, addr.Host)
-		require.Equal(t, 8080, int(addr.Port))
+	t.Run("localhost with port", func(t *testing.T) {
+		require.True(t, IsLocalhost("localhost:8080"))
 	})
 
-	t.Run("only ip", func(t *testing.T) {
-		_, err := Parse("localhost")
-		require.NotNil(t, err, "error expected, got nil instead")
-		require.Equal(t, "no port given", err.Error())
+	t.Run("ip", func(t *testing.T) {
+		require.True(t, IsIP("1.2.3.4"))
 	})
 
-	t.Run("too big port", func(t *testing.T) {
-		_, err := Parse(":65536")
-		require.NotNil(t, err, "error expected, got nil instead")
-		require.Equal(t, "invalid port: 65536", err.Error())
+	t.Run("ip with port", func(t *testing.T) {
+		require.True(t, IsIP("1.2.3.4:8080"))
+	})
+
+	t.Run("invalid ip", func(t *testing.T) {
+		require.False(t, IsIP("1.2.3.256"))
 	})
 }

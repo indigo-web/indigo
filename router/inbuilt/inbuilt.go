@@ -12,26 +12,25 @@ import (
 	"strings"
 )
 
-var _ router.Router = &Router{}
+var _ router.Fabric = new(Router)
 
-// Router is a built-in implementation of router.Router interface that provides
-// some basic router features like middlewares, groups, dynamic routing, error
-// handlers, and some implicit things like calling GET-handlers for HEAD-requests,
-// or rendering TRACE-responses automatically in case no handler is registered
+// Router is a built-in routing entity. It provides support for all the methods defined in
+// the methods package, including shortcuts for those. It also supports dynamic routing
+// (enabled automatically if dynamic path template is registered; otherwise more performant
+// static-routing implementation is used). It also provides custom error handlers for any
+// HTTP error that may occur during parsing the request or the routing of it by itself.
+// By default, TRACE requests are supported (if no handler is attached, the request will be
+// automatically processed), OPTIONS (including server-wide ones) and 405 Method Not Allowed
+// errors in compliance with their HTTP semantics.
 type Router struct {
 	isRoot      bool
 	prefix      string
 	mutators    []Mutator
-	middlewares []Middleware
 	catchers    []Catcher
+	middlewares []Middleware
 	registrar   *registrar
-	routesMap   routesMap
-	tree        radix.Tree
-	isStatic    bool
+	children    []*Router
 	errHandlers errorHandlers
-
-	children  []*Router
-	traceBuff []byte
 }
 
 // New constructs a new instance of inbuilt router
@@ -45,30 +44,51 @@ func New() *Router {
 	return r
 }
 
-// OnStart initializes the router. It merges all the groups and prepares
-func (r *Router) OnStart() error {
+// runtimeRouter is the actual router that'll be running. The reason to separate Router from runtimeRouter
+// is the fact, that there is a lot of data that is used only at registering/initialization stage.
+type runtimeRouter struct {
+	mutators    []Mutator
+	catchers    []Catcher
+	traceBuff   []byte
+	tree        radix.Tree
+	routesMap   routesMap
+	errHandlers errorHandlers
+	isStatic    bool
+}
+
+func (r *Router) Initialize() router.Router {
 	r.applyErrorHandlersMiddlewares()
 
 	if err := r.prepare(); err != nil {
-		return err
+		panic(err)
 	}
 
 	sort.Slice(r.catchers, func(i, j int) bool {
 		return len(r.catchers[i].Prefix) > len(r.catchers[j].Prefix)
 	})
-
-	r.isStatic = !r.registrar.IsDynamic()
-	if r.isStatic {
-		r.routesMap = r.registrar.AsMap()
+	isStatic := !r.registrar.IsDynamic()
+	var (
+		rmap routesMap
+		tree radix.Tree
+	)
+	if isStatic {
+		rmap = r.registrar.AsMap()
 	} else {
-		r.tree = r.registrar.AsRadixTree()
+		tree = r.registrar.AsRadixTree()
 	}
 
-	return nil
+	return &runtimeRouter{
+		mutators:    r.mutators,
+		catchers:    r.catchers,
+		tree:        tree,
+		routesMap:   rmap,
+		errHandlers: r.errHandlers,
+		isStatic:    isStatic,
+	}
 }
 
 // OnRequest processes the request
-func (r *Router) OnRequest(request *http.Request) *http.Response {
+func (r *runtimeRouter) OnRequest(request *http.Request) *http.Response {
 	r.runMutators(request)
 
 	// TODO: should path normalization be implemented as a mutator?
@@ -77,7 +97,7 @@ func (r *Router) OnRequest(request *http.Request) *http.Response {
 	return r.onRequest(request)
 }
 
-func (r *Router) onRequest(request *http.Request) *http.Response {
+func (r *runtimeRouter) onRequest(request *http.Request) *http.Response {
 	var methodsMap types.MethodsMap
 
 	if r.isStatic {
@@ -106,15 +126,14 @@ func (r *Router) onRequest(request *http.Request) *http.Response {
 	return handler(request)
 }
 
-// OnError tries to find a handler for the error, in case it can't - simply
-// request.Respond().WithError(...) will be returned
-func (r *Router) OnError(request *http.Request, err error) *http.Response {
+// OnError uses a user-defined error handler, otherwise default http.Error
+func (r *runtimeRouter) OnError(request *http.Request, err error) *http.Response {
 	r.runMutators(request)
 
 	return r.onError(request, err)
 }
 
-func (r *Router) onError(request *http.Request, err error) *http.Response {
+func (r *runtimeRouter) onError(request *http.Request, err error) *http.Response {
 	if request.Method == method.TRACE && err == status.ErrMethodNotAllowed {
 		r.traceBuff = renderHTTPRequest(request, r.traceBuff)
 
@@ -148,13 +167,13 @@ func (r *Router) onError(request *http.Request, err error) *http.Response {
 	return handler(request)
 }
 
-func (r *Router) runMutators(request *http.Request) {
+func (r *runtimeRouter) runMutators(request *http.Request) {
 	for _, mutator := range r.mutators {
 		mutator(request)
 	}
 }
 
-func (r *Router) retrieveErrorHandler(code status.Code) Handler {
+func (r *runtimeRouter) retrieveErrorHandler(code status.Code) Handler {
 	handler, found := r.errHandlers[code]
 	if !found {
 		return r.errHandlers[AllErrors]
@@ -178,4 +197,8 @@ func getHandler(reqMethod method.Method, methodsMap types.MethodsMap) Handler {
 	}
 
 	return handler
+}
+
+func isServerWideOptions(req *http.Request) bool {
+	return req.Method == method.OPTIONS && req.Path == "*"
 }

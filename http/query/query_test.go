@@ -10,7 +10,7 @@ import (
 func TestQuery(t *testing.T) {
 	// test the laziness just in place
 	header := headers.New()
-	query := NewQuery(header)
+	query := New(header)
 	query.Set([]byte("hello=world"))
 	require.Equal(t, "hello=world", string(query.raw))
 	require.False(t, query.parsed)

@@ -12,8 +12,7 @@ const AllErrors = status.Code(0)
 
 // Route is a base method for registering handlers
 func (r *Router) Route(
-	method method.Method, path string, handlerFunc Handler,
-	middlewares ...Middleware,
+	method method.Method, path string, handlerFunc Handler, middlewares ...Middleware,
 ) *Router {
 	err := r.registrar.Add(r.prefix+path, method, compose(handlerFunc, middlewares))
 	if err != nil {

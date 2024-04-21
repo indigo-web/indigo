@@ -139,6 +139,11 @@ func (s *Storage) Has(key string) bool {
 	return false
 }
 
+// Len returns a number of stored pairs
+func (s *Storage) Len() int {
+	return len(s.pairs)
+}
+
 // Clone creates a deep copy, which may be used later or stored somewhere safely. However,
 // it comes at cost of multiple allocations
 func (s *Storage) Clone() *Storage {
@@ -156,8 +161,9 @@ func (s *Storage) Unwrap() []Pair {
 }
 
 // Clear all the entries. However, all the allocated space won't be freed
-func (s *Storage) Clear() {
+func (s *Storage) Clear() *Storage {
 	s.pairs = s.pairs[:0]
+	return s
 }
 
 func (s *Storage) ensureNotNil(buff []string) []string {

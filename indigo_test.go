@@ -6,7 +6,6 @@ import (
 	"crypto/tls"
 	"encoding/json"
 	"fmt"
-	"github.com/indigo-web/indigo/http/encryption"
 	"github.com/indigo-web/indigo/http/headers"
 	"github.com/indigo-web/indigo/http/method"
 	"github.com/indigo-web/indigo/http/status"
@@ -24,15 +23,15 @@ import (
 	"testing"
 	"time"
 
+	"github.com/indigo-web/indigo/config"
 	"github.com/indigo-web/indigo/http"
 	"github.com/indigo-web/indigo/router/inbuilt"
-	"github.com/indigo-web/indigo/settings"
 )
 
 const (
 	addr      = "localhost:16100"
-	altPort   = 16800
-	httpsPort = 16443
+	altAddr   = "localhost:16800"
+	httpsAddr = "localhost:16443"
 	appURL    = "http://" + addr
 )
 
@@ -144,18 +143,18 @@ func TestFirstPhase(t *testing.T) {
 					context.WithValue(context.Background(), "easter", "egg"),
 				),
 			)
-		s := settings.Default()
+		s := config.Default()
 		s.TCP.ReadTimeout = 500 * time.Millisecond
 		_ = app.
 			Tune(s).
-			NotifyOnStart(func() {
+			OnStart(func() {
 				ch <- struct{}{}
 			}).
-			NotifyOnStop(func() {
+			OnStop(func() {
 				ch <- struct{}{}
 			}).
-			Listen(altPort, encryption.Plain).
-			AutoHTTPS(httpsPort).
+			Listen(altAddr).
+			AutoHTTPS(httpsAddr).
 			Serve(r)
 	}(app)
 
@@ -401,15 +400,19 @@ func TestFirstPhase(t *testing.T) {
 		require.Equal(t, 1, len(resp.Header["Allow"]))
 	})
 
-	// this test must ALWAYS be on the bottom as it is the longest-duration test
 	t.Run("idle disconnect", func(t *testing.T) {
-		conn, err := net.Dial("tcp4", addr)
+		conn, err := net.Dial("tcp", addr)
 		require.NoError(t, err)
 		defer conn.Close()
 
 		response, err := io.ReadAll(conn)
 		require.NoError(t, err)
-		require.Empty(t, response, "must no data be transmitted")
+		if len(response) > 0 {
+			require.Failf(
+				t, "wanted silent connection close, got response:\n%s",
+				strconv.Quote(string(response)),
+			)
+		}
 	})
 
 	testCtxValue := func(t *testing.T, addr string) {
@@ -433,11 +436,11 @@ func TestFirstPhase(t *testing.T) {
 	})
 
 	t.Run("https", func(t *testing.T) {
-		testCtxValue(t, "https://localhost:"+strconv.Itoa(httpsPort))
+		testCtxValue(t, "https://"+httpsAddr)
 	})
 
 	t.Run("alternative port", func(t *testing.T) {
-		testCtxValue(t, "http://localhost:"+strconv.Itoa(altPort))
+		testCtxValue(t, "http://"+altAddr)
 	})
 
 	requireField := func(t *testing.T, m map[string]any, key, value string) {
@@ -532,21 +535,17 @@ func TestSecondPhase(t *testing.T) {
 	app := New(addr)
 	go func(app *App) {
 		r := getInbuiltRouter()
-		s := settings.Default()
+		s := config.Default()
 		s.TCP.ReadTimeout = 500 * time.Millisecond
-		s.HTTP.OnDisconnect = func(request *http.Request) *http.Response {
-			return http.Error(request, status.ErrRequestTimeout)
-		}
 		_ = app.
 			Tune(s).
-			NotifyOnStart(func() {
+			OnStart(func() {
 				ch <- struct{}{}
 			}).
-			NotifyOnStop(func() {
+			OnStop(func() {
 				ch <- struct{}{}
 			}).
-			Listen(altPort, encryption.Plain).
-			AutoHTTPS(httpsPort).
+			AutoHTTPS(httpsAddr).
 			Serve(r)
 	}(app)
 
@@ -557,12 +556,18 @@ func TestSecondPhase(t *testing.T) {
 		require.NoError(t, err)
 		defer conn.Close()
 
-		response, err := io.ReadAll(conn)
-		require.NoError(t, err)
-		wantResponseLine := "HTTP/1.1 408 Request Timeout\r\n"
-		lf := bytes.IndexByte(response, '\n')
-		require.NotEqual(t, -1, lf, "http response must contain at least one LF")
-		require.Equal(t, wantResponseLine, string(response[:lf+1]))
+		connectionClosed := make(chan struct{})
+		go func() {
+			// the goroutine finishes when the connection is closed
+			_, _ = io.ReadAll(conn)
+			connectionClosed <- struct{}{}
+		}()
+
+		select {
+		case <-connectionClosed:
+		case <-time.NewTimer(5 * time.Second).C:
+			require.Fail(t, "idle connection stays alive")
+		}
 	})
 
 	doRequest := func(conn net.Conn) error {

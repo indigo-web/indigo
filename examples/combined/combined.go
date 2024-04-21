@@ -1,8 +1,8 @@
 package main
 
 import (
+	"github.com/indigo-web/indigo/config"
 	"github.com/indigo-web/indigo/router/inbuilt/middleware"
-	"github.com/indigo-web/indigo/settings"
 	"log"
 	"strconv"
 	"time"
@@ -14,7 +14,10 @@ import (
 	"github.com/indigo-web/indigo/router/inbuilt"
 )
 
-const addr = ":8080"
+const (
+	addr      = ":8080"
+	httpsAddr = ":8443"
+)
 
 func IndexSay(request *http.Request) *http.Response {
 	if request.Headers.Value("talking") != "allowed" {
@@ -59,14 +62,14 @@ func Stressful(request *http.Request) *http.Response {
 }
 
 func main() {
-	s := settings.Default()
+	s := config.Default()
 	s.TCP.ReadTimeout = time.Hour
 
 	app := indigo.New(addr).
 		Tune(s).
-		AutoHTTPS(8443).
-		NotifyOnStart(func() {
-			log.Println("initialized")
+		AutoHTTPS(httpsAddr).
+		OnBind(func(addr string) {
+			log.Printf("running on %s\n", addr)
 		})
 
 	r := inbuilt.New().

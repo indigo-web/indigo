@@ -2,6 +2,8 @@ package http
 
 import (
 	"context"
+	"github.com/indigo-web/indigo/config"
+	"github.com/indigo-web/indigo/http/cookie"
 	"github.com/indigo-web/indigo/http/encryption"
 	"github.com/indigo-web/indigo/http/headers"
 	"github.com/indigo-web/indigo/http/method"
@@ -14,19 +16,6 @@ import (
 	"net"
 )
 
-type Environment struct {
-	// Error is used mostly for error handlers
-	Error error
-	// AllowMethods is used to pass a string containing all the allowed methods for a
-	// specific endpoint. Has non-zero-value only when 405 Method Not Allowed raises
-	AllowMethods string
-	Encryption   encryption.Encryption
-	// reserved for router
-	AliasFrom string
-}
-
-type Params = *keyvalue.Storage
-
 var zeroContext = context.Background()
 
 // Request represents HTTP request
@@ -34,7 +23,7 @@ type Request struct {
 	// Method represents the request's method
 	Method method.Method
 	// Path represents decoded request URI
-	Path string
+	Path Path
 	// Query are request's URI parameters
 	Query *query.Query
 	// Params are dynamic segment values
@@ -72,6 +61,8 @@ type Request struct {
 	conn        net.Conn
 	wasHijacked bool
 	response    *Response
+	jar         cookie.Jar
+	cfg         *config.Config
 }
 
 // NewRequest returns a new instance of request object and body gateway
@@ -80,7 +71,7 @@ type Request struct {
 // is invalid, we need to render a response using request method, but appears
 // that default method is a null-value (proto.Unknown)
 func NewRequest(
-	hdrs headers.Headers, query *query.Query, response *Response,
+	cfg config.Config, hdrs headers.Headers, query *query.Query, response *Response,
 	conn net.Conn, body Body, params Params,
 ) *Request {
 	request := &Request{
@@ -93,6 +84,7 @@ func NewRequest(
 		Body:     body,
 		conn:     conn,
 		response: response,
+		cfg:      &cfg,
 	}
 
 	return request
@@ -118,6 +110,28 @@ func (r *Request) JSON(model any) error {
 	json.ConfigDefault.ReturnIterator(iterator)
 
 	return err
+}
+
+// Cookies returns a cookie jar with parsed cookies key-value pairs, and an error
+// if the syntax is malformed. The returned jar should be re-used, as this method
+// doesn't cache the parsed result across calls and may be pretty expensive
+func (r *Request) Cookies() (cookie.Jar, error) {
+	if r.jar == nil {
+		r.jar = cookie.NewJarPreAlloc(r.cfg.Headers.CookiesPreAllocate)
+	}
+
+	r.jar.Clear()
+
+	// in RFC 6265, 5.4 cookies are explicitly prohibited from being split into
+	// list, yet in HTTP/2 it's allowed. I have concerns of some user-agents may
+	// despite sending them as a list, even via HTTP/1.1
+	for _, value := range r.Headers.Values("cookie") {
+		if err := cookie.Parse(r.jar, value); err != nil {
+			return nil, err
+		}
+	}
+
+	return r.jar, nil
 }
 
 // Respond returns Response object.
@@ -167,3 +181,19 @@ func (r *Request) Clear() (err error) {
 }
 
 // TODO: implement FormData parsing
+
+type Environment struct {
+	// Error contains an error, if occurred
+	Error error
+	// AllowMethods is used to pass a string containing all the allowed methods for a
+	// specific endpoint. Has non-zero-value only when 405 Method Not Allowed raises
+	AllowMethods string
+	// Encryption is a token that corresponds to the used encryption method. May be
+	// extended by custom values
+	Encryption encryption.Token
+	// AliasFrom contains the original request path, in case it was replaced via alias
+	// aka implicit redirect
+	AliasFrom string
+}
+
+type Params = *keyvalue.Storage

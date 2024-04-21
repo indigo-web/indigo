@@ -22,7 +22,10 @@ func main() {
 	r := simple.New(MyHandler, func(request *http.Request) *http.Response {
 		return http.Error(request, request.Env.Error)
 	})
-	app := indigo.New(addr)
-	log.Println("Listening on", addr)
+	app := indigo.New(addr).
+		OnBind(func(addr string) {
+			log.Printf("running on %s\n", addr)
+		})
+
 	log.Fatal(app.Serve(r))
 }

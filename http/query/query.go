@@ -2,9 +2,8 @@ package query
 
 import (
 	"errors"
+	"github.com/indigo-web/indigo/http/query/internal"
 	"github.com/indigo-web/indigo/internal/keyvalue"
-
-	"github.com/indigo-web/indigo/internal/query"
 )
 
 var ErrNoSuchKey = errors.New("no entry by the key")
@@ -19,7 +18,7 @@ type Query struct {
 	raw    []byte
 }
 
-func NewQuery(underlying *keyvalue.Storage) *Query {
+func New(underlying *keyvalue.Storage) *Query {
 	return &Query{
 		params: underlying,
 	}
@@ -72,5 +71,5 @@ func (q *Query) parse() error {
 
 	q.parsed = true
 
-	return query.Parse(q.raw, q.params)
+	return internal.Parse(q.raw, q.params)
 }

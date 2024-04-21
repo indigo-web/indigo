@@ -17,8 +17,8 @@ const (
 var ErrEmptyPath = errors.New("template cannot be empty")
 
 type Segment struct {
-	Payload   string
-	IsDynamic bool
+	Payload    string
+	IsWildcard bool
 }
 
 // Template is a parsed template. It simply contains static parts, and marker names
@@ -48,8 +48,8 @@ func Parse(tmpl string) (Template, error) {
 			switch tmpl[i] {
 			case '/':
 				template.segments = append(template.segments, Segment{
-					IsDynamic: false,
-					Payload:   tmpl[offset:i],
+					IsWildcard: false,
+					Payload:    tmpl[offset:i],
 				})
 				offset = i + 1
 				state = eSlash
@@ -72,8 +72,8 @@ func Parse(tmpl string) (Template, error) {
 			switch tmpl[i] {
 			case '}':
 				template.segments = append(template.segments, Segment{
-					IsDynamic: true,
-					Payload:   tmpl[offset:i],
+					IsWildcard: true,
+					Payload:    tmpl[offset:i],
 				})
 				state = eFinishDynamic
 			case '/', '{':
@@ -98,8 +98,8 @@ func Parse(tmpl string) (Template, error) {
 
 	if state == eStatic && offset < len(tmpl)-1 {
 		template.segments = append(template.segments, Segment{
-			IsDynamic: false,
-			Payload:   tmpl[offset:],
+			IsWildcard: false,
+			Payload:    tmpl[offset:],
 		})
 	}
 
@@ -115,9 +115,10 @@ func MustParse(tmpl string) Template {
 	return template
 }
 
+// IsStatic tells whether the template contains any of wildcards
 func (t Template) IsStatic() bool {
 	for _, segment := range t.segments {
-		if segment.IsDynamic {
+		if segment.IsWildcard {
 			return false
 		}
 	}

@@ -15,14 +15,18 @@ func MyHandler(request *http.Request) *http.Response {
 	return request.Respond().
 		Code(status.OK).
 		Header("Hello", "world").
-		String("<h1>How are you doing?</h1>")
+		String("<h1>Hello, world!</h1>")
 }
 
 func main() {
 	myRouter := inbuilt.New()
 	myRouter.Get("/", MyHandler)
 
-	app := indigo.New(addr)
-	log.Println("Listening on", addr)
+	app := indigo.New(addr).
+		AutoHTTPS(":8443").
+		OnBind(func(addr string) {
+			log.Printf("running on %s\n", addr)
+		})
+
 	log.Fatal(app.Serve(myRouter))
 }

@@ -10,8 +10,9 @@ import (
 )
 
 type registrar struct {
-	routes    map[string]map[method.Method]Handler
-	isDynamic bool
+	routes      map[string]map[method.Method]Handler
+	usedMethods [method.Count]bool
+	isDynamic   bool
 }
 
 func newRegistrar() *registrar {
@@ -83,7 +84,7 @@ func (r *registrar) AsMap() routesMap {
 }
 
 func (r *registrar) AsRadixTree() radix.Tree {
-	tree := radix.NewTree()
+	tree := radix.New()
 
 	for path, v := range r.routes {
 		var (

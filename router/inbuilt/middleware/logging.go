@@ -23,7 +23,7 @@ func LogRequests(loggers ...Logger) inbuilt.Middleware {
 		}
 
 		for _, logger := range loggers {
-			logger.Printf("%s %s %d", request.Method.String(), request.Path, response.Reveal().Code)
+			logger.Printf("%s %s %d", request.Method.String(), http.Escape(request.Path), response.Reveal().Code)
 		}
 
 		return response

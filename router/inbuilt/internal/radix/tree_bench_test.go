@@ -7,7 +7,7 @@ import (
 )
 
 func BenchmarkTreeMatch(b *testing.B) {
-	tree := NewTree()
+	tree := New()
 
 	payload := Payload{
 		MethodsMap: types.MethodsMap{},
