@@ -20,7 +20,6 @@ type Suit struct {
 	router         router.Router
 	client         tcp.Client
 	upgradePreResp *http.Response
-	onDisconnect   func(req *http.Request) *http.Response
 }
 
 func New(
@@ -59,9 +58,6 @@ func (s *Suit) ServeOnce() bool {
 
 func (s *Suit) Serve() {
 	s.serve(false)
-	if s.onDisconnect != nil {
-		_ = s.Write(s.Parser.request.Proto, s.onDisconnect(s.Parser.request))
-	}
 }
 
 func (s *Suit) serve(once bool) (ok bool) {
