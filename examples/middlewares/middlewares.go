@@ -44,7 +44,7 @@ func main() {
 	v1.Get("/hello", MyBeautifulHandler)
 
 	app := indigo.New(addr).
-		OnListenerStart(func(addr string) {
+		OnBind(func(addr string) {
 			log.Printf("running on %s\n", addr)
 		})
 

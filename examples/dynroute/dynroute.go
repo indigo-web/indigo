@@ -23,7 +23,7 @@ func main() {
 	r.Get("/hello/{world-name}", MyDynamicHandler)
 
 	app := indigo.New(addr).
-		OnListenerStart(func(addr string) {
+		OnBind(func(addr string) {
 			log.Printf("running on %s\n", addr)
 		})
 

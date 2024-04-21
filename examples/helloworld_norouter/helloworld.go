@@ -23,7 +23,7 @@ func main() {
 		return http.Error(request, request.Env.Error)
 	})
 	app := indigo.New(addr).
-		OnListenerStart(func(addr string) {
+		OnBind(func(addr string) {
 			log.Printf("running on %s\n", addr)
 		})
 

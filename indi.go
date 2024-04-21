@@ -47,7 +47,8 @@ func (a *App) OnStart(cb func()) *App {
 	return a
 }
 
-func (a *App) OnListenerStart(cb func(addr string)) *App {
+// OnBind calls the passed callback for every address, that was bound without any errors
+func (a *App) OnBind(cb func(addr string)) *App {
 	a.hooks.OnListenerStart = cb
 	return a
 }
