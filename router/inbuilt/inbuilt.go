@@ -107,7 +107,7 @@ func (r *runtimeRouter) onRequest(request *http.Request) *http.Response {
 		}
 
 		methodsMap = endpoint.methodsMap
-		request.Env.AllowMethods = endpoint.allow
+		request.Env.AllowedMethods = endpoint.allow
 	} else {
 		endpoint := r.tree.Match(request.Path, request.Params)
 		if endpoint == nil {
@@ -115,7 +115,7 @@ func (r *runtimeRouter) onRequest(request *http.Request) *http.Response {
 		}
 
 		methodsMap = endpoint.MethodsMap
-		request.Env.AllowMethods = endpoint.Allow
+		request.Env.AllowedMethods = endpoint.Allow
 	}
 
 	handler := getHandler(request.Method, methodsMap)

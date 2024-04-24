@@ -12,6 +12,7 @@ import (
 	"github.com/indigo-web/indigo/http/query"
 	"github.com/indigo-web/indigo/http/status"
 	"github.com/indigo-web/indigo/internal/keyvalue"
+	"github.com/indigo-web/indigo/internal/tcp"
 	json "github.com/json-iterator/go"
 	"net"
 )
@@ -26,7 +27,7 @@ type Request struct {
 	Path Path
 	// Query are request's URI parameters
 	Query *query.Query
-	// Params are dynamic segment values
+	// Params are dynamic path's wildcards
 	Params Params
 	// Proto is the protocol, which was used to make the request
 	Proto proto.Proto
@@ -58,7 +59,7 @@ type Request struct {
 	Env Environment
 	// Body accesses the request's body
 	Body        Body
-	conn        net.Conn
+	client      tcp.Client
 	wasHijacked bool
 	response    *Response
 	jar         cookie.Jar
@@ -72,17 +73,17 @@ type Request struct {
 // that default method is a null-value (proto.Unknown)
 func NewRequest(
 	cfg config.Config, hdrs headers.Headers, query *query.Query, response *Response,
-	conn net.Conn, body Body, params Params,
+	client tcp.Client, body Body, params Params,
 ) *Request {
 	request := &Request{
 		Query:    query,
 		Params:   params,
 		Proto:    proto.HTTP11,
 		Headers:  hdrs,
-		Remote:   conn.RemoteAddr(),
+		Remote:   client.Remote(),
 		Ctx:      zeroContext,
 		Body:     body,
-		conn:     conn,
+		client:   client,
 		response: response,
 		cfg:      &cfg,
 	}
@@ -145,14 +146,14 @@ func (r *Request) Respond() *Response {
 // Hijack the connection. Request body will be implicitly read (so if you need it you
 // should read it before) all the body left. After handler exits, the connection will
 // be closed, so the connection can be hijacked only once
-func (r *Request) Hijack() (net.Conn, error) {
+func (r *Request) Hijack() (tcp.Client, error) {
 	if err := r.Body.Discard(); err != nil {
 		return nil, err
 	}
 
 	r.wasHijacked = true
 
-	return r.conn, nil
+	return r.client, nil
 }
 
 // WasHijacked returns true or false, depending on whether was a connection hijacked
@@ -185,9 +186,9 @@ func (r *Request) Clear() (err error) {
 type Environment struct {
 	// Error contains an error, if occurred
 	Error error
-	// AllowMethods is used to pass a string containing all the allowed methods for a
+	// AllowedMethods is used to pass a string containing all the allowed methods for a
 	// specific endpoint. Has non-zero-value only when 405 Method Not Allowed raises
-	AllowMethods string
+	AllowedMethods string
 	// Encryption is a token that corresponds to the used encryption method. May be
 	// extended by custom values
 	Encryption encryption.Token

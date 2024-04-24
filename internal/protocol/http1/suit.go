@@ -61,15 +61,15 @@ func (s *Suit) Serve() {
 }
 
 func (s *Suit) serve(once bool) (ok bool) {
-	for {
-		req := s.Parser.request
-		client := s.client
+	req := s.Parser.request
+	client := s.client
 
+	for {
 		data, err := client.Read()
 		if err != nil {
 			// read-error most probably means deadline exceeding. Just notify the user in
 			// this case and return
-			s.onError(req, status.ErrCloseConnection)
+			s.router.OnError(req, status.ErrCloseConnection)
 			return false
 		}
 
@@ -93,27 +93,31 @@ func (s *Suit) serve(once bool) (ok bool) {
 
 			client.Unread(extra)
 			req.Body.Init(req)
+			resp := notNil(req, s.router.OnRequest(req))
 
 			if req.WasHijacked() {
+				// in case the connection was hijacked, we must not intrude after, so fail fast
 				return false
 			}
 
-			if err = s.Write(version, s.onRequest(req)); err != nil {
+			if err = s.Write(version, resp); err != nil {
 				// if error happened during writing the response, it makes no sense to try
 				// to write anything again
-				s.onError(req, status.ErrCloseConnection)
+				s.router.OnError(req, status.ErrCloseConnection)
 				return false
 			}
 
 			if err = req.Clear(); err != nil {
 				// abusing the fact that req.Clear() can fail only due to read error
-				s.onError(req, status.ErrCloseConnection)
+				s.router.OnError(req, status.ErrCloseConnection)
 				return false
 			}
 		case Error:
 			// as fatal error already happened and connection will anyway be closed, we don't
 			// care about any socket errors anymore
-			_ = s.Write(req.Proto, s.onError(req, err))
+			resp := notNil(req, s.router.OnError(req, err))
+			_ = s.Write(req.Proto, resp)
+			return false
 		default:
 			panic(fmt.Sprintf("BUG: got unexpected parser state"))
 		}
@@ -122,14 +126,6 @@ func (s *Suit) serve(once bool) (ok bool) {
 			return true
 		}
 	}
-}
-
-func (s *Suit) onError(req *http.Request, err error) *http.Response {
-	return notNil(req, s.router.OnError(req, err))
-}
-
-func (s *Suit) onRequest(req *http.Request) *http.Response {
-	return notNil(req, s.router.OnRequest(req))
 }
 
 func notNil(req *http.Request, resp *http.Response) *http.Response {

@@ -29,6 +29,9 @@ func NewClient(conn net.Conn, timeout time.Duration, buff []byte) Client {
 	}
 }
 
+// Read returns a byte-slice containing data read from the connection. Each calls
+// return the same slice with different content, so each call basically overrides
+// result of the previous one
 func (c *client) Read() ([]byte, error) {
 	if len(c.pending) > 0 {
 		pending := c.pending
@@ -46,24 +49,35 @@ func (c *client) Read() ([]byte, error) {
 	return c.buff[:n], err
 }
 
+// Pending returns stored pending data
+func (c *client) Pending() []byte {
+	return c.pending
+}
+
+// Unread stores passed data into the pending buffer. Previous content will
+// be lost
 func (c *client) Unread(b []byte) {
 	c.pending = b
 }
 
+// Conn returns the actual connection object
 func (c *client) Conn() net.Conn {
 	return c.conn
 }
 
+// Write writes data into the underlying connection
 func (c *client) Write(b []byte) error {
 	_, err := c.conn.Write(b)
 
 	return err
 }
 
+// Remote returns the remote address of the connection
 func (c *client) Remote() net.Addr {
 	return c.conn.RemoteAddr()
 }
 
+// Close closes the connection
 func (c *client) Close() error {
 	return c.conn.Close()
 }

@@ -194,10 +194,11 @@ func (r *Response) JSON(model any) *Response {
 	return resp
 }
 
-// Error returns Response with corresponding HTTP error code, if passed error is
-// status.HTTPError.fields. Otherwise, code is considered to be 500 Internal Server Error.fields.
-// Note: revealing error text may be dangerous
-func (r *Response) Error(err error) *Response {
+// Error returns a response builder with an error set. If passed err is nil, nothing will happen.
+// If an instance of status.HTTPError is passed, error code will be automatically set. Custom
+// codes can be passed, however only first will be used. By default, the error is
+// status.ErrInternalServerError
+func (r *Response) Error(err error, code ...status.Code) *Response {
 	if err == nil {
 		return r
 	}
@@ -206,8 +207,14 @@ func (r *Response) Error(err error) *Response {
 		return r.Code(http.Code)
 	}
 
+	c := status.InternalServerError
+	if len(code) > 0 {
+		// peek the first, ignore the rest
+		c = code[0]
+	}
+
 	return r.
-		Code(status.InternalServerError).
+		Code(c).
 		String(err.Error())
 }
 
@@ -219,7 +226,6 @@ func (r *Response) Reveal() response.Fields {
 // Clear discards everything was done with Response object before
 func (r *Response) Clear() *Response {
 	r.fields = r.fields.Clear()
-
 	return r
 }
 
@@ -254,6 +260,11 @@ func JSON(request *Request, model any) *Response {
 }
 
 // Error is a predicate to request.Respond().Error(...)
-func Error(request *Request, err error) *Response {
-	return request.Respond().Error(err)
+//
+// Error returns a response builder with an error set. If passed err is nil, nothing will happen.
+// If an instance of status.HTTPError is passed, error code will be automatically set. Custom
+// codes can be passed, however only first will be used. By default, the error is
+// status.ErrInternalServerError
+func Error(request *Request, err error, code ...status.Code) *Response {
+	return request.Respond().Error(err, code...)
 }
