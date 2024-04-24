@@ -71,6 +71,7 @@ func (s *Server) Wait() {
 
 func (s *Server) connHandler(conn net.Conn) {
 	s.onConn(conn)
+	_ = conn.Close()
 	s.wg.Done()
 }
 

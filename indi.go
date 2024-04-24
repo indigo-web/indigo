@@ -190,10 +190,6 @@ func (a *App) Stop() {
 
 func (a *App) newHTTPHandler(enc encryption.Token) listenerHandler {
 	return func(conn net.Conn, r router.Router) {
-		defer func() {
-			_ = conn.Close()
-		}()
-
 		serve.HTTP1(a.cfg, conn, enc, r)
 	}
 }
