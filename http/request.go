@@ -185,9 +185,9 @@ func (r *Request) Clear() (err error) {
 type Environment struct {
 	// Error contains an error, if occurred
 	Error error
-	// AllowMethods is used to pass a string containing all the allowed methods for a
+	// AllowedMethods is used to pass a string containing all the allowed methods for a
 	// specific endpoint. Has non-zero-value only when 405 Method Not Allowed raises
-	AllowMethods string
+	AllowedMethods string
 	// Encryption is a token that corresponds to the used encryption method. May be
 	// extended by custom values
 	Encryption encryption.Token

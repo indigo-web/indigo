@@ -19,5 +19,5 @@ func defaultAllErrorsHandler(request *http.Request) *http.Response {
 func defaultMethodNotAllowedHandler(request *http.Request) *http.Response {
 	return request.Respond().
 		Error(status.ErrMethodNotAllowed).
-		Header("Allow", request.Env.AllowMethods)
+		Header("Allow", request.Env.AllowedMethods)
 }
