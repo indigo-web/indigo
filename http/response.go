@@ -209,7 +209,7 @@ func (r *Response) Error(err error, code ...status.Code) *Response {
 
 	c := status.InternalServerError
 	if len(code) > 0 {
-		// peek the first, ignore rest
+		// peek the first, ignore the rest
 		c = code[0]
 	}
 
