@@ -11,7 +11,7 @@ import (
 
 func newRequest() *Request {
 	return NewRequest(
-		config.Default(), headers.New(), nil, nil, dummy.NewNopConn(),
+		config.Default(), headers.New(), nil, nil, dummy.NewNopClient(),
 		nil, nil,
 	)
 }

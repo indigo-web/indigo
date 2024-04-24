@@ -75,7 +75,7 @@ func getInbuiltRouter() *inbuilt.Router {
 		return http.Bytes(request, body)
 	})
 
-	r.Get("/query", func(request *http.Request) (_ *http.Response) {
+	r.Get("/query", func(request *http.Request) *http.Response {
 		params, err := request.Query.Unwrap()
 		if err != nil {
 			return http.Error(request, err)
@@ -90,31 +90,30 @@ func getInbuiltRouter() *inbuilt.Router {
 		return http.Bytes(request, buff)
 	})
 
-	r.Get("/hijack", func(request *http.Request) (_ *http.Response) {
-		conn, err := request.Hijack()
-		defer func(conn net.Conn) {
-			_ = conn.Close()
-		}(conn)
+	r.Get("/hijack", func(request *http.Request) *http.Response {
+		client, err := request.Hijack()
 		if err != nil {
 			return nil
 		}
 
-		if _, err = conn.Write([]byte("j")); err != nil {
-			return nil
-		}
+		// no need for deferred connection close. It'll be closed automatically
+		// by tcp server
 
-		return
+		// just ignore the error here. If occurred, will be anyway caught by
+		// the test
+		_ = client.Write([]byte("j"))
+		return nil
 	})
 
 	r.Get("/ctx-value", func(request *http.Request) *http.Response {
 		return http.String(request, request.Ctx.Value("easter").(string))
 	})
 
-	r.Get("/panic", func(request *http.Request) (_ *http.Response) {
+	r.Get("/panic", func(request *http.Request) *http.Response {
 		panic("ich kann das nicht mehr ertragen")
 	}, middleware.Recover)
 
-	r.Get("/json", func(request *http.Request) (_ *http.Response) {
+	r.Get("/json", func(request *http.Request) *http.Response {
 		fields := request.Headers.Values("fields")
 
 		return http.JSON(request, headersToMap(request.Headers, fields))

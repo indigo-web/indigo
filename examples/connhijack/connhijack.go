@@ -13,26 +13,23 @@ import (
 const addr = ":8080"
 
 func MyHandler(request *http.Request) *http.Response {
-	conn, err := request.Hijack()
+	client, err := request.Hijack()
 	if err != nil {
 		// in case error occurred, it may be only an error with a network, so
 		// no response may be sent anyway
 		return request.Respond()
 	}
 
-	readBuff := make([]byte, 1024)
+	// connection will be closed automatically as we'll be finished here
 
 	for {
-		n, err := conn.Read(readBuff)
-		if n == 0 || err != nil {
-			_ = conn.Close()
-
-			// no matter what we return here as after handler exits, even if connection was
-			// not explicitly closed, server will do it implicitly
-			return request.Respond()
+		data, err := client.Read()
+		if err != nil {
+			// after hijacking it makes no difference, what will be returned
+			return nil
 		}
 
-		log.Println("somebody says:", strconv.Quote(string(readBuff[:n])))
+		log.Println("somebody says:", strconv.Quote(string(data)))
 	}
 }
 

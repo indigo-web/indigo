@@ -18,7 +18,7 @@ func Request(cfg config.Config, client tcp.Client, body http.Body) *http.Request
 	resp := http.NewResponse()
 	params := keyvalue.New()
 
-	return http.NewRequest(cfg, hdrs, q, resp, client.Conn(), body, params)
+	return http.NewRequest(cfg, hdrs, q, resp, client, body, params)
 }
 
 func Chunked(cfg config.Body) *chunkedbody.Parser {
