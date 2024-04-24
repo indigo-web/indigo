@@ -120,6 +120,10 @@ func getInbuiltRouter() *inbuilt.Router {
 		return http.JSON(request, headersToMap(request.Headers, fields))
 	})
 
+	r.Get("/custom-error-with-code", func(request *http.Request) *http.Response {
+		return http.Error(request, status.ErrTeapot, status.Teapot)
+	})
+
 	return r
 }
 
@@ -251,6 +255,19 @@ func TestFirstPhase(t *testing.T) {
 		}()
 
 		require.Equal(t, stdhttp.StatusOK, resp.StatusCode)
+		body, err := io.ReadAll(resp.Body)
+		require.NoError(t, err)
+		require.Empty(t, body)
+	})
+
+	t.Run("error with custom code", func(t *testing.T) {
+		resp, err := stdhttp.DefaultClient.Get(appURL + "/custom-error-with-code")
+		require.NoError(t, err)
+		defer func() {
+			_ = resp.Body.Close()
+		}()
+
+		require.Equal(t, stdhttp.StatusTeapot, resp.StatusCode)
 		body, err := io.ReadAll(resp.Body)
 		require.NoError(t, err)
 		require.Empty(t, body)
