@@ -1,7 +1,6 @@
 package http1
 
 import (
-	"bytes"
 	"fmt"
 	"github.com/indigo-web/indigo/config"
 	"github.com/indigo-web/indigo/http"
@@ -11,7 +10,6 @@ import (
 	"github.com/indigo-web/indigo/internal/tcp"
 	"github.com/indigo-web/indigo/router"
 	"github.com/indigo-web/utils/buffer"
-	"github.com/indigo-web/utils/uf"
 )
 
 type Suit struct {
@@ -78,15 +76,13 @@ func (s *Suit) serve(once bool) (ok bool) {
 		case Pending:
 		case HeadersCompleted:
 			version := req.Proto
-
 			if req.Upgrade != proto.Unknown && proto.HTTP1&req.Upgrade == req.Upgrade {
-				protoToken := uf.B2S(bytes.TrimSpace(proto.ToBytes(req.Upgrade)))
 				s.PreWrite(
 					req.Proto,
 					s.upgradePreResp.
 						Code(status.SwitchingProtocols).
 						Header("Connection", "upgrade").
-						Header("Upgrade", protoToken),
+						Header("Upgrade", trimLast(req.Proto.String())),
 				)
 				version = req.Upgrade
 			}
@@ -134,4 +130,12 @@ func notNil(req *http.Request, resp *http.Response) *http.Response {
 	}
 
 	return http.Respond(req)
+}
+
+func trimLast(s string) string {
+	if len(s) == 0 {
+		return s
+	}
+
+	return s[:len(s)-1]
 }
