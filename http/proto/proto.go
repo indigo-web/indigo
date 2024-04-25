@@ -2,7 +2,6 @@ package proto
 
 import "github.com/indigo-web/utils/uf"
 
-//go:generate stringer -type=Proto
 type Proto uint8
 
 const (
@@ -11,15 +10,18 @@ const (
 	HTTP11
 	HTTP2
 
-	WebSocket
-
 	HTTP1 = HTTP10 | HTTP11
 )
 
-var (
-	http10 = []byte("HTTP/1.0 ")
-	http11 = []byte("HTTP/1.1 ")
-)
+// String returns protocol as a string WITH A TRAILING SPACE
+func (p Proto) String() string {
+	lut := [...]string{HTTP10: "HTTP/1.0 ", HTTP11: "HTTP/1.1 ", HTTP2: "HTTP/2 "}
+	if int(p) >= len(lut) {
+		return ""
+	}
+
+	return lut[p]
+}
 
 const (
 	protoTokenLength   = len("HTTP/x.x")
@@ -47,15 +49,4 @@ func Parse(major, minor uint8) Proto {
 	}
 
 	return majorMinorVersionLUT[major][minor]
-}
-
-func ToBytes(proto Proto) []byte {
-	switch proto {
-	case HTTP10:
-		return http10
-	case HTTP11:
-		return http11
-	default:
-		return nil
-	}
 }
