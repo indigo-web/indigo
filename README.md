@@ -6,7 +6,7 @@ Indigo is a web-framework, designed to be readable, handy, yet performant (blazi
 
 # Documentation
 
-Documentation is available [here](https://floordiv.gitbook.io/indigo/). However, it isn't complete yet.
+Documentation is available [here](https://floordiv.gitbook.io/indigo/). It may be incomplete or not represent the actual state, so make sure the version in documentation corresponds to the latest release.
 
 # Hello, world!
 
