@@ -18,14 +18,14 @@ import (
 type ResponseWriter func(b []byte) error
 
 const (
-	// why 7? I don't know. There's no theory behind the number.fields. It can be adjusted
-	// to 10 as well, but why you would ever need to do this?
+	// why 7? I don't know. There's no theory behind this number nor researches.
+	// It can be adjusted to 10 as well, but why you would ever need to do this?
 	defaultHeadersNumber = 7
 	defaultFileMIME      = mime.OctetStream
 )
 
 type Response struct {
-	fields response.Fields
+	fields *response.Fields
 }
 
 // NewResponse returns a new instance of the Response object with status code set to 200 OK,
@@ -34,7 +34,7 @@ type Response struct {
 // clear reason otherwise
 func NewResponse() *Response {
 	return &Response{
-		response.Fields{
+		&response.Fields{
 			Code:        status.OK,
 			Headers:     make([]headers.Header, 0, defaultHeadersNumber),
 			ContentType: response.DefaultContentType,
@@ -219,13 +219,13 @@ func (r *Response) Error(err error, code ...status.Code) *Response {
 }
 
 // Reveal returns a struct with values, filled by builder. Used mostly in internal purposes
-func (r *Response) Reveal() response.Fields {
+func (r *Response) Reveal() *response.Fields {
 	return r.fields
 }
 
 // Clear discards everything was done with Response object before
 func (r *Response) Clear() *Response {
-	r.fields = r.fields.Clear()
+	r.fields.Clear()
 	return r
 }
 

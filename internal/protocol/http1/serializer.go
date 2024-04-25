@@ -121,7 +121,7 @@ func (d *Serializer) Write(
 	return err
 }
 
-func (d *Serializer) renderResponseLine(fields response.Fields) {
+func (d *Serializer) renderResponseLine(fields *response.Fields) {
 	statusLine := status.Line(fields.Code)
 
 	if fields.Status == "" && statusLine != "" {
@@ -136,7 +136,7 @@ func (d *Serializer) renderResponseLine(fields response.Fields) {
 	d.crlf()
 }
 
-func (d *Serializer) renderHeaders(fields response.Fields) {
+func (d *Serializer) renderHeaders(fields *response.Fields) {
 	responseHeaders := fields.Headers
 
 	for _, header := range responseHeaders {
@@ -206,7 +206,7 @@ func (d *Serializer) sendAttachment(
 }
 
 func (d *Serializer) writePlainBody(r io.Reader, writer Writer) error {
-	// TODO: implement checking whether r implements io.ReaderAt interfacd. In case it does
+	// TODO: implement checking whether r implements io.ReaderAt interface. In case it does
 	//       body may be transferred more efficiently. This requires implementing io.Writer
 	//       *http.ResponseWriter
 
@@ -338,7 +338,7 @@ func (d *Serializer) renderKnownHeader(key, value string) {
 }
 
 func (d *Serializer) renderProtocol(protocol proto.Proto) {
-	d.buff = append(d.buff, proto.ToBytes(protocol)...)
+	d.buff = append(d.buff, protocol.String()...)
 }
 
 func (d *Serializer) sp() {

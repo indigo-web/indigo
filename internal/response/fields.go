@@ -22,7 +22,7 @@ type Fields struct {
 	Code             status.Code
 }
 
-func (f Fields) Clear() Fields {
+func (f *Fields) Clear() {
 	f.Code = status.OK
 	f.Status = ""
 	f.ContentType = DefaultContentType
@@ -31,6 +31,4 @@ func (f Fields) Clear() Fields {
 	f.Body = nil
 	f.Cookies = f.Cookies[:0]
 	f.Attachment = types.Attachment{}
-
-	return f
 }
