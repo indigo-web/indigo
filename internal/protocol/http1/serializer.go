@@ -361,16 +361,14 @@ func (d *Serializer) clear() {
 func isKeepAlive(protocol proto.Proto, req *http.Request) bool {
 	switch protocol {
 	case proto.HTTP10:
-		return strcomp.EqualFold(req.Headers.Value("connection"), "keep-alive")
+		return strcomp.EqualFold(req.Connection, "keep-alive")
 	case proto.HTTP11:
 		// in case of HTTP/1.1, keep-alive may be only disabled
-		return !strcomp.EqualFold(req.Headers.Value("connection"), "close")
-	case proto.HTTP2:
-		// TODO: are there cases when HTTP/2 connection may not be keep-alived?
-		return true
+		return !strcomp.EqualFold(req.Connection, "close")
 	default:
-		// don't know what this is, but act like everything is okay
-		return true
+		// as the protocol is unknown and the code was probably caused by some sort
+		// of bug, consider closing it
+		return false
 	}
 }
 
