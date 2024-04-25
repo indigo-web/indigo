@@ -18,6 +18,17 @@ type Storage struct {
 	valuesBuff []string
 }
 
+func New() *Storage {
+	return NewPreAlloc(0)
+}
+
+// NewPreAlloc returns an instance of Storage with pre-allocated underlying storage
+func NewPreAlloc(n int) *Storage {
+	return &Storage{
+		pairs: make([]Pair, 0, n),
+	}
+}
+
 // NewFromMap returns a new instance with already inserted values from given map.
 // Note: as maps are unordered, resulting underlying structure will also contain unordered
 // pairs
@@ -35,17 +46,6 @@ func NewFromMap(m map[string][]string) *Storage {
 	}
 
 	return kv
-}
-
-// NewPreAlloc returns an instance of Storage with pre-allocated underlying storage
-func NewPreAlloc(n int) *Storage {
-	return &Storage{
-		pairs: make([]Pair, 0, n),
-	}
-}
-
-func New() *Storage {
-	return NewPreAlloc(0)
 }
 
 // Add adds a new pair of key and value
