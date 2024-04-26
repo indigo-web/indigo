@@ -49,7 +49,7 @@ func (a *App) OnStart(cb func()) *App {
 
 // OnBind calls the passed callback for every address, that was bound without any errors
 func (a *App) OnBind(cb func(addr string)) *App {
-	a.hooks.OnListenerStart = cb
+	a.hooks.OnBind = cb
 	return a
 }
 
@@ -136,8 +136,8 @@ func (a *App) bind(r router.Router) ([]*tcp.Server, error) {
 			src.Handler = a.newHTTPHandler(encryption.Plain)
 		}
 
-		if a.hooks.OnListenerStart != nil {
-			a.hooks.OnListenerStart(src.Addr)
+		if a.hooks.OnBind != nil {
+			a.hooks.OnBind(src.Addr)
 		}
 
 		servers = append(servers, tcp.NewServer(listener, func(conn net.Conn) {
@@ -199,9 +199,9 @@ func (a *App) newHTTPHandler(enc encryption.Token) listenerHandler {
 }
 
 type hooks struct {
-	OnStart         func()
-	OnListenerStart func(addr string)
-	OnStop          func()
+	OnStart func()
+	OnBind  func(addr string)
+	OnStop  func()
 }
 
 func callIfNotNil(f func()) {
