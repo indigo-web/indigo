@@ -3,7 +3,6 @@ package inbuilt
 import (
 	"github.com/indigo-web/indigo/http"
 	"github.com/indigo-web/indigo/http/headers"
-	"github.com/indigo-web/indigo/internal/httpchars"
 	"strings"
 )
 
@@ -20,11 +19,11 @@ func traceResponse(respond *http.Response, messageBody []byte) *http.Response {
 
 func renderHTTPRequest(request *http.Request, buff []byte) []byte {
 	buff = append(buff, request.Method.String()...)
-	buff = append(buff, httpchars.SP...)
+	buff = append(buff, ' ')
 	buff = requestURI(request, buff)
-	buff = append(buff, httpchars.SP...)
+	buff = append(buff, ' ')
 	buff = append(buff, strings.TrimSpace(request.Proto.String())...)
-	buff = append(buff, httpchars.CRLF...)
+	buff = append(buff, "\r\n"...)
 	buff = requestHeaders(request.Headers, buff)
 	buff = append(buff, "Content-Length: 0\r\n\r\n"...)
 
@@ -44,8 +43,8 @@ func requestURI(request *http.Request, buff []byte) []byte {
 
 func requestHeaders(hdrs headers.Headers, buff []byte) []byte {
 	for _, pair := range hdrs.Unwrap() {
-		buff = append(append(buff, pair.Key...), httpchars.COLONSP...)
-		buff = append(append(buff, pair.Value...), httpchars.CRLF...)
+		buff = append(append(buff, pair.Key...), ": "...)
+		buff = append(append(buff, pair.Value...), "\r\n"...)
 	}
 
 	return buff
