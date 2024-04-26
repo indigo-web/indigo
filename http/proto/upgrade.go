@@ -28,8 +28,6 @@ func parseUpgradeToken(token string) Proto {
 		return HTTP11
 	case "h2c", "H2C":
 		return HTTP2
-	case "websocket", "WebSocket", "WEBSOCKET":
-		return WebSocket
 	}
 
 	return Unknown

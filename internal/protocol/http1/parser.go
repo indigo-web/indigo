@@ -327,6 +327,12 @@ headerValue:
 			case cTrailer:
 				request.Encoding.HasTrailer = true
 			}
+		case 10:
+			if cConnecti == encodeU64(
+				key[0]|0x20, key[1]|0x20, key[2]|0x20, key[3]|0x20, key[4]|0x20, key[5]|0x20, key[6]|0x20, key[7]|0x20,
+			) && cOn == encodeU16(key[8]|0x20, key[9]|0x20) {
+				request.Connection = value
+			}
 		case 12:
 			if cContent == encodeU64(
 				key[0]|0x20, key[1]|0x20, key[2]|0x20, key[3]|0x20, key[4]|0x20, key[5]|0x20, key[6]|0x20, key[7]|0x20,
@@ -427,6 +433,8 @@ var (
 	cUpgrade  = encodeU64('u', 'p', 'g', 'r', 'a', 'd', 'e', 0)
 	cTrailer  = encodeU64('t', 'r', 'a', 'i', 'l', 'e', 'r', 0)
 	cContent  = encodeU64('c', 'o', 'n', 't', 'e', 'n', 't', '-')
+	cConnecti = encodeU64('c', 'o', 'n', 'n', 'e', 'c', 't', 'i')
+	cOn       = encodeU16('o', 'n')
 	cLength   = encodeU64('l', 'e', 'n', 'g', 't', 'h', 0, 0)
 	cType     = encodeU32('t', 'y', 'p', 'e')
 	cEncoding = encodeU64('e', 'n', 'c', 'o', 'd', 'i', 'n', 'g')
@@ -441,4 +449,8 @@ func encodeU64(a, b, c, d, e, f, g, h uint8) uint64 {
 
 func encodeU32(a, b, c, d uint8) uint32 {
 	return (uint32(d) << 24) | (uint32(c) << 16) | (uint32(b) << 8) | uint32(a)
+}
+
+func encodeU16(a, b uint8) uint16 {
+	return (uint16(b) << 8) | uint16(a)
 }

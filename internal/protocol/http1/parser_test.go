@@ -269,6 +269,16 @@ func TestHttpRequestsParser_Parse_GET(t *testing.T) {
 		require.Equal(t, "ha-ha", request.Headers.Value("hi-hi"))
 		require.NoError(t, request.Clear())
 	})
+
+	t.Run("connection", func(t *testing.T) {
+		raw := "GET / HTTP/1.1\r\nConnection: Keep-Alive\r\n\r\n"
+		state, extra, err := parser.Parse([]byte(raw))
+		require.NoError(t, err)
+		require.Equal(t, HeadersCompleted, state)
+		require.Empty(t, string(extra))
+		require.Equal(t, "Keep-Alive", request.Connection)
+		require.NoError(t, request.Clear())
+	})
 }
 
 func TestHttpRequestsParser_POST(t *testing.T) {

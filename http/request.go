@@ -43,6 +43,9 @@ type Request struct {
 	ContentLength int
 	// ContentType obtains Content-Type header value
 	ContentType string
+	// Connection holds the Connection header value. It isn't normalized, so can be anything
+	// and in any case. So in order to compare it, highly recommended to do it case-insensibly
+	Connection string
 	// Upgrade is the protocol token, which is set by default to proto.Unknown. In
 	// case it is anything else, then Upgrade header was received
 	Upgrade proto.Proto
@@ -174,6 +177,7 @@ func (r *Request) Clear() (err error) {
 	r.ContentLength = 0
 	r.Encoding = Encoding{}
 	r.ContentType = ""
+	r.Connection = ""
 	r.Upgrade = proto.Unknown
 	r.Ctx = zeroContext
 	r.Env = Environment{}

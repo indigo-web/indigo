@@ -9,12 +9,12 @@ type (
 	Headers = *keyvalue.Storage
 )
 
-func NewPrealloc(n int) Headers {
-	return keyvalue.NewPreAlloc(n)
-}
-
 func New() Headers {
 	return NewPrealloc(0)
+}
+
+func NewPrealloc(n int) Headers {
+	return keyvalue.NewPreAlloc(n)
 }
 
 func NewFromMap(m map[string][]string) Headers {

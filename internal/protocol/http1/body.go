@@ -203,7 +203,8 @@ func (c *chunkedBodyReader) init(request *http.Request) {
 }
 
 func (c *chunkedBodyReader) read() (body []byte, err error) {
-	data, err := c.client.Read()
+	client := c.client
+	data, err := client.Read()
 	if err != nil {
 		return nil, err
 	}
@@ -221,7 +222,7 @@ func (c *chunkedBodyReader) read() (body []byte, err error) {
 	}
 
 	c.received = received
-	c.client.Unread(extra)
+	client.Unread(extra)
 
 	return chunk, err
 }

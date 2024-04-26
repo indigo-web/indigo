@@ -1,3 +1,3 @@
 package indigo
 
-const Version = "v0.16.1"
+const Version = "v0.16.2"

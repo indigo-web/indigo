@@ -1,11 +1,10 @@
 package inbuilt
 
 import (
-	"bytes"
 	"github.com/indigo-web/indigo/http"
 	"github.com/indigo-web/indigo/http/headers"
-	"github.com/indigo-web/indigo/http/proto"
 	"github.com/indigo-web/indigo/internal/httpchars"
+	"strings"
 )
 
 /*
@@ -24,7 +23,7 @@ func renderHTTPRequest(request *http.Request, buff []byte) []byte {
 	buff = append(buff, httpchars.SP...)
 	buff = requestURI(request, buff)
 	buff = append(buff, httpchars.SP...)
-	buff = append(buff, bytes.TrimSpace(proto.ToBytes(request.Proto))...)
+	buff = append(buff, strings.TrimSpace(request.Proto.String())...)
 	buff = append(buff, httpchars.CRLF...)
 	buff = requestHeaders(request.Headers, buff)
 	buff = append(buff, "Content-Length: 0\r\n\r\n"...)

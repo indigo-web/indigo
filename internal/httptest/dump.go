@@ -3,7 +3,6 @@ package httptest
 import (
 	"github.com/indigo-web/indigo/http"
 	"github.com/indigo-web/indigo/http/headers"
-	"github.com/indigo-web/indigo/http/proto"
 	"strconv"
 )
 
@@ -32,7 +31,7 @@ func Dump(request *http.Request) (string, error) {
 	}
 
 	buff = space(buff)
-	protocol := proto.ToBytes(request.Proto)
+	protocol := request.Proto.String()
 	protocol = protocol[:len(protocol)-1]
 	buff = append(buff, protocol...)
 	buff = crlf(buff)
