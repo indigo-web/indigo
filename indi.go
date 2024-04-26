@@ -136,7 +136,10 @@ func (a *App) bind(r router.Router) ([]*tcp.Server, error) {
 			src.Handler = a.newHTTPHandler(encryption.Plain)
 		}
 
-		a.hooks.OnListenerStart(src.Addr)
+		if a.hooks.OnListenerStart != nil {
+			a.hooks.OnListenerStart(src.Addr)
+		}
+
 		servers = append(servers, tcp.NewServer(listener, func(conn net.Conn) {
 			src.Handler(conn, r)
 		}))
