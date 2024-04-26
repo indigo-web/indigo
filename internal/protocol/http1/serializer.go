@@ -1,16 +1,15 @@
 package http1
 
 import (
+	"fmt"
 	"github.com/indigo-web/indigo/http"
 	"github.com/indigo-web/indigo/http/cookie"
 	"github.com/indigo-web/indigo/http/headers"
 	"github.com/indigo-web/indigo/http/method"
 	"github.com/indigo-web/indigo/http/proto"
 	"github.com/indigo-web/indigo/http/status"
-	"github.com/indigo-web/indigo/internal/httpchars"
 	"github.com/indigo-web/indigo/internal/response"
 	"github.com/indigo-web/utils/strcomp"
-	"github.com/indigo-web/utils/uf"
 	"io"
 	"log"
 	"strconv"
@@ -22,6 +21,7 @@ const (
 	transferEncoding = "Transfer-Encoding: "
 	contentLength    = "Content-Length: "
 	setCookie        = "Set-Cookie: "
+	crlf             = "\r\n"
 )
 
 // minimalFileBuffSize defines the minimal size of the file buffer. In case it's less
@@ -243,8 +243,8 @@ func (d *Serializer) writeChunkedBody(r io.Reader, writer Writer) error {
 			// offset for it
 			blankSpace := hexValueOffset - len(buff)
 			copy(d.fileBuff[blankSpace:], buff)
-			copy(d.fileBuff[hexValueOffset:], httpchars.CRLF)
-			copy(d.fileBuff[buffOffset+n:], httpchars.CRLF)
+			copy(d.fileBuff[hexValueOffset:], crlf)
+			copy(d.fileBuff[buffOffset+n:], crlf)
 
 			if err := writer.Write(d.fileBuff[blankSpace : buffOffset+n+crlfSize]); err != nil {
 				return status.ErrCloseConnection
@@ -346,11 +346,11 @@ func (d *Serializer) sp() {
 }
 
 func (d *Serializer) colonsp() {
-	d.buff = append(d.buff, httpchars.COLONSP...)
+	d.buff = append(d.buff, ':', ' ')
 }
 
 func (d *Serializer) crlf() {
-	d.buff = append(d.buff, httpchars.CRLF...)
+	d.buff = append(d.buff, crlf...)
 }
 
 func (d *Serializer) clear() {
@@ -389,7 +389,8 @@ func processDefaultHeaders(hdrs map[string]string) defaultHeaders {
 }
 
 func renderHeader(key, value string) string {
-	return key + httpchars.COLONSP + value + uf.B2S(httpchars.CRLF)
+	// this is done once at serializer construction, so pretty much acceptable
+	return fmt.Sprintf("%s: %s\r\n", key, value)
 }
 
 type defaultHeader struct {

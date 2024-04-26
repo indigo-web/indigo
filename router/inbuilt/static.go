@@ -34,6 +34,8 @@ func isSafe(path string) bool {
 		if dot < len(path)-1 && path[dot+1] == '.' {
 			return false
 		}
+
+		path = path[dot+1:]
 	}
 
 	return true
