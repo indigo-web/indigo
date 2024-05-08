@@ -6,6 +6,7 @@ import (
 	"crypto/tls"
 	"encoding/json"
 	"fmt"
+	"github.com/indigo-web/indigo/http/cookie"
 	"github.com/indigo-web/indigo/http/headers"
 	"github.com/indigo-web/indigo/http/method"
 	"github.com/indigo-web/indigo/http/status"
@@ -121,6 +122,23 @@ func getInbuiltRouter() *inbuilt.Router {
 
 	r.Get("/custom-error-with-code", func(request *http.Request) *http.Response {
 		return http.Error(request, status.ErrTeapot, status.Teapot)
+	})
+
+	r.Get("/cookie", func(request *http.Request) *http.Response {
+		jar, err := request.Cookies()
+		if err != nil {
+			return http.Error(request, err)
+		}
+
+		buff := make([]byte, 0, 512)
+
+		for _, c := range jar.Unwrap() {
+			buff = append(buff, fmt.Sprintf("%s=%s\n", c.Key, c.Value)...)
+		}
+
+		return http.Bytes(request, buff).
+			Cookie(cookie.New("hello", "world")).
+			Cookie(cookie.New("men", "in black"))
 	})
 
 	return r
@@ -523,6 +541,32 @@ func TestFirstPhase(t *testing.T) {
 		require.Equal(t, pipelinedRequests, n, "got less successful responses as expected")
 	})
 
+	t.Run("cookie", func(t *testing.T) {
+		request := &stdhttp.Request{
+			Method: stdhttp.MethodGet,
+			URL: &url.URL{
+				Scheme: "http",
+				Host:   addr,
+				Path:   "/cookie",
+			},
+			Proto:      "HTTP/1.1",
+			ProtoMajor: 1,
+			ProtoMinor: 1,
+			Header: stdhttp.Header{
+				"Cookie": {"hello=world; men=in black", "anything=anywhere"},
+			},
+			Host:       addr,
+			RemoteAddr: addr,
+		}
+		resp, err := stdhttp.DefaultClient.Do(request)
+		require.NoError(t, err)
+		require.Equal(t, stdhttp.StatusOK, resp.StatusCode)
+		body, err := io.ReadAll(resp.Body)
+		require.NoError(t, err)
+		require.Equal(t, "hello=world\nmen=in black\nanything=anywhere\n", string(body))
+		require.Equal(t, []string{"hello=world", "men=in black"}, resp.Header.Values("Set-Cookie"))
+	})
+
 	t.Run("chunked body", func(t *testing.T) {
 		request := "POST /body-reader HTTP/1.1\r\n" +
 			"Connection: close\r\n" +
@@ -596,8 +640,9 @@ func TestSecondPhase(t *testing.T) {
 	t.Run("graceful shutdown", func(t *testing.T) {
 		client := func(ch chan<- error) {
 			conn, err := net.Dial("tcp", addr)
-			ch <- err
+			ch <- nil
 			if err != nil {
+				ch <- err
 				return
 			}
 
@@ -615,17 +660,14 @@ func TestSecondPhase(t *testing.T) {
 
 		first := make(chan error)
 		go client(first)
-		require.NoError(t, <-first)
+		<-first
 
-		// as in main test-case there is no way to combine this test with forced shutdown
 		app.GracefulStop()
-		time.Sleep(100 * time.Millisecond)
+
 		second := make(chan error)
 		go client(second)
-		// the socket on graceful shutdown isn't closed, it just stops accepting new connections.
-		// So by that, we are able to connect freely
 		<-second
-		// ...the thing is, that we'll get the read-tcp error on a try to send something
+
 		require.Error(t, <-second)
 		require.NoError(t, <-first)
 	})
