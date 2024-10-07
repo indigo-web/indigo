@@ -15,10 +15,12 @@ import (
 	"github.com/indigo-web/indigo/router"
 )
 
+const Version = "0.17.0"
+
 // App is just a struct with addr and shutdown channel that is currently
 // not used. Planning to replace it with context.WithCancel()
 type App struct {
-	cfg     config.Config
+	cfg     *config.Config
 	hooks   hooks
 	sources []source
 	errCh   chan error
