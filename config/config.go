@@ -80,6 +80,9 @@ type (
 		MaxChunkSize int64
 		// DecodingBufferSize is a size of a buffer, used to store decoded request's body
 		DecodingBufferSize int64
+		// BufferPrealloc defines the initial length of the buffer when the whole body at once
+		// is requested (normally via String() or Bytes() methods)
+		BufferPrealloc uint64
 	}
 
 	HTTP struct {
@@ -109,8 +112,8 @@ type Config struct {
 
 // Default returns default config. Those are initially well-balanced, however maximal defaults
 // are pretty permitting
-func Default() Config {
-	return Config{
+func Default() *Config {
+	return &Config{
 		URL: URL{
 			BufferSize: URLBufferSize{
 				// allocate 2kb buffer by default for storing URI (including query and protocol)
@@ -153,6 +156,7 @@ func Default() Config {
 			// 8 kilobytes is by default twice more than TCPs read buffer, so must
 			// be enough to avoid multiple reads per single TCP chunk
 			DecodingBufferSize: 8 * 1024,
+			BufferPrealloc:     1024,
 		},
 		HTTP: HTTP{
 			ResponseBuffSize: 1024,
@@ -166,10 +170,10 @@ func Default() Config {
 }
 
 // Fill fills zero-values from partially-filled Config instance with default ones
-func Fill(src Config) (new Config) {
+func Fill(src *Config) (new *Config) {
 	defaults := Default()
 
-	return Config{
+	return &Config{
 		URL: URL{
 			BufferSize: URLBufferSize{
 				Default: numOr(src.URL.BufferSize.Default, defaults.URL.BufferSize.Default),

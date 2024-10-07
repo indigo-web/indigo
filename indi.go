@@ -35,7 +35,7 @@ func New(addr string) *App {
 }
 
 // Tune replaces default config.
-func (a *App) Tune(cfg config.Config) *App {
+func (a *App) Tune(cfg *config.Config) *App {
 	a.cfg = config.Fill(cfg)
 	return a
 }

@@ -21,7 +21,7 @@ type Suit struct {
 }
 
 func New(
-	cfg config.Config,
+	cfg *config.Config,
 	r router.Router,
 	request *http.Request,
 	client tcp.Client,
@@ -40,7 +40,7 @@ func New(
 }
 
 // Initialize is the same constructor as just New, but consumes fewer arguments.
-func Initialize(cfg config.Config, r router.Router, client tcp.Client, req *http.Request) *Suit {
+func Initialize(cfg *config.Config, r router.Router, client tcp.Client, req *http.Request) *Suit {
 	keyBuff, valBuff, startLineBuff := construct.Buffers(cfg)
 	respBuff := make([]byte, 0, cfg.HTTP.ResponseBuffSize)
 

@@ -12,13 +12,13 @@ import (
 	"net"
 )
 
-func Request(cfg config.Config, client tcp.Client, body http.Body) *http.Request {
+func Request(cfg *config.Config, client tcp.Client, body http.Retriever) *http.Request {
 	hdrs := headers.NewPrealloc(cfg.Headers.Number.Default)
 	q := query.New(keyvalue.NewPreAlloc(cfg.URL.Query.PreAlloc))
 	resp := http.NewResponse()
 	params := keyvalue.New()
 
-	return http.NewRequest(cfg, hdrs, q, resp, client, body, params)
+	return http.NewRequest(cfg, hdrs, q, resp, client, http.NewBody(body, cfg), params)
 }
 
 func Chunked(cfg config.Body) *chunkedbody.Parser {
@@ -33,7 +33,7 @@ func Client(cfg config.TCP, conn net.Conn) tcp.Client {
 	return tcp.NewClient(conn, cfg.ReadTimeout, readBuff)
 }
 
-func Buffers(s config.Config) (keyBuff *buffer.Buffer, valBuff *buffer.Buffer, startLineBuff *buffer.Buffer) {
+func Buffers(s *config.Config) (keyBuff *buffer.Buffer, valBuff *buffer.Buffer, startLineBuff *buffer.Buffer) {
 	return buffer.New(s.Headers.KeySpace.Default, s.Headers.KeySpace.Maximal),
 		buffer.New(s.Headers.ValueSpace.Default, s.Headers.ValueSpace.Maximal),
 		buffer.New(s.URL.BufferSize.Default, s.URL.BufferSize.Maximal)
