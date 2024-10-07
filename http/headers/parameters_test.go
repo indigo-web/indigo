@@ -1,9 +1,8 @@
 package headers
 
 import (
-	"testing"
-
 	"github.com/stretchr/testify/require"
+	"testing"
 )
 
 func TestGetParam(t *testing.T) {
