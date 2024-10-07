@@ -10,21 +10,20 @@ import (
 func TestQuery(t *testing.T) {
 	// test the laziness just in place
 	header := headers.New()
-	query := New(header)
-	query.Set([]byte("hello=world"))
-	require.Equal(t, "hello=world", string(query.raw))
-	require.False(t, query.parsed)
+	raw := New(header)
+	raw.Update([]byte("hello=world"))
+	query, err := raw.Cook()
+	require.NoError(t, err)
 
 	t.Run("get existing key", func(t *testing.T) {
-		value, err := query.Get("hello")
-		require.NoError(t, err)
+		value, found := query.Get("hello")
+		require.True(t, found)
 		require.Equal(t, "world", value)
 	})
 
 	t.Run("get non-existing key", func(t *testing.T) {
-		_, err := query.Get("lorem")
-		require.ErrorIs(t, err, ErrNoSuchKey)
+		value, found := query.Get("lorem")
+		require.False(t, found)
+		require.Empty(t, value)
 	})
-
-	require.True(t, query.parsed)
 }

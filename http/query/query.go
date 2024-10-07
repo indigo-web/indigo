@@ -1,75 +1,53 @@
 package query
 
 import (
-	"errors"
-	"github.com/indigo-web/indigo/http/query/internal"
 	"github.com/indigo-web/indigo/internal/keyvalue"
+	"github.com/indigo-web/indigo/internal/qparams"
+	"github.com/indigo-web/utils/uf"
 )
 
-var ErrNoSuchKey = errors.New("no entry by the key")
-
+// Params are parsed key-value pairs from the query itself
 type Params = *keyvalue.Storage
 
-// Query is a lazy structure for accessing URI parameters. Its laziness is defined
-// by the fact that parameters won't be parsed until requested
+// Query is an entity for lazy accessing the query
 type Query struct {
-	parsed bool
-	params Params
 	raw    []byte
+	params Params
 }
 
-func New(underlying *keyvalue.Storage) *Query {
-	return &Query{
-		params: underlying,
-	}
+func New(params Params) Query {
+	return Query{params: params}
 }
 
-// Set is responsible for setting a raw value of query. Each call
-// resets parsedQuery value to nil (query bytearray must be parsed
-// again)
-func (q *Query) Set(raw []byte) {
-	q.raw = raw
-
-	if q.parsed {
-		q.parsed = false
-		q.params.Clear()
-	}
+// Cook parses the query and returns Params
+//
+// Recommendation: consider invoking this method only once, as repeatedly parsing big
+// enough strings may be quite expensive
+func (q *Query) Cook() (Params, error) {
+	return q.params, qparams.Parse(q.raw, qparams.Into(q.params))
 }
 
-// Get is responsible for getting a key from query. In case this
-// method is called a first time since rawQuery was set (or not set
-// at all), rawQuery bytearray will be parsed and value returned
-// (or ErrNoSuchKey instead). In case of invalid query bytearray,
-// ErrBadQuery will be returned
-func (q *Query) Get(key string) (value string, err error) {
-	if err = q.parse(); err != nil {
-		return "", err
-	}
-
-	value, found := q.params.Get(key)
-	if !found {
-		err = ErrNoSuchKey
-	}
-
-	return value, err
-}
-
-// Unwrap returns all query parameters. If error occurred, nil parameters will be returned
-func (q *Query) Unwrap() (Params, error) {
-	return q.params, q.parse()
-}
-
-// Raw just returns a raw value of query as it is
-func (q *Query) Raw() []byte {
+// Bytes returns the actual query, as it has been received
+func (q *Query) Bytes() []byte {
 	return q.raw
 }
 
-func (q *Query) parse() error {
-	if q.parsed {
-		return nil
-	}
+// String returns the actual query, as it has been received
+//
+// Note: returned string is unsafe and must never be used after the request has been
+// processed
+func (q *Query) String() string {
+	return uf.B2S(q.raw)
+}
 
-	q.parsed = true
+// Update sets the new raw query string. This doesn't cause the existing parameters
+// to be parsed again, however. Used mostly in internal purposes
+func (q *Query) Update(new []byte) {
+	q.raw = new
+}
 
-	return internal.Parse(q.raw, q.params)
+// Clear empties all the parsed parameters. Used mostly in internal purposes
+func (q *Query) Clear() {
+	q.raw = nil
+	q.params.Clear()
 }
