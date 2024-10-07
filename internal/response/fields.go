@@ -3,6 +3,7 @@ package response
 import (
 	"github.com/indigo-web/indigo/http/cookie"
 	"github.com/indigo-web/indigo/http/headers"
+	"github.com/indigo-web/indigo/http/mime"
 	"github.com/indigo-web/indigo/http/status"
 	"github.com/indigo-web/indigo/internal/types"
 )
@@ -15,7 +16,7 @@ type Fields struct {
 	Body        []byte
 	Cookies     []cookie.Cookie
 	Status      status.Status
-	ContentType string
+	ContentType mime.MIME
 	// TODO: add corresponding Content-Encoding field
 	// TODO: automatically apply the encoding on a body when specified
 	TransferEncoding string

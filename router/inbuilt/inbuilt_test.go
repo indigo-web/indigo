@@ -184,9 +184,9 @@ func TestRouter_RouteError(t *testing.T) {
 
 	t.Run("status.ErrURIDecoding (also bad request)", func(t *testing.T) {
 		request := getRequest(method.GET, "/")
-		resp := r.OnError(request, status.ErrURIDecoding)
+		resp := r.OnError(request, status.ErrURLDecoding)
 		require.Equal(t, status.Teapot, resp.Reveal().Code)
-		require.Equal(t, status.ErrURIDecoding.Error(), string(resp.Reveal().Body))
+		require.Equal(t, status.ErrURLDecoding.Error(), string(resp.Reveal().Body))
 	})
 
 	t.Run("unregistered http error", func(t *testing.T) {

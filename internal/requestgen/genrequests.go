@@ -17,7 +17,7 @@ func Headers(n int) headers.Headers {
 }
 
 func HeadersBlock(hdrs headers.Headers) (buff []byte) {
-	for _, pair := range hdrs.Unwrap() {
+	for _, pair := range hdrs.Expose() {
 		buff = append(buff, pair.Key+": "+pair.Value+"\r\n"...)
 	}
 

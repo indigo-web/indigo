@@ -59,7 +59,7 @@ func (r *Response) Status(status status.Status) *Response {
 }
 
 // ContentType sets a custom Content-Type header value.
-func (r *Response) ContentType(value string) *Response {
+func (r *Response) ContentType(value mime.MIME) *Response {
 	r.fields.ContentType = value
 	return r
 }

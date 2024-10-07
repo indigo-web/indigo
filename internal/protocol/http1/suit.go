@@ -91,7 +91,7 @@ func (s *Suit) serve(once bool) (ok bool) {
 			req.Body.Init(req)
 			resp := notNil(req, s.router.OnRequest(req))
 
-			if req.WasHijacked() {
+			if req.Hijacked() {
 				// in case the connection was hijacked, we must not intrude after, so fail fast
 				return false
 			}

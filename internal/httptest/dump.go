@@ -13,14 +13,17 @@ func Dump(request *http.Request) (string, error) {
 	buff = space(buff)
 	buff = append(buff, request.Path...)
 
-	if raw := request.Query.Raw(); len(raw) > 0 {
+	if raw := request.Query.Bytes(); len(raw) > 0 {
 		buff = question(buff)
-		params, err := request.Query.Unwrap()
+		// all this code could be easily omitted and raw query could be just be appended.
+		// However, the point here is to check whether the representation of a request stays
+		// expected even after all the transformations applied
+		params, err := request.Query.Cook()
 		if err != nil {
 			return "", err
 		}
 
-		for _, param := range params.Unwrap() {
+		for _, param := range params.Expose() {
 			buff = queryparam(buff, param.Key, param.Value)
 			buff = ampersand(buff)
 		}
@@ -36,7 +39,7 @@ func Dump(request *http.Request) (string, error) {
 	buff = append(buff, protocol...)
 	buff = crlf(buff)
 
-	for _, h := range request.Headers.Unwrap() {
+	for _, h := range request.Headers.Expose() {
 		buff = header(buff, h)
 	}
 

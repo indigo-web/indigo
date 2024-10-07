@@ -321,7 +321,7 @@ func TestHttpRequestsParser_POST(t *testing.T) {
 		}
 
 		compareRequests(t, wanted, request)
-		require.Equal(t, "hello=world", string(request.Query.Raw()))
+		require.Equal(t, "hello=world", request.Query.String())
 		require.NoError(t, request.Clear())
 	})
 }

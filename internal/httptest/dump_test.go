@@ -16,7 +16,7 @@ import (
 
 func TestDump(t *testing.T) {
 	q := query.New(keyvalue.New())
-	q.Set([]byte("hello=world&foo=bar"))
+	q.Update([]byte("hello=world&foo=bar"))
 
 	cfg := config.Default()
 	client := dummy.NewCircularClient([]byte("Hello, world!")).OneTime()

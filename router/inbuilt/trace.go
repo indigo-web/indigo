@@ -33,7 +33,7 @@ func renderHTTPRequest(request *http.Request, buff []byte) []byte {
 func requestURI(request *http.Request, buff []byte) []byte {
 	buff = append(buff, request.Path...)
 
-	if query := request.Query.Raw(); len(query) > 0 {
+	if query := request.Query.Bytes(); len(query) > 0 {
 		buff = append(buff, '?')
 		buff = append(buff, query...)
 	}
@@ -42,7 +42,7 @@ func requestURI(request *http.Request, buff []byte) []byte {
 }
 
 func requestHeaders(hdrs headers.Headers, buff []byte) []byte {
-	for _, pair := range hdrs.Unwrap() {
+	for _, pair := range hdrs.Expose() {
 		buff = append(append(buff, pair.Key...), ": "...)
 		buff = append(append(buff, pair.Value...), "\r\n"...)
 	}

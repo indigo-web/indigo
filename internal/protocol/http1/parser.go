@@ -8,7 +8,7 @@ import (
 	"github.com/indigo-web/indigo/http/method"
 	"github.com/indigo-web/indigo/http/proto"
 	"github.com/indigo-web/indigo/http/status"
-	"github.com/indigo-web/indigo/internal/uridecode"
+	"github.com/indigo-web/indigo/internal/urlencoded"
 	"github.com/indigo-web/utils/buffer"
 	"github.com/indigo-web/utils/strcomp"
 	"github.com/indigo-web/utils/uf"
@@ -160,7 +160,7 @@ path:
 
 		query := bytes.IndexByte(reqPath, '?')
 		if query != -1 {
-			request.Query.Set(reqPath[query+1:])
+			request.Query.Update(reqPath[query+1:])
 			reqPath = reqPath[:query]
 		}
 
@@ -168,7 +168,7 @@ path:
 			return Error, nil, status.ErrBadRequest
 		}
 
-		reqPath, err = uridecode.Decode(reqPath, reqPath[:0])
+		reqPath, err = urlencoded.Decode(reqPath)
 		if err != nil {
 			return Error, nil, err
 		}

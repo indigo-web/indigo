@@ -140,7 +140,7 @@ func TestPOST(t *testing.T) {
 }
 
 func compareHeaders(a, b headers.Headers) bool {
-	first, second := a.Unwrap(), b.Unwrap()
+	first, second := a.Expose(), b.Expose()
 	if len(first) != len(second) {
 		return false
 	}
