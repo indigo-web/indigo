@@ -81,7 +81,7 @@ func (b *Body) Bytes() ([]byte, error) {
 	}
 
 	if b.buff == nil {
-		b.buff = make([]byte, b.cfg.Body.BufferPrealloc)
+		b.buff = make([]byte, 0, b.cfg.Body.BufferPrealloc)
 	}
 
 	for {
