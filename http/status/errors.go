@@ -24,7 +24,7 @@ var (
 
 	ErrBadRequest                    = NewError(BadRequest, "bad request")
 	ErrTooLongRequestLine            = NewError(BadRequest, "request line is too long")
-	ErrURIDecoding                   = NewError(BadRequest, "invalid URI encoding")
+	ErrURLDecoding                   = NewError(BadRequest, "invalid urlencoded sequence")
 	ErrBadQuery                      = NewError(BadRequest, "bad URL query")
 	ErrNotFound                      = NewError(NotFound, "not found")
 	ErrInternalServerError           = NewError(InternalServerError, "internal server error")
