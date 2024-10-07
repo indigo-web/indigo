@@ -9,6 +9,7 @@ import (
 	"github.com/indigo-web/indigo/http/cookie"
 	"github.com/indigo-web/indigo/http/headers"
 	"github.com/indigo-web/indigo/http/method"
+	"github.com/indigo-web/indigo/http/mime"
 	"github.com/indigo-web/indigo/http/status"
 	"github.com/indigo-web/indigo/internal/httptest"
 	"github.com/indigo-web/indigo/router/inbuilt/middleware"
@@ -77,14 +78,14 @@ func getInbuiltRouter() *inbuilt.Router {
 	})
 
 	r.Get("/query", func(request *http.Request) *http.Response {
-		params, err := request.Query.Unwrap()
+		params, err := request.Query.Cook()
 		if err != nil {
 			return http.Error(request, err)
 		}
 
 		var buff []byte
 
-		for _, pair := range params.Unwrap() {
+		for _, pair := range params.Expose() {
 			buff = append(buff, pair.Key+":"+pair.Value+"."...)
 		}
 
@@ -131,14 +132,27 @@ func getInbuiltRouter() *inbuilt.Router {
 		}
 
 		buff := make([]byte, 0, 512)
-
-		for _, c := range jar.Unwrap() {
+		for _, c := range jar.Expose() {
 			buff = append(buff, fmt.Sprintf("%s=%s\n", c.Key, c.Value)...)
 		}
 
 		return http.Bytes(request, buff).
 			Cookie(cookie.New("hello", "world")).
 			Cookie(cookie.New("men", "in black"))
+	})
+
+	r.Get("/form-urlencoded", func(request *http.Request) *http.Response {
+		form, err := request.Body.Form()
+		if err != nil {
+			return http.Error(request, err)
+		}
+
+		buff := make([]byte, 0, 512)
+		for _, pair := range form.Expose() {
+			buff = append(buff, fmt.Sprintf("%s=%s\n", pair.Key, pair.Value)...)
+		}
+
+		return http.Bytes(request, buff)
 	})
 
 	return r
@@ -565,6 +579,32 @@ func TestFirstPhase(t *testing.T) {
 		require.NoError(t, err)
 		require.Equal(t, "hello=world\nmen=in black\nanything=anywhere\n", string(body))
 		require.Equal(t, []string{"hello=world", "men=in black"}, resp.Header.Values("Set-Cookie"))
+	})
+
+	t.Run("form data", func(t *testing.T) {
+		request := &stdhttp.Request{
+			Method: stdhttp.MethodGet,
+			URL: &url.URL{
+				Scheme: "http",
+				Host:   addr,
+				Path:   "/form-urlencoded",
+			},
+			Proto:      "HTTP/1.1",
+			ProtoMajor: 1,
+			ProtoMinor: 1,
+			Header: stdhttp.Header{
+				"Content-Type": {mime.FormUrlencoded},
+			},
+			Host:       addr,
+			RemoteAddr: addr,
+			Body:       io.NopCloser(strings.NewReader("hello=world&my+name=Paul&a%2bb=5")),
+		}
+		resp, err := stdhttp.DefaultClient.Do(request)
+		require.NoError(t, err)
+		require.Equal(t, stdhttp.StatusOK, resp.StatusCode)
+		body, err := io.ReadAll(resp.Body)
+		require.NoError(t, err)
+		require.Equal(t, "hello=world\nmy name=Paul\na+b=5\n", string(body))
 	})
 
 	t.Run("chunked body", func(t *testing.T) {
