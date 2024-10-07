@@ -302,15 +302,16 @@ headerValue:
 			return Error, nil, status.ErrHeaderFieldsTooLarge
 		}
 
+		if headerValueBuff.Preview()[headerValueBuff.SegmentLength()-1] == '\r' {
+			headerValueBuff.Trunc(1)
+		}
+
 		if headerValueBuff.SegmentLength() > p.headersCfg.MaxValueLength {
 			return Error, nil, status.ErrHeaderFieldsTooLarge
 		}
 
 		data = data[lf+1:]
 		value := uf.B2S(trimPrefixSpaces(headerValueBuff.Finish()))
-		if value[len(value)-1] == '\r' {
-			value = value[:len(value)-1]
-		}
 
 		key := p.headerKey
 		request.Headers.Add(key, value)
