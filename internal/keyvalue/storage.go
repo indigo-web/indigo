@@ -19,10 +19,10 @@ type Storage struct {
 }
 
 func New() *Storage {
-	return NewPreAlloc(0)
+	return new(Storage)
 }
 
-// NewPreAlloc returns an instance of Storage with pre-allocated underlying storage
+// NewPreAlloc returns an instance of Storage with pre-allocated underlying storage.
 func NewPreAlloc(n int) *Storage {
 	return &Storage{
 		pairs: make([]Pair, 0, n),
@@ -31,7 +31,7 @@ func NewPreAlloc(n int) *Storage {
 
 // NewFromMap returns a new instance with already inserted values from given map.
 // Note: as maps are unordered, resulting underlying structure will also contain unordered
-// pairs
+// pairs.
 func NewFromMap(m map[string][]string) *Storage {
 	// this actually doesn't always allocate exactly enough sized slice, as we don't
 	// count amount of _values_, only _keys_, where each key may contain more  (or less)
@@ -48,7 +48,7 @@ func NewFromMap(m map[string][]string) *Storage {
 	return kv
 }
 
-// Add adds a new pair of key and value
+// Add adds a new pair of key and value.
 func (s *Storage) Add(key, value string) *Storage {
 	s.pairs = append(s.pairs, Pair{
 		Key:   key,
@@ -63,7 +63,7 @@ func (s *Storage) Value(key string) string {
 }
 
 // ValueOr returns either the first value corresponding to the key or custom value, defined
-// via the second parameter
+// via the second parameter.
 func (s *Storage) ValueOr(key, or string) string {
 	value, found := s.Get(key)
 	if !found {
@@ -73,9 +73,9 @@ func (s *Storage) ValueOr(key, or string) string {
 	return value
 }
 
-// Get returns a value corresponding to the key and a bool, indicating whether the key
-// exists. In case it doesn't, empty string will be returned either
-func (s *Storage) Get(key string) (string, bool) {
+// Get returns a value and a bool, indicating whether the value was found. If it wasn't, it'll
+// be an empty string.
+func (s *Storage) Get(key string) (value string, found bool) {
 	for _, pair := range s.pairs {
 		if strcomp.EqualFold(key, pair.Key) {
 			return pair.Value, true
@@ -88,7 +88,7 @@ func (s *Storage) Get(key string) (string, bool) {
 // Values returns all values by the key. Returns nil if key doesn't exist.
 //
 // WARNING: calling it twice will override values, returned by the first call. Consider
-// copying the returned slice for safe use
+// copying the returned slice for safe use.
 func (s *Storage) Values(key string) (values []string) {
 	s.valuesBuff = s.valuesBuff[:0]
 
@@ -108,7 +108,7 @@ func (s *Storage) Values(key string) (values []string) {
 // Keys returns all unique presented keys.
 //
 // WARNING: calling it twice will override values, returned by the first call. Consider
-// copying the returned slice for safe use
+// copying the returned slice for safe use.
 func (s *Storage) Keys() []string {
 	s.uniqueBuff = s.uniqueBuff[:0]
 
@@ -123,12 +123,12 @@ func (s *Storage) Keys() []string {
 	return s.uniqueBuff
 }
 
-// Iter returns an iterator over the pairs
+// Iter returns an iterator over the pairs.
 func (s *Storage) Iter() iter.Iterator[Pair] {
 	return iter.Slice(s.pairs)
 }
 
-// Has indicates, whether there's an entry of the key
+// Has indicates, whether there's an entry of the key.
 func (s *Storage) Has(key string) bool {
 	for _, pair := range s.pairs {
 		if strcomp.EqualFold(key, pair.Key) {
@@ -139,13 +139,13 @@ func (s *Storage) Has(key string) bool {
 	return false
 }
 
-// Len returns a number of stored pairs
+// Len returns a number of stored pairs.
 func (s *Storage) Len() int {
 	return len(s.pairs)
 }
 
 // Clone creates a deep copy, which may be used later or stored somewhere safely. However,
-// it comes at cost of multiple allocations
+// it comes at cost of multiple allocations.
 func (s *Storage) Clone() *Storage {
 	return &Storage{
 		pairs:      clone(s.pairs),
@@ -154,13 +154,12 @@ func (s *Storage) Clone() *Storage {
 	}
 }
 
-// Unwrap reveals underlying data structure. Try to avoid the method if possible, as
-// changing the signature may not affect a major version
-func (s *Storage) Unwrap() []Pair {
+// Expose exposes the underlying pairs slice.
+func (s *Storage) Expose() []Pair {
 	return s.pairs
 }
 
-// Clear all the entries. However, all the allocated space won't be freed
+// Clear all the entries. However, all the allocated space won't be freed.
 func (s *Storage) Clear() *Storage {
 	s.pairs = s.pairs[:0]
 	return s
