@@ -51,38 +51,47 @@ func getRequestWithBody(chunked bool, body ...[]byte) (*http.Request, *Body) {
 	return request, reqBody
 }
 
+func readall(body *Body) ([]byte, error) {
+	var buff []byte
+
+	for {
+		data, err := body.Retrieve()
+		buff = append(buff, data...)
+		switch err {
+		case nil:
+		case io.EOF:
+			return buff, nil
+		default:
+			return buff, err
+		}
+	}
+}
+
 func TestBodyReader_Plain(t *testing.T) {
-	t.Run("call once", func(t *testing.T) {
+	t.Run("all at once", func(t *testing.T) {
 		sample := []byte("Hello, world!")
 		_, body := getRequestWithBody(false, sample)
-		actualBody, err := body.String()
-		require.NoError(t, err)
-		require.Equal(t, string(sample), actualBody)
+		actualBody, err := body.Retrieve()
+		require.EqualError(t, err, io.EOF.Error())
+		require.Equal(t, string(sample), string(actualBody))
 	})
 
-	t.Run("multiple calls", func(t *testing.T) {
+	t.Run("consecutive data pieces", func(t *testing.T) {
 		sample := [][]byte{
 			[]byte("Hel"),
 			[]byte("lo, "),
 			[]byte("wor"),
 			[]byte("ld!"),
 		}
-		toString := func(b []byte) string {
-			return string(b)
-		}
-		bodyString := ft.Sum(ft.Map(toString, sample))
+		bodyString := "Hello, world!"
 
 		_, body := getRequestWithBody(false, sample...)
-		actualBody, err := body.String()
+		actualBody, err := readall(body)
 		require.NoError(t, err)
-		require.Equal(t, bodyString, actualBody)
-
-		actualBody, err = body.String()
-		require.NoError(t, err)
-		require.Equal(t, bodyString, actualBody)
+		require.Equal(t, bodyString, string(actualBody))
 	})
 
-	t.Run("a lot of data", func(t *testing.T) {
+	t.Run("distinction", func(t *testing.T) {
 		const buffSize = 10
 		var (
 			first  = strings.Repeat("a", buffSize)
@@ -109,25 +118,6 @@ func TestBodyReader_Plain(t *testing.T) {
 		require.Equal(t, second, string(data))
 	})
 
-	t.Run("reader", func(t *testing.T) {
-		data := "qwertyuiopasdfghjklzxcvbnm"
-		_, body := getRequestWithBody(false, []byte(data))
-		result := make([]byte, 0, len(data))
-		buff := make([]byte, 1)
-
-		for {
-			n, err := body.Read(buff)
-			result = append(result, buff[:n]...)
-			if err == io.EOF {
-				break
-			}
-
-			require.NoError(t, err)
-		}
-
-		require.Equal(t, data, string(result))
-	})
-
 	t.Run("too big plain body", func(t *testing.T) {
 		data := strings.Repeat("a", 10)
 		request, _ := getRequestWithBody(false, []byte(data))
@@ -138,7 +128,7 @@ func TestBodyReader_Plain(t *testing.T) {
 		body := NewBody(client, chunkedParser, s)
 		body.Init(request)
 
-		_, err := body.Bytes()
+		_, err := readall(body)
 		require.EqualError(t, err, status.ErrBodyTooLarge.Error())
 	})
 }
@@ -149,7 +139,7 @@ func TestBodyReader_Chunked(t *testing.T) {
 	request, body := getRequestWithBody(true, chunked)
 	body.Init(request)
 
-	actualBody, err := body.String()
+	actualBody, err := readall(body)
 	require.NoError(t, err)
-	require.Equal(t, wantBody, actualBody)
+	require.Equal(t, wantBody, string(actualBody))
 }

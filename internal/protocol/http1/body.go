@@ -5,35 +5,25 @@ import (
 	"github.com/indigo-web/indigo/config"
 	"github.com/indigo-web/indigo/http"
 	"github.com/indigo-web/indigo/http/status"
-	"github.com/indigo-web/indigo/internal/stash"
 	"github.com/indigo-web/indigo/internal/tcp"
-	"github.com/indigo-web/utils/uf"
 	"io"
 	"math"
 )
 
-var _ http.Body = &Body{}
-
 type Body struct {
-	*stash.Reader
 	plain         plainBodyReader
 	chunked       chunkedBodyReader
 	isChunked     bool
 	contentLength int
-	fullBodyBuff  []byte
-	eof           bool
 }
 
 func NewBody(
 	client tcp.Client, chunkedParser *chunkedbody.Parser, s config.Body,
 ) *Body {
-	body := &Body{
+	return &Body{
 		plain:   newPlainBodyReader(client, s.MaxSize),
 		chunked: newChunkedBodyReader(client, s.MaxSize, chunkedParser),
 	}
-	body.Reader = stash.New(body.Retrieve)
-
-	return body
 }
 
 func (b *Body) Init(request *http.Request) {
@@ -44,64 +34,9 @@ func (b *Body) Init(request *http.Request) {
 	} else {
 		b.plain.init(request)
 	}
-
-	b.eof = false
-	b.Reader.Reset()
-}
-
-func (b *Body) String() (string, error) {
-	bytes, err := b.Bytes()
-
-	return uf.B2S(bytes), err
-}
-
-func (b *Body) Bytes() ([]byte, error) {
-	if b.eof {
-		return b.fullBodyBuff, nil
-	}
-
-	// FIXME: this barely works with applied transfer-encodings
-	if !b.isChunked && cap(b.fullBodyBuff) < b.contentLength {
-		b.fullBodyBuff = make([]byte, 0, b.contentLength)
-	}
-
-	b.fullBodyBuff = b.fullBodyBuff[:0]
-
-	for {
-		data, err := b.Retrieve()
-		b.fullBodyBuff = append(b.fullBodyBuff, data...)
-		switch err {
-		case nil:
-		case io.EOF:
-			return b.fullBodyBuff, nil
-		default:
-			return nil, err
-		}
-	}
-}
-
-func (b *Body) Callback(cb http.OnBodyCallback) error {
-	for {
-		data, err := b.Retrieve()
-		switch err {
-		case nil:
-		case io.EOF:
-			return cb(data)
-		default:
-			return err
-		}
-
-		if err = cb(data); err != nil {
-			return err
-		}
-	}
 }
 
 func (b *Body) Retrieve() ([]byte, error) {
-	if b.eof {
-		return nil, io.EOF
-	}
-
 	var (
 		piece []byte
 		err   error
@@ -113,30 +48,7 @@ func (b *Body) Retrieve() ([]byte, error) {
 		piece, err = b.plain.read()
 	}
 
-	b.checkEOF(err)
-
 	return piece, err
-}
-
-func (b *Body) Discard() (err error) {
-	for !b.eof {
-		_, err = b.Retrieve()
-		if err != nil {
-			break
-		}
-	}
-
-	if err == io.EOF {
-		err = nil
-	}
-
-	return err
-}
-
-func (b *Body) checkEOF(err error) {
-	if err == io.EOF {
-		b.eof = true
-	}
 }
 
 type plainBodyReader struct {
