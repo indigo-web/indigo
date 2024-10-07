@@ -7,17 +7,16 @@ import (
 	"github.com/indigo-web/indigo/http/encryption"
 	"github.com/indigo-web/indigo/http/headers"
 	"github.com/indigo-web/indigo/http/method"
-	"github.com/indigo-web/indigo/http/mime"
 	"github.com/indigo-web/indigo/http/proto"
 	"github.com/indigo-web/indigo/http/query"
-	"github.com/indigo-web/indigo/http/status"
 	"github.com/indigo-web/indigo/internal/keyvalue"
 	"github.com/indigo-web/indigo/internal/tcp"
-	json "github.com/json-iterator/go"
 	"net"
 )
 
 var zeroContext = context.Background()
+
+type Params = *keyvalue.Storage
 
 // Request represents HTTP request
 type Request struct {
@@ -26,7 +25,7 @@ type Request struct {
 	// Path represents decoded request URI
 	Path Path
 	// Query are request's URI parameters
-	Query *query.Query
+	Query query.Query
 	// Params are dynamic path's wildcards
 	Params Params
 	// Proto is the protocol, which was used to make the request
@@ -61,12 +60,12 @@ type Request struct {
 	// to gain performance, as accessing the struct is much faster than looking up in context.Context
 	Env Environment
 	// Body accesses the request's body
-	Body        Body
-	client      tcp.Client
-	wasHijacked bool
-	response    *Response
-	jar         cookie.Jar
-	cfg         *config.Config
+	Body     *Body
+	client   tcp.Client
+	hijacked bool
+	response *Response
+	jar      cookie.Jar
+	cfg      *config.Config
 }
 
 // NewRequest returns a new instance of request object and body gateway
@@ -75,8 +74,8 @@ type Request struct {
 // is invalid, we need to render a response using request method, but appears
 // that default method is a null-value (proto.Unknown)
 func NewRequest(
-	cfg config.Config, hdrs headers.Headers, query *query.Query, response *Response,
-	client tcp.Client, body Body, params Params,
+	cfg *config.Config, hdrs headers.Headers, query query.Query, response *Response,
+	client tcp.Client, body *Body, params Params,
 ) *Request {
 	request := &Request{
 		Query:    query,
@@ -88,32 +87,10 @@ func NewRequest(
 		Body:     body,
 		client:   client,
 		response: response,
-		cfg:      &cfg,
+		cfg:      cfg,
 	}
 
 	return request
-}
-
-// JSON takes a model and returns an error if occurred. Model must be a pointer to a structure.
-// If Content-Type header is given, but is not "application/json", then status.ErrUnsupportedMediaType
-// will be returned. If JSON is malformed, or it doesn't match the model, then custom jsoniter error
-// will be returned
-func (r *Request) JSON(model any) error {
-	if len(r.ContentType) > 0 && r.ContentType != mime.JSON {
-		return status.ErrUnsupportedMediaType
-	}
-
-	data, err := r.Body.Bytes()
-	if err != nil {
-		return err
-	}
-
-	iterator := json.ConfigDefault.BorrowIterator(data)
-	iterator.ReadVal(model)
-	err = iterator.Error
-	json.ConfigDefault.ReturnIterator(iterator)
-
-	return err
 }
 
 // Cookies returns a cookie jar with parsed cookies key-value pairs, and an error
@@ -147,21 +124,21 @@ func (r *Request) Respond() *Response {
 }
 
 // Hijack the connection. Request body will be implicitly read (so if you need it you
-// should read it before) all the body left. After handler exits, the connection will
-// be closed, so the connection can be hijacked only once
+// should read it before) to the end. After handler exits, the connection will
+// be closed, so the connection can be hijacked at most once
 func (r *Request) Hijack() (tcp.Client, error) {
 	if err := r.Body.Discard(); err != nil {
 		return nil, err
 	}
 
-	r.wasHijacked = true
+	r.hijacked = true
 
 	return r.client, nil
 }
 
-// WasHijacked returns true or false, depending on whether was a connection hijacked
-func (r *Request) WasHijacked() bool {
-	return r.wasHijacked
+// Hijacked tells whether the connection was hijacked or not
+func (r *Request) Hijacked() bool {
+	return r.hijacked
 }
 
 // Clear resets request headers and reads body into nowhere until completed.
@@ -171,7 +148,7 @@ func (r *Request) Clear() (err error) {
 		return err
 	}
 
-	r.Query.Set(nil)
+	r.Query.Clear()
 	r.Params.Clear()
 	r.Headers.Clear()
 	r.ContentLength = 0
@@ -184,8 +161,6 @@ func (r *Request) Clear() (err error) {
 
 	return nil
 }
-
-// TODO: implement FormData parsing
 
 type Environment struct {
 	// Error contains an error, if occurred
@@ -200,5 +175,3 @@ type Environment struct {
 	// aka implicit redirect
 	AliasFrom string
 }
-
-type Params = *keyvalue.Storage
