@@ -1,4 +1,4 @@
-package formdata
+package internal
 
 import (
 	"github.com/indigo-web/indigo/http/form"

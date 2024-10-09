@@ -1,15 +1,23 @@
-package formdata
+package internal
 
 import (
 	"github.com/indigo-web/indigo/http/form"
+	"github.com/indigo-web/indigo/http/headers"
+	"github.com/indigo-web/indigo/http/mime"
 	"github.com/indigo-web/indigo/http/status"
-	"github.com/indigo-web/indigo/internal/formdata/internal"
 	"github.com/indigo-web/utils/uf"
 	"iter"
-	"strings"
 )
 
-const DefaultCoding = "utf8"
+const (
+	DefaultCoding      = "utf8"
+	DefaultContentType = mime.Plain
+)
+
+type header struct {
+	Ok                               bool
+	Name, File, ContentType, Charset string
+}
 
 func ParseMultipart(into form.Form, data []byte, b string) (form.Form, error) {
 	var boundary string
@@ -23,9 +31,9 @@ func ParseMultipart(into form.Form, data []byte, b string) (form.Form, error) {
 	}
 
 	charset := DefaultCoding
-	s := internal.NewStream(uf.B2S(data))
+	s := newStream(uf.B2S(data))
 
-	if !stripPreamble(&s, boundary) {
+	if !skipPreamble(&s, boundary) {
 		return nil, status.ErrBadRequest
 	}
 
@@ -34,16 +42,25 @@ func ParseMultipart(into form.Form, data []byte, b string) (form.Form, error) {
 	}
 
 	for hdr, value := range formParts(&s, boundary) {
-		if !hdr.Ok {
+		if !hdr.Ok || len(hdr.Name) == 0 {
 			return nil, status.ErrBadRequest
 		}
 
 		if hdr.Name == "_charset_" {
-			charset = hdr.Charset
+			charset = value
+			if len(charset) == 0 {
+				return nil, status.ErrBadRequest
+			}
+
+			continue
 		}
 
 		if len(hdr.Charset) == 0 {
 			hdr.Charset = charset
+		}
+
+		if len(hdr.ContentType) == 0 {
+			hdr.ContentType = DefaultContentType
 		}
 
 		into = append(into, form.Data{
@@ -58,12 +75,7 @@ func ParseMultipart(into form.Form, data []byte, b string) (form.Form, error) {
 	return into, nil
 }
 
-type header struct {
-	Ok                               bool
-	Name, File, ContentType, Charset string
-}
-
-func stripPreamble(s *internal.Stream, boundary string) bool {
+func skipPreamble(s *stream, boundary string) bool {
 	b := s.FindSubstr(boundary)
 	if b == -1 {
 		return false
@@ -73,7 +85,7 @@ func stripPreamble(s *internal.Stream, boundary string) bool {
 	return true
 }
 
-func formParts(s *internal.Stream, boundary string) iter.Seq2[header, string] {
+func formParts(s *stream, boundary string) iter.Seq2[header, string] {
 	return func(yield func(header, string) bool) {
 		for {
 			hdr := parseHeaders(s)
@@ -101,7 +113,7 @@ func formParts(s *internal.Stream, boundary string) iter.Seq2[header, string] {
 	}
 }
 
-func parseHeaders(s *internal.Stream) (header header) {
+func parseHeaders(s *stream) (header header) {
 	for {
 		var ok bool
 		header, ok = parseHeader(s, header)
@@ -117,7 +129,7 @@ func parseHeaders(s *internal.Stream) (header header) {
 	}
 }
 
-func parseHeader(s *internal.Stream, origin header) (modified header, ok bool) {
+func parseHeader(s *stream, origin header) (modified header, ok bool) {
 	switch {
 	case s.ConsumeFold("Content-Disposition:"):
 		s.SkipWhitespaces()
@@ -128,11 +140,20 @@ func parseHeader(s *internal.Stream, origin header) (modified header, ok bool) {
 			return origin, false
 		}
 
-		return parseCDParams(params, origin)
+		return parseContentDispositionParams(params, origin)
 	case s.ConsumeFold("Content-Type:"):
 		s.SkipWhitespaces()
 		// TODO: I assume there can be parameters I should look after
 		origin.ContentType, ok = s.AdvanceLine()
+		if !ok {
+			return origin, false
+		}
+
+		var params string
+		origin.ContentType, params = headers.CutParams(origin.ContentType)
+		if len(params) > 0 {
+			origin, ok = parseContentTypeParams(params, origin)
+		}
 
 		return origin, ok
 	default:
@@ -142,49 +163,36 @@ func parseHeader(s *internal.Stream, origin header) (modified header, ok bool) {
 	}
 }
 
-func parseCDParams(params string, origin header) (modified header, ok bool) {
-	for {
-		key, other, found := cutByte(params, '=')
-		if !found {
-			return origin, len(stripWS(key)) == 0
+func parseContentDispositionParams(params string, origin header) (modified header, ok bool) {
+	for key, value := range headers.WalkParams(params) {
+		if len(key) == 0 || len(value) == 0 {
+			return origin, false
 		}
-
-		var value string
-		value, params, found = cutByte(other, ';')
 
 		switch key {
 		case "name":
 			origin.Name = value
 		case "filename":
 			origin.File = value
-			// others must ignore
+		}
+	}
+
+	return origin, true
+}
+
+func parseContentTypeParams(params string, origin header) (modified header, ok bool) {
+	for key, value := range headers.WalkParams(params) {
+		if len(key) == 0 || len(value) == 0 {
+			return origin, false
 		}
 
-		if !found {
+		if key == "charset" {
+			origin.Charset = value
 			return origin, true
 		}
 	}
-}
 
-func cutByte(str string, c byte) (before string, after string, found bool) {
-	pos := strings.IndexByte(str, c)
-	if pos == -1 {
-		return str, "", false
-	}
-
-	return str[:pos], str[pos+1:], true
-}
-
-func stripWS(str string) string {
-	for i, c := range str {
-		switch c {
-		case ' ', '\t':
-		default:
-			return str[i:]
-		}
-	}
-
-	return ""
+	return origin, true
 }
 
 func rstripCRLF(str string) string {
