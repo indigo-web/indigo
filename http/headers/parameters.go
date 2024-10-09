@@ -1,69 +1,34 @@
 package headers
 
 import (
-	"strconv"
+	"github.com/indigo-web/indigo/internal/strutil"
+	"iter"
 	"strings"
 )
 
-const DefaultEncoding = "iso-8859-1"
-
-var (
-	qualitySubstr = ";q=0."
-	charsetSubstr = ";charset="
-)
-
-// ValueOf returns a value until first semicolon is met. Even if the value after semicolon
-// is not a parameter, it will anyway be counted as a parameter
-func ValueOf(str string) string {
-	if index := strings.IndexByte(str, ';'); index != -1 {
-		return str[:index]
+// CutParams behaves exactly as strings.Cut, but strips whitespaces between value
+// and the first-encountered parameter in addition.
+func CutParams(header string) (value, params string) {
+	sep := strings.IndexByte(header, ';')
+	if sep == -1 {
+		return header, ""
 	}
 
-	return str
+	return header[:sep], strutil.LStripWS(header[sep+1:])
 }
 
-// QualityOf simply returns a value of quality-parameter as an uint8. If not presented or
-// is not a valid integer, 9 is returned
-func QualityOf(str string) int {
-	q, err := strconv.Atoi(getParam(str, qualitySubstr, "9"))
-	if err != nil {
-		return 9
-	}
-
-	return q
-}
-
-// CharsetOf returns a charset parameter value, returning DefaultEncoding in case not presented
-func CharsetOf(str string) string {
-	return getParam(str, charsetSubstr, DefaultEncoding)
-}
-
-// ParamOf is an alias to ParamOfOr, except no `or`-parameter is passed - empty string
-// will be returned in case not found.
-func ParamOf(str, key string) string {
-	return ParamOfOr(str, key, "")
-}
-
-// ParamOfOr looks for a parameter in a value, and if found, returns a parameter value.
-// In case parameter is not found, `or` is returned
-func ParamOfOr(str, key, or string) string {
-	return getParam(str, ";"+key+"=", or)
-}
-
-func getParam(str, substr, or string) string {
-	if index := strings.Index(str, substr); index != -1 {
-		valOffset := index + len(substr)
-
-		return str[valOffset : valOffset+getParamEnd(str[valOffset:])]
-	}
-
-	return or
-}
-
-func getParamEnd(str string) int {
-	if index := strings.IndexByte(str, ';'); index != -1 {
-		return index
-	}
-
-	return len(str)
+// WalkParams iterates over the parameters. An error is reported as the empty
+// key-value pair (key="" and value=""). Such a pair is always the last one.
+//
+// Note: the passed value MUST be parameters only, otherwise the result depends
+// on the header value itself (most probably error will be reported.)
+func WalkParams(params string) iter.Seq2[string, string] {
+	// TODO: must decode keys and values here. The problem is, we cannot do that directly
+	// TODO: as this will mutate the buffer directly, which may cause issues and unnecessary
+	// TODO: questions when calling request.Body.Bytes() afterwards. Therefore, in order to
+	// TODO: avoid holding buffers when we don't need them, we can implement a lazy decoder
+	// TODO: which will report if any urlencoded characters were met. So by that, a buffer
+	// TODO: will be used only on demand, which seems fairly enough considering that this
+	// TODO: is not a (much) likely path.
+	return strutil.WalkKV(params, ';')
 }
