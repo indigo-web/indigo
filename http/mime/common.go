@@ -34,7 +34,6 @@ const (
 // considered compatible with any other MIME
 func Complies(mime MIME, with string) bool {
 	// get rid of parameters if any
-	with = headers.ValueOf(with)
-	
+	with, _ = headers.CutParams(with)
 	return len(with) == 0 || with == mime
 }

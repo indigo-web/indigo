@@ -177,11 +177,3 @@ func disperse(data []byte, n int) (parts [][]byte) {
 
 	return parts
 }
-
-func min(a, b int) int {
-	if a < b {
-		return a
-	}
-
-	return b
-}
