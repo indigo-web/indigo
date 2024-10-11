@@ -10,7 +10,7 @@ import (
 var safeChars = [256]bool{
 	false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false,
 	false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false,
-	false, false, true, false, false, true, false, false, true, true, false, false, true, true, true, true,
+	false, false, true, false, false, true, false, false, true, true, false, true, true, true, true, true,
 	true, true, true, true, true, true, true, true, true, true, false, false, true, false, true, false,
 	false, true, true, true, true, true, true, true, true, true, true, true, true, true, true, true,
 	true, true, true, true, true, true, true, true, true, true, true, true, false, true, false, true,
@@ -26,7 +26,7 @@ var safeChars = [256]bool{
 	false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false,
 }
 
-func WalkKV(data string, sep byte) iter.Seq2[string, string] {
+func WalkKV(data string) iter.Seq2[string, string] {
 	return func(yield func(string, string) bool) {
 		var key string
 
@@ -53,7 +53,7 @@ func WalkKV(data string, sep byte) iter.Seq2[string, string] {
 		for i := 0; i < len(data); i++ {
 			c := data[i]
 
-			if c == sep {
+			if c == ';' {
 				value := data[:i]
 				data = LStripWS(data[i+1:])
 

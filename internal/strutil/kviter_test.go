@@ -25,19 +25,19 @@ func strdup(str string) string {
 
 func TestWalkKV(t *testing.T) {
 	t.Run("single value", func(t *testing.T) {
-		values := collect(WalkKV("abc", ';'))
+		values := collect(WalkKV("abc"))
 		require.Equal(t, 1, len(values))
 		require.Equal(t, strpair{"abc", ""}, values[0])
 	})
 
 	t.Run("single pair", func(t *testing.T) {
-		values := collect(WalkKV("abc=cba", ';'))
+		values := collect(WalkKV("abc=cba"))
 		require.Equal(t, 1, len(values))
 		require.Equal(t, strpair{"abc", "cba"}, values[0])
 	})
 
 	t.Run("multiple pairs", func(t *testing.T) {
-		values := collect(WalkKV("abc=cba;hello=world;", ';'))
+		values := collect(WalkKV("abc=cba;hello=world;"))
 		require.Equal(t, 3, len(values))
 		require.Equal(t, strpair{"abc", "cba"}, values[0])
 		require.Equal(t, strpair{"hello", "world"}, values[1])
@@ -45,7 +45,7 @@ func TestWalkKV(t *testing.T) {
 	})
 
 	t.Run("codings", func(t *testing.T) {
-		values := collect(WalkKV(strdup("abc=cba; hello=\"world\"; k%20ey=value%21"), ';'))
+		values := collect(WalkKV(strdup("abc=cba; hello=\"world\"; k%20ey=value%21")))
 		require.Equal(t, 3, len(values))
 		require.Equal(t, strpair{"abc", "cba"}, values[0])
 		require.Equal(t, strpair{"hello", "world"}, values[1])
