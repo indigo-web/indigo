@@ -2,6 +2,7 @@ package qparams
 
 import (
 	"fmt"
+	"github.com/indigo-web/indigo/internal/urlencoded"
 	"strings"
 	"testing"
 )
@@ -22,7 +23,7 @@ func benchmark(data []byte) func(b *testing.B) {
 		b.ResetTimer()
 
 		for i := 0; i < b.N; i++ {
-			_ = Parse(data, func(string, string) {})
+			_ = Parse(data, func(string, string) {}, urlencoded.Decode)
 		}
 	}
 }
