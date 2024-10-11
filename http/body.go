@@ -2,10 +2,11 @@ package http
 
 import (
 	"github.com/indigo-web/indigo/config"
+	"github.com/indigo-web/indigo/http/form"
 	"github.com/indigo-web/indigo/http/mime"
 	"github.com/indigo-web/indigo/http/status"
-	"github.com/indigo-web/indigo/internal/keyvalue"
-	"github.com/indigo-web/indigo/internal/qparams"
+	"github.com/indigo-web/indigo/internal/formdata"
+	"github.com/indigo-web/indigo/internal/strutil"
 	"github.com/indigo-web/utils/uf"
 	json "github.com/json-iterator/go"
 	"io"
@@ -19,25 +20,23 @@ type Retriever interface {
 	Init(*Request)
 }
 
-type FormData = keyvalue.Storage
-
 // a hack to embed the retriever privately
 type retriever = Retriever
 
 type Body struct {
 	retriever
-	request  *Request
-	formData *FormData
-	cfg      *config.Config
-	error    error
-	buff     []byte
-	pending  []byte
+	request *Request
+	form    form.Form
+	cfg     *config.Config
+	error   error
+	buff    []byte
+	pending []byte
 }
 
 func NewBody(impl retriever, cfg *config.Config) *Body {
 	return &Body{
+		// TODO: prealloc form field
 		retriever: impl,
-		formData:  keyvalue.New(),
 		cfg:       cfg,
 	}
 }
@@ -147,17 +146,27 @@ func (b *Body) JSON(model any) error {
 // Form interprets the request's body as a mime.FormUrlencoded data and
 // returns parsed key-value pairs. If the request's MIME type is defined and is different
 // from mime.FormUrlencoded, status.ErrUnsupportedMediaType is returned
-func (b *Body) Form() (*FormData, error) {
-	if !mime.Complies(mime.FormUrlencoded, b.request.ContentType) {
-		return b.formData, status.ErrUnsupportedMediaType
-	}
-
+func (b *Body) Form() (form.Form, error) {
 	raw, err := b.Bytes()
 	if err != nil {
-		return b.formData, err
+		return nil, err
 	}
 
-	return b.formData, qparams.Parse(raw, qparams.Into(b.formData))
+	switch {
+	case mime.Complies(mime.FormUrlencoded, b.request.ContentType):
+		// TODO: pass a real buffer instead of the nil
+		return formdata.ParseURLEncoded(b.form[:0], raw, nil)
+	case mime.Complies(mime.Multipart, b.request.ContentType):
+		boundary, ok := b.multipartBoundary()
+		if !ok {
+			return nil, status.ErrBadRequest
+		}
+
+		// TODO: pass the normal buffer here, too
+		return formdata.ParseMultipart(b.form[:0], raw, nil, boundary)
+	default:
+		return nil, status.ErrUnsupportedMediaType
+	}
 }
 
 // Discard discards the rest of the body (if any). If no networking error was encountered,
@@ -181,10 +190,23 @@ func (b *Body) Error() error {
 
 // Init MUST NOT be used, as it may cause deadlock. FOR INTERNAL PURPOSES ONLY.
 func (b *Body) Init(r *Request) {
-	b.formData.Clear()
 	// TODO: there must be a better way to solve the circular referencing problem
 	b.request = r
 	b.error = nil
 	b.buff = b.buff[:0]
 	b.retriever.Init(r)
+}
+
+func (b *Body) multipartBoundary() (boundary string, ok bool) {
+	for key, value := range strutil.WalkKV(strutil.CutParams(b.request.ContentType)) {
+		if key == "boundary" {
+			if len(boundary) != 0 {
+				return "", false
+			}
+
+			boundary = value
+		}
+	}
+
+	return boundary, true
 }

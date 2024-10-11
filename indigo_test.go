@@ -141,15 +141,15 @@ func getInbuiltRouter() *inbuilt.Router {
 			Cookie(cookie.New("men", "in black"))
 	})
 
-	r.Get("/form-urlencoded", func(request *http.Request) *http.Response {
+	r.Get("/form", func(request *http.Request) *http.Response {
 		form, err := request.Body.Form()
 		if err != nil {
 			return http.Error(request, err)
 		}
 
 		buff := make([]byte, 0, 512)
-		for _, pair := range form.Expose() {
-			buff = append(buff, fmt.Sprintf("%s=%s\n", pair.Key, pair.Value)...)
+		for _, pair := range form {
+			buff = append(buff, fmt.Sprintf("%s=%s\n", pair.Name, pair.Value)...)
 		}
 
 		return http.Bytes(request, buff)
@@ -581,13 +581,13 @@ func TestFirstPhase(t *testing.T) {
 		require.Equal(t, []string{"hello=world", "men=in black"}, resp.Header.Values("Set-Cookie"))
 	})
 
-	t.Run("form data", func(t *testing.T) {
+	t.Run("form urlencoded", func(t *testing.T) {
 		request := &stdhttp.Request{
 			Method: stdhttp.MethodGet,
 			URL: &url.URL{
 				Scheme: "http",
 				Host:   addr,
-				Path:   "/form-urlencoded",
+				Path:   "/form",
 			},
 			Proto:      "HTTP/1.1",
 			ProtoMajor: 1,
@@ -605,6 +605,40 @@ func TestFirstPhase(t *testing.T) {
 		body, err := io.ReadAll(resp.Body)
 		require.NoError(t, err)
 		require.Equal(t, "hello=world\nmy name=Paul\na+b=5\n", string(body))
+	})
+
+	t.Run("form multipart", func(t *testing.T) {
+		request := &stdhttp.Request{
+			Method: stdhttp.MethodGet,
+			URL: &url.URL{
+				Scheme: "http",
+				Host:   addr,
+				Path:   "/form",
+			},
+			Proto:      "HTTP/1.1",
+			ProtoMajor: 1,
+			ProtoMinor: 1,
+			Header: stdhttp.Header{
+				"Content-Type": {"multipart/form-data; boundary=someBoundary"},
+			},
+			Host:       addr,
+			RemoteAddr: addr,
+			Body: io.NopCloser(strings.NewReader(
+				"--someBoundary\r\n" +
+					"Content-Disposition: form-data; name=\"hello\"\r\n\r\n" +
+					"world" +
+					"\r\n--someBoundary\r\n" +
+					"Content-Disposition: form-data; name=\"my+name\"\r\n\r\n" +
+					"Paul" +
+					"\r\n--someBoundary--\r\n",
+			)),
+		}
+		resp, err := stdhttp.DefaultClient.Do(request)
+		require.NoError(t, err)
+		require.Equal(t, stdhttp.StatusOK, resp.StatusCode)
+		body, err := io.ReadAll(resp.Body)
+		require.NoError(t, err)
+		require.Equal(t, "hello=world\nmy+name=Paul\n", string(body))
 	})
 
 	t.Run("chunked body", func(t *testing.T) {
