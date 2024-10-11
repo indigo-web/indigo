@@ -3,7 +3,6 @@ package qparams
 import (
 	"github.com/indigo-web/indigo/http/status"
 	"github.com/indigo-web/indigo/internal/keyvalue"
-	"github.com/indigo-web/indigo/internal/urlencoded"
 	"github.com/indigo-web/utils/uf"
 )
 
@@ -16,7 +15,12 @@ func Into(s *keyvalue.Storage) func(string, string) {
 	}
 }
 
-func Parse(data []byte, cb func(k string, v string)) error {
+type (
+	CB      = func(k string, v string)
+	Decoder = func([]byte) ([]byte, error)
+)
+
+func Parse(data []byte, cb CB, decode Decoder) error {
 	var key string
 
 parseKey:
@@ -28,7 +32,7 @@ parseKey:
 		// TODO: must check for illegal characters (e.g. whitespaces, non-printables, unsafe characters)
 		switch data[i] {
 		case '=':
-			decoded, err := urlencoded.Decode(data[:i])
+			decoded, err := decode(data[:i])
 			if err != nil {
 				return err
 			}
@@ -40,7 +44,7 @@ parseKey:
 			data = data[i+1:]
 			goto parseValue
 		case '&':
-			decoded, err := urlencoded.Decode(data[:i])
+			decoded, err := decode(data[:i])
 			if err != nil {
 				return err
 			}
@@ -57,7 +61,7 @@ parseKey:
 	}
 
 	{
-		decoded, err := urlencoded.Decode(data)
+		decoded, err := decode(data)
 		if err != nil {
 			return err
 		}
@@ -74,7 +78,7 @@ parseValue:
 	for i := range data {
 		switch data[i] {
 		case '&':
-			decoded, err := urlencoded.Decode(data[:i])
+			decoded, err := decode(data[:i])
 			if err != nil {
 				return err
 			}
@@ -87,7 +91,7 @@ parseValue:
 	}
 
 	{
-		decoded, err := urlencoded.Decode(data)
+		decoded, err := decode(data)
 		if err != nil {
 			return err
 		}
