@@ -7,7 +7,7 @@ import (
 	"testing"
 )
 
-func TestDecode(t *testing.T) {
+func testDecode(t *testing.T, decode func([]byte) ([]byte, error)) {
 	t.Run("no escaping", func(t *testing.T) {
 		str := []byte("/hello")
 		decoded, err := Decode(str)
@@ -48,6 +48,17 @@ func TestDecode(t *testing.T) {
 		want := "/" + strings.Repeat("_"+strings.Repeat("a", 10), 4095/len("%5f"+strings.Repeat("a", 10)))
 		require.Equal(t, want, string(decoded))
 		require.Equal(t, 4096, cap(decoded))
+	})
+}
+
+func TestDecode(t *testing.T) {
+	testDecode(t, Decode)
+}
+
+func TestLazyDecode(t *testing.T) {
+	testDecode(t, func(bytes []byte) ([]byte, error) {
+		data, _, err := LazyDecode(bytes, nil)
+		return data, err
 	})
 }
 
