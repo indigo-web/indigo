@@ -1,8 +1,8 @@
 package keyvalue
 
 import (
-	"github.com/indigo-web/iter"
 	"github.com/indigo-web/utils/strcomp"
+	"iter"
 )
 
 type Pair struct {
@@ -124,8 +124,16 @@ func (s *Storage) Keys() []string {
 }
 
 // Iter returns an iterator over the pairs.
-func (s *Storage) Iter() iter.Iterator[Pair] {
-	return iter.Slice(s.pairs)
+func (s *Storage) Iter() iter.Seq2[string, string] {
+	return func(yield func(string, string) bool) {
+		for _, pair := range s.pairs {
+			if !yield(pair.Key, pair.Value) {
+				break
+			}
+		}
+
+		return
+	}
 }
 
 // Has indicates, whether there's an entry of the key.
