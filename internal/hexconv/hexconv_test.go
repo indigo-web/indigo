@@ -14,7 +14,7 @@ func benchLocal(b *testing.B, str string) {
 		var result uint64
 
 		for j := range str {
-			result = (result << 4) | uint64(Parse(str[j]))
+			result = (result << 4) | uint64(Halfbyte[str[j]])
 		}
 	}
 }
