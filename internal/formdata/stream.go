@@ -1,4 +1,4 @@
-package internal
+package formdata
 
 import (
 	"github.com/indigo-web/indigo/internal/strutil"

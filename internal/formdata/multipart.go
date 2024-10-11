@@ -150,7 +150,7 @@ func parseHeader(s *stream, origin header) (modified header, ok bool) {
 		}
 
 		var params string
-		origin.ContentType, params = headers.CutParams(origin.ContentType)
+		origin.ContentType, params = strutil.CutHeader(origin.ContentType)
 		if len(params) > 0 {
 			origin, ok = parseContentTypeParams(params, origin)
 		}
@@ -164,7 +164,7 @@ func parseHeader(s *stream, origin header) (modified header, ok bool) {
 }
 
 func parseContentDispositionParams(params string, origin header) (modified header, ok bool) {
-	for key, value := range headers.WalkParams(params) {
+	for key, value := range strutil.WalkKV(params) {
 		if len(key) == 0 || len(value) == 0 {
 			return origin, false
 		}
@@ -181,7 +181,7 @@ func parseContentDispositionParams(params string, origin header) (modified heade
 }
 
 func parseContentTypeParams(params string, origin header) (modified header, ok bool) {
-	for key, value := range headers.WalkParams(params) {
+	for key, value := range strutil.WalkKV(params) {
 		if len(key) == 0 || len(value) == 0 {
 			return origin, false
 		}

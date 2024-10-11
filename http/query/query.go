@@ -3,6 +3,7 @@ package query
 import (
 	"github.com/indigo-web/indigo/internal/keyvalue"
 	"github.com/indigo-web/indigo/internal/qparams"
+	"github.com/indigo-web/indigo/internal/urlencoded"
 	"github.com/indigo-web/utils/uf"
 )
 
@@ -11,8 +12,8 @@ type Params = *keyvalue.Storage
 
 // Query is an entity for lazy accessing the query
 type Query struct {
-	raw    []byte
 	params Params
+	raw    []byte
 }
 
 func New(params Params) Query {
@@ -24,7 +25,7 @@ func New(params Params) Query {
 // Recommendation: consider invoking this method only once, as repeatedly parsing big
 // enough strings may be quite expensive
 func (q *Query) Cook() (Params, error) {
-	return q.params, qparams.Parse(q.raw, qparams.Into(q.params))
+	return q.params, qparams.Parse(q.raw, qparams.Into(q.params), urlencoded.Decode)
 }
 
 // Bytes returns the actual query, as it has been received

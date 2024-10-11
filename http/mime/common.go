@@ -1,6 +1,8 @@
 package mime
 
-import "github.com/indigo-web/indigo/http/headers"
+import (
+	"github.com/indigo-web/indigo/internal/strutil"
+)
 
 type MIME = string
 
@@ -34,6 +36,6 @@ const (
 // considered compatible with any other MIME
 func Complies(mime MIME, with string) bool {
 	// get rid of parameters if any
-	with, _ = headers.CutParams(with)
+	with, _ = strutil.CutHeader(with)
 	return len(with) == 0 || with == mime
 }
