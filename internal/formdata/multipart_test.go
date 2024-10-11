@@ -1,4 +1,4 @@
-package internal
+package formdata
 
 import (
 	"github.com/indigo-web/indigo/http/form"
@@ -14,7 +14,7 @@ func TestMultipart(t *testing.T) {
 			"name=\"username\"\r\n\r\nAlice\r\n------WebKitFormBoundary7MA4YWxkTrZu0gW\r\nCo" +
 			"ntent-Disposition: form-data; name=\"profile_pic\"; filename=\"profile.png\"\r\n" +
 			"Content-Type: image/png\r\n\r\n[binary file content]\r\n------WebKitFormBoundary7MA4YWxkTrZu0gW--\r\n"
-		parsed, err := ParseMultipart(nil, []byte(data), "----WebKitFormBoundary7MA4YWxkTrZu0gW")
+		parsed, err := ParseMultipart(nil, []byte(data), nil, "----WebKitFormBoundary7MA4YWxkTrZu0gW")
 		require.Equal(t, 2, len(parsed))
 		require.Equal(t, form.Data{
 			Name:     "username",
@@ -36,7 +36,7 @@ func TestMultipart(t *testing.T) {
 	t.Run("prelude and postlude", func(t *testing.T) {
 		data := "Hello, world!--boundary\r\nContent-Disposition: form-data; " +
 			"name=username\r\n\r\nAlice\r\n--boundary--\r\nAre you still reading?"
-		parsed, err := ParseMultipart(nil, []byte(data), "boundary")
+		parsed, err := ParseMultipart(nil, []byte(data), nil, "boundary")
 		require.NoError(t, err)
 		require.Equal(t, 1, len(parsed))
 		require.Equal(t, form.Data{
@@ -51,7 +51,7 @@ func TestMultipart(t *testing.T) {
 		data := "--boundary\r\nContent-Disposition: form-data; " +
 			"name=_charset_\r\n\r\ncp1252\r\n--boundary\r\nContent-Disposition: " +
 			"form-data; name=username\r\n\r\nAlice\r\n--boundary--\r\n"
-		parsed, err := ParseMultipart(nil, []byte(data), "boundary")
+		parsed, err := ParseMultipart(nil, []byte(data), nil, "boundary")
 		require.NoError(t, err)
 		require.Equal(t, 1, len(parsed))
 		require.Equal(t, form.Data{
@@ -67,7 +67,7 @@ func TestMultipart(t *testing.T) {
 			"Content-Disposition: form-data; name=username\r\n" +
 			"Content-Type: application/octet-stream; charset=cp1252\r\n" +
 			"\r\nAlice\r\n--boundary--\r\n"
-		parsed, err := ParseMultipart(nil, []byte(data), "boundary")
+		parsed, err := ParseMultipart(nil, []byte(data), nil, "boundary")
 		require.NoError(t, err)
 		require.Equal(t, 1, len(parsed))
 		require.Equal(t, form.Data{
@@ -93,7 +93,7 @@ func TestMultipartNegative(t *testing.T) {
 		"prelude only",
 		"--boundary\r\nContent-Disposition: form-data; name=\r\n\r\nAlice--boundary--\r\n",
 	} {
-		_, err := ParseMultipart(nil, []byte(tc), "boundary")
+		_, err := ParseMultipart(nil, []byte(tc), nil, "boundary")
 		require.EqualErrorf(t, err, status.ErrBadRequest.Error(),
 			"Test case %d: wanted status.ErrBadRequest, got instead %s", i+1, err)
 	}
