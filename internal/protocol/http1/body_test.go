@@ -4,7 +4,7 @@ import (
 	"github.com/indigo-web/indigo/config"
 	"github.com/indigo-web/indigo/http/status"
 	"github.com/indigo-web/indigo/internal/construct"
-	"github.com/indigo-web/indigo/internal/tcp/dummy"
+	"github.com/indigo-web/indigo/transport/dummy"
 	"io"
 	"strconv"
 	"strings"
@@ -18,7 +18,7 @@ import (
 )
 
 func getRequestWithBody(chunked bool, body ...[]byte) (*http.Request, *Body) {
-	client := dummy.NewCircularClient(body...)
+	client := dummy.NewCircularClient(body...).OneTime()
 	chunkedParser := chunkedbody.NewParser(chunkedbody.DefaultSettings())
 	reqBody := NewBody(client, chunkedParser, config.Default().Body)
 
@@ -46,7 +46,7 @@ func getRequestWithBody(chunked bool, body ...[]byte) (*http.Request, *Body) {
 	request.Headers = hdrs
 	request.ContentLength = contentLength
 	request.Encoding.Chunked = chunked
-	reqBody.Init(request)
+	reqBody.Reset(request)
 
 	return request, reqBody
 }
@@ -103,7 +103,7 @@ func TestBodyReader_Plain(t *testing.T) {
 		request.ContentLength = buffSize
 		chunkedParser := chunkedbody.NewParser(chunkedbody.DefaultSettings())
 		body := NewBody(client, chunkedParser, config.Default().Body)
-		body.Init(request)
+		body.Reset(request)
 
 		data, err := body.Retrieve()
 		require.Equal(t, first, string(data))
@@ -126,7 +126,7 @@ func TestBodyReader_Plain(t *testing.T) {
 		s := config.Default().Body
 		s.MaxSize = 9
 		body := NewBody(client, chunkedParser, s)
-		body.Init(request)
+		body.Reset(request)
 
 		_, err := readall(body)
 		require.EqualError(t, err, status.ErrBodyTooLarge.Error())
@@ -137,9 +137,19 @@ func TestBodyReader_Chunked(t *testing.T) {
 	chunked := []byte("7\r\nMozilla\r\n9\r\nDeveloper\r\n7\r\nNetwork\r\n0\r\n\r\n")
 	wantBody := "MozillaDeveloperNetwork"
 	request, body := getRequestWithBody(true, chunked)
-	body.Init(request)
+	body.Reset(request)
 
 	actualBody, err := readall(body)
 	require.NoError(t, err)
 	require.Equal(t, wantBody, string(actualBody))
+}
+
+func TestBodyReader_TillEOF(t *testing.T) {
+	request, body := getRequestWithBody(false, []byte("Hello, "), []byte("world!"))
+	request.Connection = "close"
+	body.Reset(request)
+
+	actualBody, err := readall(body)
+	require.NoError(t, err)
+	require.Equal(t, "Hello, world!", string(actualBody))
 }

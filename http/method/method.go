@@ -15,13 +15,11 @@ const (
 	TRACE
 	PATCH
 
-	// Count is the last one enum, so contains the greatest integer value of all the
-	// methods. So real number of methods is lower by 1
+	// Count represents the maximal value an integer representation of a method can have.
 	Count = iota - 1
 )
 
-// List contains all the supported HTTP methods. They are sorted by their integer value, however
-// Unknown method is not included. So in order to index the List, you must subtract 1 first.
+// List enlists all known request methods, excluding Unknown.
 var List = []Method{GET, HEAD, POST, PUT, DELETE, CONNECT, OPTIONS, TRACE, PATCH}
 
 func Parse(str string) Method {

@@ -5,7 +5,7 @@ import (
 	"github.com/indigo-web/indigo/http/cookie"
 	"github.com/indigo-web/indigo/http/headers"
 	"github.com/indigo-web/indigo/http/query"
-	"github.com/indigo-web/indigo/internal/tcp/dummy"
+	"github.com/indigo-web/indigo/transport/dummy"
 	"github.com/stretchr/testify/require"
 	"testing"
 )
@@ -13,7 +13,7 @@ import (
 func newRequest() *Request {
 	return NewRequest(
 		config.Default(), headers.New(), query.New(nil), nil, dummy.NewNopClient(),
-		NewBody(nil, config.Default()), nil,
+		nil,
 	)
 }
 

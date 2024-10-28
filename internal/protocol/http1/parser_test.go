@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"github.com/indigo-web/indigo/internal/construct"
 	"github.com/indigo-web/indigo/internal/requestgen"
-	"github.com/indigo-web/indigo/internal/tcp/dummy"
+	"github.com/indigo-web/indigo/transport/dummy"
 	"math/rand"
 	"strings"
 	"testing"
@@ -23,7 +23,7 @@ func getParser() (*Parser, *http.Request) {
 	client := dummy.NewNopClient()
 	body := NewBody(client, construct.Chunked(cfg.Body), cfg.Body)
 	req := construct.Request(cfg, client, body)
-	suit := Initialize(cfg, nil, client, req)
+	suit := Initialize(cfg, nil, client, req, body)
 
 	return suit.Parser, req
 }
@@ -102,7 +102,7 @@ func TestHttpRequestsParser_Parse_GET(t *testing.T) {
 		}
 
 		compareRequests(t, wanted, request)
-		require.NoError(t, request.Clear())
+		require.NoError(t, request.Reset())
 	})
 
 	t.Run("simple GET with leading CRLF", func(t *testing.T) {
@@ -112,7 +112,7 @@ func TestHttpRequestsParser_Parse_GET(t *testing.T) {
 		require.Equal(t, Error, state)
 		require.Empty(t, extra)
 
-		require.NoError(t, request.Clear())
+		require.NoError(t, request.Reset())
 	})
 
 	t.Run("normal GET", func(t *testing.T) {
@@ -132,7 +132,7 @@ func TestHttpRequestsParser_Parse_GET(t *testing.T) {
 		}
 
 		compareRequests(t, wanted, request)
-		require.NoError(t, request.Clear())
+		require.NoError(t, request.Reset())
 	})
 
 	t.Run("multiple header values", func(t *testing.T) {
@@ -152,7 +152,7 @@ func TestHttpRequestsParser_Parse_GET(t *testing.T) {
 		}
 
 		compareRequests(t, wanted, request)
-		require.NoError(t, request.Clear())
+		require.NoError(t, request.Reset())
 	})
 
 	t.Run("only lf", func(t *testing.T) {
@@ -172,7 +172,7 @@ func TestHttpRequestsParser_Parse_GET(t *testing.T) {
 		}
 
 		compareRequests(t, wanted, request)
-		require.NoError(t, request.Clear())
+		require.NoError(t, request.Reset())
 	})
 
 	t.Run("escaping", func(t *testing.T) {
@@ -204,7 +204,7 @@ func TestHttpRequestsParser_Parse_GET(t *testing.T) {
 			}
 
 			compareRequests(t, wanted, request)
-			require.NoError(t, request.Clear())
+			require.NoError(t, request.Reset())
 		}
 
 	})
@@ -228,7 +228,7 @@ func TestHttpRequestsParser_Parse_GET(t *testing.T) {
 			}
 
 			compareRequests(t, wanted, request)
-			require.NoError(t, request.Clear())
+			require.NoError(t, request.Reset())
 		}
 	})
 
@@ -247,7 +247,7 @@ func TestHttpRequestsParser_Parse_GET(t *testing.T) {
 		}
 
 		compareRequests(t, wanted, request)
-		require.NoError(t, request.Clear())
+		require.NoError(t, request.Reset())
 	})
 
 	t.Run("content-length", func(t *testing.T) {
@@ -257,7 +257,7 @@ func TestHttpRequestsParser_Parse_GET(t *testing.T) {
 		require.Equal(t, HeadersCompleted, state)
 		require.Equal(t, "Hello, world!", string(extra))
 		require.Equal(t, 13, request.ContentLength)
-		require.NoError(t, request.Clear())
+		require.NoError(t, request.Reset())
 
 		raw = "GET / HTTP/1.1\r\nContent-Length: 13\r\nHi-Hi: ha-ha\r\n\r\nHello, world!"
 		state, extra, err = parser.Parse([]byte(raw))
@@ -267,7 +267,7 @@ func TestHttpRequestsParser_Parse_GET(t *testing.T) {
 		require.Equal(t, 13, request.ContentLength)
 		require.True(t, request.Headers.Has("hi-hi"))
 		require.Equal(t, "ha-ha", request.Headers.Value("hi-hi"))
-		require.NoError(t, request.Clear())
+		require.NoError(t, request.Reset())
 	})
 
 	t.Run("connection", func(t *testing.T) {
@@ -277,7 +277,7 @@ func TestHttpRequestsParser_Parse_GET(t *testing.T) {
 		require.Equal(t, HeadersCompleted, state)
 		require.Empty(t, string(extra))
 		require.Equal(t, "Keep-Alive", request.Connection)
-		require.NoError(t, request.Clear())
+		require.NoError(t, request.Reset())
 	})
 }
 
@@ -302,7 +302,7 @@ func TestHttpRequestsParser_POST(t *testing.T) {
 			}
 
 			compareRequests(t, wanted, request)
-			require.NoError(t, request.Clear())
+			require.NoError(t, request.Reset())
 		}
 	})
 
@@ -322,7 +322,7 @@ func TestHttpRequestsParser_POST(t *testing.T) {
 
 		compareRequests(t, wanted, request)
 		require.Equal(t, "hello=world", request.Query.String())
-		require.NoError(t, request.Clear())
+		require.NoError(t, request.Reset())
 	})
 }
 

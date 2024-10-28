@@ -5,10 +5,10 @@ import (
 	"github.com/indigo-web/indigo/http"
 	"github.com/indigo-web/indigo/internal/construct"
 	"github.com/indigo-web/indigo/internal/requestgen"
-	"github.com/indigo-web/indigo/internal/tcp"
-	"github.com/indigo-web/indigo/internal/tcp/dummy"
 	"github.com/indigo-web/indigo/router"
 	"github.com/indigo-web/indigo/router/inbuilt"
+	"github.com/indigo-web/indigo/transport"
+	"github.com/indigo-web/indigo/transport/dummy"
 	"strings"
 	"testing"
 )
@@ -157,14 +157,15 @@ func Benchmark_Post(b *testing.B) {
 	})
 }
 
-func newSuit(client tcp.Client) (*Suit, *http.Request) {
+func newSuit(client transport.Client) (*Suit, *http.Request) {
 	// using inbuilt router instead of simple in order to be more precise and realistic,
 	// as in wildlife simple router will be barely used
 	cfg := config.Default()
 	r := getInbuiltRouter()
-	req := construct.Request(cfg, client, NewBody(client, construct.Chunked(cfg.Body), cfg.Body))
+	body := NewBody(client, construct.Chunked(cfg.Body), cfg.Body)
+	req := construct.Request(cfg, client, body)
 
-	return Initialize(config.Default(), r, client, req), req
+	return Initialize(config.Default(), r, client, req, body), req
 }
 
 func disperse(data []byte, n int) (parts [][]byte) {

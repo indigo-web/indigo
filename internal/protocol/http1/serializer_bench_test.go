@@ -6,7 +6,7 @@ import (
 	"github.com/indigo-web/indigo/http/status"
 	"github.com/indigo-web/indigo/internal/construct"
 	"github.com/indigo-web/indigo/internal/requestgen"
-	"github.com/indigo-web/indigo/internal/tcp/dummy"
+	"github.com/indigo-web/indigo/transport/dummy"
 	"github.com/stretchr/testify/require"
 	"strings"
 	"testing"

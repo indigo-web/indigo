@@ -4,8 +4,8 @@ import (
 	"errors"
 	"github.com/indigo-web/indigo/config"
 	"github.com/indigo-web/indigo/internal/construct"
-	"github.com/indigo-web/indigo/internal/tcp/dummy"
 	"github.com/indigo-web/indigo/router"
+	"github.com/indigo-web/indigo/transport/dummy"
 	"testing"
 
 	"github.com/indigo-web/indigo/http"

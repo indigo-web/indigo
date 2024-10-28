@@ -17,7 +17,7 @@ func BenchmarkParser(b *testing.B) {
 		for i := 0; i < b.N; i++ {
 			_, _, _ = parser.Parse(data)
 			b.ReportAllocs()
-			_ = request.Clear()
+			_ = request.Reset()
 		}
 	})
 
@@ -29,7 +29,7 @@ func BenchmarkParser(b *testing.B) {
 
 		for i := 0; i < b.N; i++ {
 			_, _, _ = parser.Parse(data)
-			_ = request.Clear()
+			_ = request.Reset()
 		}
 	})
 
@@ -41,7 +41,7 @@ func BenchmarkParser(b *testing.B) {
 
 		for i := 0; i < b.N; i++ {
 			_, _, _ = parser.Parse(data)
-			_ = request.Clear()
+			_ = request.Reset()
 		}
 	})
 
@@ -53,7 +53,7 @@ func BenchmarkParser(b *testing.B) {
 
 		for i := 0; i < b.N; i++ {
 			_, _, _ = parser.Parse(data)
-			_ = request.Clear()
+			_ = request.Reset()
 		}
 	})
 }
