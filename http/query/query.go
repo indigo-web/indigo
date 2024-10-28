@@ -47,8 +47,8 @@ func (q *Query) Update(new []byte) {
 	q.raw = new
 }
 
-// Clear empties all the parsed parameters. Used mostly in internal purposes
-func (q *Query) Clear() {
+// Reset empties all the parsed parameters. Used mostly in internal purposes
+func (q *Query) Reset() {
 	q.raw = nil
 	q.params.Clear()
 }
