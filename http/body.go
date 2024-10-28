@@ -17,10 +17,13 @@ type BodyCallback func([]byte) error
 type Retriever interface {
 	// Retrieve reads and returns a piece of body available for processing
 	Retrieve() ([]byte, error)
-	Init(*Request)
 }
 
-// a hack to embed the retriever privately
+type Decompressor interface {
+	Retriever
+	Reset(Retriever) error
+}
+
 type retriever = Retriever
 
 type Body struct {
@@ -30,14 +33,17 @@ type Body struct {
 	cfg     *config.Config
 	error   error
 	buff    []byte
+	decbuff []byte
 	pending []byte
 }
 
-func NewBody(impl retriever, cfg *config.Config) *Body {
+func NewBody(r *Request, impl retriever, cfg *config.Config) *Body {
 	return &Body{
 		// TODO: prealloc form field
 		retriever: impl,
+		request:   r,
 		cfg:       cfg,
+		decbuff:   make([]byte, cfg.Body.FormDecodeBufferPrealloc),
 	}
 }
 
@@ -154,16 +160,16 @@ func (b *Body) Form() (form.Form, error) {
 
 	switch {
 	case mime.Complies(mime.FormUrlencoded, b.request.ContentType):
-		// TODO: pass a real buffer instead of the nil
-		return formdata.ParseURLEncoded(b.form[:0], raw, nil)
+		// TODO: pass some lazy buffer here instead of the b.decodebuffer(),
+		// TODO: so we don't have to allocate the whole buffer every time we parse a form
+		return formdata.ParseURLEncoded(b.form[:0], raw, b.decodebuffer())
 	case mime.Complies(mime.Multipart, b.request.ContentType):
 		boundary, ok := b.multipartBoundary()
 		if !ok {
 			return nil, status.ErrBadRequest
 		}
 
-		// TODO: pass the normal buffer here, too
-		return formdata.ParseMultipart(b.form[:0], raw, nil, boundary)
+		return formdata.ParseMultipart(b.form[:0], raw, b.decodebuffer(), boundary)
 	default:
 		return nil, status.ErrUnsupportedMediaType
 	}
@@ -188,13 +194,22 @@ func (b *Body) Error() error {
 	return b.error
 }
 
-// Init MUST NOT be used, as it may cause deadlock. FOR INTERNAL PURPOSES ONLY.
-func (b *Body) Init(r *Request) {
-	// TODO: there must be a better way to solve the circular referencing problem
-	b.request = r
+func (b *Body) Reset() error {
+	if err := b.Discard(); err != nil {
+		return err
+	}
+
 	b.error = nil
 	b.buff = b.buff[:0]
-	b.retriever.Init(r)
+	return nil
+}
+
+func (b *Body) decodebuffer() []byte {
+	if b.decbuff == nil && b.cfg.Body.FormDecodeBufferPrealloc != 0 {
+		b.decbuff = make([]byte, b.cfg.Body.FormDecodeBufferPrealloc)
+	}
+
+	return b.decbuff
 }
 
 func (b *Body) multipartBoundary() (boundary string, ok bool) {
