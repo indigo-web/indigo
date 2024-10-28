@@ -47,6 +47,7 @@ func getHeaders() headers.Headers {
 func respond(request *http.Request) *http.Response {
 	str, err := httptest.Dump(request)
 	if err != nil {
+		fmt.Println("err:", err)
 		return http.Error(request, err)
 	}
 
@@ -168,6 +169,11 @@ func headersToMap(hdrs headers.Headers, keys []string) map[string]string {
 	return m
 }
 
+func TestAddressNormalization(t *testing.T) {
+	require.Equal(t, "pavlo:80", normalizeAddr("pavlo:80"))
+	require.Equal(t, "0.0.0.0:80", normalizeAddr(":80"))
+}
+
 func TestFirstPhase(t *testing.T) {
 	ch := make(chan struct{})
 	app := New(addr)
@@ -188,8 +194,7 @@ func TestFirstPhase(t *testing.T) {
 			OnStop(func() {
 				ch <- struct{}{}
 			}).
-			Listen(altAddr).
-			AutoHTTPS(httpsAddr).
+			Bind(TCP(altAddr)).
 			Serve(r)
 	}(app)
 
@@ -483,9 +488,10 @@ func TestFirstPhase(t *testing.T) {
 		testCtxValue(t, appURL)
 	})
 
-	t.Run("https", func(t *testing.T) {
-		testCtxValue(t, "https://"+httpsAddr)
-	})
+	// TODO: add handy TLS routines
+	//t.Run("https", func(t *testing.T) {
+	//	testCtxValue(t, "https://"+httpsAddr)
+	//})
 
 	t.Run("alternative port", func(t *testing.T) {
 		testCtxValue(t, "http://"+altAddr)
@@ -679,7 +685,6 @@ func TestSecondPhase(t *testing.T) {
 			OnStop(func() {
 				ch <- struct{}{}
 			}).
-			AutoHTTPS(httpsAddr).
 			Serve(r)
 	}(app)
 
@@ -711,7 +716,7 @@ func TestSecondPhase(t *testing.T) {
 		return err
 	}
 
-	t.Run("graceful shutdown", func(t *testing.T) {
+	t.Run("shutdown", func(t *testing.T) {
 		client := func(ch chan<- error) {
 			conn, err := net.Dial("tcp", addr)
 			ch <- nil
@@ -736,7 +741,7 @@ func TestSecondPhase(t *testing.T) {
 		go client(first)
 		<-first
 
-		app.GracefulStop()
+		app.Stop()
 
 		second := make(chan error)
 		go client(second)
