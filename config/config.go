@@ -83,6 +83,9 @@ type (
 		// BufferPrealloc defines the initial length of the buffer when the whole body at once
 		// is requested (normally via String() or Bytes() methods)
 		BufferPrealloc uint64
+		// FormDecodeBufferPrealloc is for a buffer, which is used for decoding urlencoded keys
+		// in forms
+		FormDecodeBufferPrealloc uint64
 	}
 
 	HTTP struct {
@@ -97,8 +100,12 @@ type (
 		// ReadBufferSize is a size of buffer in bytes which will be used to read from
 		// socket
 		ReadBufferSize int
-		// ReadTimeout is a duration after which client will be automatically disconnected
+		// ReadTimeout controls the maximal lifetime of IDLE connections. If no data was
+		// received in this period of time, it'll be closed.
 		ReadTimeout time.Duration
+		// AcceptLoopInterruptPeriod controls how often will the Accept() call be interrupted
+		// in order to check whether it's time to stop. Defaults to 5 seconds.
+		AcceptLoopInterruptPeriod time.Duration
 	}
 )
 
@@ -157,14 +164,17 @@ func Default() *Config {
 			// be enough to avoid multiple reads per single TCP chunk
 			DecodingBufferSize: 8 * 1024,
 			BufferPrealloc:     1024,
+			// we can afford pre-allocating it to 1kb as it's allocated lazily anyway
+			FormDecodeBufferPrealloc: 1024,
 		},
 		HTTP: HTTP{
 			ResponseBuffSize: 1024,
 			FileBuffSize:     64 * 1024, // 64kb read buffer for files is pretty much sufficient
 		},
 		TCP: TCP{
-			ReadBufferSize: 4 * 1024,
-			ReadTimeout:    90 * time.Second,
+			ReadBufferSize:            4 * 1024, // 4kb is more than enough for ordinary requests.
+			ReadTimeout:               90 * time.Second,
+			AcceptLoopInterruptPeriod: 5 * time.Second,
 		},
 	}
 }
@@ -176,48 +186,49 @@ func Fill(src *Config) (new *Config) {
 	return &Config{
 		URL: URL{
 			BufferSize: URLBufferSize{
-				Default: numOr(src.URL.BufferSize.Default, defaults.URL.BufferSize.Default),
-				Maximal: numOr(src.URL.BufferSize.Maximal, defaults.URL.BufferSize.Maximal),
+				Default: either(src.URL.BufferSize.Default, defaults.URL.BufferSize.Default),
+				Maximal: either(src.URL.BufferSize.Maximal, defaults.URL.BufferSize.Maximal),
 			},
 			Query: Query{
-				PreAlloc: numOr(src.URL.Query.PreAlloc, defaults.URL.Query.PreAlloc),
+				PreAlloc: either(src.URL.Query.PreAlloc, defaults.URL.Query.PreAlloc),
 			},
 		},
 		Headers: Headers{
 			Number: HeadersNumber{
-				Default: numOr(src.Headers.Number.Default, defaults.Headers.Number.Default),
-				Maximal: numOr(src.Headers.Number.Maximal, defaults.Headers.Number.Maximal),
+				Default: either(src.Headers.Number.Default, defaults.Headers.Number.Default),
+				Maximal: either(src.Headers.Number.Maximal, defaults.Headers.Number.Maximal),
 			},
-			MaxKeyLength:   numOr(src.Headers.MaxKeyLength, defaults.Headers.MaxKeyLength),
-			MaxValueLength: numOr(src.Headers.MaxValueLength, defaults.Headers.MaxValueLength),
+			MaxKeyLength:   either(src.Headers.MaxKeyLength, defaults.Headers.MaxKeyLength),
+			MaxValueLength: either(src.Headers.MaxValueLength, defaults.Headers.MaxValueLength),
 			KeySpace: HeadersKeysSpace{
-				Default: numOr(src.Headers.KeySpace.Default, defaults.Headers.KeySpace.Default),
-				Maximal: numOr(src.Headers.KeySpace.Maximal, defaults.Headers.KeySpace.Maximal),
+				Default: either(src.Headers.KeySpace.Default, defaults.Headers.KeySpace.Default),
+				Maximal: either(src.Headers.KeySpace.Maximal, defaults.Headers.KeySpace.Maximal),
 			},
 			ValueSpace: HeadersValuesSpace{
-				Default: numOr(src.Headers.ValueSpace.Default, defaults.Headers.ValueSpace.Default),
-				Maximal: numOr(src.Headers.ValueSpace.Maximal, defaults.Headers.ValueSpace.Maximal),
+				Default: either(src.Headers.ValueSpace.Default, defaults.Headers.ValueSpace.Default),
+				Maximal: either(src.Headers.ValueSpace.Maximal, defaults.Headers.ValueSpace.Maximal),
 			},
-			MaxEncodingTokens: numOr(src.Headers.MaxEncodingTokens, defaults.Headers.MaxEncodingTokens),
+			MaxEncodingTokens: either(src.Headers.MaxEncodingTokens, defaults.Headers.MaxEncodingTokens),
 			Default:           mapOr(src.Headers.Default, defaults.Headers.Default),
 		},
 		Body: Body{
-			MaxSize:            numOr(src.Body.MaxSize, defaults.Body.MaxSize),
-			MaxChunkSize:       numOr(src.Body.MaxChunkSize, defaults.Body.MaxChunkSize),
-			DecodingBufferSize: numOr(src.Body.DecodingBufferSize, defaults.Body.DecodingBufferSize),
+			MaxSize:            either(src.Body.MaxSize, defaults.Body.MaxSize),
+			MaxChunkSize:       either(src.Body.MaxChunkSize, defaults.Body.MaxChunkSize),
+			DecodingBufferSize: either(src.Body.DecodingBufferSize, defaults.Body.DecodingBufferSize),
 		},
 		HTTP: HTTP{
-			ResponseBuffSize: numOr(src.HTTP.ResponseBuffSize, defaults.HTTP.ResponseBuffSize),
-			FileBuffSize:     numOr(src.HTTP.FileBuffSize, defaults.HTTP.FileBuffSize),
+			ResponseBuffSize: either(src.HTTP.ResponseBuffSize, defaults.HTTP.ResponseBuffSize),
+			FileBuffSize:     either(src.HTTP.FileBuffSize, defaults.HTTP.FileBuffSize),
 		},
 		TCP: TCP{
-			ReadBufferSize: numOr(src.TCP.ReadBufferSize, defaults.TCP.ReadBufferSize),
-			ReadTimeout:    numOr(src.TCP.ReadTimeout, defaults.TCP.ReadTimeout),
+			ReadBufferSize:            either(src.TCP.ReadBufferSize, defaults.TCP.ReadBufferSize),
+			ReadTimeout:               either(src.TCP.ReadTimeout, defaults.TCP.ReadTimeout),
+			AcceptLoopInterruptPeriod: either(src.TCP.AcceptLoopInterruptPeriod, defaults.TCP.AcceptLoopInterruptPeriod),
 		},
 	}
 }
 
-func numOr[T constraint.Number](custom, defaultVal T) T {
+func either[T constraint.Number](custom, defaultVal T) T {
 	if custom == 0 {
 		return defaultVal
 	}
