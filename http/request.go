@@ -4,13 +4,13 @@ import (
 	"context"
 	"github.com/indigo-web/indigo/config"
 	"github.com/indigo-web/indigo/http/cookie"
-	"github.com/indigo-web/indigo/http/encryption"
+	"github.com/indigo-web/indigo/http/crypt"
 	"github.com/indigo-web/indigo/http/headers"
 	"github.com/indigo-web/indigo/http/method"
 	"github.com/indigo-web/indigo/http/proto"
 	"github.com/indigo-web/indigo/http/query"
 	"github.com/indigo-web/indigo/internal/keyvalue"
-	"github.com/indigo-web/indigo/internal/tcp"
+	"github.com/indigo-web/indigo/transport"
 	"net"
 )
 
@@ -33,21 +33,7 @@ type Request struct {
 	// Headers are request headers. They are stored non-normalized, however lookup is
 	// case-insensitive
 	Headers headers.Headers
-	// Encoding holds an information about encoding, that was used to make the request
-	Encoding Encoding
-	// ContentLength obtains the value from Content-Length header. It holds the value of 0
-	// if isn't presented.
-	//
-	// NOTE: if any of transfer-encodings were applied, you MUST NOT look at this value
-	ContentLength int
-	// ContentType obtains Content-Type header value
-	ContentType string
-	// Connection holds the Connection header value. It isn't normalized, so can be anything
-	// and in any case. So in order to compare it, highly recommended to do it case-insensibly
-	Connection string
-	// Upgrade is the protocol token, which is set by default to proto.Unknown. In
-	// case it is anything else, then Upgrade header was received
-	Upgrade proto.Proto
+	commonHeaders
 	// Remote represents remote net.Addr.
 	// WARNING: in order to use the value to represent a user, MAKE SURE there are no proxies
 	// in the middle
@@ -61,7 +47,7 @@ type Request struct {
 	Env Environment
 	// Body accesses the request's body
 	Body     *Body
-	client   tcp.Client
+	client   transport.Client
 	hijacked bool
 	response *Response
 	jar      cookie.Jar
@@ -75,22 +61,19 @@ type Request struct {
 // that default method is a null-value (proto.Unknown)
 func NewRequest(
 	cfg *config.Config, hdrs headers.Headers, query query.Query, response *Response,
-	client tcp.Client, body *Body, params Params,
+	client transport.Client, params Params,
 ) *Request {
-	request := &Request{
+	return &Request{
 		Query:    query,
 		Params:   params,
 		Proto:    proto.HTTP11,
 		Headers:  hdrs,
 		Remote:   client.Remote(),
 		Ctx:      zeroContext,
-		Body:     body,
 		client:   client,
 		response: response,
 		cfg:      cfg,
 	}
-
-	return request
 }
 
 // Cookies returns a cookie jar with parsed cookies key-value pairs, and an error
@@ -126,7 +109,7 @@ func (r *Request) Respond() *Response {
 // Hijack the connection. Request body will be implicitly read (so if you need it you
 // should read it before) to the end. After handler exits, the connection will
 // be closed, so the connection can be hijacked at most once
-func (r *Request) Hijack() (tcp.Client, error) {
+func (r *Request) Hijack() (transport.Client, error) {
 	if err := r.Body.Discard(); err != nil {
 		return nil, err
 	}
@@ -141,25 +124,17 @@ func (r *Request) Hijacked() bool {
 	return r.hijacked
 }
 
-// Clear resets request headers and reads body into nowhere until completed.
+// Reset clears request headers and reads body into nowhere until completed.
 // It is implemented to clear the request object between requests
-func (r *Request) Clear() (err error) {
-	if err = r.Body.Discard(); err != nil {
-		return err
-	}
-
-	r.Query.Clear()
+func (r *Request) Reset() (err error) {
+	r.Query.Reset()
 	r.Params.Clear()
 	r.Headers.Clear()
-	r.ContentLength = 0
-	r.Encoding = Encoding{}
-	r.ContentType = ""
-	r.Connection = ""
-	r.Upgrade = proto.Unknown
+	r.commonHeaders = commonHeaders{}
 	r.Ctx = zeroContext
 	r.Env = Environment{}
 
-	return nil
+	return r.Body.Reset()
 }
 
 type Environment struct {
@@ -170,8 +145,37 @@ type Environment struct {
 	AllowedMethods string
 	// Encryption is a token that corresponds to the used encryption method. May be
 	// extended by custom values
-	Encryption encryption.Token
+	Encryption crypt.Encryption
 	// AliasFrom contains the original request path, in case it was replaced via alias
 	// aka implicit redirect
 	AliasFrom string
+}
+
+type commonHeaders struct {
+	// Encoding holds an information about encoding, that was used to make the request
+	Encoding Encodings
+	// ContentLength obtains the value from Content-Length header. It holds the value of 0
+	// if isn't presented.
+	//
+	// NOTE: you shouldn't rely on this value, as it may be anything (mostly 0) if any
+	// Transfer-Encoding were applied.
+	ContentLength int
+	// ContentType obtains Content-Type header value
+	ContentType string
+	// Connection holds the Connection header value. It isn't normalized, so can be anything
+	// and in any case. So in order to compare it, highly recommended to do it case-insensibly
+	Connection string
+	// Upgrade is the protocol token, which is set by default to proto.Unknown. In
+	// case it is anything else, then Upgrade header was received
+	Upgrade proto.Proto
+}
+
+type Encodings struct {
+	// Transfer contains all applied Transfer-Encoding codings in their original order, except
+	// the chunked. Chunked Transfer Encoding has its own boolean flag.
+	Transfer []string
+	// Content contains all applied Content-Encoding codings in their original order.
+	Content []string
+	// Chunked doesn't belong to any of encodings, as it is still must be processed individually
+	Chunked, HasTrailer bool
 }
