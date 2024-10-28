@@ -1,12 +1,12 @@
 package dummy
 
 import (
-	"github.com/indigo-web/indigo/internal/tcp"
+	"github.com/indigo-web/indigo/transport"
 	"io"
 	"net"
 )
 
-var _ tcp.Client = new(CircularClient)
+var _ transport.Client = new(CircularClient)
 
 // CircularClient is a client that on every read-operation returns the same data as it
 // was initialised with. This is used mainly for benchmarking
@@ -29,10 +29,6 @@ func (c *CircularClient) Read() (data []byte, err error) {
 		return nil, io.EOF
 	}
 
-	if c.oneTime {
-		c.closed = true
-	}
-
 	if len(c.tmp) > 0 {
 		data, c.tmp = c.tmp, nil
 
@@ -40,8 +36,14 @@ func (c *CircularClient) Read() (data []byte, err error) {
 	}
 
 	if c.pointer >= len(c.data) {
+		if c.oneTime {
+			c.closed = true
+			return nil, io.EOF
+		}
+
 		c.pointer = 0
 	}
+
 	piece := c.data[c.pointer]
 	c.pointer++
 
@@ -74,7 +76,7 @@ func (c *CircularClient) OneTime() *CircularClient {
 	return c
 }
 
-func NewNopClient() tcp.Client {
+func NewNopClient() transport.Client {
 	return NewCircularClient(nil)
 }
 
