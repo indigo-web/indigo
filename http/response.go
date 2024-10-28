@@ -20,8 +20,8 @@ type ResponseWriter func(b []byte) error
 const (
 	// why 7? I don't know. There's no theory behind this number nor researches.
 	// It can be adjusted to 10 as well, but why you would ever need to do this?
-	defaultHeadersNumber = 7
-	defaultFileMIME      = mime.OctetStream
+	preallocRespHeaders = 7
+	defaultFileMIME     = mime.OctetStream
 )
 
 type Response struct {
@@ -36,7 +36,7 @@ func NewResponse() *Response {
 	return &Response{
 		&response.Fields{
 			Code:        status.OK,
-			Headers:     make([]headers.Header, 0, defaultHeadersNumber),
+			Headers:     make([]headers.Header, 0, preallocRespHeaders),
 			ContentType: response.DefaultContentType,
 		},
 	}

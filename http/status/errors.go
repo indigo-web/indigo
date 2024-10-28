@@ -20,7 +20,6 @@ var (
 	ErrConnectionTimeout = NewError(RequestTimeout, "connection timed out")
 	ErrCloseConnection   = NewError(CloseConnection, "internal error as a signal")
 	ErrShutdown          = NewError(CloseConnection, "shutdown")
-	ErrGracefulShutdown  = NewError(CloseConnection, "graceful shutdown")
 
 	ErrBadRequest                    = NewError(BadRequest, "bad request")
 	ErrTooLongRequestLine            = NewError(BadRequest, "request line is too long")

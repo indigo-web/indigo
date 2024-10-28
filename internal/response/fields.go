@@ -8,7 +8,7 @@ import (
 	"github.com/indigo-web/indigo/internal/types"
 )
 
-const DefaultContentType = "text/html"
+const DefaultContentType = mime.HTML
 
 type Fields struct {
 	Attachment  types.Attachment

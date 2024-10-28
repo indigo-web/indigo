@@ -7,18 +7,20 @@ import (
 	"github.com/indigo-web/indigo/http/headers"
 	"github.com/indigo-web/indigo/http/query"
 	"github.com/indigo-web/indigo/internal/keyvalue"
-	"github.com/indigo-web/indigo/internal/tcp"
+	"github.com/indigo-web/indigo/transport"
 	"github.com/indigo-web/utils/buffer"
 	"net"
 )
 
-func Request(cfg *config.Config, client tcp.Client, body http.Retriever) *http.Request {
+func Request(cfg *config.Config, client transport.Client, body http.Retriever) *http.Request {
 	hdrs := headers.NewPrealloc(cfg.Headers.Number.Default)
 	q := query.New(keyvalue.NewPreAlloc(cfg.URL.Query.PreAlloc))
 	resp := http.NewResponse()
 	params := keyvalue.New()
+	request := http.NewRequest(cfg, hdrs, q, resp, client, params)
+	request.Body = http.NewBody(request, body, cfg)
 
-	return http.NewRequest(cfg, hdrs, q, resp, client, http.NewBody(body, cfg), params)
+	return request
 }
 
 func Chunked(cfg config.Body) *chunkedbody.Parser {
@@ -27,10 +29,10 @@ func Chunked(cfg config.Body) *chunkedbody.Parser {
 	})
 }
 
-func Client(cfg config.TCP, conn net.Conn) tcp.Client {
+func Client(cfg config.TCP, conn net.Conn) transport.Client {
 	readBuff := make([]byte, cfg.ReadBufferSize)
 
-	return tcp.NewClient(conn, cfg.ReadTimeout, readBuff)
+	return transport.NewClient(conn, cfg.ReadTimeout, readBuff)
 }
 
 func Buffers(s *config.Config) (keyBuff *buffer.Buffer, valBuff *buffer.Buffer, startLineBuff *buffer.Buffer) {

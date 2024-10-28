@@ -7,46 +7,48 @@ import (
 	"github.com/indigo-web/indigo/http/proto"
 	"github.com/indigo-web/indigo/http/status"
 	"github.com/indigo-web/indigo/internal/construct"
-	"github.com/indigo-web/indigo/internal/tcp"
 	"github.com/indigo-web/indigo/router"
+	"github.com/indigo-web/indigo/transport"
 	"github.com/indigo-web/utils/buffer"
 )
 
 type Suit struct {
 	*Parser
 	*Serializer
-	router         router.Router
-	client         tcp.Client
 	upgradePreResp *http.Response
+	body           *Body
+	router         router.Router
+	client         transport.Client
 }
 
 func New(
 	cfg *config.Config,
 	r router.Router,
 	request *http.Request,
-	client tcp.Client,
+	client transport.Client,
+	body *Body,
 	keyBuff, valBuff, startLineBuff *buffer.Buffer,
 	respBuff []byte,
 	respFileBuffSize int,
-	defaultHeaders map[string]string,
 ) *Suit {
 	return &Suit{
 		Parser:         NewParser(request, keyBuff, valBuff, startLineBuff, cfg.Headers),
-		Serializer:     NewSerializer(respBuff, respFileBuffSize, defaultHeaders, request, client),
+		Serializer:     NewSerializer(respBuff, respFileBuffSize, cfg.Headers.Default, request, client),
+		upgradePreResp: http.NewResponse(),
+		body:           body,
 		router:         r,
 		client:         client,
-		upgradePreResp: http.NewResponse(),
 	}
 }
 
 // Initialize is the same constructor as just New, but consumes fewer arguments.
-func Initialize(cfg *config.Config, r router.Router, client tcp.Client, req *http.Request) *Suit {
+func Initialize(cfg *config.Config, r router.Router, client transport.Client, req *http.Request, body *Body) *Suit {
 	keyBuff, valBuff, startLineBuff := construct.Buffers(cfg)
 	respBuff := make([]byte, 0, cfg.HTTP.ResponseBuffSize)
 
 	return New(
-		cfg, r, req, client, keyBuff, valBuff, startLineBuff,
-		respBuff, cfg.HTTP.ResponseBuffSize, cfg.Headers.Default,
+		cfg, r, req, client, body, keyBuff, valBuff, startLineBuff,
+		respBuff, cfg.HTTP.ResponseBuffSize,
 	)
 }
 
@@ -75,8 +77,12 @@ func (s *Suit) serve(once bool) (ok bool) {
 		switch state {
 		case Pending:
 		case HeadersCompleted:
+			client.Unread(extra)
+			s.body.Reset(req)
+
 			version := req.Proto
 			if req.Upgrade != proto.Unknown && proto.HTTP1&req.Upgrade == req.Upgrade {
+				// TODO: replace this with a method "WriteUpgrade" or similar
 				s.PreWrite(
 					req.Proto,
 					s.upgradePreResp.
@@ -87,9 +93,7 @@ func (s *Suit) serve(once bool) (ok bool) {
 				version = req.Upgrade
 			}
 
-			client.Unread(extra)
-			req.Body.Init(req)
-			resp := notNil(req, s.router.OnRequest(req))
+			resp := respond(req, s.router.OnRequest(req))
 
 			if req.Hijacked() {
 				// in case the connection was hijacked, we must not intrude after, so fail fast
@@ -103,7 +107,7 @@ func (s *Suit) serve(once bool) (ok bool) {
 				return false
 			}
 
-			if err = req.Clear(); err != nil {
+			if err = req.Reset(); err != nil {
 				// abusing the fact that req.Clear() can fail only due to read error
 				s.router.OnError(req, status.ErrCloseConnection)
 				return false
@@ -111,7 +115,7 @@ func (s *Suit) serve(once bool) (ok bool) {
 		case Error:
 			// as fatal error already happened and connection will anyway be closed, we don't
 			// care about any socket errors anymore
-			resp := notNil(req, s.router.OnError(req, err))
+			resp := respond(req, s.router.OnError(req, err))
 			_ = s.Write(req.Proto, resp)
 			return false
 		default:
@@ -124,7 +128,8 @@ func (s *Suit) serve(once bool) (ok bool) {
 	}
 }
 
-func notNil(req *http.Request, resp *http.Response) *http.Response {
+// respond ensures the passed resp is not nil, otherwise http.Respond(req) is returned
+func respond(req *http.Request, resp *http.Response) *http.Response {
 	if resp != nil {
 		return resp
 	}
