@@ -2,12 +2,18 @@ package indigo
 
 import (
 	"crypto/tls"
+	"errors"
 	"github.com/indigo-web/indigo/config"
 	"github.com/indigo-web/indigo/http/crypt"
 	"github.com/indigo-web/indigo/http/serve"
 	"github.com/indigo-web/indigo/router"
 	"github.com/indigo-web/indigo/transport"
 	"net"
+)
+
+var (
+	ErrBadCertificate = errors.New("one or more passed certificates are empty")
+	ErrNoCertificates = errors.New("no certificates were passed")
 )
 
 type Transport struct {
@@ -37,8 +43,20 @@ func TLS(cert, key string) Transport {
 		return Transport{error: err}
 	}
 
+	return HTTPS(c)
+}
+
+func HTTPS(certs ...tls.Certificate) Transport {
+	// simple anti-idiot checks in order to avoid the most obvious mistakes
+	switch {
+	case len(certs) == 0:
+		return Transport{error: ErrNoCertificates}
+	case !noEmptyCerts(certs):
+		return Transport{error: ErrBadCertificate}
+	}
+
 	return Transport{
-		inner: transport.NewTLS([]tls.Certificate{c}),
+		inner: transport.NewTLS(certs),
 		spawnCallback: func(cfg *config.Config, r router.Router) func(net.Conn) {
 			return func(conn net.Conn) {
 				ver := conn.(*tls.Conn).ConnectionState().Version
@@ -46,6 +64,23 @@ func TLS(cert, key string) Transport {
 			}
 		},
 	}
+}
+
+func Cert(cert, key string) tls.Certificate {
+	// in case of an error an empty certificate is returned. This will be
+	// checked and instantly reported on starting the application
+	c, _ := tls.LoadX509KeyPair(cert, key)
+	return c
+}
+
+func noEmptyCerts(certs []tls.Certificate) bool {
+	for _, c := range certs {
+		if c.Certificate == nil {
+			return false
+		}
+	}
+
+	return true
 }
 
 func tlsver2crypttoken(ver uint16) crypt.Encryption {
