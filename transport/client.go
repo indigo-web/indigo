@@ -68,7 +68,6 @@ func (c *client) Conn() net.Conn {
 // Write writes data into the underlying connection
 func (c *client) Write(b []byte) error {
 	_, err := c.conn.Write(b)
-
 	return err
 }
 

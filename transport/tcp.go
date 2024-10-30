@@ -67,6 +67,7 @@ func (t *TCP) Listen(cfg config.TCP, cb func(conn net.Conn)) error {
 		go func(conn net.Conn) {
 			t.wg.Add(1)
 			cb(conn)
+			_ = conn.Close()
 			t.wg.Done()
 		}(conn)
 	}
