@@ -19,14 +19,14 @@ func MyHandler(request *http.Request) *http.Response {
 }
 
 func main() {
-	myRouter := inbuilt.New()
-	myRouter.Get("/", MyHandler)
+	r := inbuilt.New().
+		Get("/", MyHandler)
 
 	app := indigo.New(addr).
-		AutoHTTPS(":8443").
+		Listen(":8081").
 		OnBind(func(addr string) {
 			log.Printf("running on %s\n", addr)
 		})
 
-	log.Fatal(app.Serve(myRouter))
+	log.Fatal(app.Serve(r))
 }

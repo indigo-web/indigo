@@ -67,7 +67,6 @@ func main() {
 
 	app := indigo.New(addr).
 		Tune(s).
-		AutoHTTPS(httpsAddr).
 		OnBind(func(addr string) {
 			log.Printf("running on %s\n", addr)
 		})
@@ -84,8 +83,9 @@ func main() {
 		Post(IndexSay)
 
 	r.Post("/shutdown", func(request *http.Request) (_ *http.Response) {
-		app.GracefulStop()
+		app.Stop()
 
+		// TODO: this is not guaranteed to be delivered. Must implement better ways to shutdown
 		return http.Code(request, status.Teapot)
 	})
 
