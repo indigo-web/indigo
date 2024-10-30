@@ -99,11 +99,6 @@ func getInbuiltRouter() *inbuilt.Router {
 			return nil
 		}
 
-		// no need for deferred connection close. It'll be closed automatically
-		// by tcp server
-
-		// just ignore the error here. If occurred, will be anyway caught by
-		// the test
 		_ = client.Write([]byte("j"))
 		return nil
 	})
@@ -169,11 +164,6 @@ func headersToMap(hdrs headers.Headers, keys []string) map[string]string {
 	return m
 }
 
-func TestAddressNormalization(t *testing.T) {
-	require.Equal(t, "pavlo:80", normalizeAddr("pavlo:80"))
-	require.Equal(t, "0.0.0.0:80", normalizeAddr(":80"))
-}
-
 func TestFirstPhase(t *testing.T) {
 	ch := make(chan struct{})
 	app := New(addr)
@@ -194,7 +184,7 @@ func TestFirstPhase(t *testing.T) {
 			OnStop(func() {
 				ch <- struct{}{}
 			}).
-			Bind(TCP(altAddr)).
+			Listen(altAddr, TCP()).
 			Serve(r)
 	}(app)
 
@@ -347,11 +337,11 @@ func TestFirstPhase(t *testing.T) {
 
 	t.Run("hijacking", func(t *testing.T) {
 		conn, err := sendSimpleRequest(addr, "/hijack")
+		require.NoError(t, err)
 		defer func() {
 			_ = conn.Close()
 		}()
 
-		require.NoError(t, err)
 		data, err := io.ReadAll(conn)
 		require.NoError(t, err)
 		require.Equal(t, "j", string(data))
@@ -488,7 +478,7 @@ func TestFirstPhase(t *testing.T) {
 		testCtxValue(t, appURL)
 	})
 
-	// TODO: add handy TLS routines
+	// TODO: add TLS routines for generating local trusted https certificates
 	//t.Run("https", func(t *testing.T) {
 	//	testCtxValue(t, "https://"+httpsAddr)
 	//})
