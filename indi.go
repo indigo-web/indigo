@@ -1,6 +1,7 @@
 package indigo
 
 import (
+	"crypto/tls"
 	"github.com/indigo-web/indigo/config"
 	"github.com/indigo-web/indigo/internal/strutil"
 	"github.com/indigo-web/indigo/router"
@@ -57,7 +58,8 @@ func (a *App) OnStop(cb func()) *App {
 func (a *App) Listen(addr string, ts ...Transport) *App {
 	if len(addr) == 0 {
 		// empty addr is considered a no-op Bind operation. Main use-case is omitting
-		// default TCP binding when, for example, TLS-only mode is desired
+		// default TCP binding when, for example, the default TCP listener is preferred
+		// to be disabled
 		return a
 	}
 
@@ -75,12 +77,12 @@ func (a *App) Listen(addr string, ts ...Transport) *App {
 	return a
 }
 
-// TLS is a shortcut for App.Bind(addr, TLS(cert, key)).
+// TLS is a shortcut for App.Listen(addr, indigo.TLS(indigo.Cert(cert, key))).
 //
-// Starts an TLS listener on the provided port using passed cert and key files.
-// If those are incorrect, it will be reported when the application starts.
-func (a *App) TLS(addr string, cert, key string) *App {
-	return a.Listen(addr, TLS(cert, key))
+// Starts an TLS listener on the provided address using provided 1 or more certificates.
+// Zero passed certificates will panic.
+func (a *App) TLS(addr string, certs ...tls.Certificate) *App {
+	return a.Listen(addr, TLS(certs...))
 }
 
 // Serve starts the web-application. If nil is passed instead of a router, empty inbuilt will
@@ -96,14 +98,6 @@ func (a *App) Serve(r router.Fabric) error {
 func (a *App) run(r router.Router) error {
 	callIfNotNil(a.hooks.OnStart)
 
-	// if any error occurred during transports registration, it's easier to
-	// report it before any transport will be started
-	for _, t := range a.transports {
-		if t.error != nil {
-			return t.error
-		}
-	}
-
 	for _, t := range a.transports {
 		if err := a.supervisor.Add(t.addr, t.inner, t.spawnCallback(a.cfg, r)); err != nil {
 			return err
@@ -114,7 +108,7 @@ func (a *App) run(r router.Router) error {
 		}
 	}
 
-	err := a.supervisor.Run(a.cfg.TCP)
+	err := a.supervisor.Run(a.cfg.NET)
 	callIfNotNil(a.hooks.OnStop)
 
 	return err
