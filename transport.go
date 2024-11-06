@@ -2,25 +2,20 @@ package indigo
 
 import (
 	"crypto/tls"
-	"errors"
+	"fmt"
 	"github.com/indigo-web/indigo/config"
 	"github.com/indigo-web/indigo/http/crypt"
 	"github.com/indigo-web/indigo/http/serve"
 	"github.com/indigo-web/indigo/router"
 	"github.com/indigo-web/indigo/transport"
+	"golang.org/x/crypto/acme/autocert"
 	"net"
-)
-
-var (
-	ErrBadCertificate = errors.New("one or more passed certificates are empty")
-	ErrNoCertificates = errors.New("no certificates were passed")
 )
 
 type Transport struct {
 	addr          string // must be left intact. Used by App entity only
 	inner         transport.Transport
 	spawnCallback func(cfg *config.Config, r router.Router) func(net.Conn)
-	error         error
 }
 
 func TCP() Transport {
@@ -34,29 +29,51 @@ func TCP() Transport {
 	}
 }
 
-func TLS(cert, key string) Transport {
-	c, err := tls.LoadX509KeyPair(cert, key)
-	if err != nil {
-		// if any error occurred, there's no way to report it at this point.
-		// Save it in the transport, the App will catch and return it when
-		// will bind listeners. Deferred error?
-		return Transport{error: err}
+func TLS(certs ...tls.Certificate) Transport {
+	if len(certs) == 0 {
+		panic("need at least one certificate")
 	}
 
-	return HTTPS(c)
+	return newTLSTransport(&tls.Config{Certificates: certs})
 }
 
-func HTTPS(certs ...tls.Certificate) Transport {
-	// simple anti-idiot checks in order to avoid the most obvious mistakes
-	switch {
-	case len(certs) == 0:
-		return Transport{error: ErrNoCertificates}
-	case !noEmptyCerts(certs):
-		return Transport{error: ErrBadCertificate}
+// Autocert tries to automatically issue a certificate for the given domains.
+// If operation succeeds, those will be (hopefully) saved into the default cache
+// directory, which depends on the OS. If you want to specify the cache directory,
+// use AutocertFromCache instead.
+func Autocert(domains ...string) Transport {
+	return AutocertFromCache(tlsCacheDir(), domains...)
+}
+
+// AutocertFromCache tries to automatically issue a certificate for the given domains.
+// If the operation succeeds, those will be (hopefully) saved into the provided cache
+// directory. It's recommended to use Autocert if there are no explicit needs to set
+// custom cache directory.
+func AutocertFromCache(cache string, domains ...string) Transport {
+	m := &autocert.Manager{
+		Prompt: autocert.AcceptTOS,
+		Cache:  autocert.DirCache(cache),
 	}
 
+	if len(domains) > 0 {
+		m.HostPolicy = autocert.HostWhitelist(domains...)
+	}
+
+	return newTLSTransport(&tls.Config{GetCertificate: m.GetCertificate})
+}
+
+func Cert(cert, key string) tls.Certificate {
+	c, err := tls.LoadX509KeyPair(cert, key)
+	if err != nil {
+		panic(fmt.Errorf("could not load TLS certificate: %s", err))
+	}
+
+	return c
+}
+
+func newTLSTransport(cfg *tls.Config) Transport {
 	return Transport{
-		inner: transport.NewTLS(certs),
+		inner: transport.NewTLS(cfg),
 		spawnCallback: func(cfg *config.Config, r router.Router) func(net.Conn) {
 			return func(conn net.Conn) {
 				ver := conn.(*tls.Conn).ConnectionState().Version
@@ -64,23 +81,6 @@ func HTTPS(certs ...tls.Certificate) Transport {
 			}
 		},
 	}
-}
-
-func Cert(cert, key string) tls.Certificate {
-	// in case of an error an empty certificate is returned. This will be
-	// checked and instantly reported on starting the application
-	c, _ := tls.LoadX509KeyPair(cert, key)
-	return c
-}
-
-func noEmptyCerts(certs []tls.Certificate) bool {
-	for _, c := range certs {
-		if c.Certificate == nil {
-			return false
-		}
-	}
-
-	return true
 }
 
 func tlsver2crypttoken(ver uint16) crypt.Encryption {

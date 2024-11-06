@@ -6,12 +6,12 @@ import (
 )
 
 type TLS struct {
-	certs []tls.Certificate
+	cfg *tls.Config
 	TCP
 }
 
-func NewTLS(certs []tls.Certificate) *TLS {
-	return &TLS{certs: certs}
+func NewTLS(cfg *tls.Config) *TLS {
+	return &TLS{cfg: cfg}
 }
 
 func (t *TLS) Bind(addr string) error {
@@ -20,9 +20,7 @@ func (t *TLS) Bind(addr string) error {
 		return err
 	}
 
-	l := tls.NewListener(tcp, &tls.Config{
-		Certificates: t.certs,
-	})
+	l := tls.NewListener(tcp, t.cfg)
 	t.TCP = newTCP(tlsAdapter{tcp, l})
 
 	return nil
