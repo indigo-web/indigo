@@ -64,7 +64,7 @@ func Benchmark_Get(b *testing.B) {
 
 	b.Run("10 headers", func(b *testing.B) {
 		raw := requestgen.Generate(longPath, requestgen.Headers(10))
-		dispersed := disperse(raw, config.Default().TCP.ReadBufferSize)
+		dispersed := disperse(raw, config.Default().NET.ReadBufferSize)
 		client := dummy.NewCircularClient(dispersed...)
 		server, _ := newSuit(client)
 		b.SetBytes(int64(len(raw)))
@@ -80,7 +80,7 @@ func Benchmark_Get(b *testing.B) {
 
 	b.Run("50 headers", func(b *testing.B) {
 		raw := requestgen.Generate(longPath, requestgen.Headers(50))
-		dispersed := disperse(raw, config.Default().TCP.ReadBufferSize)
+		dispersed := disperse(raw, config.Default().NET.ReadBufferSize)
 		client := dummy.NewCircularClient(dispersed...)
 		server, _ := newSuit(client)
 		b.SetBytes(int64(len(raw)))
@@ -96,7 +96,7 @@ func Benchmark_Get(b *testing.B) {
 
 	b.Run("heavily escaped", func(b *testing.B) {
 		raw := requestgen.Generate(strings.Repeat("%20", 500), requestgen.Headers(10))
-		dispersed := disperse(raw, config.Default().TCP.ReadBufferSize)
+		dispersed := disperse(raw, config.Default().NET.ReadBufferSize)
 		client := dummy.NewCircularClient(dispersed...)
 		server, _ := newSuit(client)
 		b.SetBytes(int64(len(raw)))
@@ -114,7 +114,7 @@ func Benchmark_Get(b *testing.B) {
 func Benchmark_Post(b *testing.B) {
 	b.Run("POST hello world", func(b *testing.B) {
 		raw := []byte("POST / HTTP/1.1\r\nContent-Length: 13\r\n\r\nHello, world!")
-		client := dummy.NewCircularClient(disperse(raw, config.Default().TCP.ReadBufferSize)...)
+		client := dummy.NewCircularClient(disperse(raw, config.Default().NET.ReadBufferSize)...)
 		server, _ := newSuit(client)
 		b.SetBytes(int64(len(raw)))
 		b.ReportAllocs()
@@ -128,7 +128,7 @@ func Benchmark_Post(b *testing.B) {
 	b.Run("discard POST 10mib", func(b *testing.B) {
 		body := strings.Repeat("a", 10_000_000)
 		raw := []byte("POST / HTTP/1.1\r\nContent-Length: 10000000\r\n\r\n" + body)
-		client := dummy.NewCircularClient(disperse(raw, config.Default().TCP.ReadBufferSize)...)
+		client := dummy.NewCircularClient(disperse(raw, config.Default().NET.ReadBufferSize)...)
 		server, _ := newSuit(client)
 		b.SetBytes(int64(len(raw)))
 		b.ReportAllocs()
@@ -145,7 +145,7 @@ func Benchmark_Post(b *testing.B) {
 		chunk := "fffe\r\n" + strings.Repeat("a", chunkSize) + "\r\n"
 		chunked := strings.Repeat(chunk, numberOfChunks) + "0\r\n\r\n"
 		raw := []byte("POST / HTTP/1.1\r\nTransfer-Encoding: chunked\r\n\r\n" + chunked)
-		client := dummy.NewCircularClient(disperse(raw, config.Default().TCP.ReadBufferSize)...)
+		client := dummy.NewCircularClient(disperse(raw, config.Default().NET.ReadBufferSize)...)
 		server, _ := newSuit(client)
 		b.SetBytes(int64(len(raw)))
 		b.ReportAllocs()

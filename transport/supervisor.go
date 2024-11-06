@@ -29,7 +29,7 @@ func (s *Supervisor) Add(addr string, transport Transport, cb func(net.Conn)) er
 	return nil
 }
 
-func (s *Supervisor) Run(cfg config.TCP) error {
+func (s *Supervisor) Run(cfg config.NET) error {
 	if len(s.ts) == 0 {
 		return nil
 	}

@@ -175,7 +175,7 @@ func TestFirstPhase(t *testing.T) {
 				),
 			)
 		s := config.Default()
-		s.TCP.ReadTimeout = 500 * time.Millisecond
+		s.NET.ReadTimeout = 500 * time.Millisecond
 		_ = app.
 			Tune(s).
 			OnStart(func() {
@@ -666,7 +666,7 @@ func TestSecondPhase(t *testing.T) {
 	go func(app *App) {
 		r := getInbuiltRouter()
 		s := config.Default()
-		s.TCP.ReadTimeout = 500 * time.Millisecond
+		s.NET.ReadTimeout = 500 * time.Millisecond
 		_ = app.
 			Tune(s).
 			OnStart(func() {

@@ -96,7 +96,7 @@ type (
 		FileBuffSize int
 	}
 
-	TCP struct {
+	NET struct {
 		// ReadBufferSize is a size of buffer in bytes which will be used to read from
 		// socket
 		ReadBufferSize int
@@ -114,7 +114,7 @@ type Config struct {
 	Headers Headers
 	Body    Body
 	HTTP    HTTP
-	TCP     TCP
+	NET     NET
 }
 
 // Default returns default config. Those are initially well-balanced, however maximal defaults
@@ -160,8 +160,8 @@ func Default() *Config {
 		Body: Body{
 			MaxSize:      512 * 1024 * 1024, // 512 megabytes
 			MaxChunkSize: 128 * 1024,        // 128 kilobytes
-			// 8 kilobytes is by default twice more than TCPs read buffer, so must
-			// be enough to avoid multiple reads per single TCP chunk
+			// 8 kilobytes is by default twice more than NETs read buffer, so must
+			// be enough to avoid multiple reads per single NET chunk
 			DecodingBufferSize: 8 * 1024,
 			BufferPrealloc:     1024,
 			// we can afford pre-allocating it to 1kb as it's allocated lazily anyway
@@ -171,7 +171,7 @@ func Default() *Config {
 			ResponseBuffSize: 1024,
 			FileBuffSize:     64 * 1024, // 64kb read buffer for files is pretty much sufficient
 		},
-		TCP: TCP{
+		NET: NET{
 			ReadBufferSize:            4 * 1024, // 4kb is more than enough for ordinary requests.
 			ReadTimeout:               90 * time.Second,
 			AcceptLoopInterruptPeriod: 5 * time.Second,
@@ -220,10 +220,10 @@ func Fill(src *Config) (new *Config) {
 			ResponseBuffSize: either(src.HTTP.ResponseBuffSize, defaults.HTTP.ResponseBuffSize),
 			FileBuffSize:     either(src.HTTP.FileBuffSize, defaults.HTTP.FileBuffSize),
 		},
-		TCP: TCP{
-			ReadBufferSize:            either(src.TCP.ReadBufferSize, defaults.TCP.ReadBufferSize),
-			ReadTimeout:               either(src.TCP.ReadTimeout, defaults.TCP.ReadTimeout),
-			AcceptLoopInterruptPeriod: either(src.TCP.AcceptLoopInterruptPeriod, defaults.TCP.AcceptLoopInterruptPeriod),
+		NET: NET{
+			ReadBufferSize:            either(src.NET.ReadBufferSize, defaults.NET.ReadBufferSize),
+			ReadTimeout:               either(src.NET.ReadTimeout, defaults.NET.ReadTimeout),
+			AcceptLoopInterruptPeriod: either(src.NET.AcceptLoopInterruptPeriod, defaults.NET.AcceptLoopInterruptPeriod),
 		},
 	}
 }

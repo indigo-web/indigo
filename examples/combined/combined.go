@@ -63,7 +63,7 @@ func Stressful(request *http.Request) *http.Response {
 
 func main() {
 	s := config.Default()
-	s.TCP.ReadTimeout = time.Hour
+	s.NET.ReadTimeout = time.Hour
 
 	app := indigo.New(addr).
 		Tune(s).

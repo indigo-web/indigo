@@ -29,7 +29,7 @@ func Chunked(cfg config.Body) *chunkedbody.Parser {
 	})
 }
 
-func Client(cfg config.TCP, conn net.Conn) transport.Client {
+func Client(cfg config.NET, conn net.Conn) transport.Client {
 	readBuff := make([]byte, cfg.ReadBufferSize)
 
 	return transport.NewClient(conn, cfg.ReadTimeout, readBuff)

@@ -40,7 +40,7 @@ func TestServer(t *testing.T) {
 	t.Run("5 headers", func(t *testing.T) {
 		wantHeaders := requestgen.Headers(5)
 		raw := requestgen.Generate(longPath, wantHeaders)
-		dispersed := disperse(raw, config.Default().TCP.ReadBufferSize)
+		dispersed := disperse(raw, config.Default().NET.ReadBufferSize)
 		client := dummy.NewCircularClient(dispersed...)
 		server, _ := newSuit(client)
 		server.router = newSimpleRouter(t, wantHeaders)
@@ -53,7 +53,7 @@ func TestServer(t *testing.T) {
 	t.Run("10 headers", func(t *testing.T) {
 		wantHeaders := requestgen.Headers(10)
 		raw := requestgen.Generate(longPath, wantHeaders)
-		dispersed := disperse(raw, config.Default().TCP.ReadBufferSize)
+		dispersed := disperse(raw, config.Default().NET.ReadBufferSize)
 		client := dummy.NewCircularClient(dispersed...)
 		server, _ := newSuit(client)
 		server.router = newSimpleRouter(t, wantHeaders)
@@ -66,7 +66,7 @@ func TestServer(t *testing.T) {
 	t.Run("50 headers", func(t *testing.T) {
 		wantHeaders := requestgen.Headers(50)
 		raw := requestgen.Generate(longPath, wantHeaders)
-		dispersed := disperse(raw, config.Default().TCP.ReadBufferSize)
+		dispersed := disperse(raw, config.Default().NET.ReadBufferSize)
 		client := dummy.NewCircularClient(dispersed...)
 		server, _ := newSuit(client)
 		server.router = newSimpleRouter(t, wantHeaders)
@@ -81,7 +81,7 @@ func TestServer(t *testing.T) {
 	t.Run("heavily escaped", func(t *testing.T) {
 		wantHeaders := requestgen.Headers(20)
 		raw := requestgen.Generate(strings.Repeat("%20", 500), wantHeaders)
-		dispersed := disperse(raw, config.Default().TCP.ReadBufferSize)
+		dispersed := disperse(raw, config.Default().NET.ReadBufferSize)
 		client := dummy.NewCircularClient(dispersed...)
 		server, _ := newSuit(client)
 		server.router = newSimpleRouter(t, wantHeaders)
@@ -99,7 +99,7 @@ func TestPOST(t *testing.T) {
 
 	t.Run("POST hello world", func(t *testing.T) {
 		raw := []byte("POST / HTTP/1.1\r\nContent-Length: 13\r\n\r\nHello, world!")
-		client := dummy.NewCircularClient(disperse(raw, config.Default().TCP.ReadBufferSize)...)
+		client := dummy.NewCircularClient(disperse(raw, config.Default().NET.ReadBufferSize)...)
 		server, _ := newSuit(client)
 
 		for i := 0; i < N; i++ {
@@ -110,7 +110,7 @@ func TestPOST(t *testing.T) {
 	t.Run("discard POST 10mib", func(t *testing.T) {
 		body := strings.Repeat("a", 10_000_000)
 		raw := []byte("POST / HTTP/1.1\r\nContent-Length: 10000000\r\n\r\n" + body)
-		dispersed := disperse(raw, config.Default().TCP.ReadBufferSize)
+		dispersed := disperse(raw, config.Default().NET.ReadBufferSize)
 		client := dummy.NewCircularClient(dispersed...)
 		server, _ := newSuit(client)
 
@@ -127,7 +127,7 @@ func TestPOST(t *testing.T) {
 		chunk := "fffe\r\n" + strings.Repeat("a", chunkSize) + "\r\n"
 		chunked := strings.Repeat(chunk, numberOfChunks) + "0\r\n\r\n"
 		raw := []byte("POST / HTTP/1.1\r\nTransfer-Encoding: chunked\r\n\r\n" + chunked)
-		dispersed := disperse(raw, config.Default().TCP.ReadBufferSize)
+		dispersed := disperse(raw, config.Default().NET.ReadBufferSize)
 		client := dummy.NewCircularClient(dispersed...)
 		server, _ := newSuit(client)
 

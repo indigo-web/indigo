@@ -48,7 +48,7 @@ func (t *TCP) Bind(addr string) (err error) {
 	return err
 }
 
-func (t *TCP) Listen(cfg config.TCP, cb func(conn net.Conn)) error {
+func (t *TCP) Listen(cfg config.NET, cb func(conn net.Conn)) error {
 	for !t.stop.Load() {
 		err := t.l.SetDeadline(timer.Now().Add(cfg.AcceptLoopInterruptPeriod))
 		if err != nil {
