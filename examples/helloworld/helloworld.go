@@ -9,8 +9,6 @@ import (
 	"github.com/indigo-web/indigo/router/inbuilt"
 )
 
-const addr = ":8080"
-
 func MyHandler(request *http.Request) *http.Response {
 	return request.Respond().
 		Code(status.OK).
@@ -22,8 +20,8 @@ func main() {
 	r := inbuilt.New().
 		Get("/", MyHandler)
 
-	app := indigo.New(addr).
-		Listen(":8081").
+	app := indigo.New(":8080").
+		TLS(":8443", indigo.LocalCert()).
 		OnBind(func(addr string) {
 			log.Printf("running on %s\n", addr)
 		})

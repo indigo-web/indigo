@@ -14,11 +14,6 @@ import (
 	"github.com/indigo-web/indigo/router/inbuilt"
 )
 
-const (
-	addr      = ":8080"
-	httpsAddr = ":8443"
-)
-
 func IndexSay(request *http.Request) *http.Response {
 	if request.Headers.Value("talking") != "allowed" {
 		return http.Code(request, status.UnavailableForLegalReasons)
@@ -65,7 +60,8 @@ func main() {
 	s := config.Default()
 	s.NET.ReadTimeout = time.Hour
 
-	app := indigo.New(addr).
+	app := indigo.New(":8080").
+		TLS(":8443", indigo.LocalCert()).
 		Tune(s).
 		OnBind(func(addr string) {
 			log.Printf("running on %s\n", addr)
