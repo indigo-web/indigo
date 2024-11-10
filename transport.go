@@ -1,7 +1,12 @@
 package indigo
 
 import (
+	"crypto/rand"
+	"crypto/rsa"
 	"crypto/tls"
+	"crypto/x509"
+	"crypto/x509/pkix"
+	"encoding/pem"
 	"fmt"
 	"github.com/indigo-web/indigo/config"
 	"github.com/indigo-web/indigo/http/crypt"
@@ -9,7 +14,11 @@ import (
 	"github.com/indigo-web/indigo/router"
 	"github.com/indigo-web/indigo/transport"
 	"golang.org/x/crypto/acme/autocert"
+	"math/big"
 	"net"
+	"os"
+	"path/filepath"
+	"time"
 )
 
 type Transport struct {
@@ -40,16 +49,16 @@ func TLS(certs ...tls.Certificate) Transport {
 // Autocert tries to automatically issue a certificate for the given domains.
 // If operation succeeds, those will be (hopefully) saved into the default cache
 // directory, which depends on the OS. If you want to specify the cache directory,
-// use AutocertFromCache instead.
+// use AutocertWithCache instead.
 func Autocert(domains ...string) Transport {
-	return AutocertFromCache(tlsCacheDir(), domains...)
+	return AutocertWithCache(tlsCacheDir(), domains...)
 }
 
-// AutocertFromCache tries to automatically issue a certificate for the given domains.
+// AutocertWithCache tries to automatically issue a certificate for the given domains.
 // If the operation succeeds, those will be (hopefully) saved into the provided cache
 // directory. It's recommended to use Autocert if there are no explicit needs to set
 // custom cache directory.
-func AutocertFromCache(cache string, domains ...string) Transport {
+func AutocertWithCache(cache string, domains ...string) Transport {
 	m := &autocert.Manager{
 		Prompt: autocert.AcceptTOS,
 		Cache:  autocert.DirCache(cache),
@@ -62,6 +71,24 @@ func AutocertFromCache(cache string, domains ...string) Transport {
 	return newTLSTransport(&tls.Config{GetCertificate: m.GetCertificate})
 }
 
+// LocalCert issues a self-signed certificate for local TLS-secured connections.
+// Please note, that self-signed certificates are failing security checks, so
+// browsers and tools like curl will complain.
+func LocalCert(cache ...string) tls.Certificate {
+	dir := tlsCacheDir()
+	if len(cache) > 0 {
+		dir = cache[0]
+	}
+
+	cert, key, err := generateSelfSignedCert(dir)
+	if err != nil {
+		panic(fmt.Errorf("cannot issue a local certificate: %s", err))
+	}
+
+	return Cert(cert, key)
+}
+
+// Cert loads the TLS certificate. Panics if an error happened.
 func Cert(cert, key string) tls.Certificate {
 	c, err := tls.LoadX509KeyPair(cert, key)
 	if err != nil {
@@ -77,13 +104,13 @@ func newTLSTransport(cfg *tls.Config) Transport {
 		spawnCallback: func(cfg *config.Config, r router.Router) func(net.Conn) {
 			return func(conn net.Conn) {
 				ver := conn.(*tls.Conn).ConnectionState().Version
-				serve.HTTP1(cfg, conn, tlsver2crypttoken(ver), r)
+				serve.HTTP1(cfg, conn, mapTLS(ver), r)
 			}
 		},
 	}
 }
 
-func tlsver2crypttoken(ver uint16) crypt.Encryption {
+func mapTLS(ver uint16) crypt.Encryption {
 	switch ver {
 	case tls.VersionTLS10:
 		return crypt.TLSv10
@@ -98,4 +125,89 @@ func tlsver2crypttoken(ver uint16) crypt.Encryption {
 	default:
 		return crypt.Unknown
 	}
+}
+
+func generateSelfSignedCert(cache string) (cert, key string, err error) {
+	var (
+		certfile = filepath.Join(cache, "localhost.crt")
+		keyfile  = filepath.Join(cache, "localhost.key")
+	)
+
+	if certExists(certfile, keyfile) {
+		return certfile, keyfile, nil
+	}
+
+	if err := mkdirIfNotExists(cache); err != nil {
+		return "", "", err
+	}
+
+	priv, err := rsa.GenerateKey(rand.Reader, 2048)
+	if err != nil {
+		return "", "", err
+	}
+
+	notBefore := time.Now()
+	notAfter := notBefore.Add(10 * 365 * 24 * time.Hour) // 10 years validity
+
+	template := x509.Certificate{
+		SerialNumber:          big.NewInt(1),
+		Subject:               pkix.Name{Organization: []string{"Localhost"}},
+		NotBefore:             notBefore,
+		NotAfter:              notAfter,
+		KeyUsage:              x509.KeyUsageKeyEncipherment | x509.KeyUsageDigitalSignature,
+		ExtKeyUsage:           []x509.ExtKeyUsage{x509.ExtKeyUsageServerAuth},
+		BasicConstraintsValid: true,
+	}
+
+	certDER, err := x509.CreateCertificate(rand.Reader, &template, &template, &priv.PublicKey, priv)
+	if err != nil {
+		return "", "", err
+	}
+
+	certFile, err := os.Create(certfile)
+	if err != nil {
+		return "", "", err
+	}
+	defer certFile.Close()
+
+	err = pem.Encode(certFile, &pem.Block{Type: "CERTIFICATE", Bytes: certDER})
+	if err != nil {
+		return "", "", err
+	}
+
+	keyFile, err := os.Create(keyfile)
+	if err != nil {
+		return "", "", err
+	}
+	defer keyFile.Close()
+
+	privBytes, err := x509.MarshalPKCS8PrivateKey(priv)
+	if err != nil {
+		return "", "", err
+	}
+
+	err = pem.Encode(keyFile, &pem.Block{Type: "PRIVATE KEY", Bytes: privBytes})
+	if err != nil {
+		return "", "", err
+	}
+
+	return certfile, keyfile, nil
+}
+
+func mkdirIfNotExists(dir string) error {
+	if stat, err := os.Stat(dir); err == nil && stat.IsDir() {
+		return nil
+	}
+
+	return os.MkdirAll(dir, 0700)
+}
+
+func certExists(cert, key string) bool {
+	return fileExists(cert) && fileExists(key)
+}
+
+func fileExists(filename string) bool {
+	stat, err := os.Stat(filename)
+
+	return err == nil && !stat.IsDir()
 }
