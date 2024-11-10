@@ -2,10 +2,10 @@ package http1
 
 import (
 	"fmt"
+	"github.com/dchest/uniuri"
 	"github.com/indigo-web/indigo/internal/construct"
 	"github.com/indigo-web/indigo/internal/requestgen"
 	"github.com/indigo-web/indigo/transport/dummy"
-	"math/rand"
 	"strings"
 	"testing"
 
@@ -548,15 +548,5 @@ func genHeaders(n int) (out []string) {
 }
 
 func genHeader() string {
-	return fmt.Sprintf("%s: some value", generateRandomString(16))
-}
-
-// generateRandomString generates random string of given length
-func generateRandomString(length int) string {
-	const charset = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
-	b := make([]byte, length)
-	for i := range b {
-		b[i] = charset[rand.Intn(len(charset))]
-	}
-	return string(b)
+	return fmt.Sprintf("%[1]s: %[1]s", uniuri.NewLen(16))
 }
