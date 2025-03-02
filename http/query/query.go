@@ -1,6 +1,7 @@
 package query
 
 import (
+	"github.com/indigo-web/indigo/config"
 	"github.com/indigo-web/indigo/internal/keyvalue"
 	"github.com/indigo-web/indigo/internal/qparams"
 	"github.com/indigo-web/indigo/internal/urlencoded"
@@ -12,20 +13,29 @@ type Params = *keyvalue.Storage
 
 // Query is an entity for lazy accessing the query
 type Query struct {
-	params Params
-	raw    []byte
+	cfg       *config.Config
+	params    Params
+	raw, buff []byte
 }
 
-func New(params Params) Query {
-	return Query{params: params}
+func New(params Params, cfg *config.Config) Query {
+	return Query{
+		cfg:    cfg,
+		params: params,
+	}
 }
 
-// Cook parses the query and returns Params
+// Cook parses the query and returns it in as Params.
 //
-// Recommendation: consider invoking this method only once, as repeatedly parsing big
-// enough strings may be quite expensive
-func (q *Query) Cook() (Params, error) {
-	return q.params, qparams.Parse(q.raw, qparams.Into(q.params), urlencoded.Decode)
+// Note: this method can be quite expensive. Consider saving and re-using the result.
+func (q *Query) Cook() (params Params, err error) {
+	if q.buff == nil {
+		q.buff = make([]byte, q.cfg.URL.Query.BufferPrealloc)
+	}
+
+	defFlagValue := q.cfg.URL.Query.DefaultFlagValue
+	q.buff, err = qparams.Parse(q.raw, q.buff[:0], qparams.Into(q.params), urlencoded.ExtendedDecode, defFlagValue)
+	return q.params, err
 }
 
 // Bytes returns the actual query, as it has been received
