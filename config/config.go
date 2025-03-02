@@ -1,10 +1,8 @@
 package config
 
 import (
-	"math"
+	"github.com/indigo-web/indigo/http/mime"
 	"time"
-
-	"github.com/indigo-web/utils/constraint"
 )
 
 var DefaultHeaders = map[string]string{
@@ -24,18 +22,39 @@ type (
 		Default, Maximal int
 	}
 
+	BodyForm struct {
+		// EntriesPrealloc is the number of preallocated seats for form.Form in body entity.
+		EntriesPrealloc uint64
+		// BufferPrealloc defines the initial length of the buffer when the whole body at once
+		// is requested (normally via String() or Bytes() methods.)
+		BufferPrealloc uint64
+		// DefaultCoding sets the default content encoding unless one is explicitly set.
+		DefaultCoding string
+		// DefaultContentType sets the default form body MIME (as for multipart) unless one is
+		// explicitly set.
+		DefaultContentType mime.MIME
+	}
+
 	URLBufferSize struct {
 		Default, Maximal int
 	}
 
 	Query struct {
-		PreAlloc int
+		// ParamsPrealloc sets the initial capacity of Params (aka keyvalue.Storage) storage.
+		ParamsPrealloc int
+		// BufferPrealloc sets the initial capacity of decoding buffer for queries. It is used
+		// to store decoded keys and values, as they are a subject of urlencoding, too.
+		BufferPrealloc int
+		// DefaultFlagValue sets the default value for all the flags. A flag is a query key without
+		// a value (can either be set empty or absent at all.) It is prohibited by HTTP RFC, however
+		// is used in the wild web. Unfortunate that there's a need to tolerate in general.
+		DefaultFlagValue string
 	}
 )
 
 type (
 	URL struct {
-		// MaxLength is a size for buffer that'll be allocated once and will be kept
+		// BufferSize is a size for buffer that'll be allocated once and will be kept
 		// until client disconnect
 		BufferSize URLBufferSize
 		Query      Query
@@ -58,17 +77,16 @@ type (
 		// keeping header values in memory.
 		// Default value is initial space allocated when client connects.
 		// Maximal value is a hard limit, reaching which one client triggers server
-		// to response with 431 Header Fields Too Large
+		// to response with 431 Header Fields Too Large.
 		ValueSpace HeadersValuesSpace
 		// MaxEncodingTokens is a limit of how many encodings can be applied at the body
-		// for a single request
+		// in a single request.
 		MaxEncodingTokens int
-		// Default headers are those, which will be rendered on each response unless they were
-		// not overridden by user
+		// Default headers are those, which will be rendered on each response unless overridden explicitly.
 		Default map[string]string
-		// CookiesPreAllocate defines the size of keyvalue.Storage, which is used to store cookies
-		// once on demand. Therefore, it's going to be allocated only if used
-		CookiesPreAllocate int
+		// CookiesPrealloc defines the initial keyvalue.Storage capacity, used to store the cookies
+		// itself.
+		CookiesPrealloc int
 	}
 
 	Body struct {
@@ -80,12 +98,7 @@ type (
 		MaxChunkSize int64
 		// DecodingBufferSize is a size of a buffer, used to store decoded request's body
 		DecodingBufferSize int64
-		// BufferPrealloc defines the initial length of the buffer when the whole body at once
-		// is requested (normally via String() or Bytes() methods)
-		BufferPrealloc uint64
-		// FormDecodeBufferPrealloc is for a buffer, which is used for decoding urlencoded keys
-		// in forms
-		FormDecodeBufferPrealloc uint64
+		Form               BodyForm
 	}
 
 	HTTP struct {
@@ -109,6 +122,11 @@ type (
 	}
 )
 
+// Config holds settings used across various parts of indigo, mainly restrictions, limitations
+// and pre-allocations.
+//
+// Please note: ALWAYS modify defaults (returned via Default()) and NEVER try to initialize the
+// config manually, as proper configuration values validation isn't as ubiquitous.
 type Config struct {
 	URL     URL
 	Headers Headers
@@ -118,20 +136,23 @@ type Config struct {
 }
 
 // Default returns default config. Those are initially well-balanced, however maximal defaults
-// are pretty permitting
+// are pretty permitting.
 func Default() *Config {
 	return &Config{
 		URL: URL{
 			BufferSize: URLBufferSize{
 				// allocate 2kb buffer by default for storing URI (including query and protocol)
 				Default: 2 * 1024,
-				// allow at most 64kb of URI, including query and protocol
-				Maximal: math.MaxUint16,
-				// NOTE: setting the maximal value too small (e.g. smaller than 10-15 bytes) may cause
-				// strange and ambiguous HTTP errors
+				// allow at most 16kb of URI, including query and protocol. The limit is pretty much
+				// tolerant, as most web entities are limiting it to 4-8kb.
+				Maximal: 16 * 1024,
 			},
 			Query: Query{
-				PreAlloc: 10,
+				ParamsPrealloc: 10,
+				// considering queries are generally not that huge, this must be fairly enough
+				// on average.
+				BufferPrealloc:   256,
+				DefaultFlagValue: "1",
 			},
 		},
 		Headers: Headers{
@@ -153,9 +174,9 @@ func Default() *Config {
 				Default: 1 * 1024, // allocate 1kb buffer by default
 				Maximal: 8 * 1024, // however allow at most 8kb of headers
 			},
-			MaxEncodingTokens:  15,
-			Default:            DefaultHeaders,
-			CookiesPreAllocate: 5,
+			MaxEncodingTokens: 15,
+			Default:           DefaultHeaders,
+			CookiesPrealloc:   5,
 		},
 		Body: Body{
 			MaxSize:      512 * 1024 * 1024, // 512 megabytes
@@ -163,9 +184,14 @@ func Default() *Config {
 			// 8 kilobytes is by default twice more than NETs read buffer, so must
 			// be enough to avoid multiple reads per single NET chunk
 			DecodingBufferSize: 8 * 1024,
-			BufferPrealloc:     1024,
-			// we can afford pre-allocating it to 1kb as it's allocated lazily anyway
-			FormDecodeBufferPrealloc: 1024,
+			Form: BodyForm{
+				EntriesPrealloc: 8,
+				// 1kb is intended for primarily x-www-form-urlencoded, as multipart
+				// needs of memory are fairly low
+				BufferPrealloc:     1024,
+				DefaultCoding:      "utf8",
+				DefaultContentType: mime.Plain,
+			},
 		},
 		HTTP: HTTP{
 			ResponseBuffSize: 1024,
@@ -177,69 +203,4 @@ func Default() *Config {
 			AcceptLoopInterruptPeriod: 5 * time.Second,
 		},
 	}
-}
-
-// Fill fills zero-values from partially-filled Config instance with default ones
-func Fill(src *Config) (new *Config) {
-	defaults := Default()
-
-	return &Config{
-		URL: URL{
-			BufferSize: URLBufferSize{
-				Default: either(src.URL.BufferSize.Default, defaults.URL.BufferSize.Default),
-				Maximal: either(src.URL.BufferSize.Maximal, defaults.URL.BufferSize.Maximal),
-			},
-			Query: Query{
-				PreAlloc: either(src.URL.Query.PreAlloc, defaults.URL.Query.PreAlloc),
-			},
-		},
-		Headers: Headers{
-			Number: HeadersNumber{
-				Default: either(src.Headers.Number.Default, defaults.Headers.Number.Default),
-				Maximal: either(src.Headers.Number.Maximal, defaults.Headers.Number.Maximal),
-			},
-			MaxKeyLength:   either(src.Headers.MaxKeyLength, defaults.Headers.MaxKeyLength),
-			MaxValueLength: either(src.Headers.MaxValueLength, defaults.Headers.MaxValueLength),
-			KeySpace: HeadersKeysSpace{
-				Default: either(src.Headers.KeySpace.Default, defaults.Headers.KeySpace.Default),
-				Maximal: either(src.Headers.KeySpace.Maximal, defaults.Headers.KeySpace.Maximal),
-			},
-			ValueSpace: HeadersValuesSpace{
-				Default: either(src.Headers.ValueSpace.Default, defaults.Headers.ValueSpace.Default),
-				Maximal: either(src.Headers.ValueSpace.Maximal, defaults.Headers.ValueSpace.Maximal),
-			},
-			MaxEncodingTokens: either(src.Headers.MaxEncodingTokens, defaults.Headers.MaxEncodingTokens),
-			Default:           mapOr(src.Headers.Default, defaults.Headers.Default),
-		},
-		Body: Body{
-			MaxSize:            either(src.Body.MaxSize, defaults.Body.MaxSize),
-			MaxChunkSize:       either(src.Body.MaxChunkSize, defaults.Body.MaxChunkSize),
-			DecodingBufferSize: either(src.Body.DecodingBufferSize, defaults.Body.DecodingBufferSize),
-		},
-		HTTP: HTTP{
-			ResponseBuffSize: either(src.HTTP.ResponseBuffSize, defaults.HTTP.ResponseBuffSize),
-			FileBuffSize:     either(src.HTTP.FileBuffSize, defaults.HTTP.FileBuffSize),
-		},
-		NET: NET{
-			ReadBufferSize:            either(src.NET.ReadBufferSize, defaults.NET.ReadBufferSize),
-			ReadTimeout:               either(src.NET.ReadTimeout, defaults.NET.ReadTimeout),
-			AcceptLoopInterruptPeriod: either(src.NET.AcceptLoopInterruptPeriod, defaults.NET.AcceptLoopInterruptPeriod),
-		},
-	}
-}
-
-func either[T constraint.Number](custom, defaultVal T) T {
-	if custom == 0 {
-		return defaultVal
-	}
-
-	return custom
-}
-
-func mapOr[K comparable, V any](custom, defaultVal map[K]V) map[K]V {
-	if custom == nil {
-		return defaultVal
-	}
-
-	return custom
 }
