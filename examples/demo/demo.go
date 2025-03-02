@@ -79,9 +79,10 @@ func main() {
 		Post(IndexSay)
 
 	r.Post("/shutdown", func(request *http.Request) (_ *http.Response) {
+		// TODO: this will stop the server BEFORE the answer can be sent.
+		// TODO: There gotta be a better way to stop the server AFTER the handler exits.
 		app.Stop()
 
-		// TODO: this is not guaranteed to be delivered. Must implement better ways to shutdown
 		return http.Code(request, status.Teapot)
 	})
 
