@@ -126,7 +126,7 @@ func (r *Request) Hijacked() bool {
 
 // Reset clears request headers and reads body into nowhere until completed.
 // It is implemented to clear the request object between requests
-func (r *Request) Reset() (err error) {
+func (r *Request) Reset() error {
 	r.Query.Reset()
 	r.Params.Clear()
 	r.Headers.Clear()

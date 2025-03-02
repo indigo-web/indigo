@@ -38,15 +38,12 @@ func (q *Query) Cook() (params Params, err error) {
 	return q.params, err
 }
 
-// Bytes returns the actual query, as it has been received
+// Bytes returns the query in its original form, just as it has been received.
 func (q *Query) Bytes() []byte {
 	return q.raw
 }
 
-// String returns the actual query, as it has been received
-//
-// Note: returned string is unsafe and must never be used after the request has been
-// processed
+// String returns the query in its original form, just as it has been received.
 func (q *Query) String() string {
 	return uf.B2S(q.raw)
 }
