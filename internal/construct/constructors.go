@@ -14,7 +14,7 @@ import (
 
 func Request(cfg *config.Config, client transport.Client, body http.Retriever) *http.Request {
 	hdrs := headers.NewPrealloc(cfg.Headers.Number.Default)
-	q := query.New(keyvalue.NewPreAlloc(cfg.URL.Query.PreAlloc))
+	q := query.New(keyvalue.NewPreAlloc(cfg.URL.Query.ParamsPrealloc), cfg)
 	resp := http.NewResponse()
 	params := keyvalue.New()
 	request := http.NewRequest(cfg, hdrs, q, resp, client, params)

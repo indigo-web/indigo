@@ -1,13 +1,14 @@
 package http1
 
 import (
+	"github.com/indigo-web/indigo/config"
 	"github.com/indigo-web/indigo/internal/requestgen"
 	"strings"
 	"testing"
 )
 
 func BenchmarkParser(b *testing.B) {
-	parser, request := getParser()
+	parser, request := getParser(config.Default())
 
 	b.Run("with 5 headers", func(b *testing.B) {
 		data := requestgen.Generate(strings.Repeat("a", 500), requestgen.Headers(5))

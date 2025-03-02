@@ -12,7 +12,7 @@ import (
 
 func newRequest() *Request {
 	return NewRequest(
-		config.Default(), headers.New(), query.New(nil), nil, dummy.NewNopClient(),
+		config.Default(), headers.New(), query.New(nil, config.Default()), nil, dummy.NewNopClient(),
 		nil,
 	)
 }

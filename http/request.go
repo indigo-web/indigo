@@ -81,7 +81,7 @@ func NewRequest(
 // doesn't cache the parsed result across calls and may be pretty expensive
 func (r *Request) Cookies() (cookie.Jar, error) {
 	if r.jar == nil {
-		r.jar = cookie.NewJarPreAlloc(r.cfg.Headers.CookiesPreAllocate)
+		r.jar = cookie.NewJarPreAlloc(r.cfg.Headers.CookiesPrealloc)
 	}
 
 	r.jar.Clear()

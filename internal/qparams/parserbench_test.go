@@ -18,12 +18,14 @@ func BenchmarkParse(b *testing.B) {
 }
 
 func benchmark(data []byte) func(b *testing.B) {
+	buff := make([]byte, 0, len(data))
+
 	return func(b *testing.B) {
 		b.SetBytes(int64(len(data)))
 		b.ResetTimer()
 
 		for i := 0; i < b.N; i++ {
-			_ = Parse(data, func(string, string) {}, urlencoded.Decode)
+			_, _ = Parse(data, buff, func(string, string) {}, urlencoded.Decode, "1")
 		}
 	}
 }
