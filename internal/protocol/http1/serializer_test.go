@@ -21,8 +21,8 @@ import (
 	"time"
 )
 
-func newSerializer(defaultHeaders map[string]string, request *http.Request, writer Writer) *Serializer {
-	return NewSerializer(make([]byte, 0, 1024), 128, defaultHeaders, request, writer)
+func getSerializer(defaultHeaders map[string]string, request *http.Request, writer Writer) *serializer {
+	return newSerializer(make([]byte, 0, 1024), 128, defaultHeaders, request, writer)
 }
 
 func newRequest() *http.Request {
@@ -46,7 +46,7 @@ func TestSerializer_Write(t *testing.T) {
 
 	t.Run("default builder", func(t *testing.T) {
 		writer := new(accumulativeWriter)
-		serializer := newSerializer(nil, request, writer)
+		serializer := getSerializer(nil, request, writer)
 		require.NoError(t, serializer.Write(proto.HTTP11, http.NewResponse()))
 		resp, err := stdhttp.ReadResponse(bufio.NewReader(bytes.NewBuffer(writer.Data)), stdreq)
 		require.Equal(t, 200, resp.StatusCode)
@@ -58,7 +58,7 @@ func TestSerializer_Write(t *testing.T) {
 		require.Empty(t, body)
 	})
 
-	testWithHeaders := func(t *testing.T, serializer *Serializer, writer *accumulativeWriter) {
+	testWithHeaders := func(t *testing.T, serializer *serializer, writer *accumulativeWriter) {
 		response := http.NewResponse().
 			Header("Hello", "nether").
 			Header("Something", "special", "here")
@@ -88,7 +88,7 @@ func TestSerializer_Write(t *testing.T) {
 			"Lorem":  "ipsum, something else",
 		}
 		writer := new(accumulativeWriter)
-		serializer := newSerializer(defHeaders, request, writer)
+		serializer := getSerializer(defHeaders, request, writer)
 		testWithHeaders(t, serializer, writer)
 		testWithHeaders(t, serializer, writer)
 	})
@@ -96,7 +96,7 @@ func TestSerializer_Write(t *testing.T) {
 	t.Run("HEAD request", func(t *testing.T) {
 		const body = "Hello, world!"
 		writer := new(accumulativeWriter)
-		serializer := newSerializer(nil, request, writer)
+		serializer := getSerializer(nil, request, writer)
 		response := http.NewResponse().String(body)
 		request := newRequest()
 		request.Method = method.HEAD
@@ -114,7 +114,7 @@ func TestSerializer_Write(t *testing.T) {
 	})
 
 	t.Run("HTTP/1.0 without keep-alive", func(t *testing.T) {
-		serializer := newSerializer(nil, request, new(accumulativeWriter))
+		serializer := getSerializer(nil, request, new(accumulativeWriter))
 		response := http.NewResponse()
 		err := serializer.Write(proto.HTTP10, response)
 		require.EqualError(t, err, status.ErrCloseConnection.Error())
@@ -122,7 +122,7 @@ func TestSerializer_Write(t *testing.T) {
 
 	t.Run("custom code and status", func(t *testing.T) {
 		writer := new(accumulativeWriter)
-		serializer := newSerializer(nil, request, writer)
+		serializer := getSerializer(nil, request, writer)
 		response := http.NewResponse().Code(600)
 
 		require.NoError(t, serializer.Write(proto.HTTP11, response))
@@ -136,7 +136,7 @@ func TestSerializer_Write(t *testing.T) {
 		const body = "Hello, world!"
 		reader := strings.NewReader(body)
 		writer := new(accumulativeWriter)
-		serializer := newSerializer(nil, request, writer)
+		serializer := getSerializer(nil, request, writer)
 		response := http.NewResponse().Attachment(reader, reader.Len())
 
 		require.NoError(t, serializer.Write(proto.HTTP11, response))
@@ -153,7 +153,7 @@ func TestSerializer_Write(t *testing.T) {
 		const body = "Hello, world!"
 		reader := strings.NewReader(body)
 		writer := new(accumulativeWriter)
-		serializer := newSerializer(nil, request, writer)
+		serializer := getSerializer(nil, request, writer)
 		response := http.NewResponse().Attachment(reader, 0)
 
 		require.NoError(t, serializer.Write(proto.HTTP11, response))
@@ -171,7 +171,7 @@ func TestSerializer_Write(t *testing.T) {
 		reader := strings.NewReader(body)
 		request.Method = method.HEAD
 		writer := new(accumulativeWriter)
-		serializer := newSerializer(nil, request, writer)
+		serializer := getSerializer(nil, request, writer)
 		response := http.NewResponse().Attachment(reader, reader.Len())
 		stdreq, err := stdhttp.NewRequest(stdhttp.MethodHead, "/", nil)
 		require.NoError(t, err)
@@ -189,7 +189,7 @@ func TestSerializer_Write(t *testing.T) {
 	t.Run("cookies", func(t *testing.T) {
 		t.Run("single pair no params", func(t *testing.T) {
 			writer := new(accumulativeWriter)
-			serializer := newSerializer(nil, request, writer)
+			serializer := getSerializer(nil, request, writer)
 			response := http.NewResponse().
 				Cookie(cookie.New("hello", "world"))
 
@@ -204,10 +204,10 @@ func TestSerializer_Write(t *testing.T) {
 
 		t.Run("multiple pairs with parameters", func(t *testing.T) {
 			writer := new(accumulativeWriter)
-			serializer := newSerializer(nil, request, writer)
+			serializer := getSerializer(nil, request, writer)
 			base := cookie.Build("hello", "world").
 				Path("/").
-				Domain("pavlo.gay").
+				Domain("pavlo.ooo").
 				Expires(time.Date(
 					2010, 5, 27, 16, 10, 32, 22,
 					time.FixedZone("CEST", 0),
@@ -229,9 +229,9 @@ func TestSerializer_Write(t *testing.T) {
 			require.NoError(t, err)
 			cookies := resp.Header.Values("Set-Cookie")
 			require.Equal(t, 2, len(cookies), "must be only 2 cookies")
-			wantCookie1 := "hello=world; Path=/; Domain=pavlo.gay; Expires=Thu, 27 May 2010 16:10:32 GMT; " +
+			wantCookie1 := "hello=world; Path=/; Domain=pavlo.ooo; Expires=Thu, 27 May 2010 16:10:32 GMT; " +
 				"MaxAge=3600; SameSite=Lax; Secure; HttpOnly"
-			wantCookie2 := "hello=world; Path=/; Domain=pavlo.gay; Expires=Thu, 27 May 2010 16:10:32 GMT; " +
+			wantCookie2 := "hello=world; Path=/; Domain=pavlo.ooo; Expires=Thu, 27 May 2010 16:10:32 GMT; " +
 				"MaxAge=0; SameSite=Lax; Secure; HttpOnly"
 			require.Equal(t, wantCookie1, cookies[0])
 			require.Equal(t, wantCookie2, cookies[1])
@@ -252,7 +252,7 @@ func TestSerializer_PreWrite(t *testing.T) {
 			Header("Connection", "upgrade").
 			Header("Upgrade", "HTTP/1.1")
 		writer := new(accumulativeWriter)
-		serializer := newSerializer(defHeaders, request, writer)
+		serializer := getSerializer(defHeaders, request, writer)
 		serializer.PreWrite(request.Proto, preResponse)
 
 		require.NoError(t, serializer.Write(proto.HTTP11, http.NewResponse()))
@@ -289,7 +289,7 @@ func TestSerializer_ChunkedTransfer(t *testing.T) {
 		reader := bytes.NewBuffer([]byte("Hello, world!"))
 		wantData := "d\r\nHello, world!\r\n0\r\n\r\n"
 		writer := new(accumulativeWriter)
-		serializer := newSerializer(nil, nil, writer)
+		serializer := getSerializer(nil, nil, writer)
 		serializer.fileBuff = make([]byte, math.MaxUint16)
 
 		err := serializer.writeChunkedBody(reader, writer)
@@ -305,7 +305,7 @@ func TestSerializer_ChunkedTransfer(t *testing.T) {
 		writer := new(accumulativeWriter)
 		cfg := config.Default()
 		req := construct.Request(cfg, dummy.NewNopClient(), NewBody(nil, nil, cfg.Body))
-		serializer := newSerializer(nil, req, writer)
+		serializer := getSerializer(nil, req, writer)
 		serializer.fileBuff = make([]byte, buffSize)
 
 		require.NoError(t, serializer.writeChunkedBody(reader, writer))

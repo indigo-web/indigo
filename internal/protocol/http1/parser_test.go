@@ -18,14 +18,13 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func getParser() (*Parser, *http.Request) {
-	cfg := config.Default()
+func getParser(cfg *config.Config) (*parser, *http.Request) {
 	client := dummy.NewNopClient()
 	body := NewBody(client, construct.Chunked(cfg.Body), cfg.Body)
 	req := construct.Request(cfg, client, body)
 	suit := Initialize(cfg, nil, client, req, body)
 
-	return suit.Parser, req
+	return suit.parser, req
 }
 
 type wantedRequest struct {
@@ -61,7 +60,7 @@ func splitIntoParts(req []byte, n int) (parts [][]byte) {
 }
 
 func feedPartially(
-	parser *Parser, rawRequest []byte, n int,
+	parser *parser, rawRequest []byte, n int,
 ) (state requestState, extra []byte, err error) {
 	parts := splitIntoParts(rawRequest, n)
 
@@ -85,7 +84,9 @@ func feedPartially(
 }
 
 func TestHttpRequestsParser_Parse_GET(t *testing.T) {
-	parser, request := getParser()
+	cfg := config.Default()
+	cfg.Headers.MaxEncodingTokens = 3
+	parser, request := getParser(cfg)
 
 	t.Run("simple GET", func(t *testing.T) {
 		raw := "GET / HTTP/1.1\r\n\r\n"
@@ -328,7 +329,7 @@ func TestHttpRequestsParser_POST(t *testing.T) {
 
 func TestHttpRequestsParser_Parse_Negative(t *testing.T) {
 	t.Run("no method", func(t *testing.T) {
-		parser, _ := getParser()
+		parser, _ := getParser(config.Default())
 		raw := []byte(" / HTTP/1.1\r\n\r\n")
 		state, _, err := parser.Parse(raw)
 		require.EqualError(t, err, status.ErrBadRequest.Error())
@@ -336,7 +337,7 @@ func TestHttpRequestsParser_Parse_Negative(t *testing.T) {
 	})
 
 	t.Run("no path", func(t *testing.T) {
-		parser, _ := getParser()
+		parser, _ := getParser(config.Default())
 		raw := []byte("GET HTTP/1.1\r\n\r\n")
 		state, _, err := parser.Parse(raw)
 		require.EqualError(t, err, status.ErrBadRequest.Error())
@@ -344,7 +345,7 @@ func TestHttpRequestsParser_Parse_Negative(t *testing.T) {
 	})
 
 	t.Run("whitespace as a path", func(t *testing.T) {
-		parser, _ := getParser()
+		parser, _ := getParser(config.Default())
 		raw := []byte("GET  HTTP/1.1\r\n\r\n")
 		state, _, err := parser.Parse(raw)
 		require.EqualError(t, err, status.ErrBadRequest.Error())
@@ -352,7 +353,7 @@ func TestHttpRequestsParser_Parse_Negative(t *testing.T) {
 	})
 
 	t.Run("short invalid method", func(t *testing.T) {
-		parser, _ := getParser()
+		parser, _ := getParser(config.Default())
 		raw := []byte("GE / HTTP/1.1\r\n\r\n")
 		state, _, err := parser.Parse(raw)
 		require.EqualError(t, err, status.ErrMethodNotImplemented.Error())
@@ -360,7 +361,7 @@ func TestHttpRequestsParser_Parse_Negative(t *testing.T) {
 	})
 
 	t.Run("long invalid method", func(t *testing.T) {
-		parser, _ := getParser()
+		parser, _ := getParser(config.Default())
 		raw := []byte("PATCHPOSTPUT / HTTP/1.1\r\n\r\n")
 		state, _, err := parser.Parse(raw)
 		require.EqualError(t, err, status.ErrMethodNotImplemented.Error())
@@ -368,7 +369,7 @@ func TestHttpRequestsParser_Parse_Negative(t *testing.T) {
 	})
 
 	t.Run("short invalid protocol", func(t *testing.T) {
-		parser, _ := getParser()
+		parser, _ := getParser(config.Default())
 		raw := []byte("GET / HTT\r\n\r\n")
 		state, _, err := parser.Parse(raw)
 		require.EqualError(t, err, status.ErrUnsupportedProtocol.Error())
@@ -376,7 +377,7 @@ func TestHttpRequestsParser_Parse_Negative(t *testing.T) {
 	})
 
 	t.Run("long invalid protocol", func(t *testing.T) {
-		parser, _ := getParser()
+		parser, _ := getParser(config.Default())
 		raw := []byte("GET / HTTPS/1.1\r\n\r\n")
 		state, _, err := parser.Parse(raw)
 		require.EqualError(t, err, status.ErrUnsupportedProtocol.Error())
@@ -384,7 +385,7 @@ func TestHttpRequestsParser_Parse_Negative(t *testing.T) {
 	})
 
 	t.Run("unsupported minor version", func(t *testing.T) {
-		parser, _ := getParser()
+		parser, _ := getParser(config.Default())
 		raw := []byte("GET / HTTP/1.2\r\n\r\n")
 		state, _, err := parser.Parse(raw)
 		require.EqualError(t, err, status.ErrUnsupportedProtocol.Error())
@@ -392,7 +393,7 @@ func TestHttpRequestsParser_Parse_Negative(t *testing.T) {
 	})
 
 	t.Run("unsupported major version", func(t *testing.T) {
-		parser, _ := getParser()
+		parser, _ := getParser(config.Default())
 		raw := []byte("GET / HTTP/42.1\r\n\r\n")
 		state, _, err := parser.Parse(raw)
 		require.EqualError(t, err, status.ErrUnsupportedProtocol.Error())
@@ -400,7 +401,7 @@ func TestHttpRequestsParser_Parse_Negative(t *testing.T) {
 	})
 
 	t.Run("invalid minor version", func(t *testing.T) {
-		parser, _ := getParser()
+		parser, _ := getParser(config.Default())
 		raw := []byte("GET / HTTP/1.x\r\n\r\n")
 		state, _, err := parser.Parse(raw)
 		require.EqualError(t, err, status.ErrUnsupportedProtocol.Error())
@@ -408,7 +409,7 @@ func TestHttpRequestsParser_Parse_Negative(t *testing.T) {
 	})
 
 	t.Run("invalid major version", func(t *testing.T) {
-		parser, _ := getParser()
+		parser, _ := getParser(config.Default())
 		raw := []byte("GET / HTTP/x.1\r\n\r\n")
 		state, _, err := parser.Parse(raw)
 		require.EqualError(t, err, status.ErrUnsupportedProtocol.Error())
@@ -416,7 +417,7 @@ func TestHttpRequestsParser_Parse_Negative(t *testing.T) {
 	})
 
 	t.Run("lfcr crlf break sequence", func(t *testing.T) {
-		parser, _ := getParser()
+		parser, _ := getParser(config.Default())
 		raw := []byte("GET / HTTP/1.1\n\r\r\n")
 		state, _, err := parser.Parse(raw)
 		require.EqualError(t, err, status.ErrBadRequest.Error())
@@ -427,7 +428,7 @@ func TestHttpRequestsParser_Parse_Negative(t *testing.T) {
 		// our parser is able to parse both crlf and lf splitters
 		// so in example below he sees LF CRLF CR
 		// the last one CR will be returned as extra-bytes
-		parser, _ := getParser()
+		parser, _ := getParser(config.Default())
 		raw := []byte("GET / HTTP/1.1\n\r\n\r")
 		state, extra, err := parser.Parse(raw)
 		require.Equal(t, []byte("\r"), extra)
@@ -436,7 +437,7 @@ func TestHttpRequestsParser_Parse_Negative(t *testing.T) {
 	})
 
 	t.Run("invalid content length", func(t *testing.T) {
-		parser, _ := getParser()
+		parser, _ := getParser(config.Default())
 		raw := []byte("GET / HTTP/1.1\r\nContent-Length: 1f5\r\n\r\n")
 		_, _, err := parser.Parse(raw)
 		require.EqualError(t, err, status.ErrBadRequest.Error())
@@ -446,7 +447,7 @@ func TestHttpRequestsParser_Parse_Negative(t *testing.T) {
 		// Simple Requests are not supported, because our server is
 		// HTTP/1.1-oriented, and in 1.1 simple request/response is
 		// something like a deprecated mechanism
-		parser, _ := getParser()
+		parser, _ := getParser(config.Default())
 		raw := []byte("GET / \r\n")
 		state, _, err := parser.Parse(raw)
 		require.EqualError(t, err, status.ErrUnsupportedProtocol.Error())
@@ -454,7 +455,7 @@ func TestHttpRequestsParser_Parse_Negative(t *testing.T) {
 	})
 
 	t.Run("too long header key", func(t *testing.T) {
-		parser, _ := getParser()
+		parser, _ := getParser(config.Default())
 		s := config.Default().Headers
 		raw := fmt.Sprintf(
 			"GET / HTTP/1.1\r\n%s: some value\r\n\r\n",
@@ -465,7 +466,7 @@ func TestHttpRequestsParser_Parse_Negative(t *testing.T) {
 	})
 
 	t.Run("too long header value", func(t *testing.T) {
-		parser, _ := getParser()
+		parser, _ := getParser(config.Default())
 		raw := fmt.Sprintf(
 			"GET / HTTP/1.1\r\nSome-Header: %s\r\n\r\n",
 			strings.Repeat("a", config.Default().Headers.MaxValueLength+1),
@@ -475,7 +476,7 @@ func TestHttpRequestsParser_Parse_Negative(t *testing.T) {
 	})
 
 	t.Run("too many headers", func(t *testing.T) {
-		parser, _ := getParser()
+		parser, _ := getParser(config.Default())
 		hdrs := genHeaders(config.Default().Headers.Number.Maximal + 1)
 		raw := fmt.Sprintf(
 			"GET / HTTP/1.1\r\n%s\r\n\r\n",

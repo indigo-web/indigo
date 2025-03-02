@@ -32,7 +32,7 @@ func getInbuiltRouter() router.Router {
 			return request.Respond()
 		})
 
-	return r.Initialize()
+	return r.Build()
 }
 
 func Benchmark_Get(b *testing.B) {

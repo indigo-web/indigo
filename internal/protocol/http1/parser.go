@@ -41,7 +41,7 @@ const (
 // ePathDecode2Char, etc. When headers are parsed, parser returns state
 // HeadersCompleted to notify http server about this, attaching all
 // the pending data as an extra. Body must be processed separately
-type Parser struct {
+type parser struct {
 	request         *http.Request
 	startLineBuff   *buffer.Buffer
 	headerKeyBuff   *buffer.Buffer
@@ -56,10 +56,10 @@ type Parser struct {
 	state           parserState
 }
 
-func NewParser(
+func newParser(
 	request *http.Request, keyBuff, valBuff, startLineBuff *buffer.Buffer, hdrsCfg config.Headers,
-) *Parser {
-	return &Parser{
+) *parser {
+	return &parser{
 		state:           eMethod,
 		request:         request,
 		headersCfg:      &hdrsCfg,
@@ -71,7 +71,7 @@ func NewParser(
 	}
 }
 
-func (p *Parser) Parse(data []byte) (state requestState, extra []byte, err error) {
+func (p *parser) Parse(data []byte) (state requestState, extra []byte, err error) {
 	_ = *p.request
 	request := p.request
 	headerKeyBuff := p.headerKeyBuff
@@ -168,7 +168,7 @@ path:
 			return Error, nil, status.ErrBadRequest
 		}
 
-		reqPath, err = urlencoded.Decode(reqPath)
+		reqPath, _, err = urlencoded.Decode(reqPath, reqPath[:0])
 		if err != nil {
 			return Error, nil, err
 		}
@@ -348,7 +348,10 @@ headerValue:
 			) && cEncoding == encodeU64(
 				key[8]|0x20, key[9]|0x20, key[10]|0x20, key[11]|0x20, key[12]|0x20, key[13]|0x20, key[14]|0x20, key[15]|0x20,
 			) {
-				request.Encoding.Content, _ = parseEncodingString(p.contEncToksBuff, value, cap(p.contEncToksBuff))
+				request.Encoding.Content, _, err = parseEncodingString(p.contEncToksBuff, value)
+				if err != nil {
+					return Error, nil, err
+				}
 			}
 		case 17:
 			if cTransfer == encodeU64(
@@ -356,9 +359,10 @@ headerValue:
 			) && cEncodin == encodeU64(
 				key[8]|0x20, key[9]|0x20, key[10]|0x20, key[11]|0x20, key[12]|0x20, key[13]|0x20, key[14]|0x20, key[15]|0x20,
 			) && key[16]|0x20 == 'g' {
-				request.Encoding.Transfer, request.Encoding.Chunked = parseEncodingString(
-					p.encToksBuff, value, cap(p.encToksBuff),
-				)
+				request.Encoding.Transfer, request.Encoding.Chunked, err = parseEncodingString(p.encToksBuff, value)
+				if err != nil {
+					return Error, nil, err
+				}
 			}
 		}
 
@@ -380,7 +384,7 @@ headerValueCRLFCR:
 	return Error, nil, status.ErrBadRequest
 }
 
-func (p *Parser) cleanup() {
+func (p *parser) cleanup() {
 	p.headersNumber = 0
 	p.startLineBuff.Clear()
 	p.headerKeyBuff.Clear()
@@ -391,7 +395,7 @@ func (p *Parser) cleanup() {
 	p.state = eMethod
 }
 
-func parseEncodingString(buff []string, value string, maxTokens int) (toks []string, chunked bool) {
+func parseEncodingString(buff []string, value string) (toks []string, chunked bool, err error) {
 	for len(value) > 0 {
 		var token string
 		comma := strings.IndexByte(value, ',')
@@ -401,23 +405,45 @@ func parseEncodingString(buff []string, value string, maxTokens int) (toks []str
 			token, value = value[:comma], value[comma+1:]
 		}
 
-		token = strings.TrimSpace(token)
+		token = trimSpaces(token)
 		if len(token) == 0 {
 			continue
 		}
 
-		if len(buff)+1 > maxTokens {
-			return nil, false
+		if strcomp.EqualFold(token, "chunked") {
+			if chunked {
+				// chunked is the only coding that can't be duplicated
+				return nil, false, status.ErrBadEncoding
+			}
+
+			chunked = true
 		}
 
-		if strcomp.EqualFold(token, "chunked") {
-			chunked = true
+		if len(buff) >= cap(buff) {
+			return nil, false, status.ErrTooManyEncodingTokens
 		}
 
 		buff = append(buff, token)
 	}
 
-	return buff, chunked
+	return buff, chunked, nil
+}
+
+func trimSpaces(s string) string {
+	for i, char := range s {
+		if char != ' ' {
+			s = s[i:]
+			break
+		}
+	}
+
+	for i := len(s); i > 0; i-- {
+		if s[i-1] != ' ' {
+			return s[:i]
+		}
+	}
+
+	return s[:0]
 }
 
 func trimPrefixSpaces(b []byte) []byte {

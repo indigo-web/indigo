@@ -13,8 +13,8 @@ import (
 )
 
 type Suit struct {
-	*Parser
-	*Serializer
+	*parser
+	*serializer
 	upgradePreResp *http.Response
 	body           *Body
 	router         router.Router
@@ -32,8 +32,8 @@ func New(
 	respFileBuffSize int,
 ) *Suit {
 	return &Suit{
-		Parser:         NewParser(request, keyBuff, valBuff, startLineBuff, cfg.Headers),
-		Serializer:     NewSerializer(respBuff, respFileBuffSize, cfg.Headers.Default, request, client),
+		parser:         newParser(request, keyBuff, valBuff, startLineBuff, cfg.Headers),
+		serializer:     newSerializer(respBuff, respFileBuffSize, cfg.Headers.Default, request, client),
 		upgradePreResp: http.NewResponse(),
 		body:           body,
 		router:         r,
@@ -61,7 +61,7 @@ func (s *Suit) Serve() {
 }
 
 func (s *Suit) serve(once bool) (ok bool) {
-	req := s.Parser.request
+	req := s.parser.request
 	client := s.client
 
 	for {
