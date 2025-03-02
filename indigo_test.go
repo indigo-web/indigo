@@ -47,7 +47,6 @@ func getHeaders() headers.Headers {
 func respond(request *http.Request) *http.Response {
 	str, err := httptest.Dump(request)
 	if err != nil {
-		fmt.Println("err:", err)
 		return http.Error(request, err)
 	}
 
@@ -185,6 +184,7 @@ func TestFirstPhase(t *testing.T) {
 				ch <- struct{}{}
 			}).
 			Listen(altAddr, TCP()).
+			TLS(httpsAddr, LocalCert()).
 			Serve(r)
 	}(app)
 
@@ -478,10 +478,9 @@ func TestFirstPhase(t *testing.T) {
 		testCtxValue(t, appURL)
 	})
 
-	// TODO: add TLS routines for generating local trusted https certificates
-	//t.Run("https", func(t *testing.T) {
-	//	testCtxValue(t, "https://"+httpsAddr)
-	//})
+	t.Run("https", func(t *testing.T) {
+		testCtxValue(t, "https://"+httpsAddr)
+	})
 
 	t.Run("alternative port", func(t *testing.T) {
 		testCtxValue(t, "http://"+altAddr)
@@ -634,7 +633,7 @@ func TestFirstPhase(t *testing.T) {
 		require.Equal(t, stdhttp.StatusOK, resp.StatusCode)
 		body, err := io.ReadAll(resp.Body)
 		require.NoError(t, err)
-		require.Equal(t, "hello=world\nmy+name=Paul\n", string(body))
+		require.Equal(t, "hello=world\nmy name=Paul\n", string(body))
 	})
 
 	t.Run("chunked body", func(t *testing.T) {
