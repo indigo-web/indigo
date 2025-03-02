@@ -23,7 +23,7 @@ func BenchmarkRouter_OnRequest_Static(b *testing.B) {
 
 	emptyCtx := context.Background()
 
-	r := raw.Initialize()
+	r := raw.Build()
 
 	b.Run("GET root", func(b *testing.B) {
 		for i := 0; i < b.N; i++ {

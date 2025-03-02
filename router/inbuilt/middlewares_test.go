@@ -81,7 +81,7 @@ func TestMiddlewares(t *testing.T) {
 		Use(getMiddleware(m5, stack)).
 		Get("/world", http.Respond, getMiddleware(m7, stack))
 
-	r := raw.Initialize()
+	r := raw.Build()
 
 	t.Run("/", func(t *testing.T) {
 		request := getRequest(method.GET, "/")

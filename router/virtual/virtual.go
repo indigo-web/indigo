@@ -10,14 +10,14 @@ import (
 
 type virtualFabric struct {
 	Domain string
-	Router router.Fabric
+	Router router.Builder
 }
 
-var _ router.Fabric = new(Router)
+var _ router.Builder = new(Router)
 
 type Router struct {
 	routers       []virtualFabric
-	defaultRouter router.Fabric
+	defaultRouter router.Builder
 }
 
 // New returns a new instance of the virtual Router
@@ -27,7 +27,7 @@ func New() *Router {
 
 // Host adds a new virtual router. If 0.0.0.0 is passed,
 // the router will be set as a default one
-func (r *Router) Host(host string, other router.Fabric) *Router {
+func (r *Router) Host(host string, other router.Builder) *Router {
 	host = domain.Normalize(host)
 	if domain.TrimPort(host) == "0.0.0.0" {
 		return r.Default(other)
@@ -44,23 +44,23 @@ func (r *Router) Host(host string, other router.Fabric) *Router {
 // matched.
 // Note: only requests with 0 or 1 Host header values may be passed into the default router.
 // If there are more than 1 value, the request will be refused
-func (r *Router) Default(def router.Fabric) *Router {
+func (r *Router) Default(def router.Builder) *Router {
 	r.defaultRouter = def
 	return r
 }
 
-func (r *Router) Initialize() router.Router {
+func (r *Router) Build() router.Router {
 	routers := make([]virtualRouter, len(r.routers))
 	for i, fabric := range r.routers {
 		routers[i] = virtualRouter{
 			Domain: fabric.Domain,
-			Router: fabric.Router.Initialize(),
+			Router: fabric.Router.Build(),
 		}
 	}
 
 	var defaultRouter router.Router
 	if r.defaultRouter != nil {
-		defaultRouter = r.defaultRouter.Initialize()
+		defaultRouter = r.defaultRouter.Build()
 	}
 
 	return &runtimeRouter{

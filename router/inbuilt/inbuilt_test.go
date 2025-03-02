@@ -21,7 +21,7 @@ func TestRoute(t *testing.T) {
 	raw.Route(method.GET, "/", http.Respond)
 	raw.Route(method.POST, "/", http.Respond)
 	raw.Route(method.POST, "/hello", http.Respond)
-	r := raw.Initialize()
+	r := raw.Build()
 
 	t.Run("GET /", func(t *testing.T) {
 		request := getRequest(method.GET, "/")
@@ -105,7 +105,7 @@ func TestGroups(t *testing.T) {
 	api.Group("/v2").
 		Get("/world", http.Respond)
 
-	r := raw.Initialize()
+	r := raw.Build()
 
 	require.Equal(t, status.OK, r.OnRequest(getRequest(method.GET, "/")).Reveal().Code)
 	require.Equal(t, status.OK, r.OnRequest(getRequest(method.GET, "/api/v1/hello")).Reveal().Code)
@@ -123,7 +123,7 @@ func TestResource(t *testing.T) {
 		Get(http.Respond).
 		Post(http.Respond)
 
-	r := raw.Initialize()
+	r := raw.Build()
 
 	t.Run("Root", func(t *testing.T) {
 		require.Equal(t, status.OK, r.OnRequest(getRequest(method.GET, "/")).Reveal().Code)
@@ -149,7 +149,7 @@ func TestResource_Methods(t *testing.T) {
 		Trace(http.Respond).
 		Patch(http.Respond)
 
-	r := raw.Initialize()
+	r := raw.Build()
 
 	for _, m := range method.List {
 		require.Equal(t, status.OK, r.OnRequest(getRequest(m, "/")).Reveal().Code)
@@ -159,7 +159,7 @@ func TestResource_Methods(t *testing.T) {
 func TestRouter_MethodNotAllowed(t *testing.T) {
 	r := New().
 		Get("/", http.Respond).
-		Initialize()
+		Build()
 
 	request := getRequest(method.POST, "/")
 	response := r.OnRequest(request)
@@ -173,7 +173,7 @@ func TestRouter_RouteError(t *testing.T) {
 				Code(status.Teapot).
 				String(req.Env.Error.Error())
 		}, status.BadRequest).
-		Initialize()
+		Build()
 
 	t.Run("status.ErrBadRequest", func(t *testing.T) {
 		request := getRequest(method.GET, "/")
@@ -211,7 +211,7 @@ func TestRouter_RouteError(t *testing.T) {
 					Code(status.Teapot).
 					String(fromUniversal)
 			}, AllErrors).
-			Initialize()
+			Build()
 
 		request := getRequest(method.GET, "/")
 		resp := r.OnError(request, status.ErrNotImplemented)
@@ -238,7 +238,7 @@ func TestAliases(t *testing.T) {
 			}).
 			Alias("/", "/hello")
 
-		testRootAlias(t, r.Initialize())
+		testRootAlias(t, r.Build())
 	})
 
 	t.Run("override normal handler", func(t *testing.T) {
@@ -255,7 +255,7 @@ func TestAliases(t *testing.T) {
 			}).
 			Alias("/", "/hello")
 
-		testRootAlias(t, r.Initialize())
+		testRootAlias(t, r.Build())
 	})
 
 	testOrdinaryRequest := func(t *testing.T, r router.Router) {
@@ -292,10 +292,10 @@ func TestAliases(t *testing.T) {
 			}).
 			Alias("/", "/hello")
 
-		testRootAlias(t, r.Initialize())
-		testOrdinaryRequest(t, r.Initialize())
-		testRootAlias(t, r.Initialize())
-		testOrdinaryRequest(t, r.Initialize())
+		testRootAlias(t, r.Build())
+		testOrdinaryRequest(t, r.Build())
+		testRootAlias(t, r.Build())
+		testOrdinaryRequest(t, r.Build())
 	})
 
 	t.Run("aliases on groups", func(t *testing.T) {
@@ -306,7 +306,7 @@ func TestAliases(t *testing.T) {
 			Alias("/world", "/heaven")
 
 		request := getRequest(method.GET, "/hello/world")
-		response := r.Initialize().OnRequest(request)
+		response := r.Build().OnRequest(request)
 		require.Equal(t, int(status.OK), int(response.Reveal().Code))
 	})
 }
@@ -322,7 +322,7 @@ func TestCatchers(t *testing.T) {
 			Catch("/hello", func(req *http.Request) *http.Response {
 				return req.Respond().String("double magic")
 			}).
-			Initialize()
+			Build()
 
 		resp := r.OnRequest(getRequest(method.GET, "/"))
 		require.Equal(t, status.OK, resp.Reveal().Code)
@@ -347,7 +347,7 @@ func TestMutators(t *testing.T) {
 		Mutator(func(request *http.Request) {
 			timesCalled++
 		}).
-		Initialize()
+		Build()
 
 	request := construct.Request(config.Default(), dummy.NewNopClient(), nil)
 	request.Method = method.GET
