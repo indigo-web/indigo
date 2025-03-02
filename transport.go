@@ -73,7 +73,8 @@ func AutocertWithCache(cache string, domains ...string) Transport {
 
 // LocalCert issues a self-signed certificate for local TLS-secured connections.
 // Please note, that self-signed certificates are failing security checks, so
-// browsers and tools like curl will complain.
+// browsers and tools (e.g. curl) may refuse to connect without adding security check skip
+// flags (in particular, -k or --insecure for curl.)
 func LocalCert(cache ...string) tls.Certificate {
 	dir := tlsCacheDir()
 	if len(cache) > 0 {

@@ -45,7 +45,6 @@ func (c *client) Read() ([]byte, error) {
 	}
 
 	n, err := c.conn.Read(c.buff)
-
 	return c.buff[:n], err
 }
 
