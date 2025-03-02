@@ -19,31 +19,24 @@ type Retriever interface {
 	Retrieve() ([]byte, error)
 }
 
-type Decompressor interface {
-	Retriever
-	Reset(Retriever) error
-}
-
 type retriever = Retriever
 
 type Body struct {
 	retriever
-	request *Request
-	form    form.Form
-	cfg     *config.Config
-	error   error
-	buff    []byte
-	decbuff []byte
-	pending []byte
+	request  *Request
+	cfg      *config.Config
+	form     form.Form
+	buff     []byte
+	formbuff []byte
+	pending  []byte
+	error    error
 }
 
 func NewBody(r *Request, impl retriever, cfg *config.Config) *Body {
 	return &Body{
-		// TODO: prealloc form field
 		retriever: impl,
 		request:   r,
 		cfg:       cfg,
-		decbuff:   make([]byte, cfg.Body.FormDecodeBufferPrealloc),
 	}
 }
 
@@ -86,7 +79,7 @@ func (b *Body) Bytes() ([]byte, error) {
 	}
 
 	if b.buff == nil {
-		b.buff = make([]byte, 0, b.cfg.Body.BufferPrealloc)
+		b.buff = make([]byte, 0, b.cfg.Body.Form.BufferPrealloc)
 	}
 
 	for {
@@ -131,6 +124,8 @@ func (b *Body) Read(into []byte) (n int, err error) {
 // Please note: this method cannot be used on requests with Content-Type incompatible
 // with mime.JSON (in this case, status.ErrUnsupportedMediaType is returned). It also
 // can't be called more than once.
+//
+// TODO: make possible to choose and use different from json-iterator json marshall/unmarshall
 func (b *Body) JSON(model any) error {
 	if !mime.Complies(mime.JSON, b.request.ContentType) {
 		return status.ErrUnsupportedMediaType
@@ -152,7 +147,16 @@ func (b *Body) JSON(model any) error {
 // Form interprets the request's body as a mime.FormUrlencoded data and
 // returns parsed key-value pairs. If the request's MIME type is defined and is different
 // from mime.FormUrlencoded, status.ErrUnsupportedMediaType is returned
-func (b *Body) Form() (form.Form, error) {
+func (b *Body) Form() (f form.Form, err error) {
+	// lazily allocate both in order to avoid wasting RAM when we don't really need it.
+	// Must add no runtime penalty, as the operation is done once
+	if b.form == nil {
+		b.form = make(form.Form, b.cfg.Body.Form.EntriesPrealloc)
+	}
+	if b.formbuff == nil {
+		b.formbuff = make([]byte, b.cfg.Body.Form.BufferPrealloc)
+	}
+
 	raw, err := b.Bytes()
 	if err != nil {
 		return nil, err
@@ -160,16 +164,15 @@ func (b *Body) Form() (form.Form, error) {
 
 	switch {
 	case mime.Complies(mime.FormUrlencoded, b.request.ContentType):
-		// TODO: pass some lazy buffer here instead of the b.decodebuffer(),
-		// TODO: so we don't have to allocate the whole buffer every time we parse a form
-		return formdata.ParseURLEncoded(b.form[:0], raw, b.decodebuffer())
+		f, b.formbuff, err = formdata.ParseURLEncoded(b.form[:0], raw, b.formbuff[:0], b.cfg.URL.Query.DefaultFlagValue)
+		return f, err
 	case mime.Complies(mime.Multipart, b.request.ContentType):
 		boundary, ok := b.multipartBoundary()
 		if !ok {
 			return nil, status.ErrBadRequest
 		}
 
-		return formdata.ParseMultipart(b.form[:0], raw, b.decodebuffer(), boundary)
+		return formdata.ParseMultipart(b.cfg, b.form[:0], raw, b.formbuff[:0], boundary)
 	default:
 		return nil, status.ErrUnsupportedMediaType
 	}
@@ -202,14 +205,6 @@ func (b *Body) Reset() error {
 	b.error = nil
 	b.buff = b.buff[:0]
 	return nil
-}
-
-func (b *Body) decodebuffer() []byte {
-	if b.decbuff == nil && b.cfg.Body.FormDecodeBufferPrealloc != 0 {
-		b.decbuff = make([]byte, b.cfg.Body.FormDecodeBufferPrealloc)
-	}
-
-	return b.decbuff
 }
 
 func (b *Body) multipartBoundary() (boundary string, ok bool) {
