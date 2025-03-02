@@ -30,7 +30,7 @@ func New(addr string) *App {
 
 // Tune replaces default config.
 func (a *App) Tune(cfg *config.Config) *App {
-	a.cfg = config.Fill(cfg)
+	a.cfg = cfg
 	return a
 }
 
@@ -87,12 +87,12 @@ func (a *App) TLS(addr string, certs ...tls.Certificate) *App {
 
 // Serve starts the web-application. If nil is passed instead of a router, empty inbuilt will
 // be used.
-func (a *App) Serve(r router.Fabric) error {
+func (a *App) Serve(r router.Builder) error {
 	if r == nil {
 		r = inbuilt.New()
 	}
 
-	return a.run(r.Initialize())
+	return a.run(r.Build())
 }
 
 func (a *App) run(r router.Router) error {
