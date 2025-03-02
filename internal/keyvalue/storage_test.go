@@ -65,4 +65,11 @@ func TestKeyValueStorage(t *testing.T) {
 		kv.Add("hELLO", "nether")
 		require.Equal(t, []string{"Hello", "sOME"}, kv.Keys())
 	})
+
+	t.Run("Empty", func(t *testing.T) {
+		kv := New()
+		require.True(t, kv.Empty())
+		kv.Add("hello", "world")
+		require.False(t, kv.Empty())
+	})
 }

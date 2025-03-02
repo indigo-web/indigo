@@ -152,6 +152,10 @@ func (s *Storage) Len() int {
 	return len(s.pairs)
 }
 
+func (s *Storage) Empty() bool {
+	return s.Len() == 0
+}
+
 // Clone creates a deep copy, which may be used later or stored somewhere safely. However,
 // it comes at cost of multiple allocations.
 func (s *Storage) Clone() *Storage {
