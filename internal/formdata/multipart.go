@@ -1,8 +1,8 @@
 package formdata
 
 import (
+	"github.com/indigo-web/indigo/config"
 	"github.com/indigo-web/indigo/http/form"
-	"github.com/indigo-web/indigo/http/mime"
 	"github.com/indigo-web/indigo/http/status"
 	"github.com/indigo-web/indigo/internal/strutil"
 	"github.com/indigo-web/indigo/internal/urlencoded"
@@ -10,16 +10,11 @@ import (
 	"iter"
 )
 
-const (
-	DefaultCoding      = "utf8"
-	DefaultContentType = mime.Plain
-)
-
 type header struct {
 	Name, File, ContentType, Charset string
 }
 
-func ParseMultipart(into form.Form, data []byte, buff []byte, b string) (form.Form, error) {
+func ParseMultipart(cfg *config.Config, into form.Form, data, buff []byte, b string) (form.Form, error) {
 	var boundary string
 	const boundaryFraming = len("--") + len("\r\n")
 
@@ -30,7 +25,7 @@ func ParseMultipart(into form.Form, data []byte, buff []byte, b string) (form.Fo
 		boundary = "--" + b
 	}
 
-	charset := DefaultCoding
+	charset := cfg.Body.Form.DefaultCoding
 	s := newStream(uf.B2S(data))
 
 	if !skipPreamble(&s, boundary) {
@@ -46,16 +41,15 @@ func ParseMultipart(into form.Form, data []byte, buff []byte, b string) (form.Fo
 			return nil, status.ErrBadRequest
 		}
 
-		// TODO: LazyDecodeString doesn't decode plus-symbols as spaces.
-		// TODO: But it has to
+		// TODO: DecodeString doesn't decode plus-symbols as spaces, but we need it
 
 		var err error
-		hdr.Name, buff, err = urlencoded.LazyDecodeString(hdr.Name, buff)
+		hdr.Name, buff, err = urlencoded.ExtendedDecodeString(hdr.Name, buff)
 		if err != nil {
 			return nil, err
 		}
 
-		hdr.File, buff, err = urlencoded.LazyDecodeString(hdr.File, buff)
+		hdr.File, buff, err = urlencoded.ExtendedDecodeString(hdr.File, buff)
 		if err != nil {
 			return nil, err
 		}
@@ -74,7 +68,7 @@ func ParseMultipart(into form.Form, data []byte, buff []byte, b string) (form.Fo
 		}
 
 		if len(hdr.ContentType) == 0 {
-			hdr.ContentType = DefaultContentType
+			hdr.ContentType = cfg.Body.Form.DefaultContentType
 		}
 
 		into = append(into, form.Data{
@@ -144,7 +138,6 @@ func parseHeaders(s *stream) (hdr header) {
 func parseHeader(s *stream, origin header) (modified header, ok bool) {
 	switch {
 	case s.ConsumeFold("Content-Disposition:"):
-
 		s.SkipWhitespaces()
 		s.Consume("form-data;")
 		s.SkipWhitespaces()
@@ -156,7 +149,7 @@ func parseHeader(s *stream, origin header) (modified header, ok bool) {
 		return parseContentDispositionParams(params, origin)
 	case s.ConsumeFold("Content-Type:"):
 		s.SkipWhitespaces()
-		// TODO: I assume there can be parameters I should look after
+		// TODO: there are probably important parameters I should take care of, but...
 		origin.ContentType, ok = s.AdvanceLine()
 		if !ok {
 			return origin, false
