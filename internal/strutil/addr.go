@@ -1,9 +1,6 @@
 package strutil
 
-const (
-	defaultAddress = "0.0.0.0"
-	defaultPort    = "0"
-)
+const defaultAddress = "0.0.0.0"
 
 func NormalizeAddress(addr string) string {
 	if len(addr) == 0 {
