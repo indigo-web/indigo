@@ -6,19 +6,17 @@ import (
 	"github.com/indigo-web/indigo/internal/urlencoded"
 )
 
-func ParseURLEncoded(into form.Form, data []byte, buff []byte) (form.Form, error) {
-	err := qparams.Parse(data,
+func ParseURLEncoded(into form.Form, data, buff []byte, defFlagValue string) (form.Form, []byte, error) {
+	buff, err := qparams.Parse(data, buff,
 		func(k string, v string) {
 			into = append(into, form.Data{
 				Name:  k,
 				Value: v,
 			})
 		},
-		func(bytes []byte) (data []byte, err error) {
-			data, buff, err = urlencoded.LazyDecode(bytes, buff)
-			return data, err
-		},
+		urlencoded.ExtendedDecode,
+		defFlagValue,
 	)
 
-	return into, err
+	return into, buff, err
 }
