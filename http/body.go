@@ -45,7 +45,7 @@ func NewBody(r *Request, impl retriever, cfg *config.Config) *Body {
 // The callback is not notified when there's no more data or networking error has
 // occurred.
 //
-// Please note: this method can't be called more than once.
+// Please note: this method can be used only once.
 func (b *Body) Callback(cb BodyCallback) error {
 	if b.error != nil {
 		return b.error
@@ -122,8 +122,7 @@ func (b *Body) Read(into []byte) (n int, err error) {
 // in a similar manner.
 //
 // Please note: this method cannot be used on requests with Content-Type incompatible
-// with mime.JSON (in this case, status.ErrUnsupportedMediaType is returned). It also
-// can't be called more than once.
+// with mime.JSON (in this case, status.ErrUnsupportedMediaType is returned).
 //
 // TODO: make possible to choose and use different from json-iterator json marshall/unmarshall
 func (b *Body) JSON(model any) error {

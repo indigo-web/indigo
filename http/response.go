@@ -18,8 +18,8 @@ import (
 type ResponseWriter func(b []byte) error
 
 const (
-	// why 7? I don't know. There's no theory behind this number nor researches.
-	// It can be adjusted to 10 as well, but why you would ever need to do this?
+	// why 7? I honestly don't know. There's no theory nor researches behind this.
+	// It can be adjusted to 10 as well, but why would you?
 	preallocRespHeaders = 7
 	defaultFileMIME     = mime.OctetStream
 )
