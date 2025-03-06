@@ -19,10 +19,8 @@ type Retriever interface {
 	Retrieve() ([]byte, error)
 }
 
-type retriever = Retriever
-
 type Body struct {
-	retriever
+	Retriever
 	request  *Request
 	cfg      *config.Config
 	form     form.Form
@@ -32,9 +30,9 @@ type Body struct {
 	error    error
 }
 
-func NewBody(r *Request, impl retriever, cfg *config.Config) *Body {
+func NewBody(r *Request, src Retriever, cfg *config.Config) *Body {
 	return &Body{
-		retriever: impl,
+		Retriever: src,
 		request:   r,
 		cfg:       cfg,
 	}
