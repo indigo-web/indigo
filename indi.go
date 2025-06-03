@@ -14,8 +14,12 @@ const Version = "0.17.0"
 // App is just a struct with addr and shutdown channel that is currently
 // not used. Planning to replace it with context.WithCancel()
 type App struct {
-	cfg        *config.Config
-	hooks      hooks
+	cfg   *config.Config
+	hooks struct {
+		OnStart func()
+		OnBind  func(addr string)
+		OnStop  func()
+	}
 	transports []Transport
 	supervisor transport.Supervisor
 }
@@ -96,7 +100,7 @@ func (a *App) Serve(r router.Builder) error {
 }
 
 func (a *App) run(r router.Router) error {
-	callIfNotNil(a.hooks.OnStart)
+	tryInvoke(a.hooks.OnStart)
 
 	for _, t := range a.transports {
 		if err := a.supervisor.Add(t.addr, t.inner, t.spawnCallback(a.cfg, r)); err != nil {
@@ -109,7 +113,7 @@ func (a *App) run(r router.Router) error {
 	}
 
 	err := a.supervisor.Run(a.cfg.NET)
-	callIfNotNil(a.hooks.OnStop)
+	tryInvoke(a.hooks.OnStop)
 
 	return err
 }
@@ -119,13 +123,7 @@ func (a *App) Stop() {
 	a.supervisor.Stop()
 }
 
-type hooks struct {
-	OnStart func()
-	OnBind  func(addr string)
-	OnStop  func()
-}
-
-func callIfNotNil(f func()) {
+func tryInvoke(f func()) {
 	if f != nil {
 		f()
 	}
