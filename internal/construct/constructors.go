@@ -25,7 +25,7 @@ func Request(cfg *config.Config, client transport.Client, body http.Retriever) *
 
 func Chunked(cfg config.Body) *chunkedbody.Parser {
 	return chunkedbody.NewParser(chunkedbody.Settings{
-		MaxChunkSize: cfg.MaxChunkSize,
+		MaxChunkSize: int64(cfg.MaxChunkSize),
 	})
 }
 
