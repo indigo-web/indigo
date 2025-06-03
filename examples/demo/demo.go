@@ -1,17 +1,16 @@
 package main
 
 import (
+	"github.com/indigo-web/indigo"
 	"github.com/indigo-web/indigo/config"
+	"github.com/indigo-web/indigo/http"
+	"github.com/indigo-web/indigo/http/method"
+	"github.com/indigo-web/indigo/http/status"
+	"github.com/indigo-web/indigo/router/inbuilt"
 	"github.com/indigo-web/indigo/router/inbuilt/middleware"
 	"log"
 	"strconv"
 	"time"
-
-	"github.com/indigo-web/indigo/http"
-
-	"github.com/indigo-web/indigo"
-	"github.com/indigo-web/indigo/http/status"
-	"github.com/indigo-web/indigo/router/inbuilt"
 )
 
 func IndexSay(request *http.Request) *http.Response {
@@ -24,7 +23,7 @@ func IndexSay(request *http.Request) *http.Response {
 		return http.Error(request, err)
 	}
 
-	log.Println("someone says:", strconv.Quote(body))
+	log.Println("someone whispered:", strconv.Quote(body))
 
 	return request.Respond()
 }
@@ -69,8 +68,8 @@ func main() {
 
 	r := inbuilt.New().
 		Use(middleware.LogRequests()).
-		Alias("/", "/static/index.html").
-		Alias("/favicon.ico", "/static/favicon.ico").
+		Alias("/", "/static/index.html", method.GET).
+		Alias("/favicon.ico", "/static/favicon.ico", method.GET).
 		Static("/static", "examples/combined/static")
 
 	r.Get("/stress", Stressful, middleware.Recover)
