@@ -98,7 +98,7 @@ func getInbuiltRouter() *inbuilt.Router {
 			return nil
 		}
 
-		_ = client.Write([]byte("j"))
+		_, _ = client.Write([]byte("j"))
 		return nil
 	})
 

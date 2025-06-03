@@ -33,13 +33,9 @@ var (
 	gmt              = time.FixedZone("GMT", 0)
 )
 
-type Writer interface {
-	Write([]byte) error
-}
-
 type serializer struct {
 	request *http.Request
-	writer  Writer
+	writer  io.Writer
 	buff    []byte
 	// fileBuff isn't allocated until needed in order to save memory in cases,
 	// where no files are being sent
@@ -53,7 +49,7 @@ func newSerializer(
 	fileBuffSize int,
 	defHdrs map[string]string,
 	request *http.Request,
-	writer Writer,
+	writer io.Writer,
 ) *serializer {
 	if fileBuffSize < minimalFileBuffSize {
 		log.Printf("misconfiguration: file buffer size (Config.HTTP.FileBuffSize) is %d, "+
@@ -112,7 +108,7 @@ func (s *serializer) Write(
 		s.buff = append(s.buff, fields.Body...)
 	}
 
-	err = s.writer.Write(s.buff)
+	_, err = s.writer.Write(s.buff)
 
 	if !isKeepAlive(protocol, s.request) && s.request.Upgrade == proto.Unknown {
 		err = status.ErrCloseConnection
@@ -162,7 +158,7 @@ func (s *serializer) renderHeaders(fields *response.Fields) {
 // sendAttachment simply encapsulates all the logic related to rendering arbitrary
 // io.Reader implementations
 func (s *serializer) sendAttachment(
-	request *http.Request, response *http.Response, writer Writer,
+	request *http.Request, response *http.Response, writer io.Writer,
 ) (err error) {
 	fields := response.Reveal()
 	size := fields.Attachment.Size()
@@ -180,7 +176,7 @@ func (s *serializer) sendAttachment(
 
 	s.crlf()
 
-	if err = writer.Write(s.buff); err != nil {
+	if _, err = writer.Write(s.buff); err != nil {
 		return status.ErrCloseConnection
 	}
 
@@ -205,10 +201,18 @@ func (s *serializer) sendAttachment(
 	return err
 }
 
-func (s *serializer) writePlainBody(r io.Reader, writer Writer) error {
-	// TODO: implement checking whether r implements io.ReaderAt interface. In case it does
-	// TODO: body may be transferred more efficiently. This requires implementing io.Writer
-	// TODO: *http.ResponseWriter
+func (s *serializer) writePlainBody(r io.Reader, writer io.Writer) error {
+	// TODO: we really could simply use the response buffer instead of a separated file buffer.
+
+	if w, ok := r.(io.WriterTo); ok {
+		_, err := w.WriteTo(writer)
+		if err != nil {
+			// ignore any occurred errors, cut the connection down immediately
+			err = status.ErrCloseConnection
+		}
+
+		return err
+	}
 
 	for {
 		n, err := r.Read(s.fileBuff)
@@ -220,13 +224,13 @@ func (s *serializer) writePlainBody(r io.Reader, writer Writer) error {
 			return status.ErrCloseConnection
 		}
 
-		if err = writer.Write(s.fileBuff[:n]); err != nil {
+		if _, err = writer.Write(s.fileBuff[:n]); err != nil {
 			return status.ErrCloseConnection
 		}
 	}
 }
 
-func (s *serializer) writeChunkedBody(r io.Reader, writer Writer) error {
+func (s *serializer) writeChunkedBody(r io.Reader, writer io.Writer) error {
 	const (
 		hexValueOffset = 8
 		crlfSize       = 1 /* CR */ + 1 /* LF */
@@ -246,7 +250,7 @@ func (s *serializer) writeChunkedBody(r io.Reader, writer Writer) error {
 			copy(s.fileBuff[hexValueOffset:], crlf)
 			copy(s.fileBuff[buffOffset+n:], crlf)
 
-			if err := writer.Write(s.fileBuff[blankSpace : buffOffset+n+crlfSize]); err != nil {
+			if _, err := writer.Write(s.fileBuff[blankSpace : buffOffset+n+crlfSize]); err != nil {
 				return status.ErrCloseConnection
 			}
 		}
@@ -254,7 +258,8 @@ func (s *serializer) writeChunkedBody(r io.Reader, writer Writer) error {
 		switch err {
 		case nil:
 		case io.EOF:
-			return writer.Write(chunkedFinalizer)
+			_, err = writer.Write(chunkedFinalizer)
+			return err
 		default:
 			return status.ErrCloseConnection
 		}

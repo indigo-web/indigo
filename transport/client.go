@@ -8,7 +8,7 @@ import (
 type Client interface {
 	Read() ([]byte, error)
 	Unread([]byte)
-	Write([]byte) error
+	Write([]byte) (int, error)
 	Conn() net.Conn
 	Remote() net.Addr
 	Close() error
@@ -65,9 +65,8 @@ func (c *client) Conn() net.Conn {
 }
 
 // Write writes data into the underlying connection
-func (c *client) Write(b []byte) error {
-	_, err := c.conn.Write(b)
-	return err
+func (c *client) Write(b []byte) (int, error) {
+	return c.conn.Write(b)
 }
 
 // Remote returns the remote address of the connection

@@ -21,21 +21,12 @@ import (
 	"time"
 )
 
-func getSerializer(defaultHeaders map[string]string, request *http.Request, writer Writer) *serializer {
+func getSerializer(defaultHeaders map[string]string, request *http.Request, writer io.Writer) *serializer {
 	return newSerializer(make([]byte, 0, 1024), 128, defaultHeaders, request, writer)
 }
 
 func newRequest() *http.Request {
 	return construct.Request(config.Default(), dummy.NewNopClient(), nil)
-}
-
-type accumulativeWriter struct {
-	Data []byte
-}
-
-func (a *accumulativeWriter) Write(b []byte) error {
-	a.Data = append(a.Data, b...)
-	return nil
 }
 
 func TestSerializer_Write(t *testing.T) {
@@ -45,7 +36,7 @@ func TestSerializer_Write(t *testing.T) {
 	require.NoError(t, err)
 
 	t.Run("default builder", func(t *testing.T) {
-		writer := new(accumulativeWriter)
+		writer := dummy.NewSinkholeWriter()
 		serializer := getSerializer(nil, request, writer)
 		require.NoError(t, serializer.Write(proto.HTTP11, http.NewResponse()))
 		resp, err := stdhttp.ReadResponse(bufio.NewReader(bytes.NewBuffer(writer.Data)), stdreq)
@@ -58,7 +49,7 @@ func TestSerializer_Write(t *testing.T) {
 		require.Empty(t, body)
 	})
 
-	testWithHeaders := func(t *testing.T, serializer *serializer, writer *accumulativeWriter) {
+	testWithHeaders := func(t *testing.T, serializer *serializer, writer *dummy.SinkholeWriter) {
 		response := http.NewResponse().
 			Header("Hello", "nether").
 			Header("Something", "special", "here")
@@ -87,7 +78,7 @@ func TestSerializer_Write(t *testing.T) {
 			"Server": "indigo",
 			"Lorem":  "ipsum, something else",
 		}
-		writer := new(accumulativeWriter)
+		writer := dummy.NewSinkholeWriter()
 		serializer := getSerializer(defHeaders, request, writer)
 		testWithHeaders(t, serializer, writer)
 		testWithHeaders(t, serializer, writer)
@@ -95,7 +86,7 @@ func TestSerializer_Write(t *testing.T) {
 
 	t.Run("HEAD request", func(t *testing.T) {
 		const body = "Hello, world!"
-		writer := new(accumulativeWriter)
+		writer := dummy.NewSinkholeWriter()
 		serializer := getSerializer(nil, request, writer)
 		response := http.NewResponse().String(body)
 		request := newRequest()
@@ -114,14 +105,14 @@ func TestSerializer_Write(t *testing.T) {
 	})
 
 	t.Run("HTTP/1.0 without keep-alive", func(t *testing.T) {
-		serializer := getSerializer(nil, request, new(accumulativeWriter))
+		serializer := getSerializer(nil, request, dummy.NewSinkholeWriter())
 		response := http.NewResponse()
 		err := serializer.Write(proto.HTTP10, response)
 		require.EqualError(t, err, status.ErrCloseConnection.Error())
 	})
 
 	t.Run("custom code and status", func(t *testing.T) {
-		writer := new(accumulativeWriter)
+		writer := dummy.NewSinkholeWriter()
 		serializer := getSerializer(nil, request, writer)
 		response := http.NewResponse().Code(600)
 
@@ -135,7 +126,7 @@ func TestSerializer_Write(t *testing.T) {
 	t.Run("attachment with known size", func(t *testing.T) {
 		const body = "Hello, world!"
 		reader := strings.NewReader(body)
-		writer := new(accumulativeWriter)
+		writer := dummy.NewSinkholeWriter()
 		serializer := getSerializer(nil, request, writer)
 		response := http.NewResponse().Attachment(reader, reader.Len())
 
@@ -152,7 +143,7 @@ func TestSerializer_Write(t *testing.T) {
 	t.Run("attachment with unknown size", func(t *testing.T) {
 		const body = "Hello, world!"
 		reader := strings.NewReader(body)
-		writer := new(accumulativeWriter)
+		writer := dummy.NewSinkholeWriter()
 		serializer := getSerializer(nil, request, writer)
 		response := http.NewResponse().Attachment(reader, 0)
 
@@ -170,7 +161,7 @@ func TestSerializer_Write(t *testing.T) {
 		const body = "Hello, world!"
 		reader := strings.NewReader(body)
 		request.Method = method.HEAD
-		writer := new(accumulativeWriter)
+		writer := dummy.NewSinkholeWriter()
 		serializer := getSerializer(nil, request, writer)
 		response := http.NewResponse().Attachment(reader, reader.Len())
 		stdreq, err := stdhttp.NewRequest(stdhttp.MethodHead, "/", nil)
@@ -188,7 +179,7 @@ func TestSerializer_Write(t *testing.T) {
 
 	t.Run("cookies", func(t *testing.T) {
 		t.Run("single pair no params", func(t *testing.T) {
-			writer := new(accumulativeWriter)
+			writer := dummy.NewSinkholeWriter()
 			serializer := getSerializer(nil, request, writer)
 			response := http.NewResponse().
 				Cookie(cookie.New("hello", "world"))
@@ -203,7 +194,7 @@ func TestSerializer_Write(t *testing.T) {
 		})
 
 		t.Run("multiple pairs with parameters", func(t *testing.T) {
-			writer := new(accumulativeWriter)
+			writer := dummy.NewSinkholeWriter()
 			serializer := getSerializer(nil, request, writer)
 			base := cookie.Build("hello", "world").
 				Path("/").
@@ -251,7 +242,7 @@ func TestSerializer_PreWrite(t *testing.T) {
 			Code(status.SwitchingProtocols).
 			Header("Connection", "upgrade").
 			Header("Upgrade", "HTTP/1.1")
-		writer := new(accumulativeWriter)
+		writer := dummy.NewSinkholeWriter()
 		serializer := getSerializer(defHeaders, request, writer)
 		serializer.PreWrite(request.Proto, preResponse)
 
@@ -288,7 +279,7 @@ func TestSerializer_ChunkedTransfer(t *testing.T) {
 	t.Run("single chunk", func(t *testing.T) {
 		reader := bytes.NewBuffer([]byte("Hello, world!"))
 		wantData := "d\r\nHello, world!\r\n0\r\n\r\n"
-		writer := new(accumulativeWriter)
+		writer := dummy.NewSinkholeWriter()
 		serializer := getSerializer(nil, nil, writer)
 		serializer.fileBuff = make([]byte, math.MaxUint16)
 
@@ -302,7 +293,7 @@ func TestSerializer_ChunkedTransfer(t *testing.T) {
 		parser := chunkedbody.NewParser(chunkedbody.DefaultSettings())
 		payload := strings.Repeat("abcdefgh", 10*buffSize)
 		reader := bytes.NewBuffer([]byte(payload))
-		writer := new(accumulativeWriter)
+		writer := dummy.NewSinkholeWriter()
 		cfg := config.Default()
 		req := construct.Request(cfg, dummy.NewNopClient(), NewBody(nil, nil, cfg.Body))
 		serializer := getSerializer(nil, req, writer)

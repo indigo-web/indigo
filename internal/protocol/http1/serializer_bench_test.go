@@ -14,8 +14,8 @@ import (
 
 type NopClientWriter struct{}
 
-func (n NopClientWriter) Write([]byte) error {
-	return nil
+func (n NopClientWriter) Write(p []byte) (int, error) {
+	return len(p), nil
 }
 
 func BenchmarkSerializer(b *testing.B) {

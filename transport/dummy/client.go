@@ -54,8 +54,8 @@ func (c *CircularClient) Unread(takeback []byte) {
 	c.tmp = takeback
 }
 
-func (*CircularClient) Write([]byte) error {
-	return nil
+func (*CircularClient) Write(p []byte) (int, error) {
+	return len(p), nil
 }
 
 func (c *CircularClient) Conn() net.Conn {
@@ -88,7 +88,7 @@ func NewSinkholeWriter() *SinkholeWriter {
 	return new(SinkholeWriter)
 }
 
-func (s *SinkholeWriter) Write(b []byte) error {
+func (s *SinkholeWriter) Write(b []byte) (int, error) {
 	s.Data = append(s.Data, b...)
-	return nil
+	return len(b), nil
 }
