@@ -95,9 +95,9 @@ type (
 		MaxSize uint
 		// MaxChunkSize is responsible for a maximal size of a single chunk being transferred
 		// via chunked TE
-		MaxChunkSize int64
+		MaxChunkSize int
 		// DecodingBufferSize is a size of a buffer, used to store decoded request's body
-		DecodingBufferSize int64
+		DecodingBufferSize int
 		Form               BodyForm
 	}
 
@@ -107,6 +107,7 @@ type (
 		ResponseBuffSize int
 		// FileBuffSize defines the size of the read buffer when reading a file
 		FileBuffSize int
+		//Codecs       []codec.Codec
 	}
 
 	NET struct {
@@ -126,7 +127,7 @@ type (
 // and pre-allocations.
 //
 // Please note: ALWAYS modify defaults (returned via Default()) and NEVER try to initialize the
-// config manually, as proper configuration values validation isn't as ubiquitous.
+// config manually, as this will result in highly ambiguous errors.
 type Config struct {
 	URL     URL
 	Headers Headers
