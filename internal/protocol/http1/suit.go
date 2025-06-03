@@ -41,7 +41,7 @@ func New(
 	}
 }
 
-// Initialize is the same constructor as just New, but consumes fewer arguments.
+// Initialize is the same constructor as just New, but receives fewer arguments.
 func Initialize(cfg *config.Config, r router.Router, client transport.Client, req *http.Request, body *Body) *Suit {
 	keyBuff, valBuff, startLineBuff := construct.Buffers(cfg)
 	respBuff := make([]byte, 0, cfg.HTTP.ResponseBuffSize)
@@ -78,7 +78,13 @@ func (s *Suit) serve(once bool) (ok bool) {
 		case Pending:
 		case HeadersCompleted:
 			client.Unread(extra)
-			s.body.Reset(req)
+			if err = s.body.Reset(req); err != nil {
+				// an error could occur here only if there were applied unrecognized encodings.
+				// Unfortunately, as the client made a decision to bravely ignore the list of
+				// encodings we do support, we don't want to read all the crap he sent us either.
+				s.router.OnError(req, err)
+				return false
+			}
 
 			version := req.Proto
 			if req.Upgrade != proto.Unknown && proto.HTTP1&req.Upgrade == req.Upgrade {
@@ -119,7 +125,7 @@ func (s *Suit) serve(once bool) (ok bool) {
 			_ = s.Write(req.Proto, resp)
 			return false
 		default:
-			panic(fmt.Sprintf("BUG: got unexpected parser state"))
+			panic(fmt.Sprintf("BUG: unreachable code!"))
 		}
 
 		if once {

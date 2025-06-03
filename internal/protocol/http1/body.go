@@ -4,7 +4,9 @@ import (
 	"github.com/indigo-web/chunkedbody"
 	"github.com/indigo-web/indigo/config"
 	"github.com/indigo-web/indigo/http"
+	"github.com/indigo-web/indigo/http/codec"
 	"github.com/indigo-web/indigo/http/status"
+	"github.com/indigo-web/indigo/internal/codecutil"
 	"github.com/indigo-web/indigo/transport"
 	"io"
 	"math"
@@ -16,19 +18,23 @@ type chunkedBodyReader struct {
 }
 
 type Body struct {
-	reader  func() ([]byte, error)
-	client  transport.Client
-	maxLen  uint
-	counter uint
-	chunked chunkedBodyReader
+	maxLen   uint
+	counter  uint
+	reader   func() ([]byte, error)
+	chunked  chunkedBodyReader
+	client   transport.Client
+	decoders codecutil.Cache[codec.Decompressor]
 }
 
-func NewBody(client transport.Client, chunkedParser *chunkedbody.Parser, s config.Body) *Body {
+func NewBody(
+	client transport.Client, chunkedParser *chunkedbody.Parser, s config.Body,
+	decoders codecutil.Cache[codec.Decompressor]) *Body {
 	return &Body{
-		reader:  nop,
-		client:  client,
-		maxLen:  s.MaxSize,
-		chunked: newChunkedBodyReader(chunkedParser),
+		reader:   nop,
+		client:   client,
+		maxLen:   s.MaxSize,
+		chunked:  newChunkedBodyReader(chunkedParser),
+		decoders: decoders,
 	}
 }
 
@@ -36,7 +42,7 @@ func (b *Body) Retrieve() ([]byte, error) {
 	return b.reader()
 }
 
-func (b *Body) Reset(request *http.Request) {
+func (b *Body) Reset(request *http.Request) error {
 	if request.Encoding.Chunked {
 		b.initChunked(request.Encoding.HasTrailer)
 		b.reader = b.readChunked
@@ -47,6 +53,29 @@ func (b *Body) Reset(request *http.Request) {
 		b.initPlain(uint(request.ContentLength))
 		b.reader = b.readPlain
 	}
+
+	if len(request.Encoding.Transfer) == 0 {
+		return nil
+	}
+
+	base := http.Retriever(b)
+
+	for i := len(request.Encoding.Transfer); i > 0; i-- {
+		decoder, found := b.decoders.Get(request.Encoding.Transfer[i-1])
+		if !found {
+			return status.ErrNotImplemented
+		}
+
+		if err := decoder.Reset(base); err != nil {
+			// TODO: WHAT THE FUCK ARE WE SUPPOSED TO DO IF A DECOMPRESSOR HAS FAILED TO INITIALIZE
+			return status.ErrInternalServerError
+		}
+
+		base = decoder
+	}
+
+	b.reader = base.Retrieve
+	return nil
 }
 
 func (b *Body) initPlain(totalLen uint) {
