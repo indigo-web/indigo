@@ -342,8 +342,17 @@ func (s *serializer) renderKnownHeader(key, value string) {
 	s.crlf()
 }
 
-func (s *serializer) renderProtocol(protocol proto.Proto) {
+func (s *serializer) renderProtocol(protocol proto.Protocol) {
+	// in case the request method or path were malformed, parser had no chance of reaching
+	// the protocol and thereby resulting in the unknown one.
+	const defaultFallbackProtocol = proto.HTTP11
+
+	if protocol == proto.Unknown {
+		protocol = defaultFallbackProtocol
+	}
+
 	s.buff = append(s.buff, protocol.String()...)
+	s.buff = append(s.buff, ' ')
 }
 
 func (s *serializer) sp() {
