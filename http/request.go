@@ -4,48 +4,49 @@ import (
 	"context"
 	"github.com/indigo-web/indigo/config"
 	"github.com/indigo-web/indigo/http/cookie"
-	"github.com/indigo-web/indigo/http/crypt"
-	"github.com/indigo-web/indigo/http/headers"
+	"github.com/indigo-web/indigo/http/encryption"
 	"github.com/indigo-web/indigo/http/method"
 	"github.com/indigo-web/indigo/http/proto"
-	"github.com/indigo-web/indigo/http/query"
-	"github.com/indigo-web/indigo/internal/keyvalue"
+	"github.com/indigo-web/indigo/kv"
 	"github.com/indigo-web/indigo/transport"
 	"net"
 )
 
 var zeroContext = context.Background()
 
-type Params = *keyvalue.Storage
+type (
+	Headers = *kv.Storage
+	Header  = kv.Pair
+	Params  = *kv.Storage
+	Vars    = *kv.Storage
+)
 
 // Request represents HTTP request
 type Request struct {
-	// Method represents the request's method
+	// Method is an enum representing the request method.
 	Method method.Method
-	// Path represents decoded request URI
-	Path Path
-	// Query are request's URI parameters
-	Query query.Query
-	// Params are dynamic path's wildcards
+	// Path is a decoded and validated string, guaranteed to hold ASCII-printable characters only.
+	Path string
+	// Params are request URI parameters.
 	Params Params
-	// Proto is the protocol, which was used to make the request
-	Proto proto.Proto
-	// Headers are request headers. They are stored non-normalized, however lookup is
-	// case-insensitive
-	Headers headers.Headers
+	// Vars are dynamic routing segments.
+	Vars Vars
+	// Proto is the enum of a protocol used for the request. Can be changed (mostly through upgrade).
+	Protocol proto.Protocol
+	// Headers holds non-normalized header pairs, even though lookup is case-insensitive. Header keys
+	// and values aren't validated, therefore may contain ASCII-nonprintable and/or Unicode characters.
+	Headers Headers
 	commonHeaders
-	// Remote represents remote net.Addr.
-	// WARNING: in order to use the value to represent a user, MAKE SURE there are no proxies
-	// in the middle
+	// Remote holds the remote address. Please note that this is generally not a good parameter to identify
+	// a user, because there might be proxies in the middle.
 	Remote net.Addr
-	// Ctx is a request context. It may be filled with arbitrary data across middlewares
-	// and handler by itself
+	// Ctx is user-managed context which lives as long as the connection does and is never automatically
+	// cleared.
 	Ctx context.Context
-	// Env is a set of fixed variables passed by core. They are passed separately from Request.Ctx
-	// in order to not only distinguish user-defined values in ctx from those from core, but also
-	// to gain performance, as accessing the struct is much faster than looking up in context.Context
+	// Env contains a fixed set of contextual values which are useful in specific cases. They aren't
+	// passed via the Ctx due to performance considerations.
 	Env Environment
-	// Body accesses the request's body
+	// Body is a dedicated entity providing access to the message body.
 	Body     *Body
 	client   transport.Client
 	hijacked bool
@@ -54,20 +55,18 @@ type Request struct {
 	cfg      *config.Config
 }
 
-// NewRequest returns a new instance of request object and body gateway
-// Must not be used externally, this function is for internal purposes only
-// HTTP/1.1 as a protocol by default is set because if first request from user
-// is invalid, we need to render a response using request method, but appears
-// that default method is a null-value (proto.Unknown)
 func NewRequest(
-	cfg *config.Config, hdrs headers.Headers, query query.Query, response *Response,
-	client transport.Client, params Params,
+	cfg *config.Config,
+	response *Response,
+	client transport.Client,
+	headers, params, vars *kv.Storage,
 ) *Request {
 	return &Request{
-		Query:    query,
+		Method:   method.Unknown,
+		Protocol: proto.HTTP11,
 		Params:   params,
-		Proto:    proto.HTTP11,
-		Headers:  hdrs,
+		Vars:     vars,
+		Headers:  headers,
 		Remote:   client.Remote(),
 		Ctx:      zeroContext,
 		client:   client,
@@ -124,17 +123,14 @@ func (r *Request) Hijacked() bool {
 	return r.hijacked
 }
 
-// Reset clears request headers and reads body into nowhere until completed.
-// It is implemented to clear the request object between requests
-func (r *Request) Reset() error {
-	r.Query.Reset()
+// Reset the request
+func (r *Request) Reset() {
 	r.Params.Clear()
+	r.Vars.Clear()
 	r.Headers.Clear()
 	r.commonHeaders = commonHeaders{}
 	r.Ctx = zeroContext
 	r.Env = Environment{}
-
-	return r.Body.Reset()
 }
 
 type Environment struct {
@@ -145,7 +141,7 @@ type Environment struct {
 	AllowedMethods string
 	// Encryption is a token that corresponds to the used encryption method. May be
 	// extended by custom values
-	Encryption crypt.Encryption
+	Encryption encryption.Token
 	// AliasFrom contains the original request path, in case it was replaced via alias
 	// aka implicit redirect
 	AliasFrom string
@@ -167,7 +163,7 @@ type commonHeaders struct {
 	Connection string
 	// Upgrade is the protocol token, which is set by default to proto.Unknown. In
 	// case it is anything else, then Upgrade header was received
-	Upgrade proto.Proto
+	Upgrade proto.Protocol
 }
 
 type Encodings struct {
@@ -177,5 +173,5 @@ type Encodings struct {
 	// Content contains all applied Content-Encoding codings in their original order.
 	Content []string
 	// Chunked doesn't belong to any of encodings, as it is still must be processed individually
-	Chunked, HasTrailer bool
+	Chunked bool
 }
