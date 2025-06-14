@@ -2,11 +2,11 @@
 <img src="https://gist.githubusercontent.com/flrdv/08395567a602992be0c72f445589cb90/raw/248c01ff18936b36629e520b2164ef6d78f0f57f/indigo-logo.svg" alt="This is just a logo" title="What are you looking for?" width="40%" height="40%"/>
 </p>
 
-Indigo is a web-framework, designed to be readable, handy, yet performant (blazingly fast I would even say)
+Indigo is a web-framework focusing at performance, elegancy and robustness.
 
 # Documentation
 
-Documentation is available [here](https://floordiv.gitbook.io/indigo/). It may be incomplete or not represent the actual state, so make sure the version in documentation corresponds to the latest release.
+Documentation is available [here](https://floordiv.gitbook.io/indigo/). It might be incomplete. In this case, feel free to open an issue.
 
 # Hello, world!
 
