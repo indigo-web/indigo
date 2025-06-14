@@ -23,6 +23,8 @@ const (
 var List = []Method{GET, HEAD, POST, PUT, DELETE, CONNECT, OPTIONS, TRACE, PATCH}
 
 func Parse(str string) Method {
+	// TODO: benchmark this against the dumb wall of if's. I doubt there's a difference, however
+	// TODO: there definitely is in readability and cognitive difficulty
 	switch len(str) {
 	case 3:
 		if str == "GET" {

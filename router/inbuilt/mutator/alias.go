@@ -6,7 +6,7 @@ import (
 	"github.com/indigo-web/indigo/router/inbuilt/internal/types"
 )
 
-func getAllowedMethods(methods []method.Method) (lut [method.Count]bool) {
+func getAllowedMethods(methods []method.Method) (lut [method.Count + 1]bool) {
 	if len(methods) == 0 {
 		return getAllowedMethods(method.List)
 	}

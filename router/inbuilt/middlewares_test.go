@@ -55,7 +55,7 @@ func getMiddleware(mware middleware, stack *callstack) Middleware {
 }
 
 func getRequest(m method.Method, path string) *http.Request {
-	request := construct.Request(config.Default(), dummy.NewNopClient(), nil)
+	request := construct.Request(config.Default(), dummy.NewNopClient())
 	request.Method = m
 	request.Path = path
 
