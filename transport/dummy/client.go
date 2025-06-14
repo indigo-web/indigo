@@ -50,7 +50,11 @@ func (c *CircularClient) Read() (data []byte, err error) {
 	return piece, nil
 }
 
-func (c *CircularClient) Unread(takeback []byte) {
+func (c *CircularClient) Fetch() (data []byte, err error) {
+	return c.Read()
+}
+
+func (c *CircularClient) Pushback(takeback []byte) {
 	c.tmp = takeback
 }
 
@@ -59,7 +63,7 @@ func (*CircularClient) Write(p []byte) (int, error) {
 }
 
 func (c *CircularClient) Conn() net.Conn {
-	return NewNopConn()
+	return nil
 }
 
 func (*CircularClient) Remote() net.Addr {
