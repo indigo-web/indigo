@@ -1,13 +1,14 @@
 package formdata
 
 import (
+	"github.com/flrdv/uf"
 	"github.com/indigo-web/indigo/config"
 	"github.com/indigo-web/indigo/http/form"
 	"github.com/indigo-web/indigo/http/status"
+	"github.com/indigo-web/indigo/internal/hexconv"
 	"github.com/indigo-web/indigo/internal/strutil"
-	"github.com/indigo-web/indigo/internal/urlencoded"
-	"github.com/indigo-web/utils/uf"
 	"iter"
+	"strings"
 )
 
 type header struct {
@@ -26,7 +27,7 @@ func ParseMultipart(cfg *config.Config, into form.Form, data, buff []byte, b str
 	}
 
 	charset := cfg.Body.Form.DefaultCoding
-	s := newStream(uf.B2S(data))
+	s := stream(uf.B2S(data))
 
 	if !skipPreamble(&s, boundary) {
 		return nil, status.ErrBadRequest
@@ -43,15 +44,15 @@ func ParseMultipart(cfg *config.Config, into form.Form, data, buff []byte, b str
 
 		// TODO: DecodeString doesn't decode plus-symbols as spaces, but we need it
 
-		var err error
-		hdr.Name, buff, err = urlencoded.ExtendedDecodeString(hdr.Name, buff)
-		if err != nil {
-			return nil, err
+		var ok bool
+		hdr.Name, buff, ok = urldecode(hdr.Name, buff)
+		if !ok {
+			return nil, status.ErrBadEncoding
 		}
 
-		hdr.File, buff, err = urlencoded.ExtendedDecodeString(hdr.File, buff)
-		if err != nil {
-			return nil, err
+		hdr.File, buff, ok = urldecode(hdr.File, buff)
+		if !ok {
+			return nil, status.ErrBadEncoding
 		}
 
 		if hdr.Name == "_charset_" {
@@ -119,6 +120,45 @@ func formParts(s *stream, boundary string) iter.Seq2[header, string] {
 			}
 		}
 	}
+}
+
+func urldecode(value string, buff []byte) (string, []byte, bool) {
+	escaped := false
+	checkpoint := 0
+	offset := len(buff)
+
+	for i := 0; i < len(value); i++ {
+		switch value[i] {
+		case '+':
+			// it would be better to mark the string as escaped here and do all the same just as
+			// in the case below, however, well... Let it be our tiny trick.
+			bytes := uf.S2B(value)
+			bytes[i] = ' '
+		case '%':
+			escaped = true
+			if i+2 >= len(value) {
+				return "", nil, false
+			}
+
+			buff = append(buff, value[checkpoint:i]...)
+			a, b := hexconv.Halfbyte[value[i+1]], hexconv.Halfbyte[value[i+2]]
+			if a|b == 0xFF {
+				return "", nil, false
+			}
+
+			buff = append(buff, (a<<4)|b)
+			i += 2
+			checkpoint = i + 1
+		}
+	}
+
+	if escaped {
+		buff = append(buff, value[checkpoint:]...)
+
+		return uf.B2S(buff[offset:]), buff, true
+	}
+
+	return value, buff, true
 }
 
 func parseHeaders(s *stream) (hdr header) {
@@ -211,4 +251,88 @@ func rstripCRLF(str string) string {
 	}
 
 	return str
+}
+
+type stream string
+
+func (s *stream) Find(char byte) int {
+	return strings.IndexByte(string(*s), char)
+}
+
+func (s *stream) FindSubstr(str string) int {
+	for {
+		begin := s.Find(str[0])
+		if begin == -1 {
+			return -1
+		}
+
+		if s.Compare(begin, str) {
+			return begin
+		}
+
+		s.Advance(1)
+	}
+}
+
+func (s *stream) Compare(offset int, str string) bool {
+	if len(*s) < len(str)+offset {
+		return false
+	}
+
+	return string(*s)[offset:offset+len(str)] == str
+}
+
+func (s *stream) CompareFold(offset int, str string) bool {
+	if len(*s) < len(str)+offset {
+		return false
+	}
+
+	return strutil.CmpFold(string(*s)[offset:offset+len(str)], str)
+}
+
+func (s *stream) Consume(str string) bool {
+	if s.Compare(0, str) {
+		s.Advance(len(str))
+		return true
+	}
+
+	return false
+}
+
+func (s *stream) ConsumeFold(str string) bool {
+	if s.CompareFold(0, str) {
+		s.Advance(len(str))
+		return true
+	}
+
+	return false
+}
+
+func (s *stream) Advance(n int) (leftBehind string) {
+	leftBehind = string(*s)[:n]
+	*s = stream(string(*s)[n:])
+	return leftBehind
+}
+
+func (s *stream) AdvanceExclusively(n int) (leftBehind string) {
+	leftBehind = s.Advance(n + 1)
+	return leftBehind[:len(leftBehind)-1]
+}
+
+func (s *stream) AdvanceLine() (leftBehind string, ok bool) {
+	newline := s.Find('\n')
+	if newline == -1 {
+		return "", false
+	}
+
+	leftBehind = s.AdvanceExclusively(newline)
+	if leftBehind[len(leftBehind)-1] == '\r' {
+		return leftBehind[:len(leftBehind)-1], true
+	}
+
+	return leftBehind, true
+}
+
+func (s *stream) SkipWhitespaces() {
+	*s = stream(strutil.LStripWS(string(*s)))
 }

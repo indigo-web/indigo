@@ -11,10 +11,16 @@ import (
 
 func TestMultipart(t *testing.T) {
 	t.Run("real-world example", func(t *testing.T) {
-		data := "------WebKitFormBoundary7MA4YWxkTrZu0gW\r\nContent-Disposition: form-data; " +
-			"name=\"username\"\r\n\r\nAlice\r\n------WebKitFormBoundary7MA4YWxkTrZu0gW\r\nCo" +
-			"ntent-Disposition: form-data; name=\"profile_pic\"; filename=\"profile.png\"\r\n" +
-			"Content-Type: image/png\r\n\r\n[binary file content]\r\n------WebKitFormBoundary7MA4YWxkTrZu0gW--\r\n"
+		data := "------WebKitFormBoundary7MA4YWxkTrZu0gW\r\n" +
+			"Content-Disposition: form-data; name=\"username\"\r\n" +
+			"\r\n" +
+			"Alice\r\n" +
+			"------WebKitFormBoundary7MA4YWxkTrZu0gW\r\n" +
+			"Content-Disposition: form-data; name=\"profile_pic\"; filename=\"profile.png\"\r\n" +
+			"Content-Type: image/png\r\n" +
+			"\r\n" +
+			"[binary file content]\r\n" +
+			"------WebKitFormBoundary7MA4YWxkTrZu0gW--\r\n"
 		parsed, err := ParseMultipart(
 			config.Default(), nil, []byte(data), nil, "----WebKitFormBoundary7MA4YWxkTrZu0gW",
 		)
@@ -47,6 +53,24 @@ func TestMultipart(t *testing.T) {
 			Type:    mime.Plain,
 			Charset: "utf8",
 			Value:   "Alice",
+		}, parsed[0])
+	})
+
+	t.Run("urlencoded in name and file", func(t *testing.T) {
+		data := "--boundary\r\n" +
+			"Content-Disposition: form-data; name=\"user%20name\"; filename=\"some+rabbit%21.png\"\r\n" +
+			"\r\n" +
+			"Alice\r\n" +
+			"--boundary--\r\n"
+		parsed, err := ParseMultipart(config.Default(), nil, []byte(data), nil, "boundary")
+		require.NoError(t, err)
+		require.Equal(t, 1, len(parsed))
+		require.Equal(t, form.Data{
+			Name:     "user name",
+			Filename: "some rabbit!.png",
+			Type:     mime.Plain,
+			Charset:  "utf8",
+			Value:    "Alice",
 		}, parsed[0])
 	})
 
