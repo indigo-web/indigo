@@ -1,7 +1,7 @@
 package codecutil
 
 import (
-	"github.com/indigo-web/indigo/http/codec"
+	"github.com/indigo-web/indigo/http"
 )
 
 type pair[A, B any] struct {
@@ -12,23 +12,23 @@ type pair[A, B any] struct {
 type constructor[T any] pair[string, func() T]
 
 type (
-	Compressors   = []constructor[codec.Compressor]
-	Decompressors = []constructor[codec.Decompressor]
+	Compressors   = []constructor[http.Compressor]
+	Decompressors = []constructor[http.Decompressor]
 )
 
-func Scatter(codecs []codec.Codec) (cs Compressors, dcs Decompressors) {
+func Scatter(codecs []http.Codec) (cs Compressors, dcs Decompressors) {
 	cs = make(Compressors, 0, len(codecs))
 	dcs = make(Decompressors, 0, len(codecs))
 
 	for _, c := range codecs {
 		tokens := c.Tokens()
 
-		if encoder, ok := c.(codec.Encoder); ok {
-			cs = appendCodec(cs, tokens, encoder.NewCompressor)
+		if compressorFabric, ok := c.(http.CompressorFabric); ok {
+			cs = appendCodec(cs, tokens, compressorFabric.NewCompressor)
 		}
 
-		if decoder, ok := c.(codec.Decoder); ok {
-			dcs = appendCodec(dcs, tokens, decoder.NewDecompressor)
+		if decompressorFabric, ok := c.(http.DecompressorFabric); ok {
+			dcs = appendCodec(dcs, tokens, decompressorFabric.NewDecompressor)
 		}
 	}
 

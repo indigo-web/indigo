@@ -4,7 +4,7 @@ import (
 	"strings"
 )
 
-func ChooseUpgrade(line string) Proto {
+func ChooseUpgrade(line string) Protocol {
 	for len(line) > 0 {
 		var token string
 		token, line = cutbyte(line, ',')
@@ -20,7 +20,7 @@ func ChooseUpgrade(line string) Proto {
 }
 
 // parseUpgradeToken simply parses an upgrade-token to the respective protocol enum
-func parseUpgradeToken(token string) Proto {
+func parseUpgradeToken(token string) Protocol {
 	switch token {
 	case "http/1.0", "HTTP/1.0":
 		return HTTP10

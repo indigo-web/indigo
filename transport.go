@@ -9,7 +9,7 @@ import (
 	"encoding/pem"
 	"fmt"
 	"github.com/indigo-web/indigo/config"
-	"github.com/indigo-web/indigo/http/crypt"
+	"github.com/indigo-web/indigo/http/encryption"
 	"github.com/indigo-web/indigo/http/serve"
 	"github.com/indigo-web/indigo/router"
 	"github.com/indigo-web/indigo/transport"
@@ -32,7 +32,7 @@ func TCP() Transport {
 		inner: transport.NewTCP(),
 		spawnCallback: func(cfg *config.Config, r router.Router) func(net.Conn) {
 			return func(conn net.Conn) {
-				serve.HTTP1(cfg, conn, crypt.Plain, r)
+				serve.HTTP1(cfg, conn, encryption.Plain, r)
 			}
 		},
 	}
@@ -111,20 +111,20 @@ func newTLSTransport(cfg *tls.Config) Transport {
 	}
 }
 
-func mapTLS(ver uint16) crypt.Encryption {
+func mapTLS(ver uint16) encryption.Token {
 	switch ver {
 	case tls.VersionTLS10:
-		return crypt.TLSv10
+		return encryption.TLSv10
 	case tls.VersionTLS11:
-		return crypt.TLSv11
+		return encryption.TLSv11
 	case tls.VersionTLS12:
-		return crypt.TLSv12
+		return encryption.TLSv12
 	case tls.VersionTLS13:
-		return crypt.TLSv13
+		return encryption.TLSv13
 	case tls.VersionSSL30:
-		return crypt.SSL
+		return encryption.SSL
 	default:
-		return crypt.Unknown
+		return encryption.Unknown
 	}
 }
 
