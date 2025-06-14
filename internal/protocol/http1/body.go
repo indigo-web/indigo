@@ -1,10 +1,8 @@
 package http1
 
 import (
-	"github.com/indigo-web/chunkedbody"
 	"github.com/indigo-web/indigo/config"
 	"github.com/indigo-web/indigo/http"
-	"github.com/indigo-web/indigo/http/codec"
 	"github.com/indigo-web/indigo/http/status"
 	"github.com/indigo-web/indigo/internal/codecutil"
 	"github.com/indigo-web/indigo/transport"
@@ -12,45 +10,42 @@ import (
 	"math"
 )
 
-type chunkedBodyReader struct {
-	parser     *chunkedbody.Parser
-	hasTrailer bool
+type body struct {
+	maxLen        uint64
+	counter       uint64
+	reader        func() ([]byte, error)
+	chunkedParser chunkedParser
+	client        transport.Client
+	decoders      codecutil.Cache[http.Decompressor]
 }
 
-type Body struct {
-	maxLen   uint
-	counter  uint
-	reader   func() ([]byte, error)
-	chunked  chunkedBodyReader
-	client   transport.Client
-	decoders codecutil.Cache[codec.Decompressor]
-}
-
-func NewBody(
-	client transport.Client, chunkedParser *chunkedbody.Parser, s config.Body,
-	decoders codecutil.Cache[codec.Decompressor]) *Body {
-	return &Body{
-		reader:   nop,
-		client:   client,
-		maxLen:   s.MaxSize,
-		chunked:  newChunkedBodyReader(chunkedParser),
-		decoders: decoders,
+func newBody(
+	client transport.Client,
+	s config.Body,
+	decoders codecutil.Cache[http.Decompressor],
+) *body {
+	return &body{
+		reader:        nop,
+		client:        client,
+		maxLen:        s.MaxSize,
+		chunkedParser: newChunkedParser(),
+		decoders:      decoders,
 	}
 }
 
-func (b *Body) Retrieve() ([]byte, error) {
+func (b *body) Fetch() ([]byte, error) {
 	return b.reader()
 }
 
-func (b *Body) Reset(request *http.Request) error {
+func (b *body) Reset(request *http.Request) error {
 	if request.Encoding.Chunked {
-		b.initChunked(request.Encoding.HasTrailer)
+		b.initChunked()
 		b.reader = b.readChunked
 	} else if request.Connection == "close" {
 		b.initEOFReader()
 		b.reader = b.readTillEOF
 	} else {
-		b.initPlain(uint(request.ContentLength))
+		b.initPlain(uint64(request.ContentLength))
 		b.reader = b.readPlain
 	}
 
@@ -58,7 +53,7 @@ func (b *Body) Reset(request *http.Request) error {
 		return nil
 	}
 
-	base := http.Retriever(b)
+	base := http.Fetcher(b)
 
 	for i := len(request.Encoding.Transfer); i > 0; i-- {
 		decoder, found := b.decoders.Get(request.Encoding.Transfer[i-1])
@@ -74,15 +69,15 @@ func (b *Body) Reset(request *http.Request) error {
 		base = decoder
 	}
 
-	b.reader = base.Retrieve
+	b.reader = base.Fetch
 	return nil
 }
 
-func (b *Body) initPlain(totalLen uint) {
+func (b *body) initPlain(totalLen uint64) {
 	b.counter = totalLen
 }
 
-func (b *Body) readPlain() (body []byte, err error) {
+func (b *body) readPlain() (body []byte, err error) {
 	if b.counter == 0 {
 		return nil, io.EOF
 	}
@@ -96,64 +91,57 @@ func (b *Body) readPlain() (body []byte, err error) {
 		return nil, err
 	}
 
-	if uint(len(data)) >= b.counter {
+	if uint64(len(data)) >= b.counter {
 		body, data = data[:b.counter], data[b.counter:]
-		b.client.Unread(data)
+		b.client.Pushback(data)
 		b.counter = 0
 		err = io.EOF
 	} else {
-		b.counter -= uint(len(data))
+		b.counter -= uint64(len(data))
 		body = data
 	}
 
 	return body, err
 }
 
-func (b *Body) initEOFReader() {
+func (b *body) initEOFReader() {
 	b.counter = 0
 }
 
-func (b *Body) readTillEOF() ([]byte, error) {
+func (b *body) readTillEOF() ([]byte, error) {
 	chunk, err := b.client.Read()
-	if b.counter > math.MaxUint-uint(len(chunk)) {
+	if b.counter > math.MaxUint64-uint64(len(chunk)) {
 		return nil, status.ErrBodyTooLarge
 	}
 
-	b.counter += uint(len(chunk))
+	b.counter += uint64(len(chunk))
 
 	return chunk, err
 }
 
-func newChunkedBodyReader(parser *chunkedbody.Parser) chunkedBodyReader {
-	return chunkedBodyReader{
-		parser: parser,
-	}
-}
-
-func (b *Body) initChunked(hasTrailer bool) {
-	b.chunked.hasTrailer = hasTrailer
+func (b *body) initChunked() {
 	b.counter = 0
 }
 
-func (b *Body) readChunked() (body []byte, err error) {
+func (b *body) readChunked() (body []byte, err error) {
 	data, err := b.client.Read()
 	if err != nil {
 		return nil, err
 	}
 
-	chunk, extra, err := b.chunked.parser.Parse(data, b.chunked.hasTrailer)
+	chunk, extra, err := b.chunkedParser.Parse(data)
 	switch err {
 	case nil, io.EOF:
 	default:
 		return nil, err
 	}
 
-	if b.counter > math.MaxUint-uint(len(chunk)) {
+	if b.counter > math.MaxUint64-uint64(len(chunk)) {
 		return nil, status.ErrBodyTooLarge
 	}
 
-	b.counter += uint(len(chunk))
-	b.client.Unread(extra)
+	b.counter += uint64(len(chunk))
+	b.client.Pushback(extra)
 
 	return chunk, err
 }

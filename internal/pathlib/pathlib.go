@@ -1,7 +1,7 @@
 package pathlib
 
 import (
-	"github.com/indigo-web/utils/uf"
+	"github.com/flrdv/uf"
 )
 
 type Path struct {

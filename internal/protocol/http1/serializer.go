@@ -4,12 +4,12 @@ import (
 	"fmt"
 	"github.com/indigo-web/indigo/http"
 	"github.com/indigo-web/indigo/http/cookie"
-	"github.com/indigo-web/indigo/http/headers"
 	"github.com/indigo-web/indigo/http/method"
 	"github.com/indigo-web/indigo/http/proto"
 	"github.com/indigo-web/indigo/http/status"
 	"github.com/indigo-web/indigo/internal/response"
-	"github.com/indigo-web/utils/strcomp"
+	"github.com/indigo-web/indigo/internal/strutil"
+	"github.com/indigo-web/indigo/kv"
 	"io"
 	"log"
 	"strconv"
@@ -30,7 +30,7 @@ const minimalFileBuffSize = 16
 
 var (
 	chunkedFinalizer = []byte("0\r\n\r\n")
-	gmt              = time.FixedZone("GMT", 0)
+	zoneGMT          = time.FixedZone("GMT", 0)
 )
 
 type serializer struct {
@@ -71,7 +71,7 @@ func newSerializer(
 
 // PreWrite writes the response into the buffer without actually sending it. Usually used
 // for informational responses
-func (s *serializer) PreWrite(protocol proto.Proto, response *http.Response) {
+func (s *serializer) PreWrite(protocol proto.Protocol, response *http.Response) {
 	s.renderProtocol(protocol)
 	fields := response.Reveal()
 	s.renderResponseLine(fields)
@@ -81,7 +81,7 @@ func (s *serializer) PreWrite(protocol proto.Proto, response *http.Response) {
 
 // Write writes the response, keeping in mind difference between 1.0 and 1.1 HTTP versions
 func (s *serializer) Write(
-	protocol proto.Proto, response *http.Response,
+	protocol proto.Protocol, response *http.Response,
 ) (err error) {
 	defer s.clear()
 
@@ -267,7 +267,7 @@ func (s *serializer) writeChunkedBody(r io.Reader, writer io.Writer) error {
 }
 
 // renderHeaderInto the buffer. Appends CRLF in the end
-func (s *serializer) renderHeader(header headers.Header) {
+func (s *serializer) renderHeader(header kv.Pair) {
 	s.buff = append(s.buff, header.Key...)
 	s.colonsp()
 	s.buff = append(s.buff, header.Value...)
@@ -297,7 +297,7 @@ func (s *serializer) renderCookie(c cookie.Cookie) {
 		s.buff = append(s.buff, "Expires="...)
 		// TODO: this will probably be slow. Can be optimized via rendering it manually
 		// TODO: directly into the s.buff
-		s.buff = append(s.buff, c.Expires.In(gmt).Format(time.RFC1123)...)
+		s.buff = append(s.buff, c.Expires.In(zoneGMT).Format(time.RFC1123)...)
 		s.buff = append(s.buff, ';', ' ')
 	}
 
@@ -363,13 +363,13 @@ func (s *serializer) clear() {
 	s.defaultHeaders.Reset()
 }
 
-func isKeepAlive(protocol proto.Proto, req *http.Request) bool {
+func isKeepAlive(protocol proto.Protocol, req *http.Request) bool {
 	switch protocol {
 	case proto.HTTP10:
-		return strcomp.EqualFold(req.Connection, "keep-alive")
+		return strutil.CmpFold(req.Connection, "keep-alive")
 	case proto.HTTP11:
 		// in case of HTTP/1.1, keep-alive may be only disabled
-		return !strcomp.EqualFold(req.Connection, "close")
+		return !strutil.CmpFold(req.Connection, "close")
 	default:
 		// as the protocol is unknown and the code was probably caused by some sort
 		// of bug, consider closing it
@@ -408,7 +408,7 @@ type defaultHeaders []defaultHeader
 
 func (d defaultHeaders) Exclude(key string) {
 	for i, header := range d {
-		if strcomp.EqualFold(header.Key, key) {
+		if strutil.CmpFold(header.Key, key) {
 			header.Excluded = true
 			d[i] = header
 			return

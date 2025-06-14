@@ -3,9 +3,9 @@ package virtual
 import (
 	"github.com/indigo-web/indigo/http"
 	"github.com/indigo-web/indigo/http/status"
+	"github.com/indigo-web/indigo/internal/strutil"
 	"github.com/indigo-web/indigo/router"
 	"github.com/indigo-web/indigo/router/virtual/internal/domain"
-	"github.com/indigo-web/utils/strcomp"
 )
 
 type virtualFabric struct {
@@ -117,7 +117,7 @@ func (r *runtimeRouter) getRouter(request *http.Request) (router.Router, *http.R
 	host := hosts[0]
 
 	for _, virtRouter := range r.routers {
-		if strcomp.EqualFold(virtRouter.Domain, host) {
+		if strutil.CmpFold(virtRouter.Domain, host) {
 			return virtRouter.Router, nil
 		}
 	}

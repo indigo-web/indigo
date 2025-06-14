@@ -1,7 +1,7 @@
 package strutil
 
 import (
-	"github.com/indigo-web/utils/uf"
+	"github.com/flrdv/uf"
 	"github.com/stretchr/testify/require"
 	"iter"
 	"testing"

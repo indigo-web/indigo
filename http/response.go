@@ -1,14 +1,14 @@
 package http
 
 import (
+	"github.com/flrdv/uf"
 	"github.com/indigo-web/indigo/http/cookie"
-	"github.com/indigo-web/indigo/http/headers"
 	"github.com/indigo-web/indigo/http/mime"
 	"github.com/indigo-web/indigo/http/status"
 	"github.com/indigo-web/indigo/internal/response"
+	"github.com/indigo-web/indigo/internal/strutil"
 	"github.com/indigo-web/indigo/internal/types"
-	"github.com/indigo-web/utils/strcomp"
-	"github.com/indigo-web/utils/uf"
+	"github.com/indigo-web/indigo/kv"
 	json "github.com/json-iterator/go"
 	"io"
 	"os"
@@ -36,7 +36,7 @@ func NewResponse() *Response {
 	return &Response{
 		&response.Fields{
 			Code:        status.OK,
-			Headers:     make([]headers.Header, 0, preallocRespHeaders),
+			Headers:     make([]kv.Pair, 0, preallocRespHeaders),
 			ContentType: response.DefaultContentType,
 		},
 	}
@@ -74,14 +74,14 @@ func (r *Response) TransferEncoding(value string) *Response {
 // be appended.
 func (r *Response) Header(key string, values ...string) *Response {
 	switch {
-	case strcomp.EqualFold(key, "content-type"):
+	case strutil.CmpFold(key, "content-type"):
 		return r.ContentType(values[0])
-	case strcomp.EqualFold(key, "transfer-encoding"):
+	case strutil.CmpFold(key, "transfer-encoding"):
 		return r.TransferEncoding(values[0])
 	}
 
 	for i := range values {
-		r.fields.Headers = append(r.fields.Headers, headers.Header{
+		r.fields.Headers = append(r.fields.Headers, kv.Pair{
 			Key:   key,
 			Value: values[i],
 		})
