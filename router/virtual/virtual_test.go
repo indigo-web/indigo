@@ -5,14 +5,14 @@ import (
 	"github.com/indigo-web/indigo/http"
 	"github.com/indigo-web/indigo/http/status"
 	"github.com/indigo-web/indigo/internal/construct"
-	"github.com/indigo-web/indigo/internal/tcp/dummy"
 	"github.com/indigo-web/indigo/router/inbuilt"
+	"github.com/indigo-web/indigo/transport/dummy"
 	"github.com/stretchr/testify/require"
 	"testing"
 )
 
 func newRequest(hosts ...string) *http.Request {
-	request := construct.Request(config.Default(), dummy.NewNopClient(), nil)
+	request := construct.Request(config.Default(), dummy.NewNopClient())
 	for _, host := range hosts {
 		request.Headers.Add("Host", host)
 	}
@@ -26,7 +26,7 @@ func TestVirtualRouter(t *testing.T) {
 	const OK = status.NotFound
 
 	t.Run("no hosts", func(t *testing.T) {
-		r := New().Initialize()
+		r := New().Build()
 		require.True(t, requestIs(r.OnRequest(newRequest("localhost")), status.MisdirectedRequest))
 	})
 
@@ -34,7 +34,7 @@ func TestVirtualRouter(t *testing.T) {
 		{
 			r := New().
 				Default(inbuilt.New()).
-				Initialize()
+				Build()
 
 			require.True(t, requestIs(r.OnRequest(newRequest("localhost")), OK))
 			require.True(t, requestIs(r.OnRequest(newRequest("127.0.0.1")), OK))
@@ -42,7 +42,7 @@ func TestVirtualRouter(t *testing.T) {
 		{
 			r := New().
 				Host("0.0.0.0", inbuilt.New()).
-				Initialize()
+				Build()
 
 			require.True(t, requestIs(r.OnRequest(newRequest("localhost")), OK))
 			require.True(t, requestIs(r.OnRequest(newRequest("127.0.0.1")), OK))
@@ -51,12 +51,12 @@ func TestVirtualRouter(t *testing.T) {
 
 	t.Run("single host", func(t *testing.T) {
 		r := New().
-			Host("pavlo.gay", inbuilt.New()).
-			Initialize()
+			Host("pavlo.ooo", inbuilt.New()).
+			Build()
 
-		require.True(t, requestIs(r.OnRequest(newRequest("pavlo.gay")), OK))
+		require.True(t, requestIs(r.OnRequest(newRequest("pavlo.ooo")), OK))
 		require.True(t, requestIs(r.OnRequest(newRequest("localhost")), status.MisdirectedRequest))
-		require.True(t, requestIs(r.OnRequest(newRequest("pavlo.gay", "localhost")), status.BadRequest))
+		require.True(t, requestIs(r.OnRequest(newRequest("pavlo.ooo", "localhost")), status.BadRequest))
 	})
 }
 

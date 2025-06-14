@@ -2,7 +2,6 @@ package inbuilt
 
 import (
 	"github.com/indigo-web/indigo/http"
-	"github.com/indigo-web/indigo/http/headers"
 	"strings"
 )
 
@@ -22,7 +21,7 @@ func renderHTTPRequest(request *http.Request, buff []byte) []byte {
 	buff = append(buff, ' ')
 	buff = requestURI(request, buff)
 	buff = append(buff, ' ')
-	buff = append(buff, strings.TrimSpace(request.Proto.String())...)
+	buff = append(buff, strings.TrimSpace(request.Protocol.String())...)
 	buff = append(buff, "\r\n"...)
 	buff = requestHeaders(request.Headers, buff)
 	buff = append(buff, "Content-Length: 0\r\n\r\n"...)
@@ -32,17 +31,33 @@ func renderHTTPRequest(request *http.Request, buff []byte) []byte {
 
 func requestURI(request *http.Request, buff []byte) []byte {
 	buff = append(buff, request.Path...)
-
-	if query := request.Query.Raw(); len(query) > 0 {
-		buff = append(buff, '?')
-		buff = append(buff, query...)
-	}
+	buff = requestURIParams(request.Params, buff)
 
 	return buff
 }
 
-func requestHeaders(hdrs headers.Headers, buff []byte) []byte {
-	for _, pair := range hdrs.Unwrap() {
+func requestURIParams(params http.Params, buff []byte) []byte {
+	if params.Empty() {
+		return buff
+	}
+
+	buff = append(buff, '?')
+
+	for key, val := range params.Iter() {
+		buff = append(buff, key...)
+		if len(val) > 0 {
+			buff = append(buff, '=')
+			buff = append(buff, val...)
+		}
+
+		buff = append(buff, '&')
+	}
+
+	return buff[:len(buff)-1]
+}
+
+func requestHeaders(hdrs http.Headers, buff []byte) []byte {
+	for _, pair := range hdrs.Expose() {
 		buff = append(append(buff, pair.Key...), ": "...)
 		buff = append(append(buff, pair.Value...), "\r\n"...)
 	}

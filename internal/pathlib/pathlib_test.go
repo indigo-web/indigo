@@ -5,7 +5,22 @@ import (
 	"testing"
 )
 
-func TestPath(t *testing.T) {
+func Benchmark(b *testing.B) {
+	path := NewPath("/", "/static")
+	given := "/index.html"
+
+	b.Run("replace prefixes", func(b *testing.B) {
+		b.ReportAllocs()
+		b.ResetTimer()
+
+		for i := 0; i < b.N; i++ {
+			path.Set(given)
+			_ = path.Relative()
+		}
+	})
+}
+
+func Test(t *testing.T) {
 	t.Run("replace root", func(t *testing.T) {
 		path := NewPath("/", "./static")
 		path.Set("/index.html")

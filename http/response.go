@@ -1,14 +1,14 @@
 package http
 
 import (
+	"github.com/flrdv/uf"
 	"github.com/indigo-web/indigo/http/cookie"
-	"github.com/indigo-web/indigo/http/headers"
 	"github.com/indigo-web/indigo/http/mime"
 	"github.com/indigo-web/indigo/http/status"
 	"github.com/indigo-web/indigo/internal/response"
+	"github.com/indigo-web/indigo/internal/strutil"
 	"github.com/indigo-web/indigo/internal/types"
-	"github.com/indigo-web/utils/strcomp"
-	"github.com/indigo-web/utils/uf"
+	"github.com/indigo-web/indigo/kv"
 	json "github.com/json-iterator/go"
 	"io"
 	"os"
@@ -18,10 +18,10 @@ import (
 type ResponseWriter func(b []byte) error
 
 const (
-	// why 7? I don't know. There's no theory behind this number nor researches.
-	// It can be adjusted to 10 as well, but why you would ever need to do this?
-	defaultHeadersNumber = 7
-	defaultFileMIME      = mime.OctetStream
+	// why 7? I honestly don't know. There's no theory nor researches behind this.
+	// It can be adjusted to 10 as well, but why would you?
+	preallocRespHeaders = 7
+	defaultFileMIME     = mime.OctetStream
 )
 
 type Response struct {
@@ -36,7 +36,7 @@ func NewResponse() *Response {
 	return &Response{
 		&response.Fields{
 			Code:        status.OK,
-			Headers:     make([]headers.Header, 0, defaultHeadersNumber),
+			Headers:     make([]kv.Pair, 0, preallocRespHeaders),
 			ContentType: response.DefaultContentType,
 		},
 	}
@@ -59,7 +59,7 @@ func (r *Response) Status(status status.Status) *Response {
 }
 
 // ContentType sets a custom Content-Type header value.
-func (r *Response) ContentType(value string) *Response {
+func (r *Response) ContentType(value mime.MIME) *Response {
 	r.fields.ContentType = value
 	return r
 }
@@ -74,14 +74,14 @@ func (r *Response) TransferEncoding(value string) *Response {
 // be appended.
 func (r *Response) Header(key string, values ...string) *Response {
 	switch {
-	case strcomp.EqualFold(key, "content-type"):
+	case strutil.CmpFold(key, "content-type"):
 		return r.ContentType(values[0])
-	case strcomp.EqualFold(key, "transfer-encoding"):
+	case strutil.CmpFold(key, "transfer-encoding"):
 		return r.TransferEncoding(values[0])
 	}
 
 	for i := range values {
-		r.fields.Headers = append(r.fields.Headers, headers.Header{
+		r.fields.Headers = append(r.fields.Headers, kv.Pair{
 			Key:   key,
 			Value: values[i],
 		})

@@ -17,7 +17,7 @@ func RequestsLog(loggers ...logger) types.Mutator {
 
 	return func(request *http.Request) {
 		for _, logger := range loggers {
-			logger.Printf("%s %s", request.Method.String(), http.Escape(request.Path))
+			logger.Printf("%s %s", request.Method.String(), request.Path)
 		}
 	}
 }

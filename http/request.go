@@ -5,115 +5,74 @@ import (
 	"github.com/indigo-web/indigo/config"
 	"github.com/indigo-web/indigo/http/cookie"
 	"github.com/indigo-web/indigo/http/encryption"
-	"github.com/indigo-web/indigo/http/headers"
 	"github.com/indigo-web/indigo/http/method"
-	"github.com/indigo-web/indigo/http/mime"
 	"github.com/indigo-web/indigo/http/proto"
-	"github.com/indigo-web/indigo/http/query"
-	"github.com/indigo-web/indigo/http/status"
-	"github.com/indigo-web/indigo/internal/keyvalue"
-	"github.com/indigo-web/indigo/internal/tcp"
-	json "github.com/json-iterator/go"
+	"github.com/indigo-web/indigo/kv"
+	"github.com/indigo-web/indigo/transport"
 	"net"
 )
 
 var zeroContext = context.Background()
 
+type (
+	Headers = *kv.Storage
+	Header  = kv.Pair
+	Params  = *kv.Storage
+	Vars    = *kv.Storage
+)
+
 // Request represents HTTP request
 type Request struct {
-	// Method represents the request's method
+	// Method is an enum representing the request method.
 	Method method.Method
-	// Path represents decoded request URI
-	Path Path
-	// Query are request's URI parameters
-	Query *query.Query
-	// Params are dynamic path's wildcards
+	// Path is a decoded and validated string, guaranteed to hold ASCII-printable characters only.
+	Path string
+	// Params are request URI parameters.
 	Params Params
-	// Proto is the protocol, which was used to make the request
-	Proto proto.Proto
-	// Headers are request headers. They are stored non-normalized, however lookup is
-	// case-insensitive
-	Headers headers.Headers
-	// Encoding holds an information about encoding, that was used to make the request
-	Encoding Encoding
-	// ContentLength obtains the value from Content-Length header. It holds the value of 0
-	// if isn't presented.
-	//
-	// NOTE: if any of transfer-encodings were applied, you MUST NOT look at this value
-	ContentLength int
-	// ContentType obtains Content-Type header value
-	ContentType string
-	// Connection holds the Connection header value. It isn't normalized, so can be anything
-	// and in any case. So in order to compare it, highly recommended to do it case-insensibly
-	Connection string
-	// Upgrade is the protocol token, which is set by default to proto.Unknown. In
-	// case it is anything else, then Upgrade header was received
-	Upgrade proto.Proto
-	// Remote represents remote net.Addr.
-	// WARNING: in order to use the value to represent a user, MAKE SURE there are no proxies
-	// in the middle
+	// Vars are dynamic routing segments.
+	Vars Vars
+	// Proto is the enum of a protocol used for the request. Can be changed (mostly through upgrade).
+	Protocol proto.Protocol
+	// Headers holds non-normalized header pairs, even though lookup is case-insensitive. Header keys
+	// and values aren't validated, therefore may contain ASCII-nonprintable and/or Unicode characters.
+	Headers Headers
+	commonHeaders
+	// Remote holds the remote address. Please note that this is generally not a good parameter to identify
+	// a user, because there might be proxies in the middle.
 	Remote net.Addr
-	// Ctx is a request context. It may be filled with arbitrary data across middlewares
-	// and handler by itself
+	// Ctx is user-managed context which lives as long as the connection does and is never automatically
+	// cleared.
 	Ctx context.Context
-	// Env is a set of fixed variables passed by core. They are passed separately from Request.Ctx
-	// in order to not only distinguish user-defined values in ctx from those from core, but also
-	// to gain performance, as accessing the struct is much faster than looking up in context.Context
+	// Env contains a fixed set of contextual values which are useful in specific cases. They aren't
+	// passed via the Ctx due to performance considerations.
 	Env Environment
-	// Body accesses the request's body
-	Body        Body
-	client      tcp.Client
-	wasHijacked bool
-	response    *Response
-	jar         cookie.Jar
-	cfg         *config.Config
+	// Body is a dedicated entity providing access to the message body.
+	Body     *Body
+	client   transport.Client
+	hijacked bool
+	response *Response
+	jar      cookie.Jar
+	cfg      *config.Config
 }
 
-// NewRequest returns a new instance of request object and body gateway
-// Must not be used externally, this function is for internal purposes only
-// HTTP/1.1 as a protocol by default is set because if first request from user
-// is invalid, we need to render a response using request method, but appears
-// that default method is a null-value (proto.Unknown)
 func NewRequest(
-	cfg config.Config, hdrs headers.Headers, query *query.Query, response *Response,
-	client tcp.Client, body Body, params Params,
+	cfg *config.Config,
+	response *Response,
+	client transport.Client,
+	headers, params, vars *kv.Storage,
 ) *Request {
-	request := &Request{
-		Query:    query,
+	return &Request{
+		Method:   method.Unknown,
+		Protocol: proto.HTTP11,
 		Params:   params,
-		Proto:    proto.HTTP11,
-		Headers:  hdrs,
+		Vars:     vars,
+		Headers:  headers,
 		Remote:   client.Remote(),
 		Ctx:      zeroContext,
-		Body:     body,
 		client:   client,
 		response: response,
-		cfg:      &cfg,
+		cfg:      cfg,
 	}
-
-	return request
-}
-
-// JSON takes a model and returns an error if occurred. Model must be a pointer to a structure.
-// If Content-Type header is given, but is not "application/json", then status.ErrUnsupportedMediaType
-// will be returned. If JSON is malformed, or it doesn't match the model, then custom jsoniter error
-// will be returned
-func (r *Request) JSON(model any) error {
-	if len(r.ContentType) > 0 && r.ContentType != mime.JSON {
-		return status.ErrUnsupportedMediaType
-	}
-
-	data, err := r.Body.Bytes()
-	if err != nil {
-		return err
-	}
-
-	iterator := json.ConfigDefault.BorrowIterator(data)
-	iterator.ReadVal(model)
-	err = iterator.Error
-	json.ConfigDefault.ReturnIterator(iterator)
-
-	return err
 }
 
 // Cookies returns a cookie jar with parsed cookies key-value pairs, and an error
@@ -121,7 +80,7 @@ func (r *Request) JSON(model any) error {
 // doesn't cache the parsed result across calls and may be pretty expensive
 func (r *Request) Cookies() (cookie.Jar, error) {
 	if r.jar == nil {
-		r.jar = cookie.NewJarPreAlloc(r.cfg.Headers.CookiesPreAllocate)
+		r.jar = cookie.NewJarPreAlloc(r.cfg.Headers.CookiesPrealloc)
 	}
 
 	r.jar.Clear()
@@ -147,45 +106,32 @@ func (r *Request) Respond() *Response {
 }
 
 // Hijack the connection. Request body will be implicitly read (so if you need it you
-// should read it before) all the body left. After handler exits, the connection will
-// be closed, so the connection can be hijacked only once
-func (r *Request) Hijack() (tcp.Client, error) {
+// should read it before) to the end. After handler exits, the connection will
+// be closed, so the connection can be hijacked at most once
+func (r *Request) Hijack() (transport.Client, error) {
 	if err := r.Body.Discard(); err != nil {
 		return nil, err
 	}
 
-	r.wasHijacked = true
+	r.hijacked = true
 
 	return r.client, nil
 }
 
-// WasHijacked returns true or false, depending on whether was a connection hijacked
-func (r *Request) WasHijacked() bool {
-	return r.wasHijacked
+// Hijacked tells whether the connection was hijacked or not
+func (r *Request) Hijacked() bool {
+	return r.hijacked
 }
 
-// Clear resets request headers and reads body into nowhere until completed.
-// It is implemented to clear the request object between requests
-func (r *Request) Clear() (err error) {
-	if err = r.Body.Discard(); err != nil {
-		return err
-	}
-
-	r.Query.Set(nil)
+// Reset the request
+func (r *Request) Reset() {
 	r.Params.Clear()
+	r.Vars.Clear()
 	r.Headers.Clear()
-	r.ContentLength = 0
-	r.Encoding = Encoding{}
-	r.ContentType = ""
-	r.Connection = ""
-	r.Upgrade = proto.Unknown
+	r.commonHeaders = commonHeaders{}
 	r.Ctx = zeroContext
 	r.Env = Environment{}
-
-	return nil
 }
-
-// TODO: implement FormData parsing
 
 type Environment struct {
 	// Error contains an error, if occurred
@@ -201,4 +147,31 @@ type Environment struct {
 	AliasFrom string
 }
 
-type Params = *keyvalue.Storage
+type commonHeaders struct {
+	// Encoding holds an information about encoding, that was used to make the request
+	Encoding Encodings
+	// ContentLength obtains the value from Content-Length header. It holds the value of 0
+	// if isn't presented.
+	//
+	// NOTE: you shouldn't rely on this value, as it may be anything (mostly 0) if any
+	// Transfer-Encoding were applied.
+	ContentLength int
+	// ContentType obtains Content-Type header value
+	ContentType string
+	// Connection holds the Connection header value. It isn't normalized, so can be anything
+	// and in any case. So in order to compare it, highly recommended to do it case-insensibly
+	Connection string
+	// Upgrade is the protocol token, which is set by default to proto.Unknown. In
+	// case it is anything else, then Upgrade header was received
+	Upgrade proto.Protocol
+}
+
+type Encodings struct {
+	// Transfer contains all applied Transfer-Encoding codings in their original order, except
+	// the chunked. Chunked Transfer Encoding has its own boolean flag.
+	Transfer []string
+	// Content contains all applied Content-Encoding codings in their original order.
+	Content []string
+	// Chunked doesn't belong to any of encodings, as it is still must be processed individually
+	Chunked bool
+}

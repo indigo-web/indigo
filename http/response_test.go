@@ -1,6 +1,8 @@
 package http
 
 import (
+	"errors"
+	"github.com/indigo-web/indigo/http/status"
 	"github.com/stretchr/testify/require"
 	"testing"
 )
@@ -13,5 +15,23 @@ func TestResponse(t *testing.T) {
 		require.NoError(t, err)
 		require.Equal(t, "[1,2,3]", string(resp.Reveal().Body))
 		require.Equal(t, "application/json", resp.Reveal().ContentType)
+	})
+}
+
+func BenchmarkResponse_WithError(b *testing.B) {
+	resp := NewResponse()
+	knownErr := status.ErrBadRequest
+	unknownErr := errors.New("some crap happened, unable to recover")
+
+	b.Run("KnownError", func(b *testing.B) {
+		for i := 0; i < b.N; i++ {
+			resp.Error(knownErr)
+		}
+	})
+
+	b.Run("UnknownError", func(b *testing.B) {
+		for i := 0; i < b.N; i++ {
+			resp.Error(unknownErr)
+		}
 	})
 }

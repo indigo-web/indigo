@@ -12,7 +12,7 @@ import (
 	"strings"
 )
 
-var _ router.Fabric = new(Router)
+var _ router.Builder = new(Router)
 
 // Router is a built-in routing entity. It provides support for all the methods defined in
 // the methods package, including shortcuts for those. It also supports dynamic routing
@@ -35,13 +35,11 @@ type Router struct {
 
 // New constructs a new instance of inbuilt router
 func New() *Router {
-	r := &Router{
+	return &Router{
 		isRoot:      true,
 		registrar:   newRegistrar(),
 		errHandlers: newErrorHandlers(),
 	}
-
-	return r
 }
 
 // runtimeRouter is the actual router that'll be running. The reason to separate Router from runtimeRouter
@@ -56,7 +54,7 @@ type runtimeRouter struct {
 	isStatic    bool
 }
 
-func (r *Router) Initialize() router.Router {
+func (r *Router) Build() router.Router {
 	r.applyErrorHandlersMiddlewares()
 
 	if err := r.prepare(); err != nil {
@@ -199,6 +197,7 @@ func getHandler(reqMethod method.Method, methodsMap types.MethodsMap) Handler {
 	return handler
 }
 
+// TODO: implement responding on such requests with a global list of all the available methods
 func isServerWideOptions(req *http.Request) bool {
 	return req.Method == method.OPTIONS && req.Path == "*"
 }

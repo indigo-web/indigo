@@ -5,7 +5,7 @@ import (
 	"github.com/indigo-web/indigo/http/method"
 	"github.com/indigo-web/indigo/http/status"
 	"github.com/indigo-web/indigo/internal/construct"
-	"github.com/indigo-web/indigo/internal/tcp/dummy"
+	"github.com/indigo-web/indigo/transport/dummy"
 	"github.com/stretchr/testify/require"
 	"testing"
 
@@ -55,7 +55,7 @@ func getMiddleware(mware middleware, stack *callstack) Middleware {
 }
 
 func getRequest(m method.Method, path string) *http.Request {
-	request := construct.Request(config.Default(), dummy.NewNopClient(), nil)
+	request := construct.Request(config.Default(), dummy.NewNopClient())
 	request.Method = m
 	request.Path = path
 
@@ -81,7 +81,7 @@ func TestMiddlewares(t *testing.T) {
 		Use(getMiddleware(m5, stack)).
 		Get("/world", http.Respond, getMiddleware(m7, stack))
 
-	r := raw.Initialize()
+	r := raw.Build()
 
 	t.Run("/", func(t *testing.T) {
 		request := getRequest(method.GET, "/")

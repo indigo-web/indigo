@@ -2,7 +2,7 @@ package radix
 
 import (
 	"errors"
-	"github.com/indigo-web/indigo/internal/keyvalue"
+	"github.com/indigo-web/indigo/kv"
 	"github.com/indigo-web/indigo/router/inbuilt/internal/types"
 	"strings"
 )
@@ -11,7 +11,7 @@ var ErrNotImplemented = errors.New(
 	"different dynamic segment names are not allowed for common path prefix",
 )
 
-type Params = *keyvalue.Storage
+type Params = *kv.Storage
 
 type Payload struct {
 	MethodsMap types.MethodsMap

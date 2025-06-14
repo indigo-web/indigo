@@ -3,22 +3,19 @@ package http
 import (
 	"github.com/indigo-web/indigo/config"
 	"github.com/indigo-web/indigo/http/cookie"
-	"github.com/indigo-web/indigo/http/headers"
-	"github.com/indigo-web/indigo/internal/tcp/dummy"
+	"github.com/indigo-web/indigo/kv"
+	"github.com/indigo-web/indigo/transport/dummy"
 	"github.com/stretchr/testify/require"
 	"testing"
 )
 
-func newRequest() *Request {
-	return NewRequest(
-		config.Default(), headers.New(), nil, nil, dummy.NewNopClient(),
-		nil, nil,
-	)
+func getRequest() *Request {
+	return NewRequest(config.Default(), nil, dummy.NewNopClient(), kv.New(), kv.New(), kv.New())
 }
 
 func TestCookies(t *testing.T) {
 	t.Run("no cookies", func(t *testing.T) {
-		request := newRequest()
+		request := getRequest()
 		jar, err := request.Cookies()
 		require.NoError(t, err)
 		require.Zero(t, jar.Len())
@@ -34,7 +31,7 @@ func TestCookies(t *testing.T) {
 			require.Equal(t, 3, jar.Len(), "jar must contain exactly 3 pairs")
 		}
 
-		request := newRequest()
+		request := getRequest()
 		request.Headers.Add("Cookie", "hello=world; world=hello")
 		request.Headers.Add("Cookie", "monke=funny")
 		// repeat the test twice to make sure, that calling it again won't produce
@@ -44,7 +41,7 @@ func TestCookies(t *testing.T) {
 	})
 
 	t.Run("malformed", func(t *testing.T) {
-		request := newRequest()
+		request := getRequest()
 		request.Headers.Add("Cookie", "a")
 		// repeat the test twice to make sure, that calling it again won't produce
 		// different result

@@ -9,8 +9,6 @@ import (
 	"github.com/indigo-web/indigo/router/inbuilt"
 )
 
-const addr = ":8080"
-
 func MyHandler(request *http.Request) *http.Response {
 	return request.Respond().
 		Code(status.OK).
@@ -19,14 +17,14 @@ func MyHandler(request *http.Request) *http.Response {
 }
 
 func main() {
-	myRouter := inbuilt.New()
-	myRouter.Get("/", MyHandler)
+	r := inbuilt.New().
+		Get("/", MyHandler)
 
-	app := indigo.New(addr).
-		AutoHTTPS(":8443").
+	app := indigo.New(":8080").
+		TLS(":8443", indigo.LocalCert()).
 		OnBind(func(addr string) {
 			log.Printf("running on %s\n", addr)
 		})
 
-	log.Fatal(app.Serve(myRouter))
+	log.Fatal(app.Serve(r))
 }

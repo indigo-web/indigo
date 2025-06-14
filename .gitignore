@@ -93,14 +93,10 @@ fabric.properties
 
 # Manually added local files, used for local stuff
 .DS_Store
-# yes, sometimes I even have such a files for testing local features
-# to decide which is better
-some_test.go
+
+# Hi. How are you doing?
 
 linesofcode.py
-
-basic
-
-ok/basic.go
+oldestline.sh
 
 bin/

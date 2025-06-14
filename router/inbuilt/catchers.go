@@ -2,7 +2,6 @@ package inbuilt
 
 import (
 	"fmt"
-	"github.com/indigo-web/iter"
 	"path"
 )
 
@@ -17,14 +16,11 @@ type Catcher struct {
 // is not found, and it starts with a defined prefix
 func (r *Router) Catch(prefix string, handler Handler, middlewares ...Middleware) *Router {
 	prefix = path.Join(r.prefix, prefix)
-	prefixes := iter.Map[Catcher, bool](func(el Catcher) bool {
-		return el.Prefix == prefix
-	}, iter.Slice(r.catchers))
 
-	if iter.Reduce[bool](func(prev, curr bool) bool {
-		return prev || curr
-	}, prefixes) {
-		panic(fmt.Errorf("catcher already exists: %s", prefix))
+	for _, catcher := range r.catchers {
+		if catcher.Prefix == prefix {
+			panic(fmt.Errorf("catcher already registered: %s", prefix))
+		}
 	}
 
 	r.catchers = append(r.catchers, Catcher{
