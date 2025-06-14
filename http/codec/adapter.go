@@ -1,9 +1,11 @@
 package codec
 
+import "github.com/indigo-web/indigo/http"
+
 type readerAdapter struct {
-	retriever Retriever
-	err       error
-	data      []byte
+	fetcher http.Fetcher
+	err     error
+	data    []byte
 }
 
 func (r *readerAdapter) Read(b []byte) (n int, err error) {
@@ -12,7 +14,7 @@ func (r *readerAdapter) Read(b []byte) (n int, err error) {
 			return 0, r.err
 		}
 
-		r.data, r.err = r.retriever.Retrieve()
+		r.data, r.err = r.fetcher.Fetch()
 	}
 
 	n = copy(b, r.data)
@@ -24,6 +26,6 @@ func (r *readerAdapter) Read(b []byte) (n int, err error) {
 	return n, err
 }
 
-func (r *readerAdapter) Reset(retriever Retriever) {
-	*r = readerAdapter{retriever: retriever}
+func (r *readerAdapter) Reset(fetcher http.Fetcher) {
+	*r = readerAdapter{fetcher: fetcher}
 }

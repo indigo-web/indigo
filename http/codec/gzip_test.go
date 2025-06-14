@@ -3,6 +3,8 @@ package codec
 import (
 	"bytes"
 	"fmt"
+	"github.com/indigo-web/indigo/http"
+	"github.com/indigo-web/indigo/transport/dummy"
 	"github.com/klauspost/compress/gzip"
 	"github.com/stretchr/testify/require"
 	"io"
@@ -11,18 +13,10 @@ import (
 	"testing"
 )
 
-type dummyRetriever struct {
-	content []byte
-}
-
-func (d *dummyRetriever) Retrieve() ([]byte, error) {
-	return d.content, io.EOF
-}
-
 func TestGZIP(t *testing.T) {
 	dc := NewGZIP(16)
-	require.NoError(t, dc.Reset(&dummyRetriever{gzipped("Hello, world!")}))
-	decompressed, err := retrieveAll(dc)
+	require.NoError(t, dc.Reset(dummy.NewCircularClient(gzipped("Hello, world!")).OneTime()))
+	decompressed, err := fetchAll(dc)
 	fmt.Println("err:", err, "result:", strconv.Quote(decompressed))
 }
 
@@ -40,11 +34,11 @@ func gzipped(text string) []byte {
 	return buff.Bytes()
 }
 
-func retrieveAll(source Retriever) (string, error) {
+func fetchAll(source http.Fetcher) (string, error) {
 	builder := strings.Builder{}
 
 	for {
-		data, err := source.Retrieve()
+		data, err := source.Fetch()
 		builder.Write(data)
 		switch err {
 		case nil:

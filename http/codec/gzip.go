@@ -1,6 +1,7 @@
 package codec
 
 import (
+	"github.com/indigo-web/indigo/http"
 	"github.com/klauspost/compress/gzip"
 )
 
@@ -17,12 +18,12 @@ func NewGZIP(buffsize int) *GZIP {
 	}
 }
 
-func (g *GZIP) Retrieve() ([]byte, error) {
+func (g *GZIP) Fetch() ([]byte, error) {
 	n, err := g.r.Read(g.buff)
 	return g.buff[:n], err
 }
 
-func (g *GZIP) Reset(source Retriever) error {
+func (g *GZIP) Reset(source http.Fetcher) error {
 	g.adapter.Reset(source)
 	return g.r.Reset(g.adapter)
 }
