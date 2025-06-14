@@ -1,7 +1,7 @@
-package keyvalue
+package kv
 
 import (
-	"github.com/indigo-web/utils/strcomp"
+	"github.com/indigo-web/indigo/internal/strutil"
 	"iter"
 )
 
@@ -9,9 +9,12 @@ type Pair struct {
 	Key, Value string
 }
 
-// Storage is a generic structure for storing pairs of string-string. It is used across
-// the whole database. For example, it is primarily used for request headers, however
-// used as well as a storage for URI query, dynamic routing parameters, etc.
+// TODO: add `deleted` attribute to pairs, so by that we can delete and update already existing
+// TODO: entries
+
+// Storage is an associative structure for storing (string, string) pairs. It acts as a map but
+// uses linear search instead, which proves to be more efficient on relatively low amount of
+// entries, which often enough is the case.
 type Storage struct {
 	pairs      []Pair
 	uniqueBuff []string
@@ -22,8 +25,8 @@ func New() *Storage {
 	return new(Storage)
 }
 
-// NewPreAlloc returns an instance of Storage with pre-allocated underlying storage.
-func NewPreAlloc(n int) *Storage {
+// NewPrealloc returns an instance of Storage with pre-allocated underlying storage.
+func NewPrealloc(n int) *Storage {
 	return &Storage{
 		pairs: make([]Pair, 0, n),
 	}
@@ -37,7 +40,7 @@ func NewFromMap(m map[string][]string) *Storage {
 	// count amount of _values_, only _keys_, where each key may contain more  (or less)
 	// than 1 value. But this doesn't actually matter, as this job is made just once
 	// per client, so considered not to be a hot path
-	kv := NewPreAlloc(len(m))
+	kv := NewPrealloc(len(m))
 
 	for key, values := range m {
 		for _, value := range values {
@@ -77,7 +80,7 @@ func (s *Storage) ValueOr(key, or string) string {
 // be an empty string.
 func (s *Storage) Get(key string) (value string, found bool) {
 	for _, pair := range s.pairs {
-		if strcomp.EqualFold(key, pair.Key) {
+		if strutil.CmpFold(key, pair.Key) {
 			return pair.Value, true
 		}
 	}
@@ -93,7 +96,7 @@ func (s *Storage) Values(key string) (values []string) {
 	s.valuesBuff = s.valuesBuff[:0]
 
 	for _, pair := range s.pairs {
-		if strcomp.EqualFold(pair.Key, key) {
+		if strutil.CmpFold(pair.Key, key) {
 			s.valuesBuff = append(s.valuesBuff, pair.Value)
 		}
 	}
@@ -139,7 +142,7 @@ func (s *Storage) Iter() iter.Seq2[string, string] {
 // Has indicates, whether there's an entry of the key.
 func (s *Storage) Has(key string) bool {
 	for _, pair := range s.pairs {
-		if strcomp.EqualFold(key, pair.Key) {
+		if strutil.CmpFold(key, pair.Key) {
 			return true
 		}
 	}
@@ -187,7 +190,7 @@ func (s *Storage) ensureNotNil(buff []string) []string {
 
 func contains(collection []string, key string) bool {
 	for _, element := range collection {
-		if strcomp.EqualFold(element, key) {
+		if strutil.CmpFold(element, key) {
 			return true
 		}
 	}
