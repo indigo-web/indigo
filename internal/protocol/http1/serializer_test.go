@@ -3,7 +3,6 @@ package http1
 import (
 	"bufio"
 	"bytes"
-	"github.com/indigo-web/chunkedbody"
 	"github.com/indigo-web/indigo/config"
 	"github.com/indigo-web/indigo/http"
 	"github.com/indigo-web/indigo/http/cookie"
@@ -26,7 +25,162 @@ func getSerializer(defaultHeaders map[string]string, request *http.Request, writ
 }
 
 func newRequest() *http.Request {
-	return construct.Request(config.Default(), dummy.NewNopClient(), nil)
+	return construct.Request(config.Default(), dummy.NewNopClient())
+}
+
+type NopClientWriter struct{}
+
+func (n NopClientWriter) Write(p []byte) (int, error) {
+	return len(p), nil
+}
+
+func BenchmarkSerializer(b *testing.B) {
+	defaultHeadersSmall := map[string]string{
+		"Server": "indigo",
+	}
+	defaultHeadersMedium := map[string]string{
+		"Server":           "indigo",
+		"Connection":       "keep-alive",
+		"Accept-Encodings": "identity",
+	}
+	defaultHeadersBig := map[string]string{
+		"Server":           "indigo",
+		"Connection":       "keep-alive",
+		"Accept-Encodings": "identity",
+		"Easter":           "Egg",
+		"Many":             "choices, variants, ways, solutions",
+		"Something":        "is not happening",
+		"Talking":          "allowed",
+		"Lorem":            "ipsum, doremi",
+	}
+
+	response := http.NewResponse()
+	request := construct.Request(config.Default(), dummy.NewNopClient())
+	client := NopClientWriter{}
+
+	b.Run("no body no def headers", func(b *testing.B) {
+		buff := make([]byte, 0, 1024)
+		s := newSerializer(buff, 128, nil, request, client)
+		size, err := estimateResponseSize(request, response, nil)
+		require.NoError(b, err)
+		b.SetBytes(size)
+		b.ReportAllocs()
+		b.ResetTimer()
+
+		for i := 0; i < b.N; i++ {
+			_ = s.Write(request.Protocol, response)
+		}
+	})
+
+	b.Run("with 4kb body", func(b *testing.B) {
+		response := http.NewResponse().String(strings.Repeat("a", 4096))
+		buff := make([]byte, 0, 8192)
+		serializer := newSerializer(buff, 128, nil, request, client)
+		respSize, err := estimateResponseSize(request, response, nil)
+		require.NoError(b, err)
+		b.SetBytes(respSize)
+		b.ReportAllocs()
+		b.ResetTimer()
+
+		for i := 0; i < b.N; i++ {
+			_ = serializer.Write(request.Protocol, response)
+		}
+	})
+
+	b.Run("no body 1 def header", func(b *testing.B) {
+		buff := make([]byte, 0, 1024)
+		serializer := newSerializer(buff, 128, defaultHeadersSmall, request, client)
+		respSize, err := estimateResponseSize(request, response, defaultHeadersSmall)
+		require.NoError(b, err)
+		b.SetBytes(respSize)
+		b.ReportAllocs()
+		b.ResetTimer()
+
+		for i := 0; i < b.N; i++ {
+			_ = serializer.Write(request.Protocol, response)
+		}
+	})
+
+	b.Run("no body 3 def headers", func(b *testing.B) {
+		buff := make([]byte, 0, 1024)
+		serializer := newSerializer(buff, 128, defaultHeadersMedium, request, client)
+		respSize, err := estimateResponseSize(request, response, defaultHeadersMedium)
+		require.NoError(b, err)
+		b.SetBytes(respSize)
+		b.ReportAllocs()
+		b.ResetTimer()
+
+		for i := 0; i < b.N; i++ {
+			_ = serializer.Write(request.Protocol, response)
+		}
+	})
+
+	b.Run("no body 8 def headers", func(b *testing.B) {
+		buff := make([]byte, 0, 1024)
+		serializer := newSerializer(buff, 128, defaultHeadersBig, request, client)
+		respSize, err := estimateResponseSize(request, response, defaultHeadersBig)
+		require.NoError(b, err)
+		b.SetBytes(respSize)
+		b.ReportAllocs()
+		b.ResetTimer()
+
+		for i := 0; i < b.N; i++ {
+			_ = serializer.Write(request.Protocol, response)
+		}
+	})
+
+	b.Run("no body 15 headers", func(b *testing.B) {
+		buff := make([]byte, 0, 1024)
+		request := construct.Request(config.Default(), dummy.NewNopClient())
+		request.Headers = GenerateHeaders(15)
+		serializer := newSerializer(buff, 128, nil, request, client)
+		size, err := estimateResponseSize(request, response, nil)
+		require.NoError(b, err)
+		b.SetBytes(size)
+		b.ReportAllocs()
+		b.ResetTimer()
+
+		for i := 0; i < b.N; i++ {
+			_ = serializer.Write(request.Protocol, response)
+		}
+	})
+
+	b.Run("pre-write", func(b *testing.B) {
+		preResp := http.NewResponse().Code(status.SwitchingProtocols)
+		buff := make([]byte, 0, 128)
+		serializer := newSerializer(buff, 128, nil, request, client)
+		respSize, err := estimatePreWriteSize(request, preResp, response)
+		require.NoError(b, err)
+		b.SetBytes(respSize)
+		b.ReportAllocs()
+		b.ResetTimer()
+
+		for i := 0; i < b.N; i++ {
+			serializer.PreWrite(request.Protocol, preResp)
+			_ = serializer.Write(request.Protocol, response)
+		}
+	})
+
+	// TODO: add benchmarking chunked body
+}
+
+func estimateResponseSize(req *http.Request, resp *http.Response, defHeaders map[string]string) (int64, error) {
+	writer := dummy.NewSinkholeWriter()
+	serializer := newSerializer(nil, 128, defHeaders, req, writer)
+	err := serializer.Write(req.Protocol, resp)
+
+	return int64(len(writer.Data)), err
+}
+
+func estimatePreWriteSize(
+	req *http.Request, preWrite, resp *http.Response,
+) (int64, error) {
+	writer := dummy.NewSinkholeWriter()
+	serializer := newSerializer(nil, 128, nil, req, writer)
+	serializer.PreWrite(req.Protocol, preWrite)
+	err := serializer.Write(req.Protocol, resp)
+
+	return int64(len(writer.Data)), err
 }
 
 func TestSerializer_Write(t *testing.T) {
@@ -236,7 +390,7 @@ func TestSerializer_PreWrite(t *testing.T) {
 			"Hello": "world",
 		}
 		request := newRequest()
-		request.Proto = proto.HTTP10
+		request.Protocol = proto.HTTP10
 		request.Upgrade = proto.HTTP11
 		preResponse := http.NewResponse().
 			Code(status.SwitchingProtocols).
@@ -244,7 +398,7 @@ func TestSerializer_PreWrite(t *testing.T) {
 			Header("Upgrade", "HTTP/1.1")
 		writer := dummy.NewSinkholeWriter()
 		serializer := getSerializer(defHeaders, request, writer)
-		serializer.PreWrite(request.Proto, preResponse)
+		serializer.PreWrite(request.Protocol, preResponse)
 
 		require.NoError(t, serializer.Write(proto.HTTP11, http.NewResponse()))
 
@@ -290,30 +444,19 @@ func TestSerializer_ChunkedTransfer(t *testing.T) {
 
 	t.Run("long chunk into small buffer", func(t *testing.T) {
 		const buffSize = 64
-		parser := chunkedbody.NewParser(chunkedbody.DefaultSettings())
+		p := newChunkedParser()
 		payload := strings.Repeat("abcdefgh", 10*buffSize)
 		reader := bytes.NewBuffer([]byte(payload))
 		writer := dummy.NewSinkholeWriter()
 		cfg := config.Default()
-		req := construct.Request(cfg, dummy.NewNopClient(), NewBody(nil, nil, cfg.Body))
-		serializer := getSerializer(nil, req, writer)
-		serializer.fileBuff = make([]byte, buffSize)
+		req := construct.Request(cfg, dummy.NewNopClient())
+		s := getSerializer(nil, req, writer)
+		s.fileBuff = make([]byte, buffSize)
 
-		require.NoError(t, serializer.writeChunkedBody(reader, writer))
-
-		var data []byte
-		for len(writer.Data) > 0 {
-			chunk, extra, err := parser.Parse(writer.Data, false)
-			if err != nil {
-				require.EqualError(t, err, io.EOF.Error())
-				break
-			}
-
-			require.NoError(t, err)
-			data = append(data, chunk...)
-			writer.Data = extra
-		}
-
-		require.Equal(t, payload, string(data))
+		require.NoError(t, s.writeChunkedBody(reader, writer))
+		out, extra, err := feed(&p, writer.Data)
+		require.NoError(t, err)
+		require.Empty(t, extra)
+		require.Equal(t, payload, string(out))
 	})
 }

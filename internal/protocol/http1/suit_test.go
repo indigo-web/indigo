@@ -1,18 +1,24 @@
 package http1
 
 import (
+	"fmt"
 	"github.com/indigo-web/indigo/config"
 	"github.com/indigo-web/indigo/http"
-	"github.com/indigo-web/indigo/http/headers"
-	"github.com/indigo-web/indigo/internal/requestgen"
+	"github.com/indigo-web/indigo/internal/codecutil"
+	"github.com/indigo-web/indigo/internal/construct"
+	"github.com/indigo-web/indigo/kv"
+	"github.com/indigo-web/indigo/router"
+	"github.com/indigo-web/indigo/router/inbuilt"
 	"github.com/indigo-web/indigo/router/simple"
+	"github.com/indigo-web/indigo/transport"
 	"github.com/indigo-web/indigo/transport/dummy"
 	"github.com/stretchr/testify/require"
+	"strconv"
 	"strings"
 	"testing"
 )
 
-func newSimpleRouter(t *testing.T, want headers.Headers) *simple.Router {
+func newSimpleRouter(t *testing.T, want http.Headers) *simple.Router {
 	return simple.New(func(request *http.Request) *http.Response {
 		require.True(t, compareHeaders(want, request.Headers))
 		return http.Respond(request)
@@ -28,8 +34,8 @@ func TestServer(t *testing.T) {
 	t.Run("simple get", func(t *testing.T) {
 		raw := []byte("GET / HTTP/1.1\r\nAccept-Encoding: identity\r\n\r\n")
 		client := dummy.NewCircularClient(raw)
-		server, _ := newSuit(client)
-		wantHeaders := headers.New().Add("Accept-Encoding", "identity")
+		server, _ := getSuit(client)
+		wantHeaders := kv.New().Add("Accept-Encoding", "identity")
 		server.router = newSimpleRouter(t, wantHeaders)
 
 		for i := 0; i < N; i++ {
@@ -38,11 +44,11 @@ func TestServer(t *testing.T) {
 	})
 
 	t.Run("5 headers", func(t *testing.T) {
-		wantHeaders := requestgen.Headers(5)
-		raw := requestgen.Generate(longPath, wantHeaders)
+		wantHeaders := GenerateHeaders(5)
+		raw := GenerateRequest(longPath, wantHeaders)
 		dispersed := disperse(raw, config.Default().NET.ReadBufferSize)
 		client := dummy.NewCircularClient(dispersed...)
-		server, _ := newSuit(client)
+		server, _ := getSuit(client)
 		server.router = newSimpleRouter(t, wantHeaders)
 
 		for i := 0; i < N; i++ {
@@ -51,11 +57,11 @@ func TestServer(t *testing.T) {
 	})
 
 	t.Run("10 headers", func(t *testing.T) {
-		wantHeaders := requestgen.Headers(10)
-		raw := requestgen.Generate(longPath, wantHeaders)
+		wantHeaders := GenerateHeaders(10)
+		raw := GenerateRequest(longPath, wantHeaders)
 		dispersed := disperse(raw, config.Default().NET.ReadBufferSize)
 		client := dummy.NewCircularClient(dispersed...)
-		server, _ := newSuit(client)
+		server, _ := getSuit(client)
 		server.router = newSimpleRouter(t, wantHeaders)
 
 		for i := 0; i < N; i++ {
@@ -64,11 +70,11 @@ func TestServer(t *testing.T) {
 	})
 
 	t.Run("50 headers", func(t *testing.T) {
-		wantHeaders := requestgen.Headers(50)
-		raw := requestgen.Generate(longPath, wantHeaders)
+		wantHeaders := GenerateHeaders(50)
+		raw := GenerateRequest(longPath, wantHeaders)
 		dispersed := disperse(raw, config.Default().NET.ReadBufferSize)
 		client := dummy.NewCircularClient(dispersed...)
-		server, _ := newSuit(client)
+		server, _ := getSuit(client)
 		server.router = newSimpleRouter(t, wantHeaders)
 
 		for i := 0; i < N; i++ {
@@ -79,11 +85,11 @@ func TestServer(t *testing.T) {
 	})
 
 	t.Run("heavily escaped", func(t *testing.T) {
-		wantHeaders := requestgen.Headers(20)
-		raw := requestgen.Generate(strings.Repeat("%20", 500), wantHeaders)
+		wantHeaders := GenerateHeaders(20)
+		raw := GenerateRequest(strings.Repeat("%20", 500), wantHeaders)
 		dispersed := disperse(raw, config.Default().NET.ReadBufferSize)
 		client := dummy.NewCircularClient(dispersed...)
-		server, _ := newSuit(client)
+		server, _ := getSuit(client)
 		server.router = newSimpleRouter(t, wantHeaders)
 
 		for i := 0; i < N; i++ {
@@ -100,7 +106,7 @@ func TestPOST(t *testing.T) {
 	t.Run("POST hello world", func(t *testing.T) {
 		raw := []byte("POST / HTTP/1.1\r\nContent-Length: 13\r\n\r\nHello, world!")
 		client := dummy.NewCircularClient(disperse(raw, config.Default().NET.ReadBufferSize)...)
-		server, _ := newSuit(client)
+		server, _ := getSuit(client)
 
 		for i := 0; i < N; i++ {
 			require.True(t, server.ServeOnce())
@@ -112,7 +118,7 @@ func TestPOST(t *testing.T) {
 		raw := []byte("POST / HTTP/1.1\r\nContent-Length: 10000000\r\n\r\n" + body)
 		dispersed := disperse(raw, config.Default().NET.ReadBufferSize)
 		client := dummy.NewCircularClient(dispersed...)
-		server, _ := newSuit(client)
+		server, _ := getSuit(client)
 
 		for i := 0; i < N; i++ {
 			for j := 0; j < len(dispersed); j++ {
@@ -129,17 +135,17 @@ func TestPOST(t *testing.T) {
 		raw := []byte("POST / HTTP/1.1\r\nTransfer-Encoding: chunked\r\n\r\n" + chunked)
 		dispersed := disperse(raw, config.Default().NET.ReadBufferSize)
 		client := dummy.NewCircularClient(dispersed...)
-		server, _ := newSuit(client)
+		server, _ := getSuit(client)
 
 		for i := 0; i < N; i++ {
 			for j := 0; j < len(dispersed); j++ {
-				require.True(t, server.ServeOnce())
+				require.True(t, server.ServeOnce(), fmt.Sprintf("%d:%d", i, j))
 			}
 		}
 	})
 }
 
-func compareHeaders(a, b headers.Headers) bool {
+func compareHeaders(a, b http.Headers) bool {
 	first, second := a.Expose(), b.Expose()
 	if len(first) != len(second) {
 		return false
