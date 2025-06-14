@@ -35,29 +35,19 @@ type (
 		DefaultContentType mime.MIME
 	}
 
-	URLBufferSize struct {
+	URIRequestLineSize struct {
 		Default, Maximal int
-	}
-
-	Query struct {
-		// ParamsPrealloc sets the initial capacity of Params (aka keyvalue.Storage) storage.
-		ParamsPrealloc int
-		// BufferPrealloc sets the initial capacity of decoding buffer for queries. It is used
-		// to store decoded keys and values, as they are a subject of urlencoding, too.
-		BufferPrealloc int
-		// DefaultFlagValue sets the default value for all the flags. A flag is a query key without
-		// a value (can either be set empty or absent at all.) It is prohibited by HTTP RFC, however
-		// is used in the wild web. Unfortunate that there's a need to tolerate in general.
-		DefaultFlagValue string
 	}
 )
 
 type (
-	URL struct {
-		// BufferSize is a size for buffer that'll be allocated once and will be kept
-		// until client disconnect
-		BufferSize URLBufferSize
-		Query      Query
+	URI struct {
+		// RequestLineSize is a shared buffer storing path and parameters. Also used to store method and
+		// protocol in a form of an intermediate storage when they must be saved among calls. Please note
+		// that setting the maximal boundary too low might result in very ambiguous errors.
+		RequestLineSize URIRequestLineSize
+		// ParamsPrealloc for http.Request.Params field.
+		ParamsPrealloc int
 	}
 
 	Headers struct {
@@ -83,22 +73,20 @@ type (
 		// in a single request.
 		MaxEncodingTokens int
 		// Default headers are those, which will be rendered on each response unless overridden explicitly.
-		Default map[string]string
-		// CookiesPrealloc defines the initial keyvalue.Storage capacity, used to store the cookies
+		Default map[string]string `test:"nullable"`
+		// CookiesPrealloc defines the initial kv.Storage capacity, used to store the cookies
 		// itself.
 		CookiesPrealloc int
 	}
 
 	Body struct {
 		// MaxSize describes the maximal size of a body, that can be processed. 0 will discard
-		// any request with body (each call to request's body will result in status.ErrBodyTooLarge)
-		MaxSize uint
-		// MaxChunkSize is responsible for a maximal size of a single chunk being transferred
-		// via chunked TE
-		MaxChunkSize int
-		// DecodingBufferSize is a size of a buffer, used to store decoded request's body
-		DecodingBufferSize int
-		Form               BodyForm
+		// any request with body (each call to request's body will result in status.ErrBodyTooLarge).
+		// In order to disable the setting, use the math.MaxUInt64 value.
+		MaxSize uint64
+		//// DecodingBufferSize is a size of a buffer, used to store decoded request's body
+		//DecodingBufferSize int
+		Form BodyForm
 	}
 
 	HTTP struct {
@@ -107,7 +95,6 @@ type (
 		ResponseBuffSize int
 		// FileBuffSize defines the size of the read buffer when reading a file
 		FileBuffSize int
-		//Codecs       []codec.Codec
 	}
 
 	NET struct {
@@ -129,7 +116,7 @@ type (
 // Please note: ALWAYS modify defaults (returned via Default()) and NEVER try to initialize the
 // config manually, as this will result in highly ambiguous errors.
 type Config struct {
-	URL     URL
+	URI     URI
 	Headers Headers
 	Body    Body
 	HTTP    HTTP
@@ -140,21 +127,14 @@ type Config struct {
 // are pretty permitting.
 func Default() *Config {
 	return &Config{
-		URL: URL{
-			BufferSize: URLBufferSize{
-				// allocate 2kb buffer by default for storing URI (including query and protocol)
+		URI: URI{
+			RequestLineSize: URIRequestLineSize{
 				Default: 2 * 1024,
-				// allow at most 16kb of URI, including query and protocol. The limit is pretty much
-				// tolerant, as most web entities are limiting it to 4-8kb.
-				Maximal: 16 * 1024,
+				// allow at most 32kb. This limit is pretty much tolerant as most web entities
+				// are limiting it to 4-8kb, however we do also store path parameters here.
+				Maximal: 32 * 1024,
 			},
-			Query: Query{
-				ParamsPrealloc: 10,
-				// considering queries are generally not that huge, this must be fairly enough
-				// on average.
-				BufferPrealloc:   256,
-				DefaultFlagValue: "1",
-			},
+			ParamsPrealloc: 5,
 		},
 		Headers: Headers{
 			Number: HeadersNumber{
@@ -180,11 +160,7 @@ func Default() *Config {
 			CookiesPrealloc:   5,
 		},
 		Body: Body{
-			MaxSize:      512 * 1024 * 1024, // 512 megabytes
-			MaxChunkSize: 128 * 1024,        // 128 kilobytes
-			// 8 kilobytes is by default twice more than NETs read buffer, so must
-			// be enough to avoid multiple reads per single NET chunk
-			DecodingBufferSize: 8 * 1024,
+			MaxSize: 512 * 1024 * 1024, // 512 megabytes
 			Form: BodyForm{
 				EntriesPrealloc: 8,
 				// 1kb is intended for primarily x-www-form-urlencoded, as multipart
