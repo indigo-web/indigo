@@ -7,7 +7,7 @@ import (
 
 type Client interface {
 	Read() ([]byte, error)
-	Unread([]byte)
+	Pushback([]byte)
 	Write([]byte) (int, error)
 	Conn() net.Conn
 	Remote() net.Addr
@@ -29,9 +29,8 @@ func NewClient(conn net.Conn, timeout time.Duration, buff []byte) Client {
 	}
 }
 
-// Read returns a byte-slice containing data read from the connection. Each calls
-// return the same slice with different content, so each call basically overrides
-// result of the previous one
+// Read reads data into the internal buffer and returns a piece of it back. Timeouts are also
+// handled automatically.
 func (c *client) Read() ([]byte, error) {
 	if len(c.pending) > 0 {
 		pending := c.pending
@@ -48,33 +47,32 @@ func (c *client) Read() ([]byte, error) {
 	return c.buff[:n], err
 }
 
-// Pending returns stored pending data
+// Pending returns data (if any) preserved via Pushback.
 func (c *client) Pending() []byte {
 	return c.pending
 }
 
-// Unread stores passed data into the pending buffer. Previous content will
-// be lost
-func (c *client) Unread(b []byte) {
+// Pushback preserves a chunk of data from previous read for the next read.
+func (c *client) Pushback(b []byte) {
 	c.pending = b
 }
 
-// Conn returns the actual connection object
+// Conn unwraps the underlying net.Conn.
 func (c *client) Conn() net.Conn {
 	return c.conn
 }
 
-// Write writes data into the underlying connection
+// Write writes data into the underlying connection.
 func (c *client) Write(b []byte) (int, error) {
 	return c.conn.Write(b)
 }
 
-// Remote returns the remote address of the connection
+// Remote returns the remote address of the connection.
 func (c *client) Remote() net.Addr {
 	return c.conn.RemoteAddr()
 }
 
-// Close closes the connection
+// Close closes the connection.
 func (c *client) Close() error {
 	return c.conn.Close()
 }
