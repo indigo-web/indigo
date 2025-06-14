@@ -6,28 +6,30 @@ import (
 	"crypto/tls"
 	"encoding/json"
 	"fmt"
+	"github.com/indigo-web/indigo/config"
+	"github.com/indigo-web/indigo/http"
 	"github.com/indigo-web/indigo/http/cookie"
-	"github.com/indigo-web/indigo/http/headers"
 	"github.com/indigo-web/indigo/http/method"
 	"github.com/indigo-web/indigo/http/mime"
+	"github.com/indigo-web/indigo/http/proto"
 	"github.com/indigo-web/indigo/http/status"
-	"github.com/indigo-web/indigo/internal/httptest"
+	"github.com/indigo-web/indigo/internal/testutil"
+	"github.com/indigo-web/indigo/kv"
+	"github.com/indigo-web/indigo/router/inbuilt"
 	"github.com/indigo-web/indigo/router/inbuilt/middleware"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"io"
+	"iter"
 	"net"
 	stdhttp "net/http"
 	"net/url"
 	"os"
+	"slices"
 	"strconv"
 	"strings"
 	"testing"
 	"time"
-
-	"github.com/indigo-web/indigo/config"
-	"github.com/indigo-web/indigo/http"
-	"github.com/indigo-web/indigo/router/inbuilt"
 )
 
 const (
@@ -37,15 +39,15 @@ const (
 	appURL    = "http://" + addr
 )
 
-func getHeaders() headers.Headers {
-	return headers.New().
+func getHeaders() http.Headers {
+	return kv.New().
 		Add("Host", "localhost:16100").
 		Add("User-Agent", "Go-http-client/1.1").
 		Add("Accept-Encoding", "gzip")
 }
 
 func respond(request *http.Request) *http.Response {
-	str, err := httptest.Dump(request)
+	str, err := testutil.SerializeRequest(request)
 	if err != nil {
 		return http.Error(request, err)
 	}
@@ -78,15 +80,10 @@ func getInbuiltRouter() *inbuilt.Router {
 	})
 
 	r.Get("/query", func(request *http.Request) *http.Response {
-		params, err := request.Query.Cook()
-		if err != nil {
-			return http.Error(request, err)
-		}
-
 		var buff []byte
 
-		for _, pair := range params.Expose() {
-			buff = append(buff, pair.Key+":"+pair.Value+"."...)
+		for key, value := range request.Params.Iter() {
+			buff = append(buff, key+":"+value+"."...)
 		}
 
 		return http.Bytes(request, buff)
@@ -153,7 +150,7 @@ func getInbuiltRouter() *inbuilt.Router {
 	return r
 }
 
-func headersToMap(hdrs headers.Headers, keys []string) map[string]string {
+func headersToMap(hdrs http.Headers, keys []string) map[string]string {
 	m := make(map[string]string, len(keys))
 
 	for _, key := range keys {
@@ -197,19 +194,19 @@ func TestFirstPhase(t *testing.T) {
 			_ = resp.Body.Close()
 		}()
 		require.Equal(t, stdhttp.StatusOK, resp.StatusCode)
-		repr, err := parseBody(resp)
+		body, err := io.ReadAll(resp.Body)
+		require.NoError(t, resp.Body.Close())
+		request, err := testutil.ParseRequest(string(body))
 		require.NoError(t, err)
 
-		for _, err := range httptest.Compare(repr, httptest.Request{
-			Method: method.GET,
-			Path:   "/",
-			Proto:  "HTTP/1.1",
-			Headers: getHeaders().
-				Add("Content-Length", "0"),
-			Body: "",
-		}) {
-			assert.NoError(t, err)
+		require.Equal(t, method.GET, request.Method)
+		require.Equal(t, "/", request.Path)
+		require.Equal(t, proto.HTTP11, request.Protocol)
+		wantHeaders := getHeaders().Add("Content-Length", "0")
+		for err = range compareHeaders(request.Headers, wantHeaders) {
+			assert.Fail(t, err.Error())
 		}
+		require.Empty(t, request.Body)
 	})
 
 	t.Run("root get with body", func(t *testing.T) {
@@ -221,19 +218,20 @@ func TestFirstPhase(t *testing.T) {
 			_ = resp.Body.Close()
 		}()
 		require.Equal(t, stdhttp.StatusOK, resp.StatusCode)
-		repr, err := parseBody(resp)
+
+		body, err := io.ReadAll(resp.Body)
+		require.NoError(t, resp.Body.Close())
+		request, err := testutil.ParseRequest(string(body))
 		require.NoError(t, err)
 
-		for _, err := range httptest.Compare(repr, httptest.Request{
-			Method: method.GET,
-			Path:   "/",
-			Proto:  "HTTP/1.1",
-			Headers: getHeaders().
-				Add("Content-Length", "13"),
-			Body: "Hello, world!",
-		}) {
-			assert.NoError(t, err)
+		require.Equal(t, method.GET, request.Method)
+		require.Equal(t, "/", request.Path)
+		require.Equal(t, proto.HTTP11, request.Protocol)
+		wantHeaders := getHeaders().Add("Content-Length", "13")
+		for err = range compareHeaders(request.Headers, wantHeaders) {
+			assert.Fail(t, err.Error())
 		}
+		require.Equal(t, "Hello, world!", request.Body)
 	})
 
 	t.Run("root post", func(t *testing.T) {
@@ -244,20 +242,22 @@ func TestFirstPhase(t *testing.T) {
 			_ = resp.Body.Close()
 		}()
 		require.Equal(t, stdhttp.StatusOK, resp.StatusCode)
-		repr, err := parseBody(resp)
+
+		body, err := io.ReadAll(resp.Body)
+		require.NoError(t, resp.Body.Close())
+		request, err := testutil.ParseRequest(string(body))
 		require.NoError(t, err)
 
-		for _, err := range httptest.Compare(repr, httptest.Request{
-			Method: method.POST,
-			Path:   "/",
-			Proto:  "HTTP/1.1",
-			Headers: getHeaders().
-				Add("Content-Length", "13").
-				Add("Content-Type", "text/html"),
-			Body: "Hello, world!",
-		}) {
-			assert.NoError(t, err)
+		require.Equal(t, method.POST, request.Method)
+		require.Equal(t, "/", request.Path)
+		require.Equal(t, proto.HTTP11, request.Protocol)
+		wantHeaders := getHeaders().
+			Add("Content-Type", "text/html").
+			Add("Content-Length", "13")
+		for err = range compareHeaders(request.Headers, wantHeaders) {
+			assert.Fail(t, err.Error())
 		}
+		require.Equal(t, "Hello, world!", request.Body)
 	})
 
 	t.Run("body reader", func(t *testing.T) {
@@ -319,20 +319,22 @@ func TestFirstPhase(t *testing.T) {
 			_ = resp.Body.Close()
 		}()
 		require.Equal(t, stdhttp.StatusOK, resp.StatusCode)
-		repr, err := parseBody(resp)
+
+		body, err := io.ReadAll(resp.Body)
+		require.NoError(t, resp.Body.Close())
+		request, err := testutil.ParseRequest(string(body))
 		require.NoError(t, err)
 
-		for _, err := range httptest.Compare(repr, httptest.Request{
-			Method: method.POST,
-			Path:   "/",
-			Proto:  "HTTP/1.1",
-			Headers: getHeaders().
-				Add("Content-Length", "13").
-				Add("Content-Type", "text/html"),
-			Body: "Hello, world!",
-		}) {
-			assert.NoError(t, err)
+		require.Equal(t, method.POST, request.Method)
+		require.Equal(t, "/", request.Path)
+		require.Equal(t, proto.HTTP11, request.Protocol)
+		wantHeaders := getHeaders().
+			Add("Content-Type", "text/html").
+			Add("Content-Length", "13")
+		for err = range compareHeaders(request.Headers, wantHeaders) {
+			assert.Fail(t, err.Error())
 		}
+		require.Equal(t, "Hello, world!", request.Body)
 	})
 
 	t.Run("hijacking", func(t *testing.T) {
@@ -446,7 +448,9 @@ func TestFirstPhase(t *testing.T) {
 	t.Run("idle disconnect", func(t *testing.T) {
 		conn, err := net.Dial("tcp", addr)
 		require.NoError(t, err)
-		defer conn.Close()
+		defer func() {
+			require.NoError(t, conn.Close())
+		}()
 
 		response, err := io.ReadAll(conn)
 		require.NoError(t, err)
@@ -526,7 +530,9 @@ func TestFirstPhase(t *testing.T) {
 		raw := "GET /ctx-value HTTP/1.0\r\n\r\n"
 		conn, err := net.Dial("tcp", addr)
 		require.NoError(t, err)
-		defer conn.Close()
+		defer func() {
+			require.NoError(t, conn.Close())
+		}()
 		_, err = conn.Write([]byte(raw))
 		require.NoError(t, err)
 		require.NoError(t, conn.SetReadDeadline(time.Now().Add(time.Second)))
@@ -540,7 +546,9 @@ func TestFirstPhase(t *testing.T) {
 		requests := strings.Repeat(raw, pipelinedRequests)
 		conn, err := net.Dial("tcp", addr)
 		require.NoError(t, err)
-		defer conn.Close()
+		defer func() {
+			require.NoError(t, conn.Close())
+		}()
 		_, err = conn.Write([]byte(requests))
 		require.NoError(t, err)
 		require.NoError(t, conn.SetReadDeadline(time.Now().Add(time.Second)))
@@ -637,16 +645,28 @@ func TestFirstPhase(t *testing.T) {
 	})
 
 	t.Run("chunked body", func(t *testing.T) {
-		request := "POST /body-reader HTTP/1.1\r\n" +
-			"Connection: close\r\n" +
-			"Transfer-Encoding: chunked\r\n" +
-			"\r\n" +
-			"7\r\nMozilla\r\n1\r\n \r\n11\r\nDeveloper Network\r\n0\r\n\r\n"
-		resp, err := send(addr, []byte(request))
+		request := &stdhttp.Request{
+			Method: stdhttp.MethodPost,
+			URL: &url.URL{
+				Scheme: "http",
+				Host:   addr,
+				Path:   "/body-reader",
+			},
+			Proto:            "HTTP/1.1",
+			ProtoMajor:       1,
+			ProtoMinor:       1,
+			TransferEncoding: []string{"chunked"},
+			Host:             addr,
+			RemoteAddr:       addr,
+			Body:             newCircularReader("Mozilla", " ", "Developer Network"),
+			//Body:             io.NopCloser(strings.NewReader("7\r\nMozilla\r\n1\r\n \r\n11\r\nDeveloper Network\r\n0\r\n\r\n")),
+		}
+		resp, err := stdhttp.DefaultClient.Do(request)
 		require.NoError(t, err)
-		repr, err := httptest.Parse(string(resp))
+		body, err := io.ReadAll(resp.Body)
 		require.NoError(t, err)
-		require.Equal(t, "Mozilla Developer Network", repr.Body)
+		require.NoError(t, resp.Body.Close())
+		require.Equal(t, "Mozilla Developer Network", string(body))
 	})
 
 	t.Run("forced stop", func(t *testing.T) {
@@ -682,7 +702,9 @@ func TestSecondPhase(t *testing.T) {
 	t.Run("idle disconnect", func(t *testing.T) {
 		conn, err := net.Dial("tcp4", addr)
 		require.NoError(t, err)
-		defer conn.Close()
+		defer func() {
+			require.NoError(t, conn.Close())
+		}()
 
 		connectionClosed := make(chan struct{})
 		go func() {
@@ -764,28 +786,43 @@ func sendSimpleRequest(addr, path string) (net.Conn, error) {
 	return conn, err
 }
 
-func send(addr string, req []byte) ([]byte, error) {
-	conn, err := net.Dial("tcp", addr)
-	defer conn.Close()
-	if err != nil {
-		return nil, err
-	}
+func compareHeaders(a, b http.Headers) iter.Seq[error] {
+	return func(yield func(error) bool) {
+		for _, key := range a.Keys() {
+			if slices.Compare(a.Values(key), b.Values(key)) != 0 {
+				if !yield(fmt.Errorf("%s: mismatching values", key)) {
+					return
+				}
 
-	_, err = conn.Write(req)
-	if err != nil {
-		return nil, err
+				break
+			}
+		}
 	}
-
-	return io.ReadAll(conn)
 }
 
-func parseBody(resp *stdhttp.Response) (httptest.Request, error) {
-	body, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return httptest.Request{}, err
+type circularReader struct {
+	data []string
+	ptr  int
+}
+
+func newCircularReader(data ...string) *circularReader {
+	return &circularReader{data: data}
+}
+
+func (c *circularReader) Read(b []byte) (int, error) {
+	if c.ptr >= len(c.data) {
+		return 0, io.EOF
 	}
 
-	return httptest.Parse(string(body))
+	// b is assumed to be big enough
+	n := copy(b, c.data[c.ptr])
+	c.ptr++
+
+	return n, nil
+}
+
+func (c *circularReader) Close() error {
+	return nil
 }
 
 func contains(strs []string, substr string) bool {

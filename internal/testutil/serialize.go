@@ -1,30 +1,22 @@
-package httptest
+package testutil
 
 import (
 	"github.com/indigo-web/indigo/http"
-	"github.com/indigo-web/indigo/http/headers"
 	"strconv"
 )
 
-func Dump(request *http.Request) (string, error) {
+func SerializeRequest(request *http.Request) (string, error) {
 	var buff []byte
 
 	buff = append(buff, request.Method.String()...)
 	buff = space(buff)
 	buff = append(buff, request.Path...)
 
-	if raw := request.Query.Bytes(); len(raw) > 0 {
+	if !request.Params.Empty() {
 		buff = question(buff)
-		// all this code could be easily omitted and raw query could be just be appended.
-		// However, the point here is to check whether the representation of a request stays
-		// expected even after all the transformations applied
-		params, err := request.Query.Cook()
-		if err != nil {
-			return "", err
-		}
 
-		for _, param := range params.Expose() {
-			buff = queryparam(buff, param.Key, param.Value)
+		for key, value := range request.Params.Iter() {
+			buff = queryparam(buff, key, value)
 			buff = ampersand(buff)
 		}
 
@@ -34,16 +26,14 @@ func Dump(request *http.Request) (string, error) {
 	}
 
 	buff = space(buff)
-	protocol := request.Proto.String()
-	protocol = protocol[:len(protocol)-1]
-	buff = append(buff, protocol...)
+	buff = append(buff, request.Protocol.String()...)
 	buff = crlf(buff)
 
 	for _, h := range request.Headers.Expose() {
 		buff = header(buff, h)
 	}
 
-	buff = header(buff, headers.Header{
+	buff = header(buff, http.Header{
 		Key:   "Content-Length",
 		Value: strconv.Itoa(request.ContentLength),
 	})
@@ -71,7 +61,7 @@ func crlf(b []byte) []byte {
 	return append(b, '\r', '\n')
 }
 
-func header(b []byte, h headers.Header) []byte {
+func header(b []byte, h http.Header) []byte {
 	b = append(b, h.Key...)
 	b = colonsp(b)
 	b = append(b, h.Value...)

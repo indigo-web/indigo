@@ -15,18 +15,6 @@ func LStripWS(str string) string {
 	return ""
 }
 
-func RStripWS(str string) string {
-	for i := len(str); i > 0; i-- {
-		switch str[i-1] {
-		case ' ', '\t':
-		default:
-			return str[:i]
-		}
-	}
-
-	return ""
-}
-
 // CutParams behaves exactly as strings.Cut, but strips whitespaces between value
 // and the first-encountered parameter in addition.
 func CutParams(header string) (params string) {
