@@ -2,21 +2,21 @@ package cookie
 
 import (
 	"errors"
-	"github.com/indigo-web/indigo/internal/keyvalue"
+	"github.com/indigo-web/indigo/kv"
 	"strings"
 )
 
 // Jar is a key-value storage for cookies. Key-value pairs consists of strings,
 // not cookie.Cookie, as it would lead to space wasting and require a separate
 // data structure
-type Jar = *keyvalue.Storage
+type Jar = *kv.Storage
 
 func NewJar() Jar {
-	return keyvalue.New()
+	return kv.New()
 }
 
 func NewJarPreAlloc(n int) Jar {
-	return keyvalue.NewPreAlloc(n)
+	return kv.NewPrealloc(n)
 }
 
 var ErrBadCookie = errors.New("cookie has a malformed syntax")

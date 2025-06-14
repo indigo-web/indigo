@@ -2,17 +2,17 @@ package response
 
 import (
 	"github.com/indigo-web/indigo/http/cookie"
-	"github.com/indigo-web/indigo/http/headers"
 	"github.com/indigo-web/indigo/http/mime"
 	"github.com/indigo-web/indigo/http/status"
 	"github.com/indigo-web/indigo/internal/types"
+	"github.com/indigo-web/indigo/kv"
 )
 
 const DefaultContentType = mime.HTML
 
 type Fields struct {
 	Attachment  types.Attachment
-	Headers     []headers.Header
+	Headers     []kv.Pair
 	Body        []byte
 	Cookies     []cookie.Cookie
 	Status      status.Status
