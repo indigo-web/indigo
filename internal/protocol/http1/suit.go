@@ -1,54 +1,56 @@
 package http1
 
 import (
-	"fmt"
 	"github.com/indigo-web/indigo/config"
 	"github.com/indigo-web/indigo/http"
 	"github.com/indigo-web/indigo/http/proto"
 	"github.com/indigo-web/indigo/http/status"
+	"github.com/indigo-web/indigo/internal/buffer"
+	"github.com/indigo-web/indigo/internal/codecutil"
 	"github.com/indigo-web/indigo/internal/construct"
 	"github.com/indigo-web/indigo/router"
 	"github.com/indigo-web/indigo/transport"
-	"github.com/indigo-web/utils/buffer"
 )
 
 type Suit struct {
 	*parser
+	*body
 	*serializer
 	upgradePreResp *http.Response
-	body           *Body
 	router         router.Router
 	client         transport.Client
 }
 
-func New(
+func newSuit(
 	cfg *config.Config,
 	r router.Router,
 	request *http.Request,
 	client transport.Client,
-	body *Body,
-	keyBuff, valBuff, startLineBuff *buffer.Buffer,
+	body *body,
+	keysBuff, valsBuff, requestLineBuff buffer.Buffer,
 	respBuff []byte,
-	respFileBuffSize int,
 ) *Suit {
 	return &Suit{
-		parser:         newParser(request, keyBuff, valBuff, startLineBuff, cfg.Headers),
-		serializer:     newSerializer(respBuff, respFileBuffSize, cfg.Headers.Default, request, client),
-		upgradePreResp: http.NewResponse(),
+		parser:         newParser(cfg, request, keysBuff, valsBuff, requestLineBuff),
 		body:           body,
+		serializer:     newSerializer(respBuff, cfg.HTTP.ResponseBuffSize, cfg.Headers.Default, request, client),
+		upgradePreResp: http.NewResponse(),
 		router:         r,
 		client:         client,
 	}
 }
 
-// Initialize is the same constructor as just New, but receives fewer arguments.
-func Initialize(cfg *config.Config, r router.Router, client transport.Client, req *http.Request, body *Body) *Suit {
-	keyBuff, valBuff, startLineBuff := construct.Buffers(cfg)
+// New instantiates an HTTP/1 protocol suit.
+func New(
+	cfg *config.Config, r router.Router, client transport.Client,
+	req *http.Request, decoders codecutil.Cache[http.Decompressor],
+) *Suit {
+	keysBuff, valsBuff, requestLineBuff := construct.Buffers(cfg)
 	respBuff := make([]byte, 0, cfg.HTTP.ResponseBuffSize)
+	body := newBody(client, cfg.Body, decoders)
 
-	return New(
-		cfg, r, req, client, body, keyBuff, valBuff, startLineBuff,
-		respBuff, cfg.HTTP.ResponseBuffSize,
+	return newSuit(
+		cfg, r, req, client, body, keysBuff, valsBuff, requestLineBuff, respBuff,
 	)
 }
 
@@ -61,71 +63,71 @@ func (s *Suit) Serve() {
 }
 
 func (s *Suit) serve(once bool) (ok bool) {
-	req := s.parser.request
 	client := s.client
+	request := s.parser.request
 
 	for {
 		data, err := client.Read()
 		if err != nil {
 			// read-error most probably means deadline exceeding. Just notify the user in
-			// this case and return
-			s.router.OnError(req, status.ErrCloseConnection)
+			// this case and return.
+			s.router.OnError(request, status.ErrCloseConnection)
 			return false
 		}
 
-		state, extra, err := s.Parse(data)
-		switch state {
-		case Pending:
-		case HeadersCompleted:
-			client.Unread(extra)
-			if err = s.body.Reset(req); err != nil {
-				// an error could occur here only if there were applied unrecognized encodings.
-				// Unfortunately, as the client made a decision to bravely ignore the list of
-				// encodings we do support, we don't want to read all the crap he sent us either.
-				s.router.OnError(req, err)
-				return false
-			}
-
-			version := req.Proto
-			if req.Upgrade != proto.Unknown && proto.HTTP1&req.Upgrade == req.Upgrade {
-				// TODO: replace this with a method "WriteUpgrade" or similar
-				s.PreWrite(
-					req.Proto,
-					s.upgradePreResp.
-						Code(status.SwitchingProtocols).
-						Header("Connection", "upgrade").
-						Header("Upgrade", trimLast(req.Proto.String())),
-				)
-				version = req.Upgrade
-			}
-
-			resp := respond(req, s.router.OnRequest(req))
-
-			if req.Hijacked() {
-				// in case the connection was hijacked, we must not intrude after, so fail fast
-				return false
-			}
-
-			if err = s.Write(version, resp); err != nil {
-				// if error happened during writing the response, it makes no sense to try
-				// to write anything again
-				s.router.OnError(req, status.ErrCloseConnection)
-				return false
-			}
-
-			if err = req.Reset(); err != nil {
-				// abusing the fact that req.Clear() can fail only due to read error
-				s.router.OnError(req, status.ErrCloseConnection)
-				return false
-			}
-		case Error:
-			// as fatal error already happened and connection will anyway be closed, we don't
-			// care about any socket errors anymore
-			resp := respond(req, s.router.OnError(req, err))
-			_ = s.Write(req.Proto, resp)
+		done, extra, err := s.Parse(data)
+		if err != nil {
+			resp := respond(request, s.router.OnError(request, err))
+			_ = s.Write(request.Protocol, resp)
 			return false
-		default:
-			panic(fmt.Sprintf("BUG: unreachable code!"))
+		}
+
+		if !done {
+			continue
+		}
+
+		client.Pushback(extra)
+
+		request.Body.Reset(request)
+		if err = s.body.Reset(request); err != nil {
+			// an error could occur here only if there were applied unrecognized encodings.
+			// Unfortunately, as the client made a decision to bravely ignore the list of
+			// encodings we do support, we don't want to read all the crap he sent us either.
+			s.router.OnError(request, err)
+			return false
+		}
+
+		version := request.Protocol
+		if request.Upgrade != proto.Unknown && proto.HTTP1&request.Upgrade != 0 {
+			// TODO: replace this with a method "WriteUpgrade" or similar
+			s.PreWrite(
+				request.Protocol,
+				s.upgradePreResp.
+					Code(status.SwitchingProtocols).
+					Header("Connection", "upgrade").
+					Header("Upgrade", request.Protocol.String()),
+			)
+			version = request.Upgrade
+		}
+
+		resp := respond(request, s.router.OnRequest(request))
+
+		if request.Hijacked() {
+			// in case the connection was hijacked, we must not intrude after, so fail fast
+			return false
+		}
+
+		if err = s.Write(version, resp); err != nil {
+			// if error happened during writing the response, it makes no sense to try
+			// to write anything again
+			s.router.OnError(request, status.ErrCloseConnection)
+			return false
+		}
+
+		request.Reset()
+		if err = request.Body.Discard(); err != nil {
+			s.router.OnError(request, status.ErrCloseConnection)
+			return false
 		}
 
 		if once {
@@ -141,12 +143,4 @@ func respond(req *http.Request, resp *http.Response) *http.Response {
 	}
 
 	return http.Respond(req)
-}
-
-func trimLast(s string) string {
-	if len(s) == 0 {
-		return s
-	}
-
-	return s[:len(s)-1]
 }
