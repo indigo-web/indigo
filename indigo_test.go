@@ -66,8 +66,8 @@ func getInbuiltRouter() *inbuilt.Router {
 		Get(respond).
 		Post(respond)
 
-	r.Get("/file/{name}", func(request *http.Request) *http.Response {
-		return request.Respond().File("tests/" + request.Params.Value("name"))
+	r.Get("/file/:name", func(request *http.Request) *http.Response {
+		return request.Respond().File("tests/" + request.Vars.Value("name"))
 	})
 
 	r.Post("/body-reader", func(request *http.Request) *http.Response {
