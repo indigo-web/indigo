@@ -6,8 +6,13 @@ import (
 	"strings"
 )
 
-var ErrMismatchingWildcards = errors.New(
-	"having two different names for wildcards sharing common prefix isn't supported",
+var (
+	ErrMismatchingWildcards = errors.New(
+		"having two different names for wildcards sharing common prefix isn't supported",
+	)
+	ErrBadGreedyWildcardPosition = errors.New(
+		"the greedy wildcard must always stand the last",
+	)
 )
 
 type Node[T any] struct {
@@ -20,6 +25,7 @@ type Node[T any] struct {
 
 type dynamicNode[T any] struct {
 	isLeaf   bool
+	isGreedy bool
 	next     *Node[T]
 	wildcard string
 	payload  T
@@ -35,7 +41,7 @@ func (n *Node[T]) Lookup(key string, wildcards *kv.Storage) (value T, found bool
 loop:
 	for len(key) > 0 {
 		for _, p := range node.predecessors {
-			if startswith(key, p.value) {
+			if strings.HasPrefix(key, p.value) {
 				key = key[len(p.value):]
 				node = p
 				continue loop
@@ -44,6 +50,13 @@ loop:
 
 		if node.dyn == nil {
 			return value, false
+		}
+
+		if node.dyn.isGreedy {
+			// as greedy wildcard must always stand the last, it is therefore always a leaf
+			addWildcard(node.dyn.wildcard, key, wildcards)
+
+			return node.dyn.payload, true
 		}
 
 		end := strings.IndexByte(key, '/')
@@ -72,6 +85,11 @@ loop:
 		}
 	}
 
+	if node.dyn != nil && node.dyn.isGreedy {
+		addWildcard(node.dyn.wildcard, "", wildcards)
+		return node.dyn.payload, true
+	}
+
 	return node.payload, node.isLeaf
 }
 
@@ -79,10 +97,6 @@ func addWildcard(wildcard, value string, into *kv.Storage) {
 	if len(wildcard) > 0 {
 		into.Add(wildcard, value)
 	}
-}
-
-func startswith(str, with string) bool {
-	return len(str) >= len(with) && str[:len(with)] == with
 }
 
 func (n *Node[T]) Insert(key string, value T) error {
@@ -109,10 +123,15 @@ func (n *Node[T]) insert(segs []pathSegment, value T) error {
 
 		if len(segs) == 1 {
 			n.dyn.isLeaf = true
+			n.dyn.isGreedy = seg.IsGreedy
 			n.dyn.payload = value
 
 			return nil
 		} else {
+			if seg.IsGreedy {
+				return ErrBadGreedyWildcardPosition
+			}
+
 			if n.dyn.next == nil {
 				n.dyn.next = New[T]()
 			}
@@ -128,16 +147,7 @@ func (n *Node[T]) insert(segs []pathSegment, value T) error {
 		}
 
 		if len(common) == len(p.value) {
-			if len(common) == len(seg.Value) {
-				// p.value == seg.Value
-				return p.insert(segs[1:], value)
-			}
-
-			// len(seg.Value) > len(p.value)
-			seg.Value = seg.Value[len(common):]
-			segs[0] = seg
-
-			return p.insert(segs, value)
+			return p.insert(truncCommon(segs, len(common)), value)
 		}
 
 		// len(common) < len(p.value)
@@ -149,16 +159,7 @@ func (n *Node[T]) insert(segs []pathSegment, value T) error {
 		substitution.predecessors = append(substitution.predecessors, p)
 		n.predecessors[i] = substitution
 
-		if len(common) == len(seg.Value) {
-			substitution.isLeaf = true
-			substitution.payload = value
-			return nil
-		}
-
-		// len(common) < len(seg.Value)
-		newNode := &Node[T]{value: seg.Value[len(common):]}
-		substitution.predecessors = append(substitution.predecessors, newNode)
-		return newNode.insert(segs[1:], value)
+		return substitution.insert(truncCommon(segs, len(common)), value)
 	}
 
 	newNode := &Node[T]{value: seg.Value}
@@ -169,6 +170,14 @@ func (n *Node[T]) insert(segs []pathSegment, value T) error {
 
 func IsDynamicTemplate(str string) bool {
 	return strings.IndexByte(str, ':') != -1
+}
+
+func truncCommon(segs []pathSegment, length int) []pathSegment {
+	segs[0].Value = segs[0].Value[length:]
+	if len(segs[0].Value) == 0 {
+		segs = segs[1:]
+	}
+	return segs
 }
 
 func union(a, b string) string {
@@ -183,6 +192,7 @@ func union(a, b string) string {
 
 type pathSegment struct {
 	IsWildcard bool
+	IsGreedy   bool
 	Value      string
 }
 
@@ -190,21 +200,31 @@ func splitPath(str string) (result []pathSegment) {
 	for len(str) > 0 {
 		colon := strings.IndexByte(str, ':')
 		if colon == -1 {
-			result = append(result, pathSegment{false, str})
+			result = append(result, pathSegment{false, false, str})
 			break
 		}
 
-		result = append(result, pathSegment{false, str[:colon]})
+		result = append(result, pathSegment{false, false, str[:colon]})
 		str = str[colon+1:]
 
 		boundary := strings.IndexByte(str, '/')
 		if boundary == -1 {
-			result = append(result, pathSegment{true, str})
-			break
+			boundary = len(str)
 		}
 
-		result = append(result, pathSegment{true, str[:boundary]})
-		str = str[boundary+1:]
+		wildcard := str[:boundary]
+		greedy := false
+		if strings.HasSuffix(wildcard, "...") {
+			wildcard = wildcard[:len(wildcard)-3]
+			greedy = true
+		}
+
+		result = append(result, pathSegment{true, greedy, wildcard})
+		if boundary < len(str) {
+			boundary++
+		}
+
+		str = str[boundary:]
 	}
 
 	return result

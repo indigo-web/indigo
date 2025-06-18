@@ -15,6 +15,7 @@ func BenchmarkTreeMatch(b *testing.B) {
 	tree.Insert("/hello/whopper", 2)
 	tree.Insert("/henry/world", 3)
 	tree.Insert("/hello/world/somewhere", 4)
+	b.SetBytes(int64(len("/hello/world/somewhere")))
 	b.ResetTimer()
 
 	for range b.N {
@@ -95,6 +96,31 @@ func TestTree(t *testing.T) {
 		test(t, tree, "hello/henry", 3, "name", "henry")
 		test(t, tree, "hello/jimmy/hi", 4, "name", "jimmy")
 	})
+
+	t.Run("named greedy wildcard", func(t *testing.T) {
+		tree := New[int]()
+		require.NoError(t, tree.Insert("/:path...", 1))
+
+		test(t, tree, "/", 1, "path", "")
+		test(t, tree, "/hello/world", 1, "path", "hello/world")
+	})
+
+	t.Run("anonymous greedy wildcard", func(t *testing.T) {
+		tree := New[int]()
+		require.NoError(t, tree.Insert("/:...", 1))
+
+		test(t, tree, "/", 1, "", "")
+		test(t, tree, "/hello/world", 1, "", "")
+	})
+
+	t.Run("dynamic breaks down static segment", func(t *testing.T) {
+		tree := New[int]()
+		require.NoError(t, tree.Insert("/file/by-path/:path...", 2))
+		require.NoError(t, tree.Insert("/file/:name", 1))
+
+		test(t, tree, "/file/photo.jpg", 1, "name", "photo.jpg")
+		test(t, tree, "/file/by-path/images/photo.jpg", 2, "path", "images/photo.jpg")
+	})
 }
 
 func test(t *testing.T, tree *Node[int], path string, value int, wKey, wVal string) {
@@ -115,6 +141,10 @@ func printTree(node *Node[int], depth int) {
 			fmt.Printf(" [%s", strconv.Quote(p.dyn.wildcard))
 			if p.dyn.isLeaf {
 				fmt.Printf(" {%d}", p.dyn.payload)
+			}
+
+			if p.dyn.isGreedy {
+				fmt.Print(" #")
 			}
 
 			fmt.Print("]")
