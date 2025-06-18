@@ -105,14 +105,55 @@ func TestRoute(t *testing.T) {
 	})
 }
 
+func TestDynamic(t *testing.T) {
+	t.Run("first level", func(t *testing.T) {
+		raw := New().
+			Get("/:name", func(request *http.Request) *http.Response {
+				return http.String(request, request.Vars.Value("name"))
+			})
+		r := raw.Build()
+
+		request := getRequest(method.GET, "/hello")
+		resp := r.OnRequest(request)
+		require.Equal(t, "hello", string(resp.Reveal().Body))
+	})
+
+	t.Run("in the middle", func(t *testing.T) {
+		r := New().
+			Get("/api/:method/doc", func(request *http.Request) *http.Response {
+				return http.String(request, request.Vars.Value("method"))
+			}).
+			Build()
+
+		request := getRequest(method.GET, "/api/getUser/doc")
+		resp := r.OnRequest(request)
+		require.Equal(t, "getUser", string(resp.Reveal().Body))
+	})
+
+	t.Run("anonymous section", func(t *testing.T) {
+		r := New().
+			Get("/:", func(request *http.Request) *http.Response {
+				return http.String(request, "yay")
+			}).
+			Build()
+
+		request := getRequest(method.GET, "/api")
+		resp := r.OnRequest(request)
+		require.Equal(t, "yay", string(resp.Reveal().Body))
+		request = getRequest(method.GET, "/api/second-level")
+		resp = r.OnRequest(request)
+		require.Equal(t, int(status.NotFound), int(resp.Reveal().Code))
+	})
+}
+
 func testMethodShorthand(
 	t *testing.T, router *Router,
 	route func(string, Handler, ...Middleware) *Router,
 	method method.Method,
 ) {
 	route("/", http.Respond)
-	require.Contains(t, router.registrar.routes, "/")
-	require.NotNil(t, router.registrar.routes["/"][method])
+	require.Contains(t, router.registrar.endpoints, "/")
+	require.NotNil(t, router.registrar.endpoints["/"][method])
 }
 
 func TestMethodShorthands(t *testing.T) {
