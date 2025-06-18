@@ -118,6 +118,18 @@ func TestDynamic(t *testing.T) {
 		require.Equal(t, "hello", string(resp.Reveal().Body))
 	})
 
+	t.Run("second level", func(t *testing.T) {
+		raw := New().
+			Get("/hello/:name", func(request *http.Request) *http.Response {
+				return http.String(request, request.Vars.Value("name"))
+			})
+		r := raw.Build()
+
+		request := getRequest(method.GET, "/hello/pavlo")
+		resp := r.OnRequest(request)
+		require.Equal(t, "pavlo", string(resp.Reveal().Body))
+	})
+
 	t.Run("in the middle", func(t *testing.T) {
 		r := New().
 			Get("/api/:method/doc", func(request *http.Request) *http.Response {

@@ -67,7 +67,12 @@ func getInbuiltRouter() *inbuilt.Router {
 		Post(respond)
 
 	r.Get("/file/:name", func(request *http.Request) *http.Response {
+		fmt.Println("name:", request.Vars.Value("name"))
 		return request.Respond().File("tests/" + request.Vars.Value("name"))
+	})
+
+	r.Get("/file/by-path/:path...", func(request *http.Request) *http.Response {
+		return http.File(request, request.Vars.Value("path"))
 	})
 
 	r.Post("/body-reader", func(request *http.Request) *http.Response {
@@ -350,6 +355,9 @@ func TestFirstPhase(t *testing.T) {
 	})
 
 	t.Run("request existing file", func(t *testing.T) {
+		actualContent, err := os.ReadFile("./tests/index.html")
+		require.NoError(t, err)
+
 		resp, err := stdhttp.DefaultClient.Get(appURL + "/file/index.html")
 		require.NoError(t, err)
 		require.Equal(t, stdhttp.StatusOK, resp.StatusCode)
@@ -357,19 +365,31 @@ func TestFirstPhase(t *testing.T) {
 		data, err := io.ReadAll(resp.Body)
 		require.NoError(t, err)
 
-		actualContent, err := os.ReadFile("./tests/index.html")
-		require.NoError(t, err)
 		require.Equal(t, string(actualContent), string(data))
 	})
 
 	t.Run("request non-existing file", func(t *testing.T) {
-		resp, err := stdhttp.DefaultClient.Get(appURL + "/file/doesntexists.html")
+		resp, err := stdhttp.DefaultClient.Get(appURL + "/file/doesn't-exist.html")
 		require.NoError(t, err)
 		require.Equal(t, stdhttp.StatusNotFound, resp.StatusCode)
 
 		data, err := io.ReadAll(resp.Body)
 		require.NoError(t, err)
 		require.Empty(t, string(data))
+	})
+
+	t.Run("request by path", func(t *testing.T) {
+		actualContent, err := os.ReadFile("./tests/index.html")
+		require.NoError(t, err)
+
+		resp, err := stdhttp.DefaultClient.Get(appURL + "/file/by-path/tests/index.html")
+		require.NoError(t, err)
+		require.Equal(t, stdhttp.StatusOK, resp.StatusCode)
+
+		data, err := io.ReadAll(resp.Body)
+		require.NoError(t, err)
+
+		require.Equal(t, string(actualContent), string(data))
 	})
 
 	t.Run("trace", func(t *testing.T) {
