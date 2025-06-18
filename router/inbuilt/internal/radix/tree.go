@@ -3,135 +3,209 @@ package radix
 import (
 	"errors"
 	"github.com/indigo-web/indigo/kv"
-	"github.com/indigo-web/indigo/router/inbuilt/internal/types"
 	"strings"
 )
 
-var ErrNotImplemented = errors.New(
-	"different dynamic segment names are not allowed for common path prefix",
+var ErrMismatchingWildcards = errors.New(
+	"having two different names for wildcards sharing common prefix isn't supported",
 )
 
-type Params = *kv.Storage
-
-type Payload struct {
-	MethodsMap types.MethodsMap
-	Allow      string
+type Node[T any] struct {
+	isLeaf       bool
+	value        string
+	dyn          *dynamicNode[T]
+	predecessors []*Node[T]
+	payload      T
 }
 
-type Tree = *Node
-
-type Node struct {
-	statics    arrMap
-	next       *Node
-	payload    *Payload
-	wildcard   string
-	isWildcard bool
+type dynamicNode[T any] struct {
+	isLeaf   bool
+	next     *Node[T]
+	wildcard string
+	payload  T
 }
 
-func New() *Node {
-	return newNode(new(Payload), false, "")
+func New[T any]() *Node[T] {
+	return new(Node[T])
 }
 
-func newNode(payload *Payload, isDyn bool, dynName string) *Node {
-	return &Node{
-		isWildcard: isDyn,
-		wildcard:   dynName,
-		payload:    payload,
-	}
-}
-
-func (n *Node) Insert(template Template, payload Payload) error {
-	return n.insertRecursively(template.segments, &payload)
-}
-
-func (n *Node) MustInsert(template Template, payload Payload) {
-	if err := n.Insert(template, payload); err != nil {
-		panic(err.Error())
-	}
-}
-
-func (n *Node) insertRecursively(segments []Segment, payload *Payload) error {
-	if len(segments) == 0 {
-		n.payload = payload
-
-		return nil
-	}
-
-	segment := segments[0]
-
-	if segment.IsWildcard {
-		if n.isWildcard && segment.Payload != n.wildcard {
-			return ErrNotImplemented
-		}
-
-		n.isWildcard = true
-		n.wildcard = segment.Payload
-
-		if n.next == nil {
-			n.next = newNode(nil, false, "")
-		}
-
-		return n.next.insertRecursively(segments[1:], payload)
-	}
-
-	if node := n.statics.Lookup(segment.Payload); node != nil {
-		return node.insertRecursively(segments[1:], payload)
-	}
-
-	node := newNode(nil, false, "")
-	n.statics.Add(segment.Payload, node)
-
-	return node.insertRecursively(segments[1:], payload)
-}
-
-func (n *Node) Match(path string, params Params) *Payload {
-	if path[0] != '/' {
-		// all http request paths MUST have a leading slash
-		return nil
-	}
-
-	path = path[1:]
+func (n *Node[T]) Lookup(key string, wildcards *kv.Storage) (value T, found bool) {
 	node := n
 
-	for len(path) > 0 {
-		slash := strings.IndexByte(path, '/')
-		var segment string
-		if slash == -1 {
-			segment, path = path, ""
-		} else {
-			segment, path = path[:slash], path[slash+1:]
+loop:
+	for len(key) > 0 {
+		for _, p := range node.predecessors {
+			if startswith(key, p.value) {
+				key = key[len(p.value):]
+				node = p
+				continue loop
+			}
 		}
 
-		next, ok := processSegment(params, segment, node)
-		if !ok {
+		if node.dyn == nil {
+			return value, false
+		}
+
+		end := strings.IndexByte(key, '/')
+		if end == -1 {
+			if node.dyn.isLeaf {
+				addWildcard(node.dyn.wildcard, key, wildcards)
+			}
+
+			return node.dyn.payload, node.dyn.isLeaf
+		}
+
+		segment := key[:end]
+		if len(segment) == 0 {
+			return value, false
+		}
+
+		addWildcard(node.dyn.wildcard, segment, wildcards)
+		key = key[end+1:]
+		if len(key) == 0 {
+			return node.dyn.payload, node.dyn.isLeaf
+		}
+
+		node = node.dyn.next
+		if node == nil {
+			return value, false
+		}
+	}
+
+	return node.payload, node.isLeaf
+}
+
+func addWildcard(wildcard, value string, into *kv.Storage) {
+	if len(wildcard) > 0 {
+		into.Add(wildcard, value)
+	}
+}
+
+func startswith(str, with string) bool {
+	return len(str) >= len(with) && str[:len(with)] == with
+}
+
+func (n *Node[T]) Insert(key string, value T) error {
+	return n.insert(splitPath(key), value)
+}
+
+func (n *Node[T]) insert(segs []pathSegment, value T) error {
+	if len(segs) == 0 {
+		n.isLeaf = true
+		n.payload = value
+		return nil
+	}
+
+	seg := segs[0]
+
+	if seg.IsWildcard {
+		if n.dyn == nil {
+			n.dyn = &dynamicNode[T]{wildcard: seg.Value}
+		}
+
+		if n.dyn.wildcard != seg.Value {
+			return ErrMismatchingWildcards
+		}
+
+		if len(segs) == 1 {
+			n.dyn.isLeaf = true
+			n.dyn.payload = value
+
+			return nil
+		} else {
+			if n.dyn.next == nil {
+				n.dyn.next = New[T]()
+			}
+
+			return n.dyn.next.insert(segs[1:], value)
+		}
+	}
+
+	for i, p := range n.predecessors {
+		common := union(p.value, seg.Value)
+		if len(common) == 0 {
+			continue
+		}
+
+		if len(common) == len(p.value) {
+			if len(common) == len(seg.Value) {
+				// p.value == seg.Value
+				return p.insert(segs[1:], value)
+			}
+
+			// len(seg.Value) > len(p.value)
+			seg.Value = seg.Value[len(common):]
+			segs[0] = seg
+
+			return p.insert(segs, value)
+		}
+
+		// len(common) < len(p.value)
+		// len(common) <= len(seg.Value)
+
+		stays, goes := p.value[:len(common)], p.value[len(common):]
+		substitution := &Node[T]{value: stays}
+		p.value = goes
+		substitution.predecessors = append(substitution.predecessors, p)
+		n.predecessors[i] = substitution
+
+		if len(common) == len(seg.Value) {
+			substitution.isLeaf = true
+			substitution.payload = value
 			return nil
 		}
 
-		node = next
+		// len(common) < len(seg.Value)
+		newNode := &Node[T]{value: seg.Value[len(common):]}
+		substitution.predecessors = append(substitution.predecessors, newNode)
+		return newNode.insert(segs[1:], value)
 	}
 
-	return node.payload
+	newNode := &Node[T]{value: seg.Value}
+	n.predecessors = append(n.predecessors, newNode)
+
+	return newNode.insert(segs[1:], value)
 }
 
-func processSegment(params Params, segment string, node *Node) (*Node, bool) {
-	// manually inlined arrMap.Lookup(segment)
-	if !node.statics.arrOverflow {
-		for _, entry := range node.statics.arr {
-			if entry.Key == segment {
-				return entry.Node, true
-			}
+func IsDynamicTemplate(str string) bool {
+	return strings.IndexByte(str, ':') != -1
+}
+
+func union(a, b string) string {
+	for i := 0; i < min(len(a), len(b)); i++ {
+		if a[i] != b[i] {
+			return a[:i]
 		}
-	} else if n := node.statics.m[segment]; n != nil {
-		return n, true
 	}
 
-	if !node.isWildcard || len(segment) == 0 {
-		return nil, false
+	return a[:min(len(a), len(b))]
+}
+
+type pathSegment struct {
+	IsWildcard bool
+	Value      string
+}
+
+func splitPath(str string) (result []pathSegment) {
+	for len(str) > 0 {
+		colon := strings.IndexByte(str, ':')
+		if colon == -1 {
+			result = append(result, pathSegment{false, str})
+			break
+		}
+
+		result = append(result, pathSegment{false, str[:colon]})
+		str = str[colon+1:]
+
+		boundary := strings.IndexByte(str, '/')
+		if boundary == -1 {
+			result = append(result, pathSegment{true, str})
+			break
+		}
+
+		result = append(result, pathSegment{true, str[:boundary]})
+		str = str[boundary+1:]
 	}
 
-	if len(node.wildcard) > 0 {
-		params.Add(node.wildcard, segment)
-	}
-
-	return node.next, true
+	return result
 }
