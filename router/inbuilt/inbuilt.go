@@ -7,8 +7,6 @@ import (
 	"github.com/indigo-web/indigo/router"
 	"github.com/indigo-web/indigo/router/inbuilt/internal/radix"
 	"github.com/indigo-web/indigo/router/inbuilt/uri"
-	"sort"
-	"strings"
 )
 
 var _ router.Builder = new(Router)
@@ -25,7 +23,6 @@ type Router struct {
 	isRoot      bool
 	prefix      string
 	mutators    []Mutator
-	catchers    []Catcher
 	middlewares []Middleware
 	registrar   *registrar
 	children    []*Router
@@ -45,7 +42,6 @@ func New() *Router {
 // is the fact, that there is a lot of data that is used only at registering/initialization stage.
 type runtimeRouter struct {
 	mutators    []Mutator
-	catchers    []Catcher
 	traceBuff   []byte
 	tree        *radix.Node[endpoint]
 	routesMap   routesMap
@@ -60,9 +56,6 @@ func (r *Router) Build() router.Router {
 		panic(err)
 	}
 
-	sort.Slice(r.catchers, func(i, j int) bool {
-		return len(r.catchers[i].Prefix) > len(r.catchers[j].Prefix)
-	})
 	isDynamic := r.registrar.IsDynamic()
 	var (
 		rmap routesMap
@@ -76,7 +69,6 @@ func (r *Router) Build() router.Router {
 
 	return &runtimeRouter{
 		mutators:    r.mutators,
-		catchers:    r.catchers,
 		tree:        tree,
 		routesMap:   rmap,
 		errHandlers: r.errHandlers,
@@ -132,14 +124,6 @@ func (r *runtimeRouter) onError(request *http.Request, err error) *http.Response
 		r.traceBuff = renderHTTPRequest(request, r.traceBuff)
 
 		return traceResponse(request.Respond(), r.traceBuff)
-	}
-
-	if err == status.ErrNotFound {
-		for _, catcher := range r.catchers {
-			if strings.HasPrefix(request.Path, catcher.Prefix) {
-				return catcher.Handler(request)
-			}
-		}
 	}
 
 	httpErr, ok := err.(status.HTTPError)

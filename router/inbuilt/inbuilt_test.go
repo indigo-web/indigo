@@ -101,7 +101,7 @@ func TestRoute(t *testing.T) {
 		// we have not registered any HEAD-method handler yet, so GET method
 		// is expected to be called (but without body)
 		require.Equal(t, status.OK, resp.Reveal().Code)
-		require.Empty(t, string(resp.Reveal().Body))
+		require.Empty(t, string(resp.Reveal().BufferedBody))
 	})
 }
 
@@ -115,7 +115,7 @@ func TestDynamic(t *testing.T) {
 
 		request := getRequest(method.GET, "/hello")
 		resp := r.OnRequest(request)
-		require.Equal(t, "hello", string(resp.Reveal().Body))
+		require.Equal(t, "hello", string(resp.Reveal().BufferedBody))
 	})
 
 	t.Run("second level", func(t *testing.T) {
@@ -127,7 +127,7 @@ func TestDynamic(t *testing.T) {
 
 		request := getRequest(method.GET, "/hello/pavlo")
 		resp := r.OnRequest(request)
-		require.Equal(t, "pavlo", string(resp.Reveal().Body))
+		require.Equal(t, "pavlo", string(resp.Reveal().BufferedBody))
 	})
 
 	t.Run("in the middle", func(t *testing.T) {
@@ -139,7 +139,7 @@ func TestDynamic(t *testing.T) {
 
 		request := getRequest(method.GET, "/api/getUser/doc")
 		resp := r.OnRequest(request)
-		require.Equal(t, "getUser", string(resp.Reveal().Body))
+		require.Equal(t, "getUser", string(resp.Reveal().BufferedBody))
 	})
 
 	t.Run("anonymous section", func(t *testing.T) {
@@ -151,7 +151,7 @@ func TestDynamic(t *testing.T) {
 
 		request := getRequest(method.GET, "/api")
 		resp := r.OnRequest(request)
-		require.Equal(t, "yay", string(resp.Reveal().Body))
+		require.Equal(t, "yay", string(resp.Reveal().BufferedBody))
 		request = getRequest(method.GET, "/api/second-level")
 		resp = r.OnRequest(request)
 		require.Equal(t, int(status.NotFound), int(resp.Reveal().Code))
@@ -286,14 +286,14 @@ func TestRouter_RouteError(t *testing.T) {
 		request := getRequest(method.GET, "/")
 		resp := r.OnError(request, status.ErrBadRequest)
 		require.Equal(t, status.Teapot, resp.Reveal().Code)
-		require.Equal(t, status.ErrBadRequest.Error(), string(resp.Reveal().Body))
+		require.Equal(t, status.ErrBadRequest.Error(), string(resp.Reveal().BufferedBody))
 	})
 
 	t.Run("status.ErrURIDecoding (also bad request)", func(t *testing.T) {
 		request := getRequest(method.GET, "/")
 		resp := r.OnError(request, status.ErrURLDecoding)
 		require.Equal(t, status.Teapot, resp.Reveal().Code)
-		require.Equal(t, status.ErrURLDecoding.Error(), string(resp.Reveal().Body))
+		require.Equal(t, status.ErrURLDecoding.Error(), string(resp.Reveal().BufferedBody))
 	})
 
 	t.Run("unregistered http error", func(t *testing.T) {
@@ -306,7 +306,7 @@ func TestRouter_RouteError(t *testing.T) {
 		request := getRequest(method.GET, "/")
 		resp := r.OnError(request, errors.New("any error text here"))
 		require.Equal(t, status.InternalServerError, resp.Reveal().Code)
-		require.Empty(t, string(resp.Reveal().Body))
+		require.Empty(t, string(resp.Reveal().BufferedBody))
 	})
 
 	t.Run("universal handler", func(t *testing.T) {
@@ -323,7 +323,7 @@ func TestRouter_RouteError(t *testing.T) {
 		request := getRequest(method.GET, "/")
 		resp := r.OnError(request, status.ErrNotImplemented)
 		require.Equal(t, int(status.Teapot), int(resp.Reveal().Code))
-		require.Equal(t, fromUniversal, string(resp.Reveal().Body))
+		require.Equal(t, fromUniversal, string(resp.Reveal().BufferedBody))
 	})
 }
 
@@ -332,7 +332,7 @@ func TestAliases(t *testing.T) {
 		request := getRequest(method.GET, "/")
 		response := r.OnRequest(request)
 		require.Equal(t, status.OK, response.Reveal().Code)
-		require.Equal(t, "magic word", string(response.Reveal().Body))
+		require.Equal(t, "magic word", string(response.Reveal().BufferedBody))
 	}
 
 	t.Run("single alias", func(t *testing.T) {
@@ -369,7 +369,7 @@ func TestAliases(t *testing.T) {
 		request := getRequest(method.GET, "/hello")
 		response := r.OnRequest(request)
 		require.Equal(t, status.OK, response.Reveal().Code)
-		require.Equal(t, "ordinary word", string(response.Reveal().Body))
+		require.Equal(t, "ordinary word", string(response.Reveal().BufferedBody))
 	}
 
 	t.Run("multiple calls", func(t *testing.T) {
@@ -415,34 +415,6 @@ func TestAliases(t *testing.T) {
 		request := getRequest(method.GET, "/hello/world")
 		response := r.Build().OnRequest(request)
 		require.Equal(t, int(status.OK), int(response.Reveal().Code))
-	})
-}
-
-func TestCatchers(t *testing.T) {
-	t.Run("multiple overriding endpoints", func(t *testing.T) {
-		r := New().
-			Get("/", http.Respond).
-			Get("/hello", http.Respond).
-			Catch("/", func(req *http.Request) *http.Response {
-				return req.Respond().String("magic")
-			}).
-			Catch("/hello", func(req *http.Request) *http.Response {
-				return req.Respond().String("double magic")
-			}).
-			Build()
-
-		resp := r.OnRequest(getRequest(method.GET, "/"))
-		require.Equal(t, status.OK, resp.Reveal().Code)
-		require.Empty(t, resp.Reveal().Body)
-		resp = r.OnRequest(getRequest(method.GET, "/hello"))
-		require.Equal(t, status.OK, resp.Reveal().Code)
-		require.Empty(t, resp.Reveal().Body)
-		resp = r.OnRequest(getRequest(method.GET, "/anything"))
-		require.Equal(t, status.OK, resp.Reveal().Code)
-		require.Equal(t, "magic", string(resp.Reveal().Body))
-		resp = r.OnRequest(getRequest(method.GET, "/helloworld"))
-		require.Equal(t, status.OK, resp.Reveal().Code)
-		require.Equal(t, "double magic", string(resp.Reveal().Body))
 	})
 }
 

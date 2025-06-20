@@ -32,11 +32,9 @@ func (r *Router) prepare() error {
 		}
 
 		r.mutators = append(r.mutators, child.mutators...)
-		r.catchers = append(r.catchers, child.catchers...)
 	}
 
 	r.applyMiddlewares()
-	r.applyCatchersMiddlewares()
 
 	return nil
 }

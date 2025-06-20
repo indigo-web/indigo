@@ -27,13 +27,6 @@ func (r Resource) Use(middlewares ...Middleware) Resource {
 	return r
 }
 
-// Catch registers a catcher. A catcher is a handler, that is being called if requested path
-// is not found, and it starts with a defined prefix
-func (r Resource) Catch(prefix string, handler Handler, mwares ...Middleware) Resource {
-	r.group.Catch(prefix, handler, mwares...)
-	return r
-}
-
 // Static adds a catcher of prefix, that automatically returns files from defined root
 // directory
 func (r Resource) Static(prefix, root string) Resource {
