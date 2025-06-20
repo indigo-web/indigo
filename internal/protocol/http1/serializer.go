@@ -1,7 +1,7 @@
 package http1
 
 import (
-	"fmt"
+	"github.com/indigo-web/indigo/config"
 	"github.com/indigo-web/indigo/http"
 	"github.com/indigo-web/indigo/http/cookie"
 	"github.com/indigo-web/indigo/http/method"
@@ -11,113 +11,260 @@ import (
 	"github.com/indigo-web/indigo/internal/strutil"
 	"github.com/indigo-web/indigo/kv"
 	"io"
-	"log"
+	"math/bits"
+	"net"
 	"strconv"
+	"strings"
 	"time"
 )
 
-const (
-	contentType      = "Content-Type: "
-	transferEncoding = "Transfer-Encoding: "
-	contentLength    = "Content-Length: "
-	setCookie        = "Set-Cookie: "
-	crlf             = "\r\n"
-)
+const crlf = "\r\n"
 
-// minimalFileBuffSize defines the minimal size of the file buffer. In case it's less
-// it'll be set to this value and debug log will be printed
-const minimalFileBuffSize = 16
-
-var (
-	chunkedFinalizer = []byte("0\r\n\r\n")
-	zoneGMT          = time.FixedZone("GMT", 0)
-)
+type writer interface {
+	io.Writer
+	Conn() net.Conn
+}
 
 type serializer struct {
-	request *http.Request
-	writer  io.Writer
-	buff    []byte
-	// fileBuff isn't allocated until needed in order to save memory in cases,
-	// where no files are being sent
-	fileBuff       []byte
-	fileBuffSize   int
+	cfg            *config.Config
+	request        *http.Request
+	client         writer
+	reader         constReader
+	buff           []byte
 	defaultHeaders defaultHeaders
 }
 
 func newSerializer(
+	cfg *config.Config,
+	client writer,
 	buff []byte,
-	fileBuffSize int,
 	defHdrs map[string]string,
 	request *http.Request,
-	writer io.Writer,
 ) *serializer {
-	if fileBuffSize < minimalFileBuffSize {
-		log.Printf("misconfiguration: file buffer size (Config.HTTP.FileBuffSize) is %d, "+
-			"which is below minimal (%d). The value is forcefully set to %d\n",
-			fileBuffSize, minimalFileBuffSize, minimalFileBuffSize,
-		)
-
-		fileBuffSize = minimalFileBuffSize
-	}
-
 	return &serializer{
+		cfg:            cfg,
 		request:        request,
-		writer:         writer,
-		buff:           buff[:0],
-		fileBuffSize:   fileBuffSize,
+		client:         client,
+		buff:           buff,
 		defaultHeaders: processDefaultHeaders(defHdrs),
 	}
 }
 
-// PreWrite writes the response into the buffer without actually sending it. Usually used
-// for informational responses
-func (s *serializer) PreWrite(protocol proto.Protocol, response *http.Response) {
-	s.renderProtocol(protocol)
-	fields := response.Reveal()
-	s.renderResponseLine(fields)
-	s.renderHeaders(fields)
+// Upgrade writes an informational response 101 Switching Protocols without immediately flushing it.
+func (s *serializer) Upgrade() {
+	s.appendProtocol(s.request.Protocol)
+	s.buff = append(s.buff, "101 Switching Protocol\r\n"...)
+
+	s.appendKnownHeader("Connection: ", "upgrade")
+	s.appendKnownHeader("Upgrade: ", s.request.Upgrade.String())
+
 	s.crlf()
 }
 
-// Write writes the response, keeping in mind difference between 1.0 and 1.1 HTTP versions
-func (s *serializer) Write(
-	protocol proto.Protocol, response *http.Response,
-) (err error) {
-	defer s.clear()
+func (s *serializer) Write(protocol proto.Protocol, response *http.Response) error {
+	s.appendProtocol(protocol)
+	resp := response.Reveal()
+	s.appendResponseLine(resp)
+	s.appendHeaders(resp)
 
-	s.renderProtocol(protocol)
-	fields := response.Reveal()
-	s.renderResponseLine(fields)
-
-	if fields.Attachment.Content() != nil {
-		return s.sendAttachment(s.request, response, s.writer)
+	for _, c := range resp.Cookies {
+		s.appendCookie(c)
 	}
 
-	s.renderHeaders(fields)
-
-	for _, c := range fields.Cookies {
-		s.renderCookie(c)
+	err := s.writeStream(resp)
+	if err != nil {
+		return err
 	}
 
-	s.renderContentLength(int64(len(fields.Body)))
-	s.crlf()
-
-	if s.request.Method != method.HEAD {
-		// HEAD request responses must be similar to GET request responses, except
-		// forced lack of body, even if Content-Length is specified
-		s.buff = append(s.buff, fields.Body...)
-	}
-
-	_, err = s.writer.Write(s.buff)
+	err = s.flush()
 
 	if !isKeepAlive(protocol, s.request) && s.request.Upgrade == proto.Unknown {
 		err = status.ErrCloseConnection
 	}
 
+	s.cleanup()
 	return err
 }
 
-func (s *serializer) renderResponseLine(fields *response.Fields) {
+func (s *serializer) writeStream(resp *response.Fields) error {
+	if bodyLen := len(resp.BufferedBody); bodyLen > 0 {
+		s.reader.Reset(resp.BufferedBody)
+		resp.Stream = &s.reader
+		resp.StreamSize = int64(bodyLen)
+	}
+
+	// TODO: here we should grow the buffer if necessary
+
+	switch {
+	case resp.StreamSize > -1:
+		s.appendContentLength(resp.StreamSize)
+		s.crlf()
+		if err := s.writePlainData(resp.Stream, resp.StreamSize); err != nil {
+			return err
+		}
+	case resp.Stream != nil:
+		s.appendKnownHeader("Transfer-Encoding: ", "chunked")
+		s.crlf()
+		if err := s.writeChunked(resp.Stream); err != nil {
+			return err
+		}
+	default:
+		s.appendKnownHeader("Content-Length: ", "0")
+		s.crlf()
+	}
+
+	if c, ok := resp.Stream.(io.Closer); ok {
+		return c.Close()
+	}
+
+	return nil
+}
+
+func (s *serializer) writePlainData(r io.Reader, size int64) error {
+	if size == 0 || s.request.Method == method.HEAD {
+		return nil
+	}
+
+	if r == nil {
+		// FIXME: this is clearly the user's fault. And this must somehow be signalized
+		// FIXME: explicitly, otherwise debugging this shit might become a personal hell.
+		return status.ErrInternalServerError
+	}
+
+	if w, ok := r.(io.WriterTo); ok {
+		// files do support the io.WriterTo interface and take advantage of smarter kernel
+		// mechanisms if available. In Linux it's sendfile(2), for example. File entities are
+		// smart and know if the passed Writer is a net.Conn
+		if err := s.flush(); err != nil {
+			return err
+		}
+
+		_, err := w.WriteTo(s.client.Conn())
+		return err
+	}
+
+	for size > 0 {
+		boundary := min(int64(len(s.buff))+size, int64(cap(s.buff)))
+		n, err := r.Read(s.buff[len(s.buff):boundary])
+		size -= int64(n)
+
+		if size > 0 && err != nil {
+			if err == io.EOF {
+				err = io.ErrUnexpectedEOF
+			}
+
+			return err
+		}
+
+		s.buff = s.buff[:len(s.buff)+n]
+		if err = s.flush(); err != nil {
+			return err
+		}
+	}
+
+	return s.flush()
+}
+
+var (
+	// chunkExtZeroFill is used to fill the gap between chunk length and chunk content. The count
+	// 64/4 represents 64 bits - the maximal uint size, and 4 - bits per hex value, therefore
+	// resulting in 15 characters (plus semicolon) total.
+	chunkExtZeroFill = ";" + strings.Repeat("0", 64/4-1)
+	chunkZeroTrailer = []byte("0\r\n\r\n")
+)
+
+func (s *serializer) writeChunked(r io.Reader) error {
+	if r == nil {
+		// TODO: the reader should not be nil at all. This is a probable error, therefore
+		// TODO: must somehow be signalized to the user.
+		return s.safeAppend(chunkZeroTrailer)
+	}
+
+	if s.request.Method == method.HEAD {
+		return nil
+	}
+
+	const crlflen = len(crlf)
+
+	for {
+		var (
+			buff         = s.buff[len(s.buff):cap(s.buff)]
+			maxHexLength = (bits.Len64(uint64(len(buff)))-1)/4 + 1
+			dataOffset   = maxHexLength + crlflen
+		)
+
+		if len(buff) <= dataOffset+crlflen {
+			// FIXME: in case the response buffer is too small, this will cause an infinite loop.
+			// FIXME: Consider checking it before and panicking (?)
+			if err := s.flush(); err != nil {
+				return err
+			}
+
+			continue
+		}
+
+		n, err := r.Read(buff[dataOffset : len(buff)-crlflen])
+
+		hexlen := len(strconv.AppendUint(buff[:0], uint64(n), 16)) // chunk length
+		copy(buff[hexlen:maxHexLength], chunkExtZeroFill)          // fill gap between length and (future) CRLF
+		copy(buff[maxHexLength:], crlf)                            // CRLF between length and data
+		copy(buff[dataOffset+n:], crlf)                            // CRLF at the end of the data
+
+		s.buff = s.buff[:len(s.buff)+dataOffset+n+crlflen] // extend buffer to include the written data
+
+		switch err {
+		case nil:
+		case io.EOF:
+			if n != 0 {
+				if err = s.safeAppend(chunkZeroTrailer); err != nil {
+					return err
+				}
+			}
+
+			return s.flush()
+		default:
+			return err
+		}
+
+		if err = s.flush(); err != nil {
+			return err
+		}
+	}
+}
+
+// safeAppend tries to append a string into a limited capacity buffer, which can possibly overflow.
+// If the input data is longer than free space left in the buffer, the buffer is filled till full
+// and flushed, leaving thereby free space for the rest of the string.
+func (s *serializer) safeAppend(data []byte) error {
+	for len(data) > 0 {
+		freeSpace := cap(s.buff) - len(s.buff)
+
+		if len(data) <= freeSpace {
+			s.buff = append(s.buff, data...)
+			return nil
+		}
+
+		s.buff = append(s.buff, data[:freeSpace]...)
+		if err := s.flush(); err != nil {
+			return err
+		}
+
+		data = data[freeSpace:]
+	}
+
+	return nil
+}
+
+func (s *serializer) flush() (err error) {
+	if len(s.buff) > 0 {
+		_, err = s.client.Write(s.buff)
+		s.buff = s.buff[:0]
+	}
+
+	return err
+}
+
+func (s *serializer) appendResponseLine(fields *response.Fields) {
 	statusLine := status.Line(fields.Code)
 
 	if fields.Status == "" && statusLine != "" {
@@ -132,11 +279,11 @@ func (s *serializer) renderResponseLine(fields *response.Fields) {
 	s.crlf()
 }
 
-func (s *serializer) renderHeaders(fields *response.Fields) {
+func (s *serializer) appendHeaders(fields *response.Fields) {
 	responseHeaders := fields.Headers
 
 	for _, header := range responseHeaders {
-		s.renderHeader(header)
+		s.appendHeader(header)
 		s.defaultHeaders.Exclude(header.Key)
 	}
 
@@ -148,134 +295,29 @@ func (s *serializer) renderHeaders(fields *response.Fields) {
 		s.buff = append(s.buff, header.Full...)
 	}
 
-	// Content-Type is compulsory. Transfer-Encoding is not
-	s.renderKnownHeader(contentType, fields.ContentType)
-	if len(fields.TransferEncoding) > 0 {
-		s.renderKnownHeader(transferEncoding, fields.TransferEncoding)
-	}
+	s.appendKnownHeader("Content-Type: ", fields.ContentType)
 }
 
-// sendAttachment simply encapsulates all the logic related to rendering arbitrary
-// io.Reader implementations
-func (s *serializer) sendAttachment(
-	request *http.Request, response *http.Response, writer io.Writer,
-) (err error) {
-	fields := response.Reveal()
-	size := fields.Attachment.Size()
-
-	if size > 0 {
-		s.renderHeaders(fields)
-		s.renderContentLength(int64(size))
-	} else {
-		s.renderHeaders(response.TransferEncoding("chunked").Reveal())
-	}
-
-	// now we have to send the body via plain text or chunked transfer encoding.
-	// I'm proposing to make an exception for chunked transfer encoding with a
-	// separate method that'll handle with it by its own. Maybe, even for plain-text
-
-	s.crlf()
-
-	if _, err = writer.Write(s.buff); err != nil {
-		return status.ErrCloseConnection
-	}
-
-	if request.Method == method.HEAD {
-		// HEAD requests MUST NOT contain response bodies. They are just like
-		// GET request, but without response entities
-		return nil
-	}
-
-	if len(s.fileBuff) == 0 {
-		s.fileBuff = make([]byte, s.fileBuffSize)
-	}
-
-	if fields.Attachment.Size() > 0 {
-		err = s.writePlainBody(fields.Attachment.Content(), writer)
-	} else {
-		err = s.writeChunkedBody(fields.Attachment.Content(), writer)
-	}
-
-	fields.Attachment.Close()
-
-	return err
-}
-
-func (s *serializer) writePlainBody(r io.Reader, writer io.Writer) error {
-	// TODO: we really could simply use the response buffer instead of a separated file buffer.
-
-	if w, ok := r.(io.WriterTo); ok {
-		_, err := w.WriteTo(writer)
-		if err != nil {
-			// ignore any occurred errors, cut the connection down immediately
-			err = status.ErrCloseConnection
-		}
-
-		return err
-	}
-
-	for {
-		n, err := r.Read(s.fileBuff)
-		switch err {
-		case nil:
-		case io.EOF:
-			return nil
-		default:
-			return status.ErrCloseConnection
-		}
-
-		if _, err = writer.Write(s.fileBuff[:n]); err != nil {
-			return status.ErrCloseConnection
-		}
-	}
-}
-
-func (s *serializer) writeChunkedBody(r io.Reader, writer io.Writer) error {
-	const (
-		hexValueOffset = 8
-		crlfSize       = 1 /* CR */ + 1 /* LF */
-		buffOffset     = hexValueOffset + crlfSize
-	)
-
-	for {
-		n, err := r.Read(s.fileBuff[buffOffset : len(s.fileBuff)-crlfSize])
-
-		if n > 0 {
-			// first rewrite begin of the fileBuff to contain our hexdecimal value
-			buff := strconv.AppendUint(s.fileBuff[:0], uint64(n), 16)
-			// now we can determine the length of the hexdecimal value and make an
-			// offset for it
-			blankSpace := hexValueOffset - len(buff)
-			copy(s.fileBuff[blankSpace:], buff)
-			copy(s.fileBuff[hexValueOffset:], crlf)
-			copy(s.fileBuff[buffOffset+n:], crlf)
-
-			if _, err := writer.Write(s.fileBuff[blankSpace : buffOffset+n+crlfSize]); err != nil {
-				return status.ErrCloseConnection
-			}
-		}
-
-		switch err {
-		case nil:
-		case io.EOF:
-			_, err = writer.Write(chunkedFinalizer)
-			return err
-		default:
-			return status.ErrCloseConnection
-		}
-	}
-}
-
-// renderHeaderInto the buffer. Appends CRLF in the end
-func (s *serializer) renderHeader(header kv.Pair) {
+// appendHeader writes a complete header field line, including the crlf at the end.
+func (s *serializer) appendHeader(header kv.Pair) {
 	s.buff = append(s.buff, header.Key...)
 	s.colonsp()
 	s.buff = append(s.buff, header.Value...)
 	s.crlf()
 }
 
-func (s *serializer) renderCookie(c cookie.Cookie) {
-	s.buff = append(s.buff, setCookie...)
+// appendKnownHeader differs from appendHeader only by the fact that the key is known to already
+// have a colon and a space included.
+func (s *serializer) appendKnownHeader(key, value string) {
+	s.buff = append(s.buff, key...)
+	s.buff = append(s.buff, value...)
+	s.crlf()
+}
+
+var zoneGMT = time.FixedZone("GMT", 0)
+
+func (s *serializer) appendCookie(c cookie.Cookie) {
+	s.buff = append(s.buff, "Set-Cookie: "...)
 	s.buff = append(s.buff, c.Name...)
 	s.buff = append(s.buff, '=')
 	s.buff = append(s.buff, c.Value...)
@@ -295,9 +337,8 @@ func (s *serializer) renderCookie(c cookie.Cookie) {
 
 	if !c.Expires.IsZero() {
 		s.buff = append(s.buff, "Expires="...)
-		// TODO: this will probably be slow. Can be optimized via rendering it manually
-		// TODO: directly into the s.buff
-		s.buff = append(s.buff, c.Expires.In(zoneGMT).Format(time.RFC1123)...)
+		// TODO: this might be slow. We can write the date manually though
+		s.buff = c.Expires.In(zoneGMT).AppendFormat(s.buff, time.RFC1123)
 		s.buff = append(s.buff, ';', ' ')
 	}
 
@@ -331,18 +372,13 @@ func (s *serializer) renderCookie(c cookie.Cookie) {
 	s.crlf()
 }
 
-func (s *serializer) renderContentLength(value int64) {
-	s.buff = strconv.AppendInt(append(s.buff, contentLength...), value, 10)
+func (s *serializer) appendContentLength(value int64) {
+	s.buff = append(s.buff, "Content-Length: "...)
+	s.buff = strconv.AppendUint(s.buff, uint64(value), 10)
 	s.crlf()
 }
 
-func (s *serializer) renderKnownHeader(key, value string) {
-	s.buff = append(s.buff, key...)
-	s.buff = append(s.buff, value...)
-	s.crlf()
-}
-
-func (s *serializer) renderProtocol(protocol proto.Protocol) {
+func (s *serializer) appendProtocol(protocol proto.Protocol) {
 	// in case the request method or path were malformed, parser had no chance of reaching
 	// the protocol and thereby resulting in the unknown one.
 	const defaultFallbackProtocol = proto.HTTP11
@@ -352,7 +388,7 @@ func (s *serializer) renderProtocol(protocol proto.Protocol) {
 	}
 
 	s.buff = append(s.buff, protocol.String()...)
-	s.buff = append(s.buff, ' ')
+	s.sp()
 }
 
 func (s *serializer) sp() {
@@ -367,8 +403,7 @@ func (s *serializer) crlf() {
 	s.buff = append(s.buff, crlf...)
 }
 
-func (s *serializer) clear() {
-	s.buff = s.buff[:0]
+func (s *serializer) cleanup() {
 	s.defaultHeaders.Reset()
 }
 
@@ -390,7 +425,7 @@ func processDefaultHeaders(hdrs map[string]string) defaultHeaders {
 	processed := make(defaultHeaders, 0, len(hdrs))
 
 	for key, value := range hdrs {
-		full := renderHeader(key, value)
+		full := key + ": " + value + crlf
 		processed = append(processed, defaultHeader{
 			// we let the GC release all the values of the map, as here we're using only
 			// the brand-new line without keeping the original string
@@ -402,9 +437,22 @@ func processDefaultHeaders(hdrs map[string]string) defaultHeaders {
 	return processed
 }
 
-func renderHeader(key, value string) string {
-	// used at initialization period only, so quite acceptable
-	return fmt.Sprintf("%s: %s\r\n", key, value)
+type constReader struct {
+	data []byte
+}
+
+func (c *constReader) Read(b []byte) (n int, err error) {
+	n = copy(b, c.data)
+	c.data = c.data[n:]
+	if len(c.data) == 0 {
+		err = io.EOF
+	}
+
+	return n, err
+}
+
+func (c *constReader) Reset(data []byte) {
+	c.data = data
 }
 
 type defaultHeader struct {

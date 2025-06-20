@@ -35,6 +35,10 @@ type (
 		DefaultContentType mime.MIME
 	}
 
+	HTTPResponseBuffer struct {
+		Default, Maximal int
+	}
+
 	URIRequestLineSize struct {
 		Default, Maximal int
 	}
@@ -90,11 +94,13 @@ type (
 	}
 
 	HTTP struct {
-		// ResponseBuffSize is responsible for a response buffer that is being allocated when
-		// client connects and is used for rendering the response into it
-		ResponseBuffSize int
-		// FileBuffSize defines the size of the read buffer when reading a file
-		FileBuffSize int
+		// ResponseBuffer is used to store the byte-representation of a response, ready to be sent
+		// over the network. It can grow up:
+		//
+		// 1. If the response body size is known (1) and exceeds the current buffer size (2);
+		//    Note: maximal response buffer size won't exceed even if the full response body size is
+		//          longer than that.
+		ResponseBuffer HTTPResponseBuffer
 	}
 
 	NET struct {
@@ -171,8 +177,10 @@ func Default() *Config {
 			},
 		},
 		HTTP: HTTP{
-			ResponseBuffSize: 1024,
-			FileBuffSize:     64 * 1024, // 64kb read buffer for files is pretty much sufficient
+			ResponseBuffer: HTTPResponseBuffer{
+				Default: 1024,
+				Maximal: 64 * 1024,
+			},
 		},
 		NET: NET{
 			ReadBufferSize:            4 * 1024, // 4kb is more than enough for ordinary requests.
