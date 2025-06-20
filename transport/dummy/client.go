@@ -24,6 +24,10 @@ func NewCircularClient(data ...[]byte) *CircularClient {
 	}
 }
 
+func NewNopClient() *CircularClient {
+	return NewCircularClient(nil)
+}
+
 func (c *CircularClient) Read() (data []byte, err error) {
 	if c.closed {
 		return nil, io.EOF
@@ -58,12 +62,12 @@ func (c *CircularClient) Pushback(takeback []byte) {
 	c.tmp = takeback
 }
 
-func (*CircularClient) Write(p []byte) (int, error) {
+func (c *CircularClient) Write(p []byte) (int, error) {
 	return len(p), nil
 }
 
 func (c *CircularClient) Conn() net.Conn {
-	return nil
+	return new(Conn).Nop()
 }
 
 func (*CircularClient) Remote() net.Addr {
@@ -78,21 +82,4 @@ func (c *CircularClient) Close() error {
 func (c *CircularClient) OneTime() *CircularClient {
 	c.oneTime = true
 	return c
-}
-
-func NewNopClient() transport.Client {
-	return NewCircularClient(nil)
-}
-
-type SinkholeWriter struct {
-	Data []byte
-}
-
-func NewSinkholeWriter() *SinkholeWriter {
-	return new(SinkholeWriter)
-}
-
-func (s *SinkholeWriter) Write(b []byte) (int, error) {
-	s.Data = append(s.Data, b...)
-	return len(b), nil
 }
