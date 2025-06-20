@@ -121,6 +121,22 @@ func TestTree(t *testing.T) {
 		test(t, tree, "/file/photo.jpg", 1, "name", "photo.jpg")
 		test(t, tree, "/file/by-path/images/photo.jpg", 2, "path", "images/photo.jpg")
 	})
+
+	t.Run("no static section", func(t *testing.T) {
+		tree := New[int]()
+		require.NoError(t, tree.Insert(":path...", 1))
+
+		test(t, tree, "/", 1, "path", "/")
+		test(t, tree, "/hello/world", 1, "path", "/hello/world")
+	})
+
+	t.Run("wildcard in the middle of a segment", func(t *testing.T) {
+		tree := New[int]()
+		require.NoError(t, tree.Insert("/prefix:path...", 1))
+
+		test(t, tree, "/prefix42", 1, "path", "42")
+		test(t, tree, "/prefixnowhere/like/this", 1, "path", "nowhere/like/this")
+	})
 }
 
 func test(t *testing.T, tree *Node[int], path string, value int, wKey, wVal string) {
