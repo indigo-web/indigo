@@ -67,7 +67,6 @@ func getInbuiltRouter() *inbuilt.Router {
 		Post(respond)
 
 	r.Get("/file/:name", func(request *http.Request) *http.Response {
-		fmt.Println("name:", request.Vars.Value("name"))
 		return request.Respond().File("tests/" + request.Vars.Value("name"))
 	})
 
@@ -177,7 +176,7 @@ func TestFirstPhase(t *testing.T) {
 			)
 		s := config.Default()
 		s.NET.ReadTimeout = 500 * time.Millisecond
-		_ = app.
+		require.NoError(t, app.
 			Tune(s).
 			OnStart(func() {
 				ch <- struct{}{}
@@ -187,7 +186,8 @@ func TestFirstPhase(t *testing.T) {
 			}).
 			Listen(altAddr, TCP()).
 			TLS(httpsAddr, LocalCert()).
-			Serve(r)
+			Serve(r),
+		)
 	}(app)
 
 	<-ch
@@ -219,6 +219,7 @@ func TestFirstPhase(t *testing.T) {
 		req, err := stdhttp.NewRequest(stdhttp.MethodGet, appURL+"/", r)
 		require.NoError(t, err)
 		resp, err := stdhttp.DefaultClient.Do(req)
+		require.NoError(t, err)
 		defer func() {
 			_ = resp.Body.Close()
 		}()
