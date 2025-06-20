@@ -98,5 +98,6 @@ fabric.properties
 
 linesofcode.py
 oldestline.sh
+cloc.sh
 
 bin/
