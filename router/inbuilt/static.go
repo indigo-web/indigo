@@ -1,25 +1,46 @@
 package inbuilt
 
 import (
+	"fmt"
 	"github.com/indigo-web/indigo/http"
 	"github.com/indigo-web/indigo/http/status"
-	"github.com/indigo-web/indigo/internal/pathlib"
+	"os"
 	"strings"
 )
 
 // Static adds a catcher of prefix, that automatically returns files from defined root
 // directory
 func (r *Router) Static(prefix, root string, mwares ...Middleware) *Router {
-	pathReplacer := pathlib.NewPath(prefix, root)
+	stat, err := os.Stat(root)
+	if err != nil {
+		panic(err)
+	}
 
-	return r.Catch(prefix, func(request *http.Request) *http.Response {
-		pathReplacer.Set(request.Path)
-		path := pathReplacer.Relative()
+	if !stat.IsDir() {
+		panic(fmt.Sprintf("%s: not a directory", root))
+	}
+
+	fs := os.DirFS(root)
+
+	return r.Get(prefix+"/:path...", func(request *http.Request) *http.Response {
+		path := request.Vars.Value("path")
 		if !isSafe(path) {
-			return http.Error(request, status.ErrNotFound)
+			return http.Error(request, status.ErrBadRequest)
 		}
 
-		return request.Respond().File(path)
+		file, err := fs.Open(path)
+		if err != nil {
+			return http.Error(request, status.ErrNotFound).
+				String(err.(*os.PathError).Err.Error())
+		}
+
+		fstat, err := file.Stat()
+		if err != nil {
+			return http.Error(request, status.ErrInternalServerError).
+				String(err.(*os.PathError).Err.Error())
+		}
+
+		return http.SizedStream(request, file, fstat.Size())
 	}, mwares...)
 }
 
