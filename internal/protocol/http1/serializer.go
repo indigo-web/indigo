@@ -13,6 +13,7 @@ import (
 	"io"
 	"math/bits"
 	"net"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -93,8 +94,6 @@ func (s *serializer) writeStream(resp *response.Fields) error {
 		resp.StreamSize = int64(bodyLen)
 	}
 
-	// TODO: here we should grow the buffer if necessary
-
 	switch {
 	case resp.StreamSize > -1:
 		s.appendContentLength(resp.StreamSize)
@@ -143,8 +142,13 @@ func (s *serializer) writePlainData(r io.Reader, size int64) error {
 		return err
 	}
 
+	if int(size) >= cap(s.buff) {
+		newSize := min(s.cfg.HTTP.ResponseBuffer.Maximal, int(size))
+		slices.Grow(s.buff, newSize-cap(s.buff))
+	}
+
 	for size > 0 {
-		boundary := min(int64(len(s.buff))+size, int64(cap(s.buff)))
+		boundary := min(len(s.buff)+int(size), cap(s.buff))
 		n, err := r.Read(s.buff[len(s.buff):boundary])
 		size -= int64(n)
 
@@ -228,6 +232,12 @@ func (s *serializer) writeChunked(r io.Reader) error {
 
 		if err = s.flush(); err != nil {
 			return err
+		}
+
+		if cap(s.buff)-dataOffset-n-crlflen <= cap(s.buff)>>6 {
+			// if free space left after the whole chunk was written is less than
+			// ~1.56% of the buffer total capacity, double the buffer size.
+			s.buff = slices.Grow(s.buff, cap(s.buff)*2)
 		}
 	}
 }
