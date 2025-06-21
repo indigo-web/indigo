@@ -159,7 +159,10 @@ func (r *Response) File(path string) *Response {
 
 // Stream sets a reader to be the source of the response's body.
 func (r *Response) Stream(reader io.Reader) *Response {
+	// TODO: we can check whether the reader implements Len() int interface and in that
+	// TODO: case elide the chunked transfer encoding
 	r.fields.Stream = reader
+	r.fields.StreamSize = -1
 	return r
 }
 
