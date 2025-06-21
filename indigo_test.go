@@ -192,6 +192,20 @@ func TestFirstPhase(t *testing.T) {
 
 	<-ch
 
+	// Ensure the server is ready to accept connections
+	deadline := time.Now().Add(2 * time.Second)
+	for {
+		conn, err := net.Dial("tcp4", addr)
+		if err == nil {
+			_ = conn.Close()
+			break
+		}
+		if time.Now().After(deadline) {
+			t.Fatalf("server did not start listening on %s in time: %v", addr, err)
+		}
+		time.Sleep(50 * time.Millisecond)
+	}
+
 	t.Run("root get", func(t *testing.T) {
 		resp, err := stdhttp.DefaultClient.Get(appURL + "/")
 		require.NoError(t, err)
