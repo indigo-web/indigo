@@ -95,11 +95,14 @@ type (
 
 	HTTP struct {
 		// ResponseBuffer is used to store the byte-representation of a response, ready to be sent
-		// over the network. It can grow up:
+		// over the network.
 		//
-		// 1. If the response body size is known (1) and exceeds the current buffer size (2);
-		//    Note: maximal response buffer size won't exceed even if the full response body size is
-		//          longer than that.
+		// Response buffer growth rules:
+		//  1) If the stream is sized (1) and its size overflows current buffer length (2),
+		//   grow it to contain the whole stream at once, but limit the size to at most
+		//   `HTTP.ResponseBuffer.Maximal`
+		//  2) If the stream is unsized (1) and the previous write used more than ~98.44% of its total
+		//   capacity (2), the capacity doubles.
 		ResponseBuffer HTTPResponseBuffer
 	}
 

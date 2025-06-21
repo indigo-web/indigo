@@ -232,24 +232,6 @@ func TestSerializer(t *testing.T) {
 		testWithHeaders(t, s, writer)
 	})
 
-	t.Run("HEAD request", func(t *testing.T) {
-		const body = "Hello, world!"
-		writer := new(JournalingClient)
-		response := http.NewResponse().String(body)
-		request := newRequest()
-		request.Method = method.HEAD
-		s := getSerializer(nil, request, writer)
-
-		require.NoError(t, s.Write(proto.HTTP11, response))
-
-		resp, err := parseHTTP11Response("HEAD", writer)
-		require.NoError(t, err)
-		require.Equal(t, len(body), int(resp.ContentLength))
-		fullBody, err := io.ReadAll(resp.Body)
-		require.NoError(t, err)
-		require.Empty(t, fullBody)
-	})
-
 	t.Run("HTTP/1.0 without keep-alive", func(t *testing.T) {
 		serializer := getSerializer(nil, request, new(JournalingClient))
 		response := http.NewResponse()
@@ -266,59 +248,6 @@ func TestSerializer(t *testing.T) {
 		resp, err := parseHTTP11Response("GET", writer)
 		require.NoError(t, err)
 		require.Equal(t, 600, resp.StatusCode)
-	})
-
-	t.Run("sized stream", func(t *testing.T) {
-		const body = "Hello, world!"
-		reader := strings.NewReader(body)
-		writer := new(JournalingClient)
-		serializer := getSerializer(nil, request, writer)
-		response := http.NewResponse().SizedStream(reader, int64(reader.Len()))
-
-		require.NoError(t, serializer.Write(proto.HTTP11, response))
-		resp, err := parseHTTP11Response("GET", writer)
-		require.NoError(t, err)
-		require.Equal(t, len(body), int(resp.ContentLength))
-		require.Nil(t, resp.TransferEncoding)
-		fullBody, err := io.ReadAll(resp.Body)
-		require.NoError(t, err)
-		require.Equal(t, body, string(fullBody))
-	})
-
-	t.Run("unsized stream", func(t *testing.T) {
-		const body = "Hello, world!"
-		reader := strings.NewReader(body)
-		writer := new(JournalingClient)
-		s := getSerializer(nil, request, writer)
-		response := http.NewResponse().Stream(reader)
-
-		require.NoError(t, s.Write(proto.HTTP11, response))
-		resp, err := parseHTTP11Response("GET", writer)
-		require.NoError(t, err)
-		require.Equal(t, 1, len(resp.TransferEncoding))
-		require.Equal(t, "chunked", resp.TransferEncoding[0])
-		fullBody, err := io.ReadAll(resp.Body)
-		require.NoError(t, err)
-		require.Equal(t, body, string(fullBody))
-	})
-
-	t.Run("stream in response to HEAD", func(t *testing.T) {
-		const body = "Hello, world!"
-		reader := strings.NewReader(body)
-		request.Method = method.HEAD
-		writer := new(JournalingClient)
-		s := getSerializer(nil, request, writer)
-		response := http.NewResponse().SizedStream(reader, int64(reader.Len()))
-
-		require.NoError(t, s.Write(proto.HTTP11, response))
-
-		resp, err := parseHTTP11Response("HEAD", writer)
-		require.NoError(t, err)
-		require.Nil(t, resp.TransferEncoding)
-		require.Equal(t, len(body), int(resp.ContentLength))
-		fullBody, err := io.ReadAll(resp.Body)
-		require.NoError(t, err)
-		require.Empty(t, string(fullBody))
 	})
 
 	t.Run("cookies", func(t *testing.T) {
@@ -408,7 +337,7 @@ func TestSerializer(t *testing.T) {
 		require.Equal(t, []string{"world"}, resp.Header["Hello"])
 	})
 
-	t.Run("reuse", func(t *testing.T) {
+	{
 		defHeaders := map[string]string{
 			"Hello": "world",
 		}
@@ -493,8 +422,39 @@ func TestSerializer(t *testing.T) {
 			testUnsized(t, "HEAD", "")
 		})
 
-		// TODO: add tests with WriterTo
-	})
+		t.Run("WriterTo and Closer", func(t *testing.T) {
+			request.Method = method.GET
+			w := new(writerToCloser)
+			w.Reset([]byte(helloworld))
+			resp := http.NewResponse().
+				SizedStream(w, int64(len(helloworld)))
+			require.NoError(t, s.Write(proto.HTTP11, resp))
+			testSized(t, "GET", len(helloworld), helloworld)
+		})
+	}
+}
+
+type writerToCloser struct {
+	constReader
+	Closed bool
+}
+
+func (w *writerToCloser) WriteTo(writer io.Writer) (n int64, err error) {
+	for len(w.data) > 0 {
+		written, err := writer.Write(w.data)
+		w.data = w.data[written:]
+		n += int64(written)
+		if err != nil {
+			return n, err
+		}
+	}
+
+	return n, nil
+}
+
+func (w *writerToCloser) Close() error {
+	w.Closed = true
+	return nil
 }
 
 func TestSerializer_ChunkedTransfer(t *testing.T) {
