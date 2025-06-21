@@ -7,7 +7,6 @@ import (
 	"github.com/indigo-web/indigo/http/status"
 	"github.com/indigo-web/indigo/internal/response"
 	"github.com/indigo-web/indigo/internal/strutil"
-	"github.com/indigo-web/indigo/internal/types"
 	"github.com/indigo-web/indigo/kv"
 	json "github.com/json-iterator/go"
 	"io"
@@ -25,7 +24,7 @@ const (
 )
 
 type Response struct {
-	fields *response.Fields
+	fields response.Fields
 }
 
 // NewResponse returns a new instance of the Response object with status code set to 200 OK,
@@ -34,10 +33,11 @@ type Response struct {
 // clear reason otherwise
 func NewResponse() *Response {
 	return &Response{
-		&response.Fields{
+		response.Fields{
 			Code:        status.OK,
 			Headers:     make([]kv.Pair, 0, preallocRespHeaders),
 			ContentType: response.DefaultContentType,
+			StreamSize:  -1,
 		},
 	}
 }
@@ -112,13 +112,13 @@ func (r *Response) String(body string) *Response {
 // Bytes sets the response's body to passed slice WITHOUT COPYING. Changing
 // the passed slice later will affect the response by itself
 func (r *Response) Bytes(body []byte) *Response {
-	r.fields.Body = body
+	r.fields.BufferedBody = body
 	return r
 }
 
 // Write implements io.Reader interface. It always returns n=len(b) and err=nil
 func (r *Response) Write(b []byte) (n int, err error) {
-	r.fields.Body = append(r.fields.Body, b...)
+	r.fields.BufferedBody = append(r.fields.BufferedBody, b...)
 	return len(b), nil
 }
 
@@ -132,7 +132,6 @@ func (r *Response) TryFile(path string) (*Response, error) {
 
 	stat, err := fd.Stat()
 	if err != nil {
-		// ...and if we can't get stats on it, it exists, however something in system went wrong
 		return r, status.ErrInternalServerError
 	}
 	if stat.IsDir() {
@@ -144,7 +143,7 @@ func (r *Response) TryFile(path string) (*Response, error) {
 		r.fields.ContentType = defaultFileMIME
 	}
 
-	return r.Attachment(fd, int(stat.Size())), nil
+	return r.SizedStream(fd, stat.Size()), nil
 }
 
 // File opens a file for reading and returns a new Response with attachment, set to the file
@@ -158,10 +157,21 @@ func (r *Response) File(path string) *Response {
 	return resp
 }
 
-// Attachment sets a Response's attachment. In this case Response body will be ignored.
-// If size <= 0, then Transfer-Encoding: chunked will be used
-func (r *Response) Attachment(reader io.Reader, size int) *Response {
-	r.fields.Attachment = types.NewAttachment(reader, size)
+// Stream sets a reader to be the source of the response's body.
+func (r *Response) Stream(reader io.Reader) *Response {
+	// TODO: we can check whether the reader implements Len() int interface and in that
+	// TODO: case elide the chunked transfer encoding
+	r.fields.Stream = reader
+	r.fields.StreamSize = -1
+	return r
+}
+
+// SizedStream receives a hint of the stream's future size. This helps, for example, uploading files,
+// as in this case we can rely on io.WriterTo interface, which might use more effective kernel mechanisms
+// available, e.g. sendfile(2) for Linux.
+func (r *Response) SizedStream(reader io.Reader, size int64) *Response {
+	r.fields.Stream = reader
+	r.fields.StreamSize = size
 	return r
 }
 
@@ -174,7 +184,7 @@ func (r *Response) Cookie(cookies ...cookie.Cookie) *Response {
 // TryJSON receives a model (must be a pointer to the structure) and returns a new Response
 // object and an error
 func (r *Response) TryJSON(model any) (*Response, error) {
-	r.fields.Body = r.fields.Body[:0]
+	r.fields.BufferedBody = r.fields.BufferedBody[:0]
 	stream := json.ConfigDefault.BorrowStream(r)
 	stream.WriteVal(model)
 	err := stream.Flush()
@@ -220,7 +230,7 @@ func (r *Response) Error(err error, code ...status.Code) *Response {
 
 // Reveal returns a struct with values, filled by builder. Used mostly in internal purposes
 func (r *Response) Reveal() *response.Fields {
-	return r.fields
+	return &r.fields
 }
 
 // Clear discards everything was done with Response object before
@@ -229,42 +239,52 @@ func (r *Response) Clear() *Response {
 	return r
 }
 
-// Respond is a predicate to request.Respond(). May be used as a dummy handler
+// Respond is a shorthand for request.Respond(). May be used as a dummy handler
 func Respond(request *Request) *Response {
 	return request.Respond()
 }
 
-// Code is a predicate to request.Respond().Code(...)
+// Code is a shorthand for request.Respond().Code(...)
 func Code(request *Request, code status.Code) *Response {
 	return request.Respond().Code(code)
 }
 
-// String is a predicate to request.Respond().String(...)
+// String is a shorthand for request.Respond().String(...)
 func String(request *Request, str string) *Response {
 	return request.Respond().String(str)
 }
 
-// Bytes is a predicate to request.Respond().Bytes(...)
+// Bytes is a shorthand for request.Respond().Bytes(...)
 func Bytes(request *Request, b []byte) *Response {
 	return request.Respond().Bytes(b)
 }
 
-// File is a predicate to request.Respond().File(...)
+// File is a shorthand for request.Respond().File(...)
 func File(request *Request, path string) *Response {
 	return request.Respond().File(path)
 }
 
-// JSON is a predicate to request.Respond().JSON(...)
+// Stream is a shorthand for request.Respond().Stream(...)
+func Stream(request *Request, reader io.Reader) *Response {
+	return request.Respond().Stream(reader)
+}
+
+// SizedStream is a shorthand for request.Respond().SizedStream(...)
+func SizedStream(request *Request, reader io.Reader, size int64) *Response {
+	return request.Respond().SizedStream(reader, size)
+}
+
+// JSON is a shorthand for request.Respond().JSON(...)
 func JSON(request *Request, model any) *Response {
 	return request.Respond().JSON(model)
 }
 
-// Error is a predicate to request.Respond().Error(...)
+// Error is a shorthand for request.Respond().Error(...)
 //
-// Error returns a response builder with an error set. If passed err is nil, nothing will happen.
-// If an instance of status.HTTPError is passed, error code will be automatically set. Custom
-// codes can be passed, however only first will be used. By default, the error is
-// status.ErrInternalServerError
+// Error returns the response builder with an error set. If passed err is nil, nothing will happen.
+// If an instance of status.HTTPError is passed, its status code is automatically set. Otherwise,
+// status.ErrInternalServerError is used. A custom code can be set. Passing multiple status codes
+// will discard all except the first one.
 func Error(request *Request, err error, code ...status.Code) *Response {
 	return request.Respond().Error(err, code...)
 }

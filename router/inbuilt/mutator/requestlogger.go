@@ -2,15 +2,15 @@ package mutator
 
 import (
 	"github.com/indigo-web/indigo/http"
-	"github.com/indigo-web/indigo/router/inbuilt/internal/types"
+	"github.com/indigo-web/indigo/router/inbuilt/internal"
 	"log"
 )
 
-type logger interface {
+type Logger interface {
 	Printf(fmt string, v ...any)
 }
 
-func RequestsLog(loggers ...logger) types.Mutator {
+func LogRequest(loggers ...Logger) internal.Mutator {
 	if len(loggers) == 0 {
 		loggers = append(loggers, log.Default())
 	}

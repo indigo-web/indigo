@@ -13,7 +13,7 @@ func TestResponse(t *testing.T) {
 		m := []int{1, 2, 3}
 		resp, err := response.TryJSON(m)
 		require.NoError(t, err)
-		require.Equal(t, "[1,2,3]", string(resp.Reveal().Body))
+		require.Equal(t, "[1,2,3]", string(resp.Reveal().BufferedBody))
 		require.Equal(t, "application/json", resp.Reveal().ContentType)
 	})
 }

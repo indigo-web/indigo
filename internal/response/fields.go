@@ -4,32 +4,33 @@ import (
 	"github.com/indigo-web/indigo/http/cookie"
 	"github.com/indigo-web/indigo/http/mime"
 	"github.com/indigo-web/indigo/http/status"
-	"github.com/indigo-web/indigo/internal/types"
 	"github.com/indigo-web/indigo/kv"
+	"io"
 )
 
 const DefaultContentType = mime.HTML
 
 type Fields struct {
-	Attachment  types.Attachment
-	Headers     []kv.Pair
-	Body        []byte
-	Cookies     []cookie.Cookie
-	Status      status.Status
-	ContentType mime.MIME
-	// TODO: add corresponding Content-Encoding field
-	// TODO: automatically apply the encoding on a body when specified
+	Code   status.Code
+	Status status.Status
+	// TODO: Content-Encoding might also be handy
 	TransferEncoding string
-	Code             status.Code
+	ContentType      mime.MIME
+	Stream           io.Reader
+	StreamSize       int64
+	BufferedBody     []byte
+	Headers          []kv.Pair
+	Cookies          []cookie.Cookie
 }
 
 func (f *Fields) Clear() {
 	f.Code = status.OK
 	f.Status = ""
-	f.ContentType = DefaultContentType
 	f.TransferEncoding = ""
+	f.ContentType = DefaultContentType
+	f.Stream = nil
+	f.StreamSize = -1
+	f.BufferedBody = nil
 	f.Headers = f.Headers[:0]
-	f.Body = nil
 	f.Cookies = f.Cookies[:0]
-	f.Attachment = types.Attachment{}
 }

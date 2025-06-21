@@ -1,32 +1,38 @@
 package inbuilt
 
 import (
+	"github.com/indigo-web/indigo/http"
 	"github.com/indigo-web/indigo/http/method"
 	"github.com/indigo-web/indigo/http/status"
-	"github.com/indigo-web/indigo/router/inbuilt/internal/types"
+	"github.com/indigo-web/indigo/router/inbuilt/internal/radix"
 	"strings"
 )
 
-type Handler = types.Handler
+type (
+	Handler       func(*http.Request) *http.Response
+	errorHandlers map[status.Code]Handler
+	methodLUT     [method.Count + 1]Handler
+)
 
-type errorHandlers map[status.Code]Handler
-
-type routesMapEntry struct {
-	methodsMap types.MethodsMap
-	allow      string
+type endpoint struct {
+	methods methodLUT
+	allow   string
 }
 
-type routesMap map[string]routesMapEntry
+type (
+	routesMap map[string]endpoint
+	radixTree = *radix.Node[endpoint]
+)
 
 func (r routesMap) Add(path string, m method.Method, handler Handler) {
 	entry := r[path]
-	entry.methodsMap[m] = handler
-	entry.allow = getAllowString(entry.methodsMap)
+	entry.methods[m] = handler
+	entry.allow = getAllowString(entry.methods)
 	r[path] = entry
 }
 
-func getAllowString(methodsMap types.MethodsMap) (allowed string) {
-	for i, handler := range methodsMap {
+func getAllowString(methods methodLUT) (allowed string) {
+	for i, handler := range methods {
 		if handler == nil {
 			continue
 		}

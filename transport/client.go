@@ -39,6 +39,7 @@ func (c *client) Read() ([]byte, error) {
 		return pending, nil
 	}
 
+	// TODO: use internal/timer?
 	if err := c.conn.SetReadDeadline(time.Now().Add(c.timeout)); err != nil {
 		return nil, err
 	}

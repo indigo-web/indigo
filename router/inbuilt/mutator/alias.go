@@ -3,7 +3,7 @@ package mutator
 import (
 	"github.com/indigo-web/indigo/http"
 	"github.com/indigo-web/indigo/http/method"
-	"github.com/indigo-web/indigo/router/inbuilt/internal/types"
+	"github.com/indigo-web/indigo/router/inbuilt/internal"
 )
 
 func getAllowedMethods(methods []method.Method) (lut [method.Count + 1]bool) {
@@ -18,7 +18,7 @@ func getAllowedMethods(methods []method.Method) (lut [method.Count + 1]bool) {
 	return lut
 }
 
-func Alias(from, to string, forMethods ...method.Method) types.Mutator {
+func Alias(from, to string, forMethods ...method.Method) internal.Mutator {
 	allowedMethods := getAllowedMethods(forMethods)
 
 	return func(request *http.Request) {

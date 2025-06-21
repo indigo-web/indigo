@@ -106,7 +106,7 @@ chunkExt:
 		if c.chunkLength == 0 {
 			goto trailer
 		}
-
+		
 		goto chunkBody
 	}
 

@@ -6,10 +6,7 @@ import (
 	"github.com/indigo-web/indigo/http/status"
 	"github.com/indigo-web/indigo/router"
 	"github.com/indigo-web/indigo/router/inbuilt/internal/radix"
-	"github.com/indigo-web/indigo/router/inbuilt/internal/types"
 	"github.com/indigo-web/indigo/router/inbuilt/uri"
-	"sort"
-	"strings"
 )
 
 var _ router.Builder = new(Router)
@@ -26,7 +23,6 @@ type Router struct {
 	isRoot      bool
 	prefix      string
 	mutators    []Mutator
-	catchers    []Catcher
 	middlewares []Middleware
 	registrar   *registrar
 	children    []*Router
@@ -46,9 +42,8 @@ func New() *Router {
 // is the fact, that there is a lot of data that is used only at registering/initialization stage.
 type runtimeRouter struct {
 	mutators    []Mutator
-	catchers    []Catcher
 	traceBuff   []byte
-	tree        radix.Tree
+	tree        *radix.Node[endpoint]
 	routesMap   routesMap
 	errHandlers errorHandlers
 	isStatic    bool
@@ -61,27 +56,23 @@ func (r *Router) Build() router.Router {
 		panic(err)
 	}
 
-	sort.Slice(r.catchers, func(i, j int) bool {
-		return len(r.catchers[i].Prefix) > len(r.catchers[j].Prefix)
-	})
-	isStatic := !r.registrar.IsDynamic()
+	isDynamic := r.registrar.IsDynamic()
 	var (
 		rmap routesMap
-		tree radix.Tree
+		tree *radix.Node[endpoint]
 	)
-	if isStatic {
-		rmap = r.registrar.AsMap()
-	} else {
+	if isDynamic {
 		tree = r.registrar.AsRadixTree()
+	} else {
+		rmap = r.registrar.AsMap()
 	}
 
 	return &runtimeRouter{
 		mutators:    r.mutators,
-		catchers:    r.catchers,
 		tree:        tree,
 		routesMap:   rmap,
 		errHandlers: r.errHandlers,
-		isStatic:    isStatic,
+		isStatic:    !isDynamic,
 	}
 }
 
@@ -96,28 +87,25 @@ func (r *runtimeRouter) OnRequest(request *http.Request) *http.Response {
 }
 
 func (r *runtimeRouter) onRequest(request *http.Request) *http.Response {
-	var methodsMap types.MethodsMap
+	var (
+		e     endpoint
+		found bool
+	)
 
 	if r.isStatic {
-		endpoint, found := r.routesMap[request.Path]
-		if !found {
-			return r.onError(request, status.ErrNotFound)
-		}
-
-		methodsMap = endpoint.methodsMap
-		request.Env.AllowedMethods = endpoint.allow
+		e, found = r.routesMap[request.Path]
 	} else {
-		endpoint := r.tree.Match(request.Path, request.Params)
-		if endpoint == nil {
-			return r.onError(request, status.ErrNotFound)
-		}
-
-		methodsMap = endpoint.MethodsMap
-		request.Env.AllowedMethods = endpoint.Allow
+		e, found = r.tree.Lookup(request.Path, request.Vars)
 	}
 
-	handler := getHandler(request.Method, methodsMap)
+	if !found {
+		return r.onError(request, status.ErrNotFound)
+	}
+
+	handler := getHandler(request.Method, e.methods)
 	if handler == nil {
+		request.Env.AllowedMethods = e.allow
+
 		return r.onError(request, status.ErrMethodNotAllowed)
 	}
 
@@ -136,14 +124,6 @@ func (r *runtimeRouter) onError(request *http.Request, err error) *http.Response
 		r.traceBuff = renderHTTPRequest(request, r.traceBuff)
 
 		return traceResponse(request.Respond(), r.traceBuff)
-	}
-
-	if err == status.ErrNotFound {
-		for _, catcher := range r.catchers {
-			if strings.HasPrefix(request.Path, catcher.Prefix) {
-				return catcher.Handler(request)
-			}
-		}
 	}
 
 	httpErr, ok := err.(status.HTTPError)
@@ -188,10 +168,10 @@ func (r *Router) applyErrorHandlersMiddlewares() {
 
 // getHandler looks up for a handler in the methodsMap. In case request method is HEAD, however
 // no matching handler is found, a handler for corresponding GET request will be retrieved
-func getHandler(reqMethod method.Method, methodsMap types.MethodsMap) Handler {
-	handler := methodsMap[reqMethod]
+func getHandler(reqMethod method.Method, mlut methodLUT) Handler {
+	handler := mlut[reqMethod]
 	if handler == nil && reqMethod == method.HEAD {
-		return getHandler(method.GET, methodsMap)
+		return getHandler(method.GET, mlut)
 	}
 
 	return handler

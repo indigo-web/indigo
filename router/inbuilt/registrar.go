@@ -4,37 +4,41 @@ import (
 	"fmt"
 	"github.com/indigo-web/indigo/http/method"
 	"github.com/indigo-web/indigo/router/inbuilt/internal/radix"
-	"github.com/indigo-web/indigo/router/inbuilt/internal/types"
 	"github.com/indigo-web/indigo/router/inbuilt/uri"
 	"strings"
 )
 
 type registrar struct {
-	routes      map[string]map[method.Method]Handler
+	endpoints   map[string]map[method.Method]Handler
 	usedMethods [method.Count]bool
 	isDynamic   bool
 }
 
 func newRegistrar() *registrar {
 	return &registrar{
-		routes: make(map[string]map[method.Method]Handler),
+		endpoints: make(map[string]map[method.Method]Handler),
 	}
 }
 
 func (r *registrar) Add(path string, m method.Method, handler Handler) error {
+	if len(path) == 0 {
+		return fmt.Errorf("empty path")
+	}
+
+	// TODO: support urlencoded characters in endpoints.
 	path = uri.Normalize(path)
-	methodsMap := r.routes[path]
+	methodsMap := r.endpoints[path]
 	if methodsMap == nil {
 		methodsMap = make(map[method.Method]Handler)
 	}
 
 	if _, ok := methodsMap[m]; ok {
-		return fmt.Errorf("route already registered: %s %s", m, path)
+		return fmt.Errorf("%s %s: already registered", m, path)
 	}
 
 	methodsMap[m] = handler
-	r.routes[path] = methodsMap
-	r.isDynamic = r.isDynamic || !radix.MustParse(path).IsStatic()
+	r.endpoints[path] = methodsMap
+	r.isDynamic = r.isDynamic || radix.IsDynamicTemplate(path)
 
 	return nil
 }
@@ -42,17 +46,17 @@ func (r *registrar) Add(path string, m method.Method, handler Handler) error {
 func (r *registrar) Merge(another *registrar) error {
 	r.isDynamic = r.isDynamic || another.isDynamic
 
-	for path, v := range another.routes {
+	for path, v := range another.endpoints {
 		for method_, handler := range v {
-			if r.routes[path] == nil {
-				r.routes[path] = make(map[method.Method]Handler)
+			if r.endpoints[path] == nil {
+				r.endpoints[path] = make(map[method.Method]Handler)
 			}
 
-			if r.routes[path][method_] != nil {
+			if r.endpoints[path][method_] != nil {
 				return fmt.Errorf("route already registered: %s %s", method_.String(), path)
 			}
 
-			r.routes[path][method_] = handler
+			r.endpoints[path][method_] = handler
 		}
 	}
 
@@ -60,7 +64,7 @@ func (r *registrar) Merge(another *registrar) error {
 }
 
 func (r *registrar) Apply(f func(handler Handler) Handler) {
-	for _, v := range r.routes {
+	for _, v := range r.endpoints {
 		for key, handler := range v {
 			v[key] = f(handler)
 		}
@@ -72,9 +76,9 @@ func (r *registrar) IsDynamic() bool {
 }
 
 func (r *registrar) AsMap() routesMap {
-	rmap := make(routesMap)
+	rmap := make(routesMap, len(r.endpoints))
 
-	for path, v := range r.routes {
+	for path, v := range r.endpoints {
 		for method_, handler := range v {
 			rmap.Add(path, method_, handler)
 		}
@@ -83,24 +87,30 @@ func (r *registrar) AsMap() routesMap {
 	return rmap
 }
 
-func (r *registrar) AsRadixTree() radix.Tree {
-	tree := radix.New()
+func (r *registrar) AsRadixTree() radixTree {
+	tree := radix.New[endpoint]()
 
-	for path, v := range r.routes {
-		var (
-			methodsMap types.MethodsMap
-			allow      string
-		)
-
-		for method_, handler := range v {
-			methodsMap[method_] = handler
-			allow += method_.String() + ","
+	for path, e := range r.endpoints {
+		if len(path) == 0 {
+			panic("empty path")
 		}
 
-		tree.MustInsert(radix.MustParse(path), radix.Payload{
-			MethodsMap: methodsMap,
-			Allow:      strings.TrimSuffix(allow, ","),
-		})
+		var (
+			mlut  methodLUT
+			allow string
+		)
+
+		for m, handler := range e {
+			mlut[m] = handler
+			allow += m.String() + ","
+		}
+
+		if err := tree.Insert(path, endpoint{
+			methods: mlut,
+			allow:   strings.TrimSuffix(allow, ","),
+		}); err != nil {
+			panic(err)
+		}
 	}
 
 	return tree

@@ -16,9 +16,8 @@ type Suit struct {
 	*parser
 	*body
 	*serializer
-	upgradePreResp *http.Response
-	router         router.Router
-	client         transport.Client
+	router router.Router
+	client transport.Client
 }
 
 func newSuit(
@@ -31,12 +30,11 @@ func newSuit(
 	respBuff []byte,
 ) *Suit {
 	return &Suit{
-		parser:         newParser(cfg, request, keysBuff, valsBuff, requestLineBuff),
-		body:           body,
-		serializer:     newSerializer(respBuff, cfg.HTTP.ResponseBuffSize, cfg.Headers.Default, request, client),
-		upgradePreResp: http.NewResponse(),
-		router:         r,
-		client:         client,
+		parser:     newParser(cfg, request, keysBuff, valsBuff, requestLineBuff),
+		body:       body,
+		serializer: newSerializer(cfg, client, respBuff, cfg.Headers.Default, request),
+		router:     r,
+		client:     client,
 	}
 }
 
@@ -46,7 +44,7 @@ func New(
 	req *http.Request, decoders codecutil.Cache[http.Decompressor],
 ) *Suit {
 	keysBuff, valsBuff, requestLineBuff := construct.Buffers(cfg)
-	respBuff := make([]byte, 0, cfg.HTTP.ResponseBuffSize)
+	respBuff := make([]byte, 0, cfg.HTTP.ResponseBuffer.Default)
 	body := newBody(client, cfg.Body, decoders)
 
 	return newSuit(
@@ -99,14 +97,7 @@ func (s *Suit) serve(once bool) (ok bool) {
 
 		version := request.Protocol
 		if request.Upgrade != proto.Unknown && proto.HTTP1&request.Upgrade != 0 {
-			// TODO: replace this with a method "WriteUpgrade" or similar
-			s.PreWrite(
-				request.Protocol,
-				s.upgradePreResp.
-					Code(status.SwitchingProtocols).
-					Header("Connection", "upgrade").
-					Header("Upgrade", request.Protocol.String()),
-			)
+			s.Upgrade()
 			version = request.Upgrade
 		}
 
