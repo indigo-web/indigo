@@ -16,6 +16,8 @@ type Fields struct {
 	// TODO: Content-Encoding might also be handy
 	TransferEncoding string
 	ContentType      mime.MIME
+	Charset          mime.Charset
+	CharsetSet       bool
 	Stream           io.Reader
 	StreamSize       int64
 	BufferedBody     []byte
@@ -28,6 +30,8 @@ func (f *Fields) Clear() {
 	f.Status = ""
 	f.TransferEncoding = ""
 	f.ContentType = DefaultContentType
+	f.Charset = mime.Unset
+	f.CharsetSet = false
 	f.Stream = nil
 	f.StreamSize = -1
 	f.BufferedBody = nil

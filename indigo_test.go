@@ -60,7 +60,8 @@ func getInbuiltRouter() *inbuilt.Router {
 
 	r := inbuilt.New().
 		Use(middleware.Recover).
-		Use(middleware.CustomContext(ctx))
+		Use(middleware.CustomContext(ctx)).
+		Static("/static", "tests")
 
 	r.Resource("/").
 		Get(respond).
@@ -405,6 +406,37 @@ func TestFirstPhase(t *testing.T) {
 		require.NoError(t, err)
 
 		require.Equal(t, string(actualContent), string(data))
+	})
+
+	testStatic := func(t *testing.T, file, mime string) {
+		actualContent, err := os.ReadFile("./tests/" + file)
+		require.NoError(t, err)
+
+		resp, err := stdhttp.DefaultClient.Get(appURL + "/static/" + file)
+		require.NoError(t, err)
+		require.Equal(t, stdhttp.StatusOK, resp.StatusCode)
+		if len(mime) > 0 {
+			require.Equal(t, mime, resp.Header["Content-Type"][0])
+		} else {
+			require.Empty(t, resp.Header["Content-Type"])
+		}
+
+		data, err := io.ReadAll(resp.Body)
+		require.NoError(t, err)
+
+		require.Equal(t, string(actualContent), string(data))
+	}
+
+	t.Run("request static html", func(t *testing.T) {
+		testStatic(t, "index.html", "text/html;charset=utf8")
+	})
+
+	t.Run("request static css", func(t *testing.T) {
+		testStatic(t, "styles.css", "text/css;charset=utf8")
+	})
+
+	t.Run("request static non-standard extension", func(t *testing.T) {
+		testStatic(t, "pics.vfs", mime.Unset)
 	})
 
 	t.Run("trace", func(t *testing.T) {

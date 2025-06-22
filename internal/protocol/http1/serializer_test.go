@@ -7,6 +7,7 @@ import (
 	"github.com/indigo-web/indigo/http"
 	"github.com/indigo-web/indigo/http/cookie"
 	"github.com/indigo-web/indigo/http/method"
+	"github.com/indigo-web/indigo/http/mime"
 	"github.com/indigo-web/indigo/http/proto"
 	"github.com/indigo-web/indigo/http/status"
 	"github.com/indigo-web/indigo/internal/construct"
@@ -344,6 +345,7 @@ func TestSerializer(t *testing.T) {
 		writer := new(JournalingClient)
 		request := newRequest()
 		s := getSerializer(defHeaders, request, writer)
+
 		testSized := func(t *testing.T, method string, contentLength int, body string) {
 			r, err := parseHTTP11Response(method, writer)
 			require.NoError(t, err)
@@ -432,6 +434,44 @@ func TestSerializer(t *testing.T) {
 			testSized(t, "GET", len(helloworld), helloworld)
 		})
 	}
+
+	t.Run("content-type charset", func(t *testing.T) {
+		writer := new(JournalingClient)
+		request := newRequest()
+		request.Method = method.HEAD
+		s := getSerializer(nil, request, writer)
+
+		testMIME := func(t *testing.T, resp *http.Response, wantMIME string) {
+			require.NoError(t, s.Write(proto.HTTP11, resp))
+			r, err := parseHTTP11Response("HEAD", writer)
+			require.NoError(t, err)
+
+			if wantMIME != mime.Unset {
+				require.Equal(t, wantMIME, r.Header["Content-Type"][0])
+				require.Equal(t, 1, len(r.Header["Content-Type"]))
+			} else {
+				require.Empty(t, r.Header["Content-Type"])
+			}
+
+			writer.Reset()
+		}
+
+		t.Run("known default", func(t *testing.T) {
+			testMIME(t, http.NewResponse(), "text/html;charset=utf8")
+		})
+
+		t.Run("unknown default", func(t *testing.T) {
+			testMIME(t, http.NewResponse().ContentType(mime.PNG), "image/png")
+		})
+
+		t.Run("explicitly set", func(t *testing.T) {
+			testMIME(t, http.NewResponse().ContentType(mime.CSS, mime.UTF32), "text/css;charset=utf32")
+		})
+
+		t.Run("no content type", func(t *testing.T) {
+			testMIME(t, http.NewResponse().ContentType(mime.Unset), mime.Unset)
+		})
+	})
 }
 
 type writerToCloser struct {

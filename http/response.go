@@ -11,7 +11,6 @@ import (
 	json "github.com/json-iterator/go"
 	"io"
 	"os"
-	"path/filepath"
 )
 
 type ResponseWriter func(b []byte) error
@@ -32,14 +31,13 @@ type Response struct {
 // NOTE: it's recommended to use Request.Respond() method inside of handlers, if there's no
 // clear reason otherwise
 func NewResponse() *Response {
-	return &Response{
-		response.Fields{
-			Code:        status.OK,
-			Headers:     make([]kv.Pair, 0, preallocRespHeaders),
-			ContentType: response.DefaultContentType,
-			StreamSize:  -1,
-		},
+	fields := response.Fields{
+		Headers: make([]kv.Pair, 0, preallocRespHeaders),
 	}
+
+	fields.Clear()
+
+	return &Response{fields}
 }
 
 // Code sets a Response code and a corresponding status.
@@ -58,9 +56,17 @@ func (r *Response) Status(status status.Status) *Response {
 	return r
 }
 
-// ContentType sets a custom Content-Type header value.
-func (r *Response) ContentType(value mime.MIME) *Response {
+// ContentType sets a custom Content-Type header value. If a charset isn't explicitly set,
+// it'll be set to a default one (if) defined in mime.DefaultCharsets. It can be explicitly
+// unset using the mime.Unset value.
+func (r *Response) ContentType(value mime.MIME, charset ...mime.Charset) *Response {
 	r.fields.ContentType = value
+
+	if len(charset) > 0 {
+		r.fields.CharsetSet = true
+		r.fields.Charset = charset[0]
+	}
+
 	return r
 }
 
@@ -70,8 +76,9 @@ func (r *Response) TransferEncoding(value string) *Response {
 	return r
 }
 
-// Header sets header values to a key. In case it already exists the value will
-// be appended.
+// Header appends a key-values pair into the list of headers to be sent in the response.
+//
+// If Content-Type or Transfer-Encoding are passed, respective methods will be used instead.
 func (r *Response) Header(key string, values ...string) *Response {
 	switch {
 	case strutil.CmpFold(key, "content-type"):
@@ -138,12 +145,9 @@ func (r *Response) TryFile(path string) (*Response, error) {
 		return r, status.ErrNotFound
 	}
 
-	r.fields.ContentType = mime.Extension[filepath.Ext(path)]
-	if len(r.fields.ContentType) == 0 {
-		r.fields.ContentType = defaultFileMIME
-	}
-
-	return r.SizedStream(fd, stat.Size()), nil
+	return r.
+		ContentType(mime.Guess(path, mime.HTML)).
+		SizedStream(fd, stat.Size()), nil
 }
 
 // File opens a file for reading and returns a new Response with attachment, set to the file

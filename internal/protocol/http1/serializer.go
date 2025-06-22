@@ -5,6 +5,7 @@ import (
 	"github.com/indigo-web/indigo/http"
 	"github.com/indigo-web/indigo/http/cookie"
 	"github.com/indigo-web/indigo/http/method"
+	"github.com/indigo-web/indigo/http/mime"
 	"github.com/indigo-web/indigo/http/proto"
 	"github.com/indigo-web/indigo/http/status"
 	"github.com/indigo-web/indigo/internal/response"
@@ -305,7 +306,27 @@ func (s *serializer) appendHeaders(fields *response.Fields) {
 		s.buff = append(s.buff, header.Full...)
 	}
 
-	s.appendKnownHeader("Content-Type: ", fields.ContentType)
+	if fields.ContentType != mime.Unset {
+		s.buff = append(s.buff, "Content-Type: "...)
+		s.buff = append(s.buff, fields.ContentType...)
+
+		if fields.CharsetSet {
+			s.appendCharset(fields.Charset)
+		} else {
+			s.appendCharset(mime.DefaultCharset[fields.ContentType])
+		}
+
+		s.crlf()
+	}
+}
+
+func (s *serializer) appendCharset(charset string) {
+	if charset == mime.Unset {
+		return
+	}
+
+	s.buff = append(s.buff, ";charset="...)
+	s.buff = append(s.buff, charset...)
 }
 
 // appendHeader writes a complete header field line, including the crlf at the end.
