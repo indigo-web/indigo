@@ -2,29 +2,36 @@ package mime
 
 var Extension = map[string]MIME{
 	".avif": AVIF,
-	// TODO: charset MUST NOT be constant, but rather be derived from the file itself
-	".css":  "text/css; charset=utf-8",
+	".css":  CSS,
 	".gif":  GIF,
-	".htm":  "text/html; charset=utf-8",
-	".html": "text/html; charset=utf-8",
+	".htm":  HTML,
+	".html": HTML,
 	".jpeg": JPEG,
 	".jpg":  JPEG,
-	".js":   "text/javascript; charset=utf-8",
+	".js":   JAVASCRIPT,
+	".mjs":  JAVASCRIPT,
 	".json": JSON,
-	".mjs":  "text/javascript; charset=utf-8",
 	".pdf":  PDF,
 	".png":  PNG,
 	".svg":  SVG,
 	".wasm": WASM,
 	".webp": WEBP,
-	".xml":  "text/xml; charset=utf-8",
+	".xml":  XML,
 	".gz":   GZIP,
-	".sql":  "application/sql",
-	".tzif": "application/tzif",
+	".sql":  SQL,
+	".tzif": TZIF,
 	".yaml": YAML,
-	".xfdf": "application/xfdf",
+	".xfdf": XFDF,
 	".zip":  ZIP,
 	".zlib": ZLIB,
 	".zstd": ZSTD,
 	".ico":  ICO,
+}
+
+// DefaultCharset defines charsets, used by default for MIMEs unless explicitly set.
+var DefaultCharset = map[MIME]Charset{
+	CSS:        UTF8,
+	HTML:       UTF8,
+	JAVASCRIPT: UTF8,
+	XML:        UTF8,
 }
