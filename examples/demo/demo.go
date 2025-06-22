@@ -70,7 +70,7 @@ func main() {
 		Use(middleware.LogRequests()).
 		Alias("/", "/static/index.html", method.GET).
 		Alias("/favicon.ico", "/static/favicon.ico", method.GET).
-		Static("/static", "examples/combined/static")
+		Static("/static", "examples/demo/static")
 
 	r.Get("/stress", Stressful, middleware.Recover)
 
