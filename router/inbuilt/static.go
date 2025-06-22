@@ -3,6 +3,7 @@ package inbuilt
 import (
 	"fmt"
 	"github.com/indigo-web/indigo/http"
+	"github.com/indigo-web/indigo/http/mime"
 	"github.com/indigo-web/indigo/http/status"
 	"os"
 	"strings"
@@ -40,7 +41,9 @@ func (r *Router) Static(prefix, root string, mwares ...Middleware) *Router {
 				String(err.(*os.PathError).Err.Error())
 		}
 
-		return http.SizedStream(request, file, fstat.Size())
+		return http.
+			SizedStream(request, file, fstat.Size()).
+			ContentType(mime.Guess(path))
 	}, mwares...)
 }
 
