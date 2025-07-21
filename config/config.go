@@ -5,10 +5,6 @@ import (
 	"time"
 )
 
-var DefaultHeaders = map[string]string{
-	"Accept-Encodings": "identity",
-}
-
 type (
 	HeadersNumber struct {
 		Default, Maximal int
@@ -29,7 +25,7 @@ type (
 		// is requested (normally via String() or Bytes() methods.)
 		BufferPrealloc uint64
 		// DefaultCoding sets the default content encoding unless one is explicitly set.
-		DefaultCoding string
+		DefaultCoding mime.Charset
 		// DefaultContentType sets the default form body MIME (as for multipart) unless one is
 		// explicitly set.
 		DefaultContentType mime.MIME
@@ -76,7 +72,8 @@ type (
 		// MaxEncodingTokens is a limit of how many encodings can be applied at the body
 		// in a single request.
 		MaxEncodingTokens int
-		// Default headers are those, which will be rendered on each response unless overridden explicitly.
+		// Default headers are headers to be included into every response implicitly, unless
+		// explicitly overridden.
 		Default map[string]string `test:"nullable"`
 		// CookiesPrealloc defines the initial kv.Storage capacity, used to store the cookies
 		// itself.
@@ -165,7 +162,7 @@ func Default() *Config {
 				Maximal: 8 * 1024, // however allow at most 8kb of headers
 			},
 			MaxEncodingTokens: 15,
-			Default:           DefaultHeaders,
+			Default:           make(map[string]string),
 			CookiesPrealloc:   5,
 		},
 		Body: Body{
@@ -173,9 +170,9 @@ func Default() *Config {
 			Form: BodyForm{
 				EntriesPrealloc: 8,
 				// 1kb is intended for primarily x-www-form-urlencoded, as multipart
-				// needs of memory are fairly low
+				// needs of memory are assumingly fairly low
 				BufferPrealloc:     1024,
-				DefaultCoding:      "utf8",
+				DefaultCoding:      mime.UTF8,
 				DefaultContentType: mime.Plain,
 			},
 		},
