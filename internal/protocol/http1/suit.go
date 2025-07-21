@@ -10,6 +10,7 @@ import (
 	"github.com/indigo-web/indigo/internal/construct"
 	"github.com/indigo-web/indigo/router"
 	"github.com/indigo-web/indigo/transport"
+	"maps"
 )
 
 type Suit struct {
@@ -18,6 +19,7 @@ type Suit struct {
 	*serializer
 	router router.Router
 	client transport.Client
+	codecs codecutil.Cache
 }
 
 func newSuit(
@@ -26,33 +28,39 @@ func newSuit(
 	request *http.Request,
 	client transport.Client,
 	body *body,
-	keysBuff, valsBuff, requestLineBuff buffer.Buffer,
+	codecs codecutil.Cache,
+	keysBuff, valsBuff, statusBuff buffer.Buffer,
 	respBuff []byte,
 ) *Suit {
+	defHeaders := maps.Clone(cfg.Headers.Default)
+	defHeaders["Accept-Encoding"] = codecs.AcceptEncodings()
+
 	return &Suit{
-		parser:     newParser(cfg, request, keysBuff, valsBuff, requestLineBuff),
+		parser:     newParser(cfg, request, keysBuff, valsBuff, statusBuff),
 		body:       body,
-		serializer: newSerializer(cfg, client, respBuff, cfg.Headers.Default, request),
+		serializer: newSerializer(cfg, request, client, codecs, respBuff, defHeaders),
 		router:     r,
 		client:     client,
+		codecs:     codecs,
 	}
 }
 
 // New instantiates an HTTP/1 protocol suit.
 func New(
-	cfg *config.Config, r router.Router, client transport.Client,
-	req *http.Request, decoders codecutil.Cache[http.Decompressor],
+	cfg *config.Config,
+	r router.Router,
+	client transport.Client,
+	request *http.Request,
+	codecs codecutil.Cache,
 ) *Suit {
-	keysBuff, valsBuff, requestLineBuff := construct.Buffers(cfg)
+	keysBuff, valsBuff, statusBuff := construct.Buffers(cfg)
 	respBuff := make([]byte, 0, cfg.HTTP.ResponseBuffer.Default)
-	body := newBody(client, cfg.Body, decoders)
+	b := newBody(client, cfg.Body)
 
-	return newSuit(
-		cfg, r, req, client, body, keysBuff, valsBuff, requestLineBuff, respBuff,
-	)
+	return newSuit(cfg, r, request, client, b, codecs, keysBuff, valsBuff, statusBuff, respBuff)
 }
 
-func (s *Suit) ServeOnce() bool {
+func (s *Suit) ServeOnce() (ok bool) {
 	return s.serve(true)
 }
 
@@ -85,13 +93,20 @@ func (s *Suit) serve(once bool) (ok bool) {
 		}
 
 		client.Pushback(extra)
-
 		request.Body.Reset(request)
-		if err = s.body.Reset(request); err != nil {
-			// an error could occur here only if there were applied unrecognized encodings.
-			// Unfortunately, as the client made a decision to bravely ignore the list of
-			// encodings we do support, we don't want to read all the crap he sent us either.
-			s.router.OnError(request, err)
+		s.body.Reset(request)
+
+		if err = s.applyDecoders(request.Encoding.Transfer); err != nil {
+			// even if the connection is going to be upgraded in advance, the error happened with the
+			// request prior to upgrade.
+			resp := respond(request, s.router.OnError(request, err))
+			_ = s.Write(request.Protocol, resp)
+			return false
+		}
+
+		if err = s.applyDecoders(request.Encoding.Content); err != nil {
+			resp := respond(request, s.router.OnError(request, err))
+			_ = s.Write(request.Protocol, resp)
 			return false
 		}
 
@@ -125,6 +140,25 @@ func (s *Suit) serve(once bool) (ok bool) {
 			return true
 		}
 	}
+}
+
+func (s *Suit) applyDecoders(tokens []string) error {
+	request := s.parser.request
+
+	for i := len(tokens); i > 0; i-- {
+		c := s.codecs.Get(tokens[i-1])
+		if c == nil {
+			return status.ErrUnsupportedEncoding
+		}
+
+		if err := c.ResetDecompressor(request.Body.Fetcher); err != nil {
+			return status.ErrInternalServerError
+		}
+
+		request.Body.Fetcher = c
+	}
+
+	return nil
 }
 
 // respond ensures the passed resp is not nil, otherwise http.Respond(req) is returned

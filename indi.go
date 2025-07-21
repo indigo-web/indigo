@@ -3,6 +3,7 @@ package indigo
 import (
 	"crypto/tls"
 	"github.com/indigo-web/indigo/config"
+	"github.com/indigo-web/indigo/http/codec"
 	"github.com/indigo-web/indigo/internal/strutil"
 	"github.com/indigo-web/indigo/router"
 	"github.com/indigo-web/indigo/router/inbuilt"
@@ -20,6 +21,7 @@ type App struct {
 		OnBind  func(addr string)
 		OnStop  func()
 	}
+	codecs     []codec.Codec
 	transports []Transport
 	supervisor transport.Supervisor
 }
@@ -56,6 +58,12 @@ func (a *App) OnBind(cb func(addr string)) *App {
 // and all the clients are already disconnected.
 func (a *App) OnStop(cb func()) *App {
 	a.hooks.OnStop = cb
+	return a
+}
+
+// Codec appends a new codec into the list of supported.
+func (a *App) Codec(codec codec.Codec) *App {
+	a.codecs = append(a.codecs, codec)
 	return a
 }
 

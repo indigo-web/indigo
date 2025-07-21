@@ -1,32 +1,27 @@
 package http1
 
 import (
+	"bytes"
 	"fmt"
 	"github.com/indigo-web/indigo/config"
 	"github.com/indigo-web/indigo/http"
+	"github.com/indigo-web/indigo/http/codec"
+	"github.com/indigo-web/indigo/http/method"
 	"github.com/indigo-web/indigo/internal/codecutil"
 	"github.com/indigo-web/indigo/internal/construct"
+	"github.com/indigo-web/indigo/internal/dump"
 	"github.com/indigo-web/indigo/kv"
 	"github.com/indigo-web/indigo/router"
 	"github.com/indigo-web/indigo/router/inbuilt"
-	"github.com/indigo-web/indigo/router/simple"
 	"github.com/indigo-web/indigo/transport"
 	"github.com/indigo-web/indigo/transport/dummy"
+	"github.com/klauspost/compress/gzip"
 	"github.com/stretchr/testify/require"
+	"io"
 	"strconv"
 	"strings"
 	"testing"
 )
-
-func newSimpleRouter(t *testing.T, want http.Headers) *simple.Router {
-	return simple.New(func(request *http.Request) *http.Response {
-		require.True(t, compareHeaders(want, request.Headers))
-		return http.Respond(request)
-	}, func(request *http.Request) *http.Response {
-		require.Failf(t, "unexpected error", "unexpected error: %s", request.Env.Error.Error())
-		return nil
-	})
-}
 
 func GenerateHeaders(n int) http.Headers {
 	hdrs := kv.NewPrealloc(n)
@@ -60,7 +55,11 @@ func getInbuiltRouter() router.Router {
 		Get("/with-header", func(request *http.Request) *http.Response {
 			return request.Respond().Header("Hello", "World")
 		}).
-		Get("/"+longPath, http.Respond)
+		Get("/"+longPath, http.Respond).
+		Get("/echo", func(request *http.Request) *http.Response {
+			b, err := request.Body.String()
+			return http.String(request, b).Error(err)
+		})
 
 	r.Resource("/").
 		Get(http.Respond).
@@ -197,13 +196,11 @@ func Benchmark_Post(b *testing.B) {
 	})
 }
 
-func getSuit(client transport.Client) (*Suit, *http.Request) {
-	// using inbuilt router instead of simple in order to be more precise and realistic,
-	// as in wildlife simple router will be barely used
+func getSuit(client transport.Client, codecs ...codec.Codec) (*Suit, *http.Request) {
 	cfg := config.Default()
 	r := getInbuiltRouter()
 	req := construct.Request(cfg, client)
-	suit := New(cfg, r, client, req, codecutil.Cache[http.Decompressor]{})
+	suit := New(cfg, r, client, req, codecutil.NewCache(codecs))
 	req.Body = http.NewBody(cfg, suit)
 
 	return suit, req
@@ -221,75 +218,55 @@ func disperse(data []byte, n int) (parts [][]byte) {
 }
 
 func TestServer(t *testing.T) {
-	const N = 10
+	t.Run("decompress gzip", func(t *testing.T) {
+		gzipped := encodeGZIP("Hello, world!")
+		chunked := encodeChunked(gzipped)
+		req := construct.Request(config.Default(), dummy.NewNopClient())
+		req.Method = method.GET
+		req.Path = "/echo"
+		req.Encoding.Chunked = true
+		req.Encoding.Transfer = []string{"gzip"}
+		req.Body = http.NewBody(config.Default(), dummy.NewClient(chunked).Once())
+		rawRequest, err := dump.Request(req)
+		require.NoError(t, err)
 
-	t.Run("simple get", func(t *testing.T) {
-		raw := []byte("GET / HTTP/1.1\r\nAccept-Encoding: identity\r\n\r\n")
-		client := dummy.NewCircularClient(raw)
-		server, _ := getSuit(client)
-		wantHeaders := kv.New().Add("Accept-Encoding", "identity")
-		server.router = newSimpleRouter(t, wantHeaders)
-
-		for i := 0; i < N; i++ {
-			require.True(t, server.ServeOnce())
-		}
+		client := dummy.NewClient([]byte(rawRequest)).Once()
+		server, _ := getSuit(client, codec.NewGZIP())
+		require.True(t, server.ServeOnce())
+		resp, err := parseHTTP11Response("GET", []byte(client.Written()))
+		require.Equal(t, 200, resp.StatusCode)
+		require.Equal(t, []string{"gzip"}, resp.Header["Accept-Encoding"])
+		b, err := io.ReadAll(resp.Body)
+		require.NoError(t, err)
+		require.Equal(t, "Hello, world!", string(b))
 	})
+}
 
-	t.Run("5 headers", func(t *testing.T) {
-		wantHeaders := GenerateHeaders(5)
-		raw := GenerateRequest(longPath, wantHeaders)
-		dispersed := disperse(raw, config.Default().NET.ReadBufferSize)
-		client := dummy.NewCircularClient(dispersed...)
-		server, _ := getSuit(client)
-		server.router = newSimpleRouter(t, wantHeaders)
+func encodeChunked(input []byte) []byte {
+	w := new(JournalingClient)
+	s := getSerializer(nil, newRequest(), w)
 
-		for i := 0; i < N; i++ {
-			require.True(t, server.ServeOnce())
-		}
-	})
+	r := bytes.NewReader(input)
+	err := s.writeChunked(r)
+	if err != nil {
+		panic(err)
+	}
 
-	t.Run("10 headers", func(t *testing.T) {
-		wantHeaders := GenerateHeaders(10)
-		raw := GenerateRequest(longPath, wantHeaders)
-		dispersed := disperse(raw, config.Default().NET.ReadBufferSize)
-		client := dummy.NewCircularClient(dispersed...)
-		server, _ := getSuit(client)
-		server.router = newSimpleRouter(t, wantHeaders)
+	return w.Data
+}
 
-		for i := 0; i < N; i++ {
-			require.True(t, server.ServeOnce())
-		}
-	})
+func encodeGZIP(text string) []byte {
+	buff := bytes.NewBuffer(nil)
+	c := gzip.NewWriter(buff)
+	_, err := c.Write([]byte(text))
+	if err != nil {
+		panic("unexpected error during gzipping")
+	}
+	if c.Close() != nil {
+		panic("unexpected error during closing gzip writer")
+	}
 
-	t.Run("50 headers", func(t *testing.T) {
-		wantHeaders := GenerateHeaders(50)
-		raw := GenerateRequest(longPath, wantHeaders)
-		dispersed := disperse(raw, config.Default().NET.ReadBufferSize)
-		client := dummy.NewCircularClient(dispersed...)
-		server, _ := getSuit(client)
-		server.router = newSimpleRouter(t, wantHeaders)
-
-		for i := 0; i < N; i++ {
-			for j := 0; j < len(dispersed); j++ {
-				require.True(t, server.ServeOnce())
-			}
-		}
-	})
-
-	t.Run("heavily escaped", func(t *testing.T) {
-		wantHeaders := GenerateHeaders(20)
-		raw := GenerateRequest(strings.Repeat("%20", 500), wantHeaders)
-		dispersed := disperse(raw, config.Default().NET.ReadBufferSize)
-		client := dummy.NewCircularClient(dispersed...)
-		server, _ := getSuit(client)
-		server.router = newSimpleRouter(t, wantHeaders)
-
-		for i := 0; i < N; i++ {
-			for j := 0; j < len(dispersed); j++ {
-				require.True(t, server.ServeOnce())
-			}
-		}
-	})
+	return buff.Bytes()
 }
 
 func TestPOST(t *testing.T) {

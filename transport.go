@@ -23,17 +23,17 @@ import (
 )
 
 type Transport struct {
-	addr          string // must be left intact. Used by App entity only
+	addr          string
 	inner         transport.Transport
-	spawnCallback func(cfg *config.Config, r router.Router) func(net.Conn)
+	spawnCallback func(cfg *config.Config, r router.Router, c []codec.Codec) func(net.Conn)
 }
 
 func TCP() Transport {
 	return Transport{
 		inner: transport.NewTCP(),
-		spawnCallback: func(cfg *config.Config, r router.Router) func(net.Conn) {
+		spawnCallback: func(cfg *config.Config, r router.Router, c []codec.Codec) func(net.Conn) {
 			return func(conn net.Conn) {
-				serve.HTTP1(cfg, conn, encryption.Plain, r)
+				serve.HTTP1(cfg, conn, 0, r, codecutil.NewCache(c))
 			}
 		},
 	}
