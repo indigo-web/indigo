@@ -59,8 +59,7 @@ func (r *Router) Patch(path string, handler Handler, middlewares ...Middleware) 
 	return r
 }
 
-// File is a shortcut for responding with a single file without having to write own
-// closure or enabling static content distribution.
+// File is a shortcut handler for single file endpoints.
 func File(filename string) Handler {
 	return func(request *http.Request) *http.Response {
 		return http.File(request, filename)

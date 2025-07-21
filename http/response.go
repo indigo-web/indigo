@@ -19,7 +19,6 @@ const (
 	// why 7? I honestly don't know. There's no theory nor researches behind this.
 	// It can be adjusted to 10 as well, but why would you?
 	preallocRespHeaders = 7
-	defaultFileMIME     = mime.OctetStream
 )
 
 type Response struct {
@@ -34,7 +33,6 @@ func NewResponse() *Response {
 	fields := response.Fields{
 		Headers: make([]kv.Pair, 0, preallocRespHeaders),
 	}
-
 	fields.Clear()
 
 	return &Response{fields}

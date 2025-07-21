@@ -100,10 +100,12 @@ func (a *App) Serve(r router.Builder) error {
 }
 
 func (a *App) run(r router.Router) error {
-	tryInvoke(a.hooks.OnStart)
+	if a.hooks.OnStart != nil {
+		a.hooks.OnStart()
+	}
 
 	for _, t := range a.transports {
-		if err := a.supervisor.Add(t.addr, t.inner, t.spawnCallback(a.cfg, r)); err != nil {
+		if err := a.supervisor.Add(t.addr, t.inner, t.spawnCallback(a.cfg, r, a.codecs)); err != nil {
 			return err
 		}
 
@@ -113,7 +115,9 @@ func (a *App) run(r router.Router) error {
 	}
 
 	err := a.supervisor.Run(a.cfg.NET)
-	tryInvoke(a.hooks.OnStop)
+	if a.hooks.OnStop != nil {
+		a.hooks.OnStop()
+	}
 
 	return err
 }
@@ -121,10 +125,4 @@ func (a *App) run(r router.Router) error {
 // Stop stops the whole application immediately and waits until it _really_ stops.
 func (a *App) Stop() {
 	a.supervisor.Stop()
-}
-
-func tryInvoke(f func()) {
-	if f != nil {
-		f()
-	}
 }

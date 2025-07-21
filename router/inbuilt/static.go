@@ -31,13 +31,15 @@ func (r *Router) Static(prefix, root string, mwares ...Middleware) *Router {
 
 		file, err := fs.Open(path)
 		if err != nil {
-			return http.Error(request, status.ErrNotFound).
+			return http.
+				Error(request, status.ErrNotFound).
 				String(err.(*os.PathError).Err.Error())
 		}
 
 		fstat, err := file.Stat()
 		if err != nil {
-			return http.Error(request, status.ErrInternalServerError).
+			return http.
+				Error(request, status.ErrInternalServerError).
 				String(err.(*os.PathError).Err.Error())
 		}
 

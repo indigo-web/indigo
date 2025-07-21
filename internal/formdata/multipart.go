@@ -42,8 +42,6 @@ func ParseMultipart(cfg *config.Config, into form.Form, data, buff []byte, b str
 			return nil, status.ErrBadRequest
 		}
 
-		// TODO: DecodeString doesn't decode plus-symbols as spaces, but we need it
-
 		var ok bool
 		hdr.Name, buff, ok = urldecode(hdr.Name, buff)
 		if !ok {
