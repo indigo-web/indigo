@@ -5,6 +5,14 @@ import (
 	"net"
 )
 
+type Transport interface {
+	Bind(addr string) error
+	Listen(cfg config.NET, cb func(conn net.Conn)) error
+	Stop()
+	Close()
+	Wait()
+}
+
 type Supervisor struct {
 	ts     []boundTransport
 	stopch chan struct{}
