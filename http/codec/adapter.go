@@ -1,11 +1,17 @@
 package codec
 
-import "github.com/indigo-web/indigo/http"
+import (
+	"github.com/indigo-web/indigo/http"
+)
 
 type readerAdapter struct {
 	fetcher http.Fetcher
 	err     error
 	data    []byte
+}
+
+func newAdapter() *readerAdapter {
+	return new(readerAdapter)
 }
 
 func (r *readerAdapter) Read(b []byte) (n int, err error) {
