@@ -96,12 +96,23 @@ func (s *Suit) serve(once bool) (ok bool) {
 		request.Body.Reset(request)
 		s.body.Reset(request)
 
-		if err = s.applyDecoders(request.Encoding.Transfer); err != nil {
-			// even if the connection is going to be upgraded in advance, the error happened with the
-			// request prior to upgrade.
-			resp := respond(request, s.router.OnError(request, err))
+		transferEncoding := request.Encoding.Transfer
+
+		if !validateTransferEncodingTokens(transferEncoding) {
+			resp := respond(request, s.router.OnError(request, status.ErrUnsupportedEncoding))
 			_ = s.Write(request.Protocol, resp)
 			return false
+		}
+
+		if len(transferEncoding) > 0 {
+			// get rid of the trailing chunked encoding as it is already built-in.
+			if err = s.applyDecoders(transferEncoding[:len(transferEncoding)-1]); err != nil {
+				// even if the connection is going to be upgraded in advance, the error happened with the
+				// request prior to upgrade.
+				resp := respond(request, s.router.OnError(request, err))
+				_ = s.Write(request.Protocol, resp)
+				return false
+			}
 		}
 
 		if err = s.applyDecoders(request.Encoding.Content); err != nil {
@@ -140,6 +151,20 @@ func (s *Suit) serve(once bool) (ok bool) {
 			return true
 		}
 	}
+}
+
+func validateTransferEncodingTokens(tokens []string) bool {
+	if len(tokens) == 0 {
+		return true
+	}
+
+	for _, token := range tokens[:len(tokens)-1] {
+		if token == "chunked" {
+			return false
+		}
+	}
+
+	return tokens[len(tokens)-1] == "chunked"
 }
 
 func (s *Suit) applyDecoders(tokens []string) error {
