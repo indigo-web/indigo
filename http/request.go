@@ -20,7 +20,7 @@ type (
 	Vars    = *kv.Storage
 )
 
-// Request represents HTTP request
+// Request is the HTTP request representation.
 type Request struct {
 	// Method is an enum representing the request method.
 	Method method.Method
