@@ -1,6 +1,9 @@
 package method
 
-import "testing"
+import (
+	"github.com/stretchr/testify/assert"
+	"testing"
+)
 
 func BenchmarkMethod(b *testing.B) {
 	var parsed Method
@@ -21,3 +24,9 @@ func BenchmarkMethod(b *testing.B) {
 }
 
 func keepalive(Method) {}
+
+func TestMethod(t *testing.T) {
+	for _, method := range List {
+		assert.Equal(t, method.String(), Parse(method.String()).String())
+	}
+}
