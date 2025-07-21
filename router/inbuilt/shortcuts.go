@@ -59,6 +59,48 @@ func (r *Router) Patch(path string, handler Handler, middlewares ...Middleware) 
 	return r
 }
 
+// Mkcol is a shortcut for registering MKCOL-requests.
+func (r *Router) Mkcol(path string, handler Handler, middlewares ...Middleware) *Router {
+	r.Route(method.MKCOL, path, handler, middlewares...)
+	return r
+}
+
+// Move is a shortcut for registering MOVE-requests.
+func (r *Router) Move(path string, handler Handler, middlewares ...Middleware) *Router {
+	r.Route(method.MOVE, path, handler, middlewares...)
+	return r
+}
+
+// Copy is a shortcut for registering COPY-requests.
+func (r *Router) Copy(path string, handler Handler, middlewares ...Middleware) *Router {
+	r.Route(method.COPY, path, handler, middlewares...)
+	return r
+}
+
+// Lock is a shortcut for registering LOCK-requests.
+func (r *Router) Lock(path string, handler Handler, middlewares ...Middleware) *Router {
+	r.Route(method.LOCK, path, handler, middlewares...)
+	return r
+}
+
+// Unlock is a shortcut for registering UNLOCK-requests.
+func (r *Router) Unlock(path string, handler Handler, middlewares ...Middleware) *Router {
+	r.Route(method.UNLOCK, path, handler, middlewares...)
+	return r
+}
+
+// Propfind is a shortcut for registering PROPFIND-requests.
+func (r *Router) Propfind(path string, handler Handler, middlewares ...Middleware) *Router {
+	r.Route(method.PROPFIND, path, handler, middlewares...)
+	return r
+}
+
+// Proppatch is a shortcut for registering PROPPATCH-requests.
+func (r *Router) Proppatch(path string, handler Handler, middlewares ...Middleware) *Router {
+	r.Route(method.PROPPATCH, path, handler, middlewares...)
+	return r
+}
+
 // File is a shortcut handler for single file endpoints.
 func File(filename string) Handler {
 	return func(request *http.Request) *http.Response {

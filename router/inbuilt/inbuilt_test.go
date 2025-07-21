@@ -7,6 +7,7 @@ import (
 	"github.com/indigo-web/indigo/internal/construct"
 	"github.com/indigo-web/indigo/router"
 	"github.com/indigo-web/indigo/transport/dummy"
+	"github.com/stretchr/testify/assert"
 	"strings"
 	"testing"
 
@@ -244,22 +245,36 @@ func TestResource(t *testing.T) {
 }
 
 func TestResource_Methods(t *testing.T) {
+	echoMethod := func(req *http.Request) *http.Response {
+		return req.Respond().Status(req.Method.String())
+	}
+
 	raw := New()
 	raw.Resource("/").
-		Get(http.Respond).
-		Head(http.Respond).
-		Post(http.Respond).
-		Put(http.Respond).
-		Delete(http.Respond).
-		Connect(http.Respond).
-		Options(http.Respond).
-		Trace(http.Respond).
-		Patch(http.Respond)
+		Get(echoMethod).
+		Head(echoMethod).
+		Post(echoMethod).
+		Put(echoMethod).
+		Delete(echoMethod).
+		Connect(echoMethod).
+		Options(echoMethod).
+		Trace(echoMethod).
+		Patch(echoMethod).
+		Mkcol(echoMethod).
+		Move(echoMethod).
+		Copy(echoMethod).
+		Lock(echoMethod).
+		Unlock(echoMethod).
+		Propfind(echoMethod).
+		Proppatch(echoMethod)
 
 	r := raw.Build()
 
 	for _, m := range method.List {
-		require.Equal(t, status.OK, r.OnRequest(getRequest(m, "/")).Reveal().Code)
+		resp := r.OnRequest(getRequest(m, "/")).Reveal()
+		if assert.Equal(t, int(status.OK), int(resp.Code)) {
+			assert.Equal(t, m.String(), resp.Status)
+		}
 	}
 }
 
