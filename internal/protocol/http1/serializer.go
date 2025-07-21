@@ -8,6 +8,7 @@ import (
 	"github.com/indigo-web/indigo/http/mime"
 	"github.com/indigo-web/indigo/http/proto"
 	"github.com/indigo-web/indigo/http/status"
+	"github.com/indigo-web/indigo/internal/codecutil"
 	"github.com/indigo-web/indigo/internal/response"
 	"github.com/indigo-web/indigo/internal/strutil"
 	"github.com/indigo-web/indigo/kv"
@@ -34,21 +35,24 @@ type serializer struct {
 	reader         constReader
 	buff           []byte
 	defaultHeaders defaultHeaders
+	codecs         codecutil.Cache
 }
 
 func newSerializer(
 	cfg *config.Config,
-	client writer,
-	buff []byte,
-	defHdrs map[string]string,
 	request *http.Request,
+	client writer,
+	codecs codecutil.Cache,
+	buff []byte,
+	defaultHeaders map[string]string,
 ) *serializer {
 	return &serializer{
 		cfg:            cfg,
 		request:        request,
 		client:         client,
+		codecs:         codecs,
 		buff:           buff,
-		defaultHeaders: processDefaultHeaders(defHdrs),
+		defaultHeaders: preprocessDefaultHeaders(defaultHeaders),
 	}
 }
 
@@ -194,6 +198,7 @@ func (s *serializer) writeChunked(r io.Reader) error {
 	for {
 		var (
 			buff         = s.buff[len(s.buff):cap(s.buff)]
+			buffOffset   = 0
 			maxHexLength = (bits.Len64(uint64(len(buff)))-1)/4 + 1
 			dataOffset   = maxHexLength + crlflen
 		)
@@ -211,11 +216,21 @@ func (s *serializer) writeChunked(r io.Reader) error {
 		n, err := r.Read(buff[dataOffset : len(buff)-crlflen])
 
 		hexlen := len(strconv.AppendUint(buff[:0], uint64(n), 16)) // chunk length
-		copy(buff[hexlen:maxHexLength], chunkExtZeroFill)          // fill gap between length and (future) CRLF
-		copy(buff[maxHexLength:], crlf)                            // CRLF between length and data
-		copy(buff[dataOffset+n:], crlf)                            // CRLF at the end of the data
 
-		s.buff = s.buff[:len(s.buff)+dataOffset+n+crlflen] // extend buffer to include the written data
+		if len(s.buff) > 0 {
+			// if there was any data in the buffer before, we must fill the gap in between.
+			// The best way to do it is via an extension.
+			copy(buff[hexlen:maxHexLength], chunkExtZeroFill)
+		} else {
+			// otherwise, we can save a couple of bytes by simply truncating the unused prefix slots.
+			buffOffset = maxHexLength - hexlen
+			copy(buff[buffOffset:], buff[:hexlen])
+		}
+
+		copy(buff[maxHexLength:], crlf) // CRLF between length and data
+		copy(buff[dataOffset+n:], crlf) // CRLF at the end of the data
+
+		s.buff = s.buff[buffOffset : len(s.buff)+dataOffset+n+crlflen] // extend buffer to include the written data
 
 		switch err {
 		case nil:
@@ -452,10 +467,10 @@ func isKeepAlive(protocol proto.Protocol, req *http.Request) bool {
 	}
 }
 
-func processDefaultHeaders(hdrs map[string]string) defaultHeaders {
-	processed := make(defaultHeaders, 0, len(hdrs))
+func preprocessDefaultHeaders(headers map[string]string) defaultHeaders {
+	processed := make(defaultHeaders, 0, len(headers))
 
-	for key, value := range hdrs {
+	for key, value := range headers {
 		full := key + ": " + value + crlf
 		processed = append(processed, defaultHeader{
 			// we let the GC release all the values of the map, as here we're using only

@@ -3,6 +3,7 @@ package http1
 import (
 	"bufio"
 	"bytes"
+	"fmt"
 	"github.com/indigo-web/indigo/config"
 	"github.com/indigo-web/indigo/http"
 	"github.com/indigo-web/indigo/http/cookie"
@@ -10,43 +11,47 @@ import (
 	"github.com/indigo-web/indigo/http/mime"
 	"github.com/indigo-web/indigo/http/proto"
 	"github.com/indigo-web/indigo/http/status"
+	"github.com/indigo-web/indigo/internal/codecutil"
 	"github.com/indigo-web/indigo/internal/construct"
 	"github.com/indigo-web/indigo/transport/dummy"
 	"github.com/stretchr/testify/require"
 	"io"
 	"net"
 	stdhttp "net/http"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
 )
 
 func getSerializer(defaultHeaders map[string]string, request *http.Request, w writer) *serializer {
-	return newSerializer(config.Default(), w, make([]byte, 0, 1024), defaultHeaders, request)
+	return newSerializer(config.Default(), request, w, codecutil.NewCache(nil), make([]byte, 0, 1024), defaultHeaders)
 }
 
 func newRequest() *http.Request {
 	return construct.Request(config.Default(), dummy.NewNopClient())
 }
 
+var codecs = codecutil.NewCache(nil)
+
 func BenchmarkSerializer(b *testing.B) {
 	defaultHeadersSmall := map[string]string{
 		"Server": "indigo",
 	}
 	defaultHeadersMedium := map[string]string{
-		"Server":           "indigo",
-		"Connection":       "keep-alive",
-		"Accept-Encodings": "identity",
+		"Server":          "indigo",
+		"Connection":      "keep-alive",
+		"Accept-Encoding": "identity",
 	}
 	defaultHeadersBig := map[string]string{
-		"Server":           "indigo",
-		"Connection":       "keep-alive",
-		"Accept-Encodings": "identity",
-		"Easter":           "Egg",
-		"Many":             "choices, variants, ways, solutions",
-		"Something":        "is not happening",
-		"Talking":          "allowed",
-		"Lorem":            "ipsum, doremi",
+		"Server":          "indigo",
+		"Connection":      "keep-alive",
+		"Accept-Encoding": "identity",
+		"Easter":          "Egg",
+		"Many":            "choices, variants, ways, solutions",
+		"Something":       "is not happening",
+		"Talking":         "allowed",
+		"Lorem":           "ipsum, doremi",
 	}
 
 	response := http.NewResponse()
@@ -55,7 +60,7 @@ func BenchmarkSerializer(b *testing.B) {
 
 	b.Run("no body no def headers", func(b *testing.B) {
 		buff := make([]byte, 0, 1024)
-		s := newSerializer(config.Default(), w, buff, nil, request)
+		s := newSerializer(config.Default(), request, w, codecs, buff, nil)
 		size, err := estimateResponseSize(request, response, nil)
 		require.NoError(b, err)
 		b.SetBytes(size)
@@ -70,7 +75,7 @@ func BenchmarkSerializer(b *testing.B) {
 	b.Run("with 4kb body", func(b *testing.B) {
 		response := http.NewResponse().String(strings.Repeat("a", 4096))
 		buff := make([]byte, 0, 8192)
-		s := newSerializer(config.Default(), w, buff, nil, request)
+		s := newSerializer(config.Default(), request, w, codecs, buff, nil)
 		respSize, err := estimateResponseSize(request, response, nil)
 		require.NoError(b, err)
 		b.SetBytes(respSize)
@@ -84,7 +89,7 @@ func BenchmarkSerializer(b *testing.B) {
 
 	b.Run("no body 1 def header", func(b *testing.B) {
 		buff := make([]byte, 0, 1024)
-		s := newSerializer(config.Default(), w, buff, defaultHeadersSmall, request)
+		s := newSerializer(config.Default(), request, w, codecs, buff, defaultHeadersSmall)
 		respSize, err := estimateResponseSize(request, response, defaultHeadersSmall)
 		require.NoError(b, err)
 		b.SetBytes(respSize)
@@ -98,7 +103,7 @@ func BenchmarkSerializer(b *testing.B) {
 
 	b.Run("no body 3 def headers", func(b *testing.B) {
 		buff := make([]byte, 0, 1024)
-		s := newSerializer(config.Default(), w, buff, defaultHeadersMedium, request)
+		s := newSerializer(config.Default(), request, w, codecs, buff, defaultHeadersMedium)
 		respSize, err := estimateResponseSize(request, response, defaultHeadersMedium)
 		require.NoError(b, err)
 		b.SetBytes(respSize)
@@ -112,7 +117,7 @@ func BenchmarkSerializer(b *testing.B) {
 
 	b.Run("no body 8 def headers", func(b *testing.B) {
 		buff := make([]byte, 0, 1024)
-		s := newSerializer(config.Default(), w, buff, defaultHeadersBig, request)
+		s := newSerializer(config.Default(), request, w, codecs, buff, defaultHeadersBig)
 		respSize, err := estimateResponseSize(request, response, defaultHeadersBig)
 		require.NoError(b, err)
 		b.SetBytes(respSize)
@@ -128,7 +133,7 @@ func BenchmarkSerializer(b *testing.B) {
 		buff := make([]byte, 0, 1024)
 		request := newRequest()
 		request.Headers = GenerateHeaders(15)
-		s := newSerializer(config.Default(), w, buff, nil, request)
+		s := newSerializer(config.Default(), request, w, codecs, buff, nil)
 		size, err := estimateResponseSize(request, response, nil)
 		require.NoError(b, err)
 		b.SetBytes(size)
@@ -142,7 +147,7 @@ func BenchmarkSerializer(b *testing.B) {
 
 	b.Run("pre-write", func(b *testing.B) {
 		buff := make([]byte, 0, 128)
-		s := newSerializer(config.Default(), w, buff, nil, request)
+		s := newSerializer(config.Default(), request, w, codecs, buff, nil)
 		request.Upgrade = proto.HTTP11
 		respSize, err := estimateUpgradeSize(request, response)
 		require.NoError(b, err)
@@ -161,7 +166,7 @@ func BenchmarkSerializer(b *testing.B) {
 
 func estimateResponseSize(req *http.Request, resp *http.Response, defHeaders map[string]string) (int64, error) {
 	writer := new(JournalingClient)
-	s := newSerializer(config.Default(), writer, make([]byte, 0, 128), defHeaders, req)
+	s := newSerializer(config.Default(), req, writer, codecs, make([]byte, 0, 128), defHeaders)
 	err := s.Write(req.Protocol, resp)
 
 	return int64(len(writer.Data)), err
@@ -171,7 +176,7 @@ func estimateUpgradeSize(
 	req *http.Request, resp *http.Response,
 ) (int64, error) {
 	writer := new(JournalingClient)
-	s := newSerializer(config.Default(), writer, make([]byte, 0, 128), nil, req)
+	s := newSerializer(config.Default(), req, writer, codecs, make([]byte, 0, 128), nil)
 	s.Upgrade()
 	err := s.Write(req.Protocol, resp)
 
@@ -187,12 +192,12 @@ func TestSerializer(t *testing.T) {
 		s := getSerializer(nil, request, writer)
 		require.NoError(t, s.Write(proto.HTTP11, http.NewResponse()))
 
-		resp, err := parseHTTP11Response("GET", writer)
+		fmt.Println("response:", strconv.Quote(string(writer.Data)))
+		resp, err := parseHTTP11Response("GET", writer.Data)
 		require.NoError(t, err)
 		require.Equal(t, 200, resp.StatusCode)
-		require.Equal(t, 2, len(resp.Header))
-		require.Contains(t, resp.Header, "Content-Length")
-		require.Contains(t, resp.Header, "Content-Type")
+		require.Equal(t, []string{"0"}, resp.Header["Content-Length"])
+		require.Equal(t, []string{"text/html;charset=utf8"}, resp.Header["Content-Type"])
 		body, err := io.ReadAll(resp.Body)
 		require.NoError(t, err)
 		require.Empty(t, body)
@@ -204,16 +209,14 @@ func TestSerializer(t *testing.T) {
 			Header("Something", "special", "here")
 
 		require.NoError(t, s.Write(proto.HTTP11, response))
-		resp, err := parseHTTP11Response("GET", writer)
+		resp, err := parseHTTP11Response("GET", writer.Data)
 		require.NoError(t, err)
 		require.Equal(t, 200, resp.StatusCode)
 
-		require.Equal(t, 1, len(resp.Header["Hello"]), resp.Header)
-		require.Equal(t, "nether", resp.Header["Hello"][0], resp.Header)
-		require.Equal(t, 1, len(resp.Header["Server"]), resp.Header)
-		require.Equal(t, "indigo", resp.Header["Server"][0], resp.Header)
-		require.Equal(t, []string{"ipsum, something else"}, resp.Header["Lorem"], resp.Header)
-		require.Equal(t, []string{"special", "here"}, resp.Header["Something"], resp.Header)
+		require.Equal(t, []string{"nether"}, resp.Header["Hello"])
+		require.Equal(t, []string{"indigo"}, resp.Header["Server"])
+		require.Equal(t, []string{"ipsum, something else"}, resp.Header["Lorem"])
+		require.Equal(t, []string{"special", "here"}, resp.Header["Something"])
 
 		body, err := io.ReadAll(resp.Body)
 		require.NoError(t, err)
@@ -246,7 +249,7 @@ func TestSerializer(t *testing.T) {
 		response := http.NewResponse().Code(600)
 
 		require.NoError(t, serializer.Write(proto.HTTP11, response))
-		resp, err := parseHTTP11Response("GET", writer)
+		resp, err := parseHTTP11Response("GET", writer.Data)
 		require.NoError(t, err)
 		require.Equal(t, 600, resp.StatusCode)
 	})
@@ -259,7 +262,7 @@ func TestSerializer(t *testing.T) {
 				Cookie(cookie.New("hello", "world"))
 
 			require.NoError(t, serializer.Write(proto.HTTP11, response))
-			resp, err := parseHTTP11Response("HEAD", writer)
+			resp, err := parseHTTP11Response("HEAD", writer.Data)
 			require.NoError(t, err)
 			c := resp.Header.Get("Set-Cookie")
 			require.Equal(t, "hello=world", c)
@@ -286,7 +289,7 @@ func TestSerializer(t *testing.T) {
 				)
 
 			require.NoError(t, serializer.Write(proto.HTTP11, response))
-			resp, err := parseHTTP11Response("HEAD", writer)
+			resp, err := parseHTTP11Response("HEAD", writer.Data)
 			require.NoError(t, err)
 			cookies := resp.Header.Values("Set-Cookie")
 			require.Equal(t, 2, len(cookies), "must be only 2 cookies")
@@ -334,7 +337,6 @@ func TestSerializer(t *testing.T) {
 		require.NoError(t, err)
 		require.Equal(t, 200, resp.StatusCode)
 		require.Equal(t, "HTTP/1.1", resp.Proto)
-		require.Contains(t, resp.Header, "Hello")
 		require.Equal(t, []string{"world"}, resp.Header["Hello"])
 	})
 
@@ -347,7 +349,7 @@ func TestSerializer(t *testing.T) {
 		s := getSerializer(defHeaders, request, writer)
 
 		testSized := func(t *testing.T, method string, contentLength int, body string) {
-			r, err := parseHTTP11Response(method, writer)
+			r, err := parseHTTP11Response(method, writer.Data)
 			require.NoError(t, err)
 			require.Equal(t, "HTTP/1.1", r.Proto)
 			require.Equal(t, "200 OK", r.Status)
@@ -362,7 +364,7 @@ func TestSerializer(t *testing.T) {
 		}
 
 		testUnsized := func(t *testing.T, method string, body string) {
-			r, err := parseHTTP11Response(method, writer)
+			r, err := parseHTTP11Response(method, writer.Data)
 			require.NoError(t, err)
 			require.Equal(t, "HTTP/1.1", r.Proto)
 			require.Equal(t, "200 OK", r.Status)
@@ -443,7 +445,7 @@ func TestSerializer(t *testing.T) {
 
 		testMIME := func(t *testing.T, resp *http.Response, wantMIME string) {
 			require.NoError(t, s.Write(proto.HTTP11, resp))
-			r, err := parseHTTP11Response("HEAD", writer)
+			r, err := parseHTTP11Response("HEAD", writer.Data)
 			require.NoError(t, err)
 
 			if wantMIME != mime.Unset {
@@ -497,10 +499,32 @@ func (w *writerToCloser) Close() error {
 	return nil
 }
 
-func TestSerializer_ChunkedTransfer(t *testing.T) {
+type circularReader struct {
+	queue [][]byte
+}
+
+func newCircularReader(data ...[]byte) *circularReader {
+	return &circularReader{queue: data}
+}
+
+func (c *circularReader) Read(p []byte) (n int, err error) {
+	if len(c.queue) == 0 {
+		return 0, io.EOF
+	}
+
+	n = copy(p, c.queue[0])
+	c.queue[0] = c.queue[0][n:]
+	if len(c.queue[0]) == 0 {
+		c.queue = c.queue[1:]
+	}
+
+	return n, nil
+}
+
+func TestSerializer_Chunked(t *testing.T) {
 	t.Run("single chunk", func(t *testing.T) {
 		reader := bytes.NewBuffer([]byte("Hello, world!"))
-		wantData := "d;0\r\nHello, world!\r\n0;0\r\n\r\n"
+		wantData := "d\r\nHello, world!\r\n0\r\n\r\n"
 		writer := new(JournalingClient)
 		s := getSerializer(nil, newRequest(), writer)
 
@@ -515,7 +539,7 @@ func TestSerializer_ChunkedTransfer(t *testing.T) {
 		cfg := config.Default()
 		cfg.HTTP.ResponseBuffer.Default = buffSize
 		cfg.HTTP.ResponseBuffer.Maximal = buffSize
-		s := newSerializer(cfg, w, make([]byte, 0, buffSize), nil, newRequest())
+		s := newSerializer(cfg, newRequest(), w, codecs, make([]byte, 0, buffSize), nil)
 
 		p := newChunkedParser()
 		payload := strings.Repeat("Pavlo is the best", 10*buffSize)
@@ -527,10 +551,22 @@ func TestSerializer_ChunkedTransfer(t *testing.T) {
 		require.Empty(t, extra)
 		require.Equal(t, payload, string(out))
 	})
+
+	t.Run("eliding zerofill", func(t *testing.T) {
+		w := new(JournalingClient)
+		s := getSerializer(nil, newRequest(), w)
+		stream := newCircularReader([]byte("Hello"), []byte("world"))
+		s.appendProtocol(proto.HTTP11)
+		resp := http.NewResponse().Stream(stream)
+		require.NoError(t, s.writeStream(resp.Reveal()))
+
+		expect := "HTTP/1.1 Transfer-Encoding: chunked\r\n\r\n5;0\r\nHello\r\n5\r\nworld\r\n0\r\n\r\n"
+		require.Equal(t, expect, string(w.Data))
+	})
 }
 
-func parseHTTP11Response(method string, writer *JournalingClient) (*stdhttp.Response, error) {
-	reader := bufio.NewReader(bytes.NewBuffer(writer.Data))
+func parseHTTP11Response(method string, data []byte) (*stdhttp.Response, error) {
+	reader := bufio.NewReader(bytes.NewBuffer(data))
 	req, err := stdhttp.NewRequest(method, "/", nil)
 	if err != nil {
 		return nil, err
