@@ -15,7 +15,7 @@ import (
 
 type Suit struct {
 	*parser
-	*body
+	*Body
 	*serializer
 	router router.Router
 	client transport.Client
@@ -27,7 +27,7 @@ func newSuit(
 	r router.Router,
 	request *http.Request,
 	client transport.Client,
-	body *body,
+	body *Body,
 	codecs codecutil.Cache,
 	keysBuff, valsBuff, statusBuff buffer.Buffer,
 	respBuff []byte,
@@ -37,7 +37,7 @@ func newSuit(
 
 	return &Suit{
 		parser:     newParser(cfg, request, keysBuff, valsBuff, statusBuff),
-		body:       body,
+		Body:       body,
 		serializer: newSerializer(cfg, request, client, codecs, respBuff, defHeaders),
 		router:     r,
 		client:     client,
@@ -55,7 +55,7 @@ func New(
 ) *Suit {
 	keysBuff, valsBuff, statusBuff := construct.Buffers(cfg)
 	respBuff := make([]byte, 0, cfg.HTTP.ResponseBuffer.Default)
-	b := newBody(client, cfg.Body)
+	b := NewBody(client, cfg.Body)
 
 	return newSuit(cfg, r, request, client, b, codecs, keysBuff, valsBuff, statusBuff, respBuff)
 }
@@ -94,7 +94,7 @@ func (s *Suit) serve(once bool) (ok bool) {
 
 		client.Pushback(extra)
 		request.Body.Reset(request)
-		s.body.Reset(request)
+		s.Body.Reset(request)
 
 		transferEncoding := request.Encoding.Transfer
 
