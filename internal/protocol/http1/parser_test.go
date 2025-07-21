@@ -12,6 +12,7 @@ import (
 	"github.com/indigo-web/indigo/internal/construct"
 	"github.com/indigo-web/indigo/kv"
 	"github.com/indigo-web/indigo/transport/dummy"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"strings"
 	"testing"
@@ -336,15 +337,15 @@ func TestParser(t *testing.T) {
 	})
 
 	t.Run("Transfer-Encoding and Content-Encoding", func(t *testing.T) {
-		raw := "GET / HTTP/1.1\r\nTransfer-Encoding: gzip, deflate, chunked\r\nContent-Encoding: png, chunked, gz\r\n\r\n"
+		raw := "GET / HTTP/1.1\r\nTransfer-Encoding: chunked\r\nContent-Encoding: gzip, deflate\r\n\r\n"
 		parser, request := getParser(cfg)
 		done, extra, err := parser.Parse([]byte(raw))
 		require.NoError(t, err)
 		require.True(t, done)
 		require.Empty(t, string(extra))
-		require.Equal(t, []string{"gzip", "deflate"}, request.Encoding.Transfer)
+		require.Equal(t, []string{"chunked"}, request.Encoding.Transfer)
 		require.True(t, request.Encoding.Chunked)
-		require.Equal(t, []string{"png", "chunked", "gz"}, request.Encoding.Content)
+		require.Equal(t, []string{"gzip", "deflate"}, request.Encoding.Content)
 		request.Reset()
 	})
 
@@ -536,15 +537,6 @@ func TestParser_Edgecases(t *testing.T) {
 		require.EqualError(t, err, status.ErrTooManyHeaders.Error())
 	})
 
-	t.Run("duplicate chunked TE token", func(t *testing.T) {
-		parser, _ := getParser(config.Default())
-		raw := "GET / HTTP/1.1\r\nTransfer-Encoding: gzip, deflate, chunked, chunked\r\n\r\n"
-		done, extra, err := parser.Parse([]byte(raw))
-		require.True(t, done)
-		require.Empty(t, string(extra))
-		require.EqualError(t, err, status.ErrBadEncoding.Error())
-	})
-
 	t.Run("too many Transfer-Encoding tokens", func(t *testing.T) {
 		cfg := config.Default()
 		cfg.Headers.MaxEncodingTokens = 3
@@ -558,63 +550,63 @@ func TestParser_Edgecases(t *testing.T) {
 }
 
 func TestParseEncoding(t *testing.T) {
-	t.Run("empty string", func(t *testing.T) {
-		toks, chunked, err := parseEncodingString(make([]string, 0, 10), "")
+	t.Run("empty", func(t *testing.T) {
+		toks, err := parseEncodingString(make([]string, 0, 10), "")
 		require.NoError(t, err)
 		require.Empty(t, toks)
-		require.False(t, chunked)
 	})
 
-	t.Run("only chunked", func(t *testing.T) {
-		toks, chunked, err := parseEncodingString(make([]string, 0, 10), "chunked")
+	t.Run("chunked", func(t *testing.T) {
+		toks, err := parseEncodingString(make([]string, 0, 10), "chunked")
 		require.NoError(t, err)
 		require.Equal(t, []string{"chunked"}, toks)
-		require.True(t, chunked)
 	})
 
-	t.Run("only gzip", func(t *testing.T) {
-		toks, chunked, err := parseEncodingString(make([]string, 0, 10), "gzip")
+	t.Run("gzip", func(t *testing.T) {
+		toks, err := parseEncodingString(make([]string, 0, 10), "gzip")
 		require.NoError(t, err)
 		require.Equal(t, []string{"gzip"}, toks)
-		require.False(t, chunked)
 	})
 
-	t.Run("chunked,gzip without space", func(t *testing.T) {
-		toks, chunked, err := parseEncodingString(make([]string, 0, 10), "chunked,gzip")
-		require.NoError(t, err)
-		require.Equal(t, []string{"chunked", "gzip"}, toks)
-		require.True(t, chunked)
-		toks, chunked, err = parseEncodingString(make([]string, 0, 10), "gzip,chunked")
-		require.NoError(t, err)
-		require.Equal(t, []string{"gzip", "chunked"}, toks)
-		require.True(t, chunked)
-	})
+	t.Run("multiple tokens", func(t *testing.T) {
+		for i, tc := range []struct {
+			Sample string
+			Want   []string
+		}{
+			{"chunked,gzip", []string{"chunked", "gzip"}},
+			{"gzip,chunked", []string{"gzip", "chunked"}},
+			{" gzip,    chunked  ", []string{"gzip", "chunked"}},
+		} {
+			toks, err := parseEncodingString(make([]string, 0, 2), tc.Sample)
+			if assert.NoError(t, err) {
+				assert.Equal(t, tc.Want, toks, i+1)
+			}
+		}
 
-	t.Run("chunked,gzip with space", func(t *testing.T) {
-		toks, chunked, err := parseEncodingString(make([]string, 0, 10), "chunked,  gzip")
+		toks, err := parseEncodingString(make([]string, 0, 10), "chunked,gzip")
 		require.NoError(t, err)
 		require.Equal(t, []string{"chunked", "gzip"}, toks)
-		require.True(t, chunked)
-		toks, chunked, err = parseEncodingString(make([]string, 0, 10), "gzip,  chunked")
+		toks, err = parseEncodingString(make([]string, 0, 10), "gzip,chunked")
+		require.NoError(t, err)
 		require.Equal(t, []string{"gzip", "chunked"}, toks)
-		require.True(t, chunked)
 	})
 
 	t.Run("extra commas", func(t *testing.T) {
-		toks, chunked, err := parseEncodingString(make([]string, 0, 10), " , chunked, gzip, ")
-		require.NoError(t, err)
-		require.Equal(t, []string{"chunked", "gzip"}, toks)
-		require.True(t, chunked)
-		toks, chunked, err = parseEncodingString(make([]string, 0, 10), " , chunked")
-		require.Equal(t, []string{"chunked"}, toks)
-		require.True(t, chunked)
+		for i, tc := range []string{
+			", chunked",
+			"chunked, ",
+			"gzip,,chunked",
+			"gzip, , chunked",
+		} {
+			_, err := parseEncodingString(make([]string, 0, 2), tc)
+			assert.EqualError(t, err, status.ErrUnsupportedEncoding.Error(), i+1)
+		}
 	})
 
 	t.Run("overflow tokens limit", func(t *testing.T) {
-		toks, chunked, err := parseEncodingString(make([]string, 0, 1), "gzip,flate,chunked")
+		toks, err := parseEncodingString(make([]string, 0, 1), "gzip,flate,chunked")
 		require.EqualError(t, err, status.ErrTooManyEncodingTokens.Error())
 		require.Nil(t, toks)
-		require.False(t, chunked)
 	})
 }
 

@@ -10,7 +10,6 @@ import (
 	"github.com/indigo-web/indigo/http/status"
 	"github.com/indigo-web/indigo/internal/buffer"
 	"github.com/indigo-web/indigo/internal/hexconv"
-	"github.com/indigo-web/indigo/internal/strutil"
 	"strings"
 )
 
@@ -549,7 +548,7 @@ headerValue:
 			) && cEncoding == encodeU64(
 				key[8]|0x20, key[9]|0x20, key[10]|0x20, key[11]|0x20, key[12]|0x20, key[13]|0x20, key[14]|0x20, key[15]|0x20,
 			) {
-				request.Encoding.Content, _, err = parseEncodingString(p.contentEncodings, value)
+				request.Encoding.Content, err = parseEncodingString(p.contentEncodings, value)
 				if err != nil {
 					return true, nil, err
 				}
@@ -560,16 +559,20 @@ headerValue:
 			) && cEncodin == encodeU64(
 				key[8]|0x20, key[9]|0x20, key[10]|0x20, key[11]|0x20, key[12]|0x20, key[13]|0x20, key[14]|0x20, key[15]|0x20,
 			) && key[16]|0x20 == 'g' {
-				request.Encoding.Transfer, request.Encoding.Chunked, err = parseEncodingString(p.transferEncodings, value)
+				request.Encoding.Transfer, err = parseEncodingString(p.transferEncodings, value)
 				if err != nil {
 					return true, nil, err
 				}
-				t := request.Encoding.Transfer
-				if len(t) > 0 && (!request.Encoding.Chunked || !strutil.CmpFold(t[len(t)-1], "chunked")) {
-					return true, nil, status.ErrBadEncoding
+
+				te := request.Encoding.Transfer
+				if len(te) > 0 {
+					if te[len(te)-1] != "chunked" {
+						return true, nil, status.ErrBadEncoding
+					}
+					
+					request.Encoding.Chunked = true
 				}
 
-				request.Encoding.Transfer = t[:len(t)-1]
 			}
 		}
 
@@ -650,7 +653,7 @@ func (p *parser) cleanup() {
 	p.state = eMethod
 }
 
-func parseEncodingString(buff []string, value string) (toks []string, chunked bool, err error) {
+func parseEncodingString(buff []string, value string) (toks []string, err error) {
 	var token string
 
 	for len(value) > 0 {
@@ -663,26 +666,17 @@ func parseEncodingString(buff []string, value string) (toks []string, chunked bo
 
 		token = trimSpaces(token)
 		if len(token) == 0 {
-			continue
-		}
-
-		if strutil.CmpFold(token, "chunked") {
-			if chunked {
-				// chunked cannot be wrapped into chunked
-				return nil, false, status.ErrBadEncoding
-			}
-
-			chunked = true
+			return nil, status.ErrUnsupportedEncoding
 		}
 
 		if len(buff) >= cap(buff) {
-			return nil, false, status.ErrTooManyEncodingTokens
+			return nil, status.ErrTooManyEncodingTokens
 		}
 
 		buff = append(buff, token)
 	}
 
-	return buff, chunked, nil
+	return buff, nil
 }
 
 func trimSpaces(s string) string {
