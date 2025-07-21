@@ -22,7 +22,7 @@ func HTTPSOnly(optionalParams ...HTTPOnlyParams) inbuilt.Middleware {
 	params := optional(optionalParams, HTTPOnlyParams{})
 
 	return func(next inbuilt.Handler, request *http.Request) *http.Response {
-		if request.Env.Encryption.IsSafe() {
+		if request.Env.Encryption != 0 {
 			return next(request)
 		}
 

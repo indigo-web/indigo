@@ -3,7 +3,6 @@ package serve
 import (
 	"github.com/indigo-web/indigo/config"
 	"github.com/indigo-web/indigo/http"
-	"github.com/indigo-web/indigo/http/encryption"
 	"github.com/indigo-web/indigo/internal/codecutil"
 	"github.com/indigo-web/indigo/internal/construct"
 	"github.com/indigo-web/indigo/internal/protocol/http1"

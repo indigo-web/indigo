@@ -4,7 +4,6 @@ import (
 	"context"
 	"github.com/indigo-web/indigo/config"
 	"github.com/indigo-web/indigo/http/cookie"
-	"github.com/indigo-web/indigo/http/encryption"
 	"github.com/indigo-web/indigo/http/method"
 	"github.com/indigo-web/indigo/http/proto"
 	"github.com/indigo-web/indigo/kv"
@@ -139,9 +138,9 @@ type Environment struct {
 	// AllowedMethods is used to pass a string containing all the allowed methods for a
 	// specific endpoint. Has non-zero-value only when 405 Method Not Allowed raises
 	AllowedMethods string
-	// Encryption is a token that corresponds to the used encryption method. May be
-	// extended by custom values
-	Encryption encryption.Token
+	// Encryption represents the cryptographic protocol on top of the connection. They're
+	// comparable against the tls.Version... enums. Zero value means no encryption.
+	Encryption uint16
 	// AliasFrom contains the original request path, in case it was replaced via alias
 	// aka implicit redirect
 	AliasFrom string
