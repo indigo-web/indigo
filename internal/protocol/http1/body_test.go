@@ -72,7 +72,7 @@ func readall(b *body) ([]byte, error) {
 func TestBody(t *testing.T) {
 	t.Run("zero length", func(t *testing.T) {
 		req, b := getRequestWithBody(false)
-		require.NoError(t, b.Reset(req))
+		b.Reset(req)
 
 		data, err := b.Fetch()
 		require.EqualError(t, err, io.EOF.Error())
@@ -82,7 +82,7 @@ func TestBody(t *testing.T) {
 	t.Run("all at once", func(t *testing.T) {
 		sample := []byte("Hello, world!")
 		request, b := getRequestWithBody(false, sample)
-		require.NoError(t, b.Reset(request))
+		b.Reset(request)
 
 		actualBody, err := b.Fetch()
 		require.EqualError(t, err, io.EOF.Error())
@@ -99,7 +99,7 @@ func TestBody(t *testing.T) {
 		bodyString := "Hello, world!"
 
 		req, b := getRequestWithBody(false, sample...)
-		require.NoError(t, b.Reset(req))
+		b.Reset(req)
 		actualBody, err := readall(b)
 		require.NoError(t, err)
 		require.Equal(t, bodyString, string(actualBody))
@@ -116,7 +116,7 @@ func TestBody(t *testing.T) {
 		request := construct.Request(config.Default(), dummy.NewNopClient())
 		request.ContentLength = buffSize
 		b := getBody(client)
-		require.NoError(t, b.Reset(request))
+		b.Reset(request)
 
 		data, err := b.Fetch()
 		require.Equal(t, first, string(data))
@@ -138,7 +138,7 @@ func TestBody(t *testing.T) {
 		s := config.Default().Body
 		s.MaxSize = 9
 		b := newBody(client, s)
-		require.NoError(t, b.Reset(request))
+		b.Reset(request)
 
 		_, err := readall(b)
 		require.EqualError(t, err, status.ErrBodyTooLarge.Error())
@@ -150,7 +150,7 @@ func TestBodyReader_Chunked(t *testing.T) {
 		chunked := []byte("7\r\nMozilla\r\n9\r\nDeveloper\r\n7\r\nNetwork\r\n0\r\n\r\n")
 		wantBody := "MozillaDeveloperNetwork"
 		request, b := getRequestWithBody(true, chunked)
-		require.NoError(t, b.Reset(request))
+		b.Reset(request)
 
 		actualBody, err := readall(b)
 		require.NoError(t, err)
@@ -161,7 +161,7 @@ func TestBodyReader_Chunked(t *testing.T) {
 func TestBodyReader_ConnectionClose(t *testing.T) {
 	request, b := getRequestWithBody(false, []byte("Hello, "), []byte("world!"))
 	request.Connection = "close"
-	require.NoError(t, b.Reset(request))
+	b.Reset(request)
 
 	actualBody, err := readall(b)
 	require.NoError(t, err)

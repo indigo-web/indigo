@@ -864,9 +864,7 @@ func parseHTTP11Request(data string) (Request, error) {
 	}
 
 	request.Body.Reset(request)
-	if err := suit.Reset(request); err != nil {
-		return Request{}, err
-	}
+	suit.Reset(request)
 
 	body, err := request.Body.String()
 
