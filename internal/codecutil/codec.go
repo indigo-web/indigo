@@ -1,76 +1,65 @@
 package codecutil
 
 import (
-	"github.com/indigo-web/indigo/http"
+	"github.com/indigo-web/indigo/http/codec"
+	"github.com/indigo-web/indigo/internal/strutil"
+	"iter"
 )
 
-type pair[A, B any] struct {
-	A A
-	B B
+type Cache struct {
+	codecs    []codec.Codec
+	instances []codec.Instance
 }
 
-type constructor[T any] pair[string, func() T]
+func NewCache(codecs []codec.Codec) Cache {
+	return Cache{
+		codecs:    codecs,
+		instances: make([]codec.Instance, len(codecs)),
+	}
+}
 
-type (
-	Compressors   = []constructor[http.Compressor]
-	Decompressors = []constructor[http.Decompressor]
-)
-
-func Scatter(codecs []http.Codec) (cs Compressors, dcs Decompressors) {
-	cs = make(Compressors, 0, len(codecs))
-	dcs = make(Decompressors, 0, len(codecs))
-
-	for _, c := range codecs {
-		tokens := c.Tokens()
-
-		if compressorFabric, ok := c.(http.CompressorFabric); ok {
-			cs = appendCodec(cs, tokens, compressorFabric.NewCompressor)
-		}
-
-		if decompressorFabric, ok := c.(http.DecompressorFabric); ok {
-			dcs = appendCodec(dcs, tokens, decompressorFabric.NewDecompressor)
+func (c Cache) find(token string) (int, codec.Codec) {
+	for i, entry := range c.codecs {
+		if entry.Token() == token {
+			return i, entry
 		}
 	}
 
-	return cs, dcs
+	return -1, nil
 }
 
-func appendCodec[T any](dst []constructor[T], tokens []string, constr func() T) []constructor[T] {
-	for _, token := range tokens {
-		dst = append(dst, constructor[T]{token, constr})
+func (c Cache) Get(token string) codec.Instance {
+	idx, cd := c.find(token)
+	if idx == -1 {
+		return nil
 	}
 
-	return dst
-}
-
-// Cache manages codecs by returning either one from cache or newly instantiated.
-type Cache[T any] struct {
-	constructors []constructor[T]
-	cache        []pair[bool, T]
-}
-
-func NewCache[T any](constructors []constructor[T]) Cache[T] {
-	return Cache[T]{
-		constructors: constructors,
-		cache:        make([]pair[bool, T], len(constructors)),
+	inst := c.instances[idx]
+	if inst == nil {
+		inst = cd.New()
+		c.instances[idx] = inst
 	}
+
+	return inst
 }
 
-func (c Cache[T]) Get(token string) (instance T, found bool) {
-	for i, constr := range c.constructors {
-		if constr.A == token {
-			return c.get(i), true
+func (c Cache) AcceptEncodings() string {
+	// TODO: somehow cache the value so we don't have to build the string every time
+	// TODO: a new connection establishes?
+
+	if len(c.codecs) == 0 {
+		return "identity"
+	}
+
+	return strutil.Join(traverseTokens(c.codecs), ",")
+}
+
+func traverseTokens(codecs []codec.Codec) iter.Seq[string] {
+	return func(yield func(string) bool) {
+		for _, c := range codecs {
+			if !yield(c.Token()) {
+				break
+			}
 		}
 	}
-
-	return instance, false
-}
-
-func (c Cache[T]) get(index int) T {
-	cached := c.cache[index]
-	if !cached.A {
-		return c.constructors[index].B()
-	}
-
-	return cached.B
 }
