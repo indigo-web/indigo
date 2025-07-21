@@ -6,29 +6,31 @@ import (
 	"net"
 )
 
-var _ transport.Client = new(CircularClient)
+var _ transport.Client = new(Client)
 
-// CircularClient is a client that on every read-operation returns the same data as it
-// was initialised with. This is used mainly for benchmarking
-type CircularClient struct {
-	data            [][]byte
-	tmp             []byte
-	pointer         int
-	closed, oneTime bool
+// Client returns the same data as it was initialised with on every read, unless set to
+// shoot once. It also tracks all the written data, making it thereby a universal mock
+// suitable for most of the tests.
+type Client struct {
+	closed, once bool
+	pointer      int
+	tmp          []byte
+	written      []byte
+	data         [][]byte
 }
 
-func NewCircularClient(data ...[]byte) *CircularClient {
-	return &CircularClient{
+func NewClient(data ...[]byte) *Client {
+	return &Client{
 		data:    data,
 		pointer: 0,
 	}
 }
 
-func NewNopClient() *CircularClient {
-	return NewCircularClient(nil)
+func NewNopClient() *Client {
+	return NewClient(nil)
 }
 
-func (c *CircularClient) Read() (data []byte, err error) {
+func (c *Client) Read() (data []byte, err error) {
 	if c.closed {
 		return nil, io.EOF
 	}
@@ -40,7 +42,7 @@ func (c *CircularClient) Read() (data []byte, err error) {
 	}
 
 	if c.pointer >= len(c.data) {
-		if c.oneTime {
+		if c.once {
 			c.closed = true
 			return nil, io.EOF
 		}
@@ -54,32 +56,37 @@ func (c *CircularClient) Read() (data []byte, err error) {
 	return piece, nil
 }
 
-func (c *CircularClient) Fetch() (data []byte, err error) {
+func (c *Client) Fetch() (data []byte, err error) {
 	return c.Read()
 }
 
-func (c *CircularClient) Pushback(takeback []byte) {
+func (c *Client) Pushback(takeback []byte) {
 	c.tmp = takeback
 }
 
-func (c *CircularClient) Write(p []byte) (int, error) {
+func (c *Client) Write(p []byte) (int, error) {
+	c.written = append(c.written, p...)
 	return len(p), nil
 }
 
-func (c *CircularClient) Conn() net.Conn {
+func (c *Client) Conn() net.Conn {
 	return new(Conn).Nop()
 }
 
-func (*CircularClient) Remote() net.Addr {
+func (*Client) Remote() net.Addr {
 	return nil
 }
 
-func (c *CircularClient) Close() error {
+func (c *Client) Close() error {
 	c.closed = true
 	return nil
 }
 
-func (c *CircularClient) OneTime() *CircularClient {
-	c.oneTime = true
+func (c *Client) Once() *Client {
+	c.once = true
 	return c
+}
+
+func (c *Client) Written() string {
+	return string(c.written)
 }

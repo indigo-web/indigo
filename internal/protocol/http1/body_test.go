@@ -4,7 +4,6 @@ import (
 	"github.com/indigo-web/indigo/config"
 	"github.com/indigo-web/indigo/http"
 	"github.com/indigo-web/indigo/http/status"
-	"github.com/indigo-web/indigo/internal/codecutil"
 	"github.com/indigo-web/indigo/internal/construct"
 	"github.com/indigo-web/indigo/kv"
 	"github.com/indigo-web/indigo/transport"
@@ -17,14 +16,12 @@ import (
 )
 
 func getBody(client transport.Client) *body {
-	cfg := config.Default()
-
-	return newBody(client, cfg.Body, codecutil.NewCache[http.Decompressor](nil))
+	return newBody(client, config.Default().Body)
 }
 
 func getRequestWithBody(chunked bool, body ...[]byte) (*http.Request, *body) {
 	cfg := config.Default()
-	client := dummy.NewCircularClient(body...).OneTime()
+	client := dummy.NewClient(body...).Once()
 	req := construct.Request(cfg, client)
 	b := getBody(client)
 	req.Body = http.NewBody(cfg, b)
@@ -72,7 +69,7 @@ func readall(b *body) ([]byte, error) {
 	}
 }
 
-func TestBody_Plain(t *testing.T) {
+func TestBody(t *testing.T) {
 	t.Run("zero length", func(t *testing.T) {
 		req, b := getRequestWithBody(false)
 		require.NoError(t, b.Reset(req))
@@ -82,9 +79,6 @@ func TestBody_Plain(t *testing.T) {
 		require.Empty(t, data)
 	})
 
-}
-
-func TestBodyReader_Plain(t *testing.T) {
 	t.Run("all at once", func(t *testing.T) {
 		sample := []byte("Hello, world!")
 		request, b := getRequestWithBody(false, sample)
@@ -118,7 +112,7 @@ func TestBodyReader_Plain(t *testing.T) {
 			second = strings.Repeat("b", buffSize)
 		)
 
-		client := dummy.NewCircularClient([]byte(first + second))
+		client := dummy.NewClient([]byte(first + second))
 		request := construct.Request(config.Default(), dummy.NewNopClient())
 		request.ContentLength = buffSize
 		b := getBody(client)
@@ -140,10 +134,10 @@ func TestBodyReader_Plain(t *testing.T) {
 	t.Run("too big plain body", func(t *testing.T) {
 		data := strings.Repeat("a", 10)
 		request, _ := getRequestWithBody(false, []byte(data))
-		client := dummy.NewCircularClient([]byte(data))
+		client := dummy.NewClient([]byte(data))
 		s := config.Default().Body
 		s.MaxSize = 9
-		b := newBody(client, s, codecutil.NewCache[http.Decompressor](nil))
+		b := newBody(client, s)
 		require.NoError(t, b.Reset(request))
 
 		_, err := readall(b)
@@ -164,7 +158,7 @@ func TestBodyReader_Chunked(t *testing.T) {
 	})
 }
 
-func TestBodyReader_TillEOF(t *testing.T) {
+func TestBodyReader_ConnectionClose(t *testing.T) {
 	request, b := getRequestWithBody(false, []byte("Hello, "), []byte("world!"))
 	request.Connection = "close"
 	require.NoError(t, b.Reset(request))
