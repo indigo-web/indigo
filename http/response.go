@@ -68,9 +68,10 @@ func (r *Response) ContentType(value mime.MIME, charset ...mime.Charset) *Respon
 	return r
 }
 
-// TransferEncoding sets a custom Transfer-Encoding header value.
-func (r *Response) TransferEncoding(value string) *Response {
-	r.fields.TransferEncoding = value
+// Encoding sets the Content-Encoding value. If the passed token corresponds to any of registered codecs,
+// the body stream will be automatically compressed by the codec.
+func (r *Response) Encoding(value string) *Response {
+	r.fields.Encoding = value
 	return r
 }
 
@@ -81,8 +82,8 @@ func (r *Response) Header(key string, values ...string) *Response {
 	switch {
 	case strutil.CmpFold(key, "content-type"):
 		return r.ContentType(values[0])
-	case strutil.CmpFold(key, "transfer-encoding"):
-		return r.TransferEncoding(values[0])
+	case strutil.CmpFold(key, "content-encoding"):
+		return r.Encoding(values[0])
 	}
 
 	for i := range values {

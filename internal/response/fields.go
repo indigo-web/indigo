@@ -11,24 +11,23 @@ import (
 const DefaultContentType = mime.HTML
 
 type Fields struct {
-	Code   status.Code
-	Status status.Status
-	// TODO: Content-Encoding might also be handy
-	TransferEncoding string
-	ContentType      mime.MIME
-	Charset          mime.Charset
-	CharsetSet       bool
-	Stream           io.Reader
-	StreamSize       int64
-	BufferedBody     []byte
-	Headers          []kv.Pair
-	Cookies          []cookie.Cookie
+	Code         status.Code
+	Status       status.Status
+	Encoding     string
+	ContentType  mime.MIME
+	Charset      mime.Charset
+	CharsetSet   bool
+	Stream       io.Reader
+	StreamSize   int64
+	BufferedBody []byte
+	Headers      []kv.Pair
+	Cookies      []cookie.Cookie
 }
 
 func (f *Fields) Clear() {
 	f.Code = status.OK
 	f.Status = ""
-	f.TransferEncoding = ""
+	f.Encoding = ""
 	f.ContentType = DefaultContentType
 	f.Charset = mime.Unset
 	f.CharsetSet = false
