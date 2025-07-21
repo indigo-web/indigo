@@ -18,11 +18,18 @@ func _() {
 	_ = x[OPTIONS-7]
 	_ = x[TRACE-8]
 	_ = x[PATCH-9]
+	_ = x[MKCOL-10]
+	_ = x[MOVE-11]
+	_ = x[COPY-12]
+	_ = x[LOCK-13]
+	_ = x[UNLOCK-14]
+	_ = x[PROPFIND-15]
+	_ = x[PROPPATCH-16]
 }
 
-const _Method_name = "UnknownGETHEADPOSTPUTDELETECONNECTOPTIONSTRACEPATCH"
+const _Method_name = "UnknownGETHEADPOSTPUTDELETECONNECTOPTIONSTRACEPATCHMKCOLMOVECOPYLOCKUNLOCKPROPFINDPROPPATCH"
 
-var _Method_index = [...]uint8{0, 7, 10, 14, 18, 21, 27, 34, 41, 46, 51}
+var _Method_index = [...]uint8{0, 7, 10, 14, 18, 21, 27, 34, 41, 46, 51, 56, 60, 64, 68, 74, 82, 91}
 
 func (i Method) String() string {
 	if i >= Method(len(_Method_index)-1) {
