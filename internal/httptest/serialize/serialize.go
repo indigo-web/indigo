@@ -1,11 +1,11 @@
-package dump
+package serialize
 
 import (
 	"github.com/indigo-web/indigo/http"
 	"strconv"
 )
 
-func Request(request *http.Request) (string, error) {
+func Headers(request *http.Request) string {
 	var buff []byte
 
 	buff = append(buff, request.Method.String()...)
@@ -15,7 +15,7 @@ func Request(request *http.Request) (string, error) {
 	if !request.Params.Empty() {
 		buff = append(buff, '?')
 
-		for key, value := range request.Params.Iter() {
+		for key, value := range request.Params.Pairs() {
 			buff = queryparam(buff, key, value)
 			buff = append(buff, '&')
 		}
@@ -33,15 +33,7 @@ func Request(request *http.Request) (string, error) {
 		buff = header(buff, h)
 	}
 
-	if request.Encoding.Chunked {
-		buff = append(buff, "Transfer-Encoding: "...)
-		for _, enc := range request.Encoding.Transfer {
-			buff = append(buff, enc...)
-			buff = append(buff, ',', ' ')
-		}
-
-		buff = append(buff, "chunked\r\n"...)
-	} else {
+	if !request.Encoding.Chunked {
 		buff = header(buff, http.Header{
 			Key:   "Content-Length",
 			Value: strconv.Itoa(request.ContentLength),
@@ -49,10 +41,15 @@ func Request(request *http.Request) (string, error) {
 	}
 
 	buff = append(buff, '\r', '\n')
-	body, err := request.Body.Bytes()
-	buff = append(buff, body...)
 
-	return string(buff), err
+	return string(buff)
+}
+
+func Request(request *http.Request) (string, error) {
+	headers := Headers(request)
+	body, err := request.Body.String()
+
+	return headers + body, err
 }
 
 func header(b []byte, h http.Header) []byte {
