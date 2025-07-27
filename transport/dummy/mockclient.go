@@ -12,22 +12,21 @@ var _ transport.Client = new(Client)
 // shoot once. It also tracks all the written data, making it thereby a universal mock
 // suitable for most of the tests.
 type Client struct {
-	closed, once bool
-	pointer      int
-	tmp          []byte
-	written      []byte
-	data         [][]byte
+	closed     bool
+	once       bool
+	journaling bool
+	pointer    int
+	tmp        []byte
+	written    []byte
+	data       [][]byte
 }
 
-func NewClient(data ...[]byte) *Client {
+func NewMockClient(data ...[]byte) *Client {
 	return &Client{
-		data:    data,
-		pointer: 0,
+		data:       data,
+		pointer:    0,
+		journaling: true,
 	}
-}
-
-func NewNopClient() *Client {
-	return NewClient(nil)
 }
 
 func (c *Client) Read() (data []byte, err error) {
@@ -65,7 +64,10 @@ func (c *Client) Pushback(takeback []byte) {
 }
 
 func (c *Client) Write(p []byte) (int, error) {
-	c.written = append(c.written, p...)
+	if c.journaling {
+		c.written = append(c.written, p...)
+	}
+
 	return len(p), nil
 }
 
@@ -87,6 +89,15 @@ func (c *Client) Once() *Client {
 	return c
 }
 
+func (c *Client) Journaling(flag bool) *Client {
+	c.journaling = flag
+	return c
+}
+
 func (c *Client) Written() string {
+	if !c.journaling {
+		panic("mock client: cannot access written data: journaling is disabled!")
+	}
+
 	return string(c.written)
 }

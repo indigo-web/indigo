@@ -1,7 +1,6 @@
 package strutil
 
 import (
-	"github.com/flrdv/uf"
 	"github.com/stretchr/testify/require"
 	"iter"
 	"testing"
@@ -17,10 +16,6 @@ func collect(i iter.Seq2[string, string]) (pairs []strpair) {
 	}
 
 	return pairs
-}
-
-func strdup(str string) string {
-	return string(uf.S2B(str))
 }
 
 func TestWalkKV(t *testing.T) {
@@ -45,7 +40,7 @@ func TestWalkKV(t *testing.T) {
 	})
 
 	t.Run("codings", func(t *testing.T) {
-		values := collect(WalkKV(strdup("abc=cba; hello=\"world\"; k%20ey=value%21")))
+		values := collect(WalkKV("abc=cba; hello=\"world\"; k%20ey=value%21"))
 		require.Equal(t, 3, len(values))
 		require.Equal(t, strpair{"abc", "cba"}, values[0])
 		require.Equal(t, strpair{"hello", "world"}, values[1])

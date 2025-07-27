@@ -28,10 +28,6 @@ func getSerializer(defaultHeaders map[string]string, request *http.Request, w wr
 	return newSerializer(config.Default(), request, w, codecutil.NewCache(nil), make([]byte, 0, 1024), defaultHeaders)
 }
 
-func newRequest() *http.Request {
-	return construct.Request(config.Default(), dummy.NewNopClient())
-}
-
 var codecs = codecutil.NewCache(nil)
 
 func BenchmarkSerializer(b *testing.B) {
@@ -55,7 +51,7 @@ func BenchmarkSerializer(b *testing.B) {
 	}
 
 	response := http.NewResponse()
-	request := newRequest()
+	request := construct.Request(config.Default(), dummy.NewNopClient())
 	w := dummy.NewNopClient()
 
 	b.Run("no body no def headers", func(b *testing.B) {
@@ -131,8 +127,8 @@ func BenchmarkSerializer(b *testing.B) {
 
 	b.Run("no body 15 headers", func(b *testing.B) {
 		buff := make([]byte, 0, 1024)
-		request := newRequest()
-		request.Headers = GenerateHeaders(15)
+		request := construct.Request(config.Default(), dummy.NewNopClient())
+		request.Headers = generateHeaders(15)
 		s := newSerializer(config.Default(), request, w, codecs, buff, nil)
 		size, err := estimateResponseSize(request, response, nil)
 		require.NoError(b, err)
@@ -184,6 +180,10 @@ func estimateUpgradeSize(
 }
 
 func TestSerializer(t *testing.T) {
+	newRequest := func() *http.Request {
+		return construct.Request(config.Default(), dummy.NewNopClient())
+	}
+
 	request := newRequest()
 	request.Method = method.GET
 
@@ -522,6 +522,10 @@ func (c *circularReader) Read(p []byte) (n int, err error) {
 }
 
 func TestSerializer_Chunked(t *testing.T) {
+	newRequest := func() *http.Request {
+		return construct.Request(config.Default(), dummy.NewNopClient())
+	}
+
 	t.Run("single chunk", func(t *testing.T) {
 		reader := bytes.NewBuffer([]byte("Hello, world!"))
 		wantData := "d\r\nHello, world!\r\n0\r\n\r\n"

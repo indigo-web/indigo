@@ -112,7 +112,7 @@ func TestBody(t *testing.T) {
 			second = strings.Repeat("b", buffSize)
 		)
 
-		client := dummy.NewClient([]byte(first + second))
+		client := dummy.NewMockClient([]byte(first + second))
 		request := construct.Request(config.Default(), dummy.NewNopClient())
 		request.ContentLength = buffSize
 		b := getBody(client)
@@ -134,10 +134,10 @@ func TestBody(t *testing.T) {
 	t.Run("too big plain body", func(t *testing.T) {
 		data := strings.Repeat("a", 10)
 		request, _ := getRequestWithBody(false, []byte(data))
-		client := dummy.NewClient([]byte(data))
+		client := dummy.NewMockClient([]byte(data))
 		s := config.Default().Body
 		s.MaxSize = 9
-		b := NewBody(client, s)
+		b := newBody(client, s)
 		b.Reset(request)
 
 		_, err := readall(b)

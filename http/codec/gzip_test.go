@@ -29,7 +29,7 @@ func gzipped(text string) []byte {
 
 func gunzip(gzipped ...[]byte) (string, error) {
 	dc := NewGZIP().New()
-	err := dc.ResetDecompressor(dummy.NewClient(gzipped...).Once())
+	err := dc.ResetDecompressor(dummy.NewMockClient(gzipped...).Once())
 	if err != nil {
 		return "", err
 	}
