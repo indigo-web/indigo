@@ -29,8 +29,8 @@ var _ Instance = new(gzipCodec)
 
 type gzipCodec struct {
 	adapter *readerAdapter
-	r       gzip.Reader  // decompressor
 	w       *gzip.Writer // compressor
+	r       gzip.Reader  // decompressor
 	buff    []byte
 }
 

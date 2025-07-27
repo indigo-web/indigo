@@ -6,7 +6,7 @@ import (
 	"testing"
 )
 
-func pushSegment(t *testing.T, buff Buffer, text string) Buffer {
+func pushSegment(t *testing.T, buff *Buffer, text string) *Buffer {
 	ok := buff.Append([]byte(text))
 	require.True(t, ok)
 	segment := buff.Finish()

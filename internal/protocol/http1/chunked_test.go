@@ -4,7 +4,6 @@ import (
 	"github.com/indigo-web/indigo/http/status"
 	"github.com/stretchr/testify/require"
 	"io"
-	"iter"
 	"testing"
 )
 
@@ -84,7 +83,7 @@ func TestChunked(t *testing.T) {
 			p := newChunkedParser()
 			var output []byte
 
-			for chunk := range scatter(i+1, sample) {
+			for _, chunk := range scatter(sample, i+1) {
 				out, extra, err := feed(&p, chunk)
 				require.NoError(t, err)
 				require.Empty(t, extra)
@@ -116,17 +115,4 @@ func TestChunked(t *testing.T) {
 		_, _, err := feed(&p, []byte("00000000d\r\nHello, world!\r\n0\r\n\r\n"))
 		require.EqualError(t, err, status.ErrBadChunk.Error())
 	})
-}
-
-func scatter(n int, data []byte) iter.Seq[[]byte] {
-	return func(yield func([]byte) bool) {
-		for len(data) > 0 {
-			boundary := min(n, len(data))
-			if !yield(data[:boundary]) {
-				return
-			}
-
-			data = data[boundary:]
-		}
-	}
 }

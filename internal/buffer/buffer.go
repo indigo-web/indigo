@@ -8,8 +8,8 @@ type Buffer struct {
 	maxSize int
 }
 
-func New(initialSize, maxSize int) Buffer {
-	return Buffer{
+func New(initialSize, maxSize int) *Buffer {
+	return &Buffer{
 		memory:  make([]byte, 0, initialSize),
 		maxSize: maxSize,
 	}
