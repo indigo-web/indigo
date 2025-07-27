@@ -9,7 +9,7 @@ import (
 	"math"
 )
 
-type Body struct {
+type body struct {
 	maxLen        uint64
 	counter       uint64
 	reader        func() ([]byte, error)
@@ -17,8 +17,8 @@ type Body struct {
 	client        transport.Client
 }
 
-func NewBody(client transport.Client, s config.Body) *Body {
-	return &Body{
+func newBody(client transport.Client, s config.Body) *body {
+	return &body{
 		reader:        nop,
 		client:        client,
 		maxLen:        s.MaxSize,
@@ -26,11 +26,11 @@ func NewBody(client transport.Client, s config.Body) *Body {
 	}
 }
 
-func (b *Body) Fetch() ([]byte, error) {
+func (b *body) Fetch() ([]byte, error) {
 	return b.reader()
 }
 
-func (b *Body) Reset(request *http.Request) {
+func (b *body) Reset(request *http.Request) {
 	if request.Encoding.Chunked {
 		b.initChunked()
 		b.reader = b.readChunked
@@ -43,11 +43,11 @@ func (b *Body) Reset(request *http.Request) {
 	}
 }
 
-func (b *Body) initPlain(totalLen uint64) {
+func (b *body) initPlain(totalLen uint64) {
 	b.counter = totalLen
 }
 
-func (b *Body) readPlain() (body []byte, err error) {
+func (b *body) readPlain() (body []byte, err error) {
 	if b.counter == 0 {
 		return nil, io.EOF
 	}
@@ -74,11 +74,11 @@ func (b *Body) readPlain() (body []byte, err error) {
 	return body, err
 }
 
-func (b *Body) initEOFReader() {
+func (b *body) initEOFReader() {
 	b.counter = 0
 }
 
-func (b *Body) readTillEOF() ([]byte, error) {
+func (b *body) readTillEOF() ([]byte, error) {
 	chunk, err := b.client.Read()
 	if b.counter > math.MaxUint64-uint64(len(chunk)) {
 		return nil, status.ErrBodyTooLarge
@@ -89,11 +89,11 @@ func (b *Body) readTillEOF() ([]byte, error) {
 	return chunk, err
 }
 
-func (b *Body) initChunked() {
+func (b *body) initChunked() {
 	b.counter = 0
 }
 
-func (b *Body) readChunked() (body []byte, err error) {
+func (b *body) readChunked() (body []byte, err error) {
 	data, err := b.client.Read()
 	if err != nil {
 		return nil, err

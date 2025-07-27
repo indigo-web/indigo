@@ -15,13 +15,13 @@ import (
 	"testing"
 )
 
-func getBody(client transport.Client) *Body {
-	return NewBody(client, config.Default().Body)
+func getBody(client transport.Client) *body {
+	return newBody(client, config.Default().Body)
 }
 
-func getRequestWithBody(chunked bool, body ...[]byte) (*http.Request, *Body) {
+func getRequestWithBody(chunked bool, body ...[]byte) (*http.Request, *body) {
 	cfg := config.Default()
-	client := dummy.NewClient(body...).Once()
+	client := dummy.NewMockClient(body...).Once()
 	req := construct.Request(cfg, client)
 	b := getBody(client)
 	req.Body = http.NewBody(cfg, b)
@@ -53,7 +53,7 @@ func getRequestWithBody(chunked bool, body ...[]byte) (*http.Request, *Body) {
 	return req, b
 }
 
-func readall(b *Body) ([]byte, error) {
+func readall(b *body) ([]byte, error) {
 	var buff []byte
 
 	for {
