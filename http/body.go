@@ -167,7 +167,7 @@ func (b *Body) Form() (f form.Form, err error) {
 
 	switch {
 	case mime.Complies(mime.FormUrlencoded, b.contentType):
-		f, b.formbuff, err = formdata.ParseURLEncoded(b.form[:0], raw, b.formbuff[:0])
+		f, b.formbuff, err = formdata.ParseFormURLEncoded(b.form[:0], raw, b.formbuff[:0])
 		return f, err
 	case mime.Complies(mime.Multipart, b.contentType):
 		boundary, ok := b.multipartBoundary()
