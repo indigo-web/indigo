@@ -18,10 +18,6 @@ func Now() time.Time {
 const Resolution = 500 * time.Millisecond
 
 func init() {
-	// there is no guarantee that the goroutine will be started immediately. If it won't,
-	// some rapid usage of the timer will result in zero-time, which isn't great actually
-	Time.Store(time.Now().UnixMilli())
-
 	go func() {
 		for {
 			Time.Store(time.Now().UnixMilli())
