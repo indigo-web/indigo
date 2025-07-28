@@ -122,7 +122,7 @@ func (r *Request) Hijacked() bool {
 	return r.hijacked
 }
 
-// Reset the request
+// Reset clears all the request fields to its zero values. This also includes resetting the context.
 func (r *Request) Reset() {
 	r.Params.Clear()
 	r.Vars.Clear()
@@ -166,11 +166,13 @@ type commonHeaders struct {
 }
 
 type Encodings struct {
-	// Transfer contains all applied Transfer-Encoding codings in their original order, except
-	// the chunked. Chunked Transfer Encoding has its own boolean flag.
+	// Accept is the list of accepted by client tokens.
+	Accept []string
+	// Transfer is the list of tokens used for this request from `Transfer-Encoding` header value.
 	Transfer []string
-	// Content contains all applied Content-Encoding codings in their original order.
+	// Content is the list of tokens used for this request from `Content-Encoding` header value.
 	Content []string
-	// Chunked doesn't belong to any of encodings, as it is still must be processed individually
+	// Chunked describes whether the Transfer attribute is not empty and ends with the `chunked`
+	// encoding.
 	Chunked bool
 }
