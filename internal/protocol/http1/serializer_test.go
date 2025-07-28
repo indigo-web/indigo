@@ -10,7 +10,6 @@ import (
 	"github.com/indigo-web/indigo/http/method"
 	"github.com/indigo-web/indigo/http/mime"
 	"github.com/indigo-web/indigo/http/proto"
-	"github.com/indigo-web/indigo/http/status"
 	"github.com/indigo-web/indigo/internal/codecutil"
 	"github.com/indigo-web/indigo/internal/construct"
 	"github.com/indigo-web/indigo/transport/dummy"
@@ -234,13 +233,6 @@ func TestSerializer(t *testing.T) {
 		s := getSerializer(defHeaders, request, writer)
 		testWithHeaders(t, s, writer)
 		testWithHeaders(t, s, writer)
-	})
-
-	t.Run("HTTP/1.0 without keep-alive", func(t *testing.T) {
-		serializer := getSerializer(nil, request, new(JournalingClient))
-		response := http.NewResponse()
-		err := serializer.Write(proto.HTTP10, response)
-		require.EqualError(t, err, status.ErrCloseConnection.Error())
 	})
 
 	t.Run("custom code and status", func(t *testing.T) {

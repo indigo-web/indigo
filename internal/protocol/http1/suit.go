@@ -8,14 +8,15 @@ import (
 	"github.com/indigo-web/indigo/internal/buffer"
 	"github.com/indigo-web/indigo/internal/codecutil"
 	"github.com/indigo-web/indigo/internal/construct"
+	"github.com/indigo-web/indigo/internal/strutil"
 	"github.com/indigo-web/indigo/router"
 	"github.com/indigo-web/indigo/transport"
 	"maps"
 )
 
 type Suit struct {
-	*parser
-	*Body
+	*Parser
+	*body
 	*serializer
 	router router.Router
 	client transport.Client
@@ -27,17 +28,17 @@ func newSuit(
 	r router.Router,
 	request *http.Request,
 	client transport.Client,
-	body *Body,
+	body *body,
 	codecs codecutil.Cache,
-	keysBuff, valsBuff, statusBuff buffer.Buffer,
+	headersBuff, statusBuff *buffer.Buffer,
 	respBuff []byte,
 ) *Suit {
 	defHeaders := maps.Clone(cfg.Headers.Default)
 	defHeaders["Accept-Encoding"] = codecs.AcceptEncodings()
 
 	return &Suit{
-		parser:     newParser(cfg, request, keysBuff, valsBuff, statusBuff),
-		Body:       body,
+		Parser:     NewParser(cfg, request, headersBuff, statusBuff),
+		body:       body,
 		serializer: newSerializer(cfg, request, client, codecs, respBuff, defHeaders),
 		router:     r,
 		client:     client,
@@ -53,11 +54,11 @@ func New(
 	request *http.Request,
 	codecs codecutil.Cache,
 ) *Suit {
-	keysBuff, valsBuff, statusBuff := construct.Buffers(cfg)
+	headersBuff, statusBuff := construct.Buffers(cfg)
 	respBuff := make([]byte, 0, cfg.HTTP.ResponseBuffer.Default)
-	b := NewBody(client, cfg.Body)
+	b := newBody(client, cfg.Body)
 
-	return newSuit(cfg, r, request, client, b, codecs, keysBuff, valsBuff, statusBuff, respBuff)
+	return newSuit(cfg, r, request, client, b, codecs, headersBuff, statusBuff, respBuff)
 }
 
 func (s *Suit) ServeOnce() (ok bool) {
@@ -70,7 +71,7 @@ func (s *Suit) Serve() {
 
 func (s *Suit) serve(once bool) (ok bool) {
 	client := s.client
-	request := s.parser.request
+	request := s.Parser.request
 
 	for {
 		data, err := client.Read()
@@ -89,15 +90,18 @@ func (s *Suit) serve(once bool) (ok bool) {
 		}
 
 		if !done {
+			if once {
+				return true
+			}
+
 			continue
 		}
 
 		client.Pushback(extra)
 		request.Body.Reset(request)
-		s.Body.Reset(request)
+		s.body.Reset(request)
 
 		transferEncoding := request.Encoding.Transfer
-
 		if !validateTransferEncodingTokens(transferEncoding) {
 			resp := respond(request, s.router.OnError(request, status.ErrUnsupportedEncoding))
 			_ = s.Write(request.Protocol, resp)
@@ -135,21 +139,44 @@ func (s *Suit) serve(once bool) (ok bool) {
 		}
 
 		if err = s.Write(version, resp); err != nil {
-			// if error happened during writing the response, it makes no sense to try
-			// to write anything again
+			// considering any write errors could occur due to broken connection, it makes
+			// thereby no sense to try to write any error back. Moreover, there could be an
+			// already sent data, which would overlay and result in a complete mess at the
+			// client side.
 			s.router.OnError(request, status.ErrCloseConnection)
 			return false
 		}
 
-		request.Reset()
 		if err = request.Body.Discard(); err != nil {
-			s.router.OnError(request, status.ErrCloseConnection)
+			resp = s.router.OnError(request, status.ErrCloseConnection)
+			_ = s.Write(request.Protocol, resp)
 			return false
+		}
+
+		if !isKeepAlive(version, request) {
+			s.router.OnError(request, status.ErrCloseConnection)
+			return true
 		}
 
 		if once {
 			return true
 		}
+
+		request.Reset()
+	}
+}
+
+func isKeepAlive(protocol proto.Protocol, req *http.Request) bool {
+	switch protocol {
+	case proto.HTTP10:
+		return strutil.CmpFoldSafe(req.Connection, "keep-alive")
+	case proto.HTTP11:
+		// in case of HTTP/1.1, keep-alive may be only disabled
+		return !strutil.CmpFoldSafe(req.Connection, "close")
+	default:
+		// as the protocol is unknown and the code was probably caused by some sort
+		// of bug, consider closing it
+		return false
 	}
 }
 
@@ -168,7 +195,7 @@ func validateTransferEncodingTokens(tokens []string) bool {
 }
 
 func (s *Suit) applyDecoders(tokens []string) error {
-	request := s.parser.request
+	request := s.Parser.request
 
 	for i := len(tokens); i > 0; i-- {
 		c := s.codecs.Get(tokens[i-1])

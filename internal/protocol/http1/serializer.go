@@ -84,10 +84,6 @@ func (s *serializer) Write(protocol proto.Protocol, response *http.Response) err
 
 	err = s.flush()
 
-	if !isKeepAlive(protocol, s.request) && s.request.Upgrade == proto.Unknown {
-		err = status.ErrCloseConnection
-	}
-
 	s.cleanup()
 	return err
 }
@@ -214,7 +210,6 @@ func (s *serializer) writeChunked(r io.Reader) error {
 		}
 
 		n, err := r.Read(buff[dataOffset : len(buff)-crlflen])
-
 		hexlen := len(strconv.AppendUint(buff[:0], uint64(n), 16)) // chunk length
 
 		if len(s.buff) > 0 {
@@ -383,7 +378,7 @@ func (s *serializer) appendCookie(c cookie.Cookie) {
 
 	if !c.Expires.IsZero() {
 		s.buff = append(s.buff, "Expires="...)
-		// TODO: this might be slow. We can write the date manually though
+		// TODO: this _may_ be slow. We could write it manually instead
 		s.buff = c.Expires.In(zoneGMT).AppendFormat(s.buff, time.RFC1123)
 		s.buff = append(s.buff, ';', ' ')
 	}
@@ -453,20 +448,6 @@ func (s *serializer) cleanup() {
 	s.defaultHeaders.Reset()
 }
 
-func isKeepAlive(protocol proto.Protocol, req *http.Request) bool {
-	switch protocol {
-	case proto.HTTP10:
-		return strutil.CmpFold(req.Connection, "keep-alive")
-	case proto.HTTP11:
-		// in case of HTTP/1.1, keep-alive may be only disabled
-		return !strutil.CmpFold(req.Connection, "close")
-	default:
-		// as the protocol is unknown and the code was probably caused by some sort
-		// of bug, consider closing it
-		return false
-	}
-}
-
 func preprocessDefaultHeaders(headers map[string]string) defaultHeaders {
 	processed := make(defaultHeaders, 0, len(headers))
 
@@ -511,7 +492,7 @@ type defaultHeaders []defaultHeader
 
 func (d defaultHeaders) Exclude(key string) {
 	for i, header := range d {
-		if strutil.CmpFold(header.Key, key) {
+		if strutil.CmpFoldFast(header.Key, key) {
 			header.Excluded = true
 			d[i] = header
 			return
