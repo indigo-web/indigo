@@ -80,9 +80,9 @@ func (r *Response) Encoding(value string) *Response {
 // If Content-Type or Transfer-Encoding are passed, respective methods will be used instead.
 func (r *Response) Header(key string, values ...string) *Response {
 	switch {
-	case strutil.CmpFold(key, "content-type"):
+	case strutil.CmpFoldFast(key, "content-type"):
 		return r.ContentType(values[0])
-	case strutil.CmpFold(key, "content-encoding"):
+	case strutil.CmpFoldFast(key, "content-encoding"):
 		return r.Encoding(values[0])
 	}
 

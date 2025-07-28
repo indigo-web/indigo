@@ -285,7 +285,7 @@ func (s *stream) CompareFold(offset int, str string) bool {
 		return false
 	}
 
-	return strutil.CmpFold(string(*s)[offset:offset+len(str)], str)
+	return strutil.CmpFoldSafe(string(*s)[offset:offset+len(str)], str)
 }
 
 func (s *stream) Consume(str string) bool {

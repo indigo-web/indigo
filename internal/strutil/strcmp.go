@@ -1,5 +1,7 @@
 package strutil
 
+import "unsafe"
+
 var lut = [256]byte{
 	'\x00', '\x01', '\x02', '\x03', '\x04', '\x05', '\x06', '\x07', '\x08', '\x09', '\x0a', '\x0b', '\x0c', '\x0d', '\x0e', '\x0f',
 	'\x10', '\x11', '\x12', '\x13', '\x14', '\x15', '\x16', '\x17', '\x18', '\x19', '\x1a', '\x1b', '\x1c', '\x1d', '\x1e', '\x1f',
@@ -19,14 +21,41 @@ var lut = [256]byte{
 	'\xf0', '\xf1', '\xf2', '\xf3', '\xf4', '\xf5', '\xf6', '\xf7', '\xf8', '\xf9', '\xfa', '\xfb', '\xfc', '\xfd', '\xfe', '\xff',
 }
 
-// CmpFold compares two strings case-insensitively. Works on any ASCII ranges.
-func CmpFold(str1, str2 string) bool {
-	if len(str1) != len(str2) {
+// CmpFoldSafe compares two strings in a case-insensitive manner without relying on bitwise lowercasing.
+func CmpFoldSafe(s1, s2 string) bool {
+	if len(s1) != len(s2) {
 		return false
 	}
 
-	for i := range str1 {
-		if lut[str1[i]] != lut[str2[i]] {
+	for i := range s1 {
+		if lut[s1[i]] != lut[s2[i]] {
+			return false
+		}
+	}
+
+	return true
+}
+
+// CmpFoldFast compares two strings in a case-insensitive manner. Works significantly faster than CmpFoldSafe,
+// especially on longer strings
+func CmpFoldFast(s1, s2 string) bool {
+	if len(s1) != len(s2) {
+		return false
+	}
+
+	const lowercase = 0x2020202020202020
+	i := 0
+
+	for ; i <= len(s1)-8; i += 8 {
+		s1chunk := *(*uint64)(unsafe.Pointer(unsafe.StringData(s1[i:])))
+		s2chunk := *(*uint64)(unsafe.Pointer(unsafe.StringData(s2[i:])))
+		if s1chunk|lowercase != s2chunk|lowercase {
+			return false
+		}
+	}
+
+	for ; i < len(s1); i++ {
+		if s1[i]|0x20 != s2[i]|0x20 {
 			return false
 		}
 	}
