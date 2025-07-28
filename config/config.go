@@ -7,14 +7,10 @@ import (
 
 type (
 	HeadersNumber struct {
-		Default, Maximal int
+		Default, Maximal int32
 	}
 
-	HeadersKeysSpace struct {
-		Default, Maximal int
-	}
-
-	HeadersValuesSpace struct {
+	HeadersSpace struct {
 		Default, Maximal int
 	}
 
@@ -55,23 +51,13 @@ type (
 		// Default value is an initial size of allocated headers map.
 		// Maximal value is maximum number of headers allowed to be presented
 		Number HeadersNumber
-		// MaxKeyLength is responsible for maximal header key length restriction.
-		MaxKeyLength int
-		// MaxValueLength is responsible for maximal header value length restriction.
-		MaxValueLength int
-		// KeySpace is responsible for limitation of how much space can headers' keys
-		// consume. Default value is how many bytes to pre-allocate, and maximal is
-		// how many bytes can be stored maximally
-		KeySpace HeadersKeysSpace
-		// HeadersValuesSpace is responsible for a maximal space in bytes available for
-		// keeping header values in memory.
-		// Default value is initial space allocated when client connects.
-		// Maximal value is a hard limit, reaching which one client triggers server
-		// to response with 431 Header Fields Too Large.
-		ValueSpace HeadersValuesSpace
+		// Space limits the amount of memory occupied by request headers.
+		Space HeadersSpace
 		// MaxEncodingTokens is a limit of how many encodings can be applied at the body
 		// in a single request.
 		MaxEncodingTokens int
+		// MaxAcceptEncodingTokens is a limit for the buffer storing accepted by a client encodings.
+		MaxAcceptEncodingTokens int
 		// Default headers are headers to be included into every response implicitly, unless
 		// explicitly overridden.
 		Default map[string]string `test:"nullable"`
@@ -136,9 +122,10 @@ func Default() *Config {
 		URI: URI{
 			RequestLineSize: URIRequestLineSize{
 				Default: 2 * 1024,
-				// allow at most 32kb. This limit is pretty much tolerant as most web entities
-				// are limiting it to 4-8kb, however we do also store path parameters here.
-				Maximal: 32 * 1024,
+				// allow at most 16kb of request line, which is effectively pretty much tolerant,
+				// considering most web-entities limit it to 4-8kb. However, we do also store path
+				// parameters here, too.
+				Maximal: 16 * 1024,
 			},
 			ParamsPrealloc: 5,
 		},
@@ -147,23 +134,14 @@ func Default() *Config {
 				Default: 10,
 				Maximal: 50,
 			},
-			MaxKeyLength:   100,      // basically 100 bytes
-			MaxValueLength: 8 * 1024, // 8 kilobytes (just like nginx)
-			KeySpace: HeadersKeysSpace{
-				Default: 1 * 1024,
-				Maximal: 4 * 1024,
+			Space: HeadersSpace{
+				Default: 1 * 1024,  // 1kb for headers must be fairly enough in most cases.
+				Maximal: 16 * 1024, // However, there also might be extremely long cookies.
 			},
-			ValueSpace: HeadersValuesSpace{
-				// for simple requests without many heavy-weighted headers must be enough
-				// to avoid a relatively big amount of re-allocations
-				// this may be an issue, if there are more custom encodings than this. However,
-				// such cases are considered to be too rare
-				Default: 1 * 1024, // allocate 1kb buffer by default
-				Maximal: 8 * 1024, // however allow at most 8kb of headers
-			},
-			MaxEncodingTokens: 15,
-			Default:           make(map[string]string),
-			CookiesPrealloc:   5,
+			MaxEncodingTokens:       4,  // 1 for chunked, leaving at most 3 compressors to be composed
+			MaxAcceptEncodingTokens: 20, // that must be a way too advanced client
+			Default:                 make(map[string]string),
+			CookiesPrealloc:         5,
 		},
 		Body: Body{
 			MaxSize: 512 * 1024 * 1024, // 512 megabytes

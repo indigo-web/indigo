@@ -14,14 +14,15 @@ import (
 	"github.com/indigo-web/indigo/transport/dummy"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"slices"
 	"strings"
 	"testing"
 )
 
-func getParser(cfg *config.Config) (*parser, *http.Request) {
+func getParser(cfg *config.Config) (*Parser, *http.Request) {
 	request := construct.Request(cfg, dummy.NewNopClient())
-	keys, values, requestLine := construct.Buffers(cfg)
-	p := newParser(cfg, request, keys, values, requestLine)
+	headers, statusLine := construct.Buffers(cfg)
+	p := NewParser(cfg, request, headers, statusLine)
 
 	return p, request
 }
@@ -30,7 +31,7 @@ func BenchmarkParser(b *testing.B) {
 	parser, request := getParser(config.Default())
 
 	b.Run("with 5 headers", func(b *testing.B) {
-		data := GenerateRequest(strings.Repeat("a", 500), GenerateHeaders(5))
+		data := generateRequest(strings.Repeat("a", 500), generateHeaders(5))
 		b.SetBytes(int64(len(data)))
 		b.ReportAllocs()
 		b.ResetTimer()
@@ -42,7 +43,7 @@ func BenchmarkParser(b *testing.B) {
 	})
 
 	b.Run("with 10 headers", func(b *testing.B) {
-		data := GenerateRequest(strings.Repeat("a", 500), GenerateHeaders(10))
+		data := generateRequest(strings.Repeat("a", 500), generateHeaders(10))
 		b.SetBytes(int64(len(data)))
 		b.ReportAllocs()
 		b.ResetTimer()
@@ -54,7 +55,7 @@ func BenchmarkParser(b *testing.B) {
 	})
 
 	b.Run("with 50 headers", func(b *testing.B) {
-		data := GenerateRequest(strings.Repeat("a", 500), GenerateHeaders(50))
+		data := generateRequest(strings.Repeat("a", 500), generateHeaders(50))
 		b.SetBytes(int64(len(data)))
 		b.ReportAllocs()
 		b.ResetTimer()
@@ -66,7 +67,7 @@ func BenchmarkParser(b *testing.B) {
 	})
 
 	b.Run("escaped 10 headers", func(b *testing.B) {
-		data := GenerateRequest(strings.Repeat("%20", 500), GenerateHeaders(10))
+		data := generateRequest(strings.Repeat("%20", 500), generateHeaders(10))
 		b.SetBytes(int64(len(data)))
 		b.ReportAllocs()
 		b.ResetTimer()
@@ -90,10 +91,9 @@ func compareRequests(t *testing.T, wanted wantedRequest, actual *http.Request) {
 	require.Equal(t, wanted.Path, actual.Path)
 	require.Equal(t, wanted.Protocol, actual.Protocol)
 
-	keys := wanted.Headers.Keys()
-
-	for _, key := range keys {
-		require.Equal(t, wanted.Headers.Values(key), actual.Headers.Values(key))
+	for key := range wanted.Headers.Keys() {
+		wh, ah := wanted.Headers.Values(key), actual.Headers.Values(key)
+		require.Equal(t, slices.Collect(wh), slices.Collect(ah))
 	}
 }
 
@@ -110,7 +110,7 @@ func splitIntoParts(req []byte, n int) (parts [][]byte) {
 	return parts
 }
 
-func feedPartially(p *parser, raw []byte, n int) (done bool, extra []byte, err error) {
+func feedPartially(p *Parser, raw []byte, n int) (done bool, extra []byte, err error) {
 	parts := splitIntoParts(raw, n)
 
 	for i, chunk := range parts {
@@ -237,7 +237,7 @@ func TestParser(t *testing.T) {
 				"/hello, world",
 			},
 			{
-				GenerateRequest(strings.Repeat("%20", 500), GenerateHeaders(10)),
+				generateRequest(strings.Repeat("%20", 500), generateHeaders(10)),
 				"/" + strings.Repeat(" ", 500),
 			},
 		}
@@ -505,30 +505,9 @@ func TestParser_Edgecases(t *testing.T) {
 		require.True(t, done)
 	})
 
-	t.Run("too long header key", func(t *testing.T) {
-		parser, _ := getParser(config.Default())
-		s := config.Default().Headers
-		raw := fmt.Sprintf(
-			"GET / HTTP/1.1\r\n%s: some value\r\n\r\n",
-			strings.Repeat("a", s.MaxKeyLength*s.Number.Maximal+1),
-		)
-		_, _, err := parser.Parse([]byte(raw))
-		require.EqualError(t, err, status.ErrHeaderFieldsTooLarge.Error())
-	})
-
-	t.Run("too long header value", func(t *testing.T) {
-		parser, _ := getParser(config.Default())
-		raw := fmt.Sprintf(
-			"GET / HTTP/1.1\r\nSome-Header: %s\r\n\r\n",
-			strings.Repeat("a", config.Default().Headers.MaxValueLength+1),
-		)
-		_, _, err := parser.Parse([]byte(raw))
-		require.EqualError(t, err, status.ErrHeaderFieldsTooLarge.Error())
-	})
-
 	t.Run("too many headers", func(t *testing.T) {
 		parser, _ := getParser(config.Default())
-		hdrs := genHeaders(config.Default().Headers.Number.Maximal + 1)
+		hdrs := genHeaders(int(config.Default().Headers.Number.Maximal + 1))
 		raw := fmt.Sprintf(
 			"GET / HTTP/1.1\r\n%s\r\n\r\n",
 			strings.Join(hdrs, "\r\n"),
@@ -547,64 +526,50 @@ func TestParser_Edgecases(t *testing.T) {
 		require.Empty(t, string(extra))
 		require.EqualError(t, err, status.ErrTooManyEncodingTokens.Error())
 	})
+
+	t.Run("duplicate Transfer-Encoding", func(t *testing.T) {
+		raw := "GET / HTTP/1.1\r\nTransfer-Encoding: gzip\r\nTransfer-Encoding: chunked\r\n\r\n"
+		parser, request := getParser(config.Default())
+		_, _, err := parser.Parse([]byte(raw))
+		require.EqualError(t, err, status.ErrBadEncoding.Error())
+		request.Reset()
+	})
 }
 
-func TestParseEncoding(t *testing.T) {
-	t.Run("empty", func(t *testing.T) {
-		toks, err := parseEncodingString(make([]string, 0, 10), "")
-		require.NoError(t, err)
-		require.Empty(t, toks)
-	})
-
-	t.Run("chunked", func(t *testing.T) {
-		toks, err := parseEncodingString(make([]string, 0, 10), "chunked")
-		require.NoError(t, err)
-		require.Equal(t, []string{"chunked"}, toks)
-	})
-
-	t.Run("gzip", func(t *testing.T) {
-		toks, err := parseEncodingString(make([]string, 0, 10), "gzip")
-		require.NoError(t, err)
-		require.Equal(t, []string{"gzip"}, toks)
-	})
-
-	t.Run("multiple tokens", func(t *testing.T) {
+func TestSplitTokens(t *testing.T) {
+	t.Run("positive", func(t *testing.T) {
 		for i, tc := range []struct {
 			Sample string
 			Want   []string
 		}{
+			{"", []string{}},
+			{"identity", []string{}},
+			{"chunked", []string{"chunked"}},
 			{"chunked,gzip", []string{"chunked", "gzip"}},
 			{"gzip,chunked", []string{"gzip", "chunked"}},
 			{" gzip,    chunked  ", []string{"gzip", "chunked"}},
 		} {
-			toks, err := parseEncodingString(make([]string, 0, 2), tc.Sample)
+			_, toks, err := splitTokens(make([]string, 0, 2), tc.Sample)
 			if assert.NoError(t, err) {
 				assert.Equal(t, tc.Want, toks, i+1)
 			}
 		}
-
-		toks, err := parseEncodingString(make([]string, 0, 10), "chunked,gzip")
-		require.NoError(t, err)
-		require.Equal(t, []string{"chunked", "gzip"}, toks)
-		toks, err = parseEncodingString(make([]string, 0, 10), "gzip,chunked")
-		require.NoError(t, err)
-		require.Equal(t, []string{"gzip", "chunked"}, toks)
 	})
 
-	t.Run("extra commas", func(t *testing.T) {
+	t.Run("negative", func(t *testing.T) {
 		for i, tc := range []string{
 			", chunked",
 			"chunked, ",
 			"gzip,,chunked",
 			"gzip, , chunked",
 		} {
-			_, err := parseEncodingString(make([]string, 0, 2), tc)
+			_, _, err := splitTokens(make([]string, 0, 2), tc)
 			assert.EqualError(t, err, status.ErrUnsupportedEncoding.Error(), i+1)
 		}
 	})
 
 	t.Run("overflow tokens limit", func(t *testing.T) {
-		toks, err := parseEncodingString(make([]string, 0, 1), "gzip,flate,chunked")
+		_, toks, err := splitTokens(make([]string, 0, 1), "gzip,flate,chunked")
 		require.EqualError(t, err, status.ErrTooManyEncodingTokens.Error())
 		require.Nil(t, toks)
 	})

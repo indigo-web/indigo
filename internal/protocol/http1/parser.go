@@ -10,6 +10,7 @@ import (
 	"github.com/indigo-web/indigo/http/status"
 	"github.com/indigo-web/indigo/internal/buffer"
 	"github.com/indigo-web/indigo/internal/hexconv"
+	"github.com/indigo-web/indigo/internal/strutil"
 	"strings"
 )
 
@@ -34,43 +35,39 @@ const (
 	eHeaderValueCRLFCR
 )
 
-type parser struct {
-	urlEncodedChar    uint8
-	state             parserState
-	cfg               *config.Config
-	request           *http.Request
-	headersNumber     int
-	contentLength     int
-	key               string
-	transferEncodings []string
-	contentEncodings  []string
-	requestLine       *buffer.Buffer
-	headerKeys        *buffer.Buffer
-	headerValues      *buffer.Buffer
+type Parser struct {
+	urlEncodedChar      uint8
+	state               parserState
+	metTransferEncoding bool
+	headersNumber       int32
+	contentLength       int32
+	cfg                 *config.Config
+	request             *http.Request
+	requestLine         *buffer.Buffer
+	headers             *buffer.Buffer
+	key                 string
+	acceptEncodings     []string
+	encodings           []string
 }
 
-func newParser(
-	cfg *config.Config, request *http.Request, headerKeys, headerValues, requestLine buffer.Buffer,
-) *parser {
-	return &parser{
+func NewParser(cfg *config.Config, request *http.Request, requestLine, headers *buffer.Buffer) *Parser {
+	return &Parser{
 		cfg:     cfg,
 		state:   eMethod,
 		request: request,
 		// TODO: pass these through arguments instead of allocating in-place
-		transferEncodings: make([]string, 0, cfg.Headers.MaxEncodingTokens),
-		contentEncodings:  make([]string, 0, cfg.Headers.MaxEncodingTokens),
-		requestLine:       &requestLine,
-		headerKeys:        &headerKeys,
-		headerValues:      &headerValues,
+		acceptEncodings: make([]string, 0, cfg.Headers.MaxAcceptEncodingTokens),
+		encodings:       make([]string, 0, cfg.Headers.MaxEncodingTokens),
+		requestLine:     requestLine,
+		headers:         headers,
 	}
 }
 
-func (p *parser) Parse(data []byte) (done bool, extra []byte, err error) {
+func (p *Parser) Parse(data []byte) (done bool, extra []byte, err error) {
 	_ = *p.request
 	request := p.request
 	requestLine := p.requestLine
-	headerKeys := p.headerKeys
-	headerValues := p.headerValues
+	headers := p.headers
 	headersCfg := p.cfg.Headers
 
 	switch p.state {
@@ -455,7 +452,7 @@ headerKey:
 
 		colon := bytes.IndexByte(data, ':')
 		if colon == -1 {
-			if !headerKeys.Append(data) {
+			if !headers.Append(data) {
 				return true, nil, status.ErrHeaderFieldsTooLarge
 			}
 
@@ -463,11 +460,11 @@ headerKey:
 			return false, nil, nil
 		}
 
-		if !headerKeys.Append(data[:colon]) {
+		if !headers.Append(data[:colon]) {
 			return true, nil, status.ErrHeaderFieldsTooLarge
 		}
 
-		key := uf.B2S(headerKeys.Finish())
+		key := uf.B2S(headers.Finish())
 		p.key = key
 		data = data[colon+1:]
 
