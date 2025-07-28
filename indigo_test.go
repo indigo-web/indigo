@@ -14,14 +14,11 @@ import (
 	"github.com/indigo-web/indigo/http/mime"
 	"github.com/indigo-web/indigo/http/proto"
 	"github.com/indigo-web/indigo/http/status"
-	"github.com/indigo-web/indigo/internal/codecutil"
-	"github.com/indigo-web/indigo/internal/construct"
-	"github.com/indigo-web/indigo/internal/dump"
-	"github.com/indigo-web/indigo/internal/protocol/http1"
+	"github.com/indigo-web/indigo/internal/httptest/parse"
+	"github.com/indigo-web/indigo/internal/httptest/serialize"
 	"github.com/indigo-web/indigo/kv"
 	"github.com/indigo-web/indigo/router/inbuilt"
 	"github.com/indigo-web/indigo/router/inbuilt/middleware"
-	"github.com/indigo-web/indigo/transport/dummy"
 	"github.com/klauspost/compress/gzip"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -53,7 +50,7 @@ func getHeaders() http.Headers {
 }
 
 func respond(request *http.Request) *http.Response {
-	str, err := dump.Request(request)
+	str, err := serialize.Request(request)
 	if err != nil {
 		return http.Error(request, err)
 	}
@@ -93,7 +90,7 @@ func getInbuiltRouter() *inbuilt.Router {
 	r.Get("/query", func(request *http.Request) *http.Response {
 		var buff []byte
 
-		for key, value := range request.Params.Iter() {
+		for key, value := range request.Params.Pairs() {
 			buff = append(buff, key+":"+value+"."...)
 		}
 
@@ -119,7 +116,7 @@ func getInbuiltRouter() *inbuilt.Router {
 	}, middleware.Recover)
 
 	r.Get("/json", func(request *http.Request) *http.Response {
-		fields := request.Headers.Values("fields")
+		fields := slices.Collect(request.Headers.Values("fields"))
 
 		return http.JSON(request, headersToMap(request.Headers, fields))
 	})
@@ -165,7 +162,7 @@ func headersToMap(hdrs http.Headers, keys []string) map[string]string {
 	m := make(map[string]string, len(keys))
 
 	for _, key := range keys {
-		m[key] = strings.Join(hdrs.Values(key), ", ")
+		m[key] = strings.Join(slices.Collect(hdrs.Values(key)), ", ")
 	}
 
 	return m
@@ -190,7 +187,7 @@ func TestFirstPhase(t *testing.T) {
 				),
 			)
 		s := config.Default()
-		s.NET.ReadTimeout = 500 * time.Millisecond
+		s.NET.ReadTimeout = 1 * time.Second
 		require.NoError(t, app.
 			Tune(s).
 			OnStart(func() {
@@ -206,7 +203,6 @@ func TestFirstPhase(t *testing.T) {
 	}(app)
 
 	<-ch
-
 	// Ensure the server is ready to accept connections
 	waitForAvailability(t)
 
@@ -214,7 +210,7 @@ func TestFirstPhase(t *testing.T) {
 		resp, err := stdhttp.DefaultClient.Get(appURL + "/")
 		require.NoError(t, err)
 		require.Equal(t, stdhttp.StatusOK, resp.StatusCode)
-		request, err := parseHTTP11Request(readFullBody(t, resp))
+		request, err := parse.HTTP11Request(readFullBody(t, resp))
 		require.NoError(t, err)
 
 		require.Equal(t, method.GET, request.Method)
@@ -224,7 +220,9 @@ func TestFirstPhase(t *testing.T) {
 		for err = range compareHeaders(request.Headers, wantHeaders) {
 			assert.Fail(t, err.Error())
 		}
-		require.Empty(t, request.Body)
+		body, err := request.Body.String()
+		require.NoError(t, err)
+		require.Empty(t, body)
 	})
 
 	t.Run("root get with body", func(t *testing.T) {
@@ -234,7 +232,7 @@ func TestFirstPhase(t *testing.T) {
 		resp, err := stdhttp.DefaultClient.Do(req)
 		require.NoError(t, err)
 		require.Equal(t, stdhttp.StatusOK, resp.StatusCode)
-		request, err := parseHTTP11Request(readFullBody(t, resp))
+		request, err := parse.HTTP11Request(readFullBody(t, resp))
 		require.NoError(t, err)
 
 		require.Equal(t, method.GET, request.Method)
@@ -244,7 +242,9 @@ func TestFirstPhase(t *testing.T) {
 		for err = range compareHeaders(request.Headers, wantHeaders) {
 			assert.Fail(t, err.Error())
 		}
-		require.Equal(t, "Hello, world!", request.Body)
+		body, err := request.Body.String()
+		require.NoError(t, err)
+		require.Equal(t, "Hello, world!", body)
 	})
 
 	t.Run("root post", func(t *testing.T) {
@@ -252,7 +252,7 @@ func TestFirstPhase(t *testing.T) {
 		resp, err := stdhttp.DefaultClient.Post(appURL+"/", "text/html", r)
 		require.NoError(t, err)
 		require.Equal(t, stdhttp.StatusOK, resp.StatusCode)
-		request, err := parseHTTP11Request(readFullBody(t, resp))
+		request, err := parse.HTTP11Request(readFullBody(t, resp))
 		require.NoError(t, err)
 
 		require.Equal(t, method.POST, request.Method)
@@ -264,7 +264,9 @@ func TestFirstPhase(t *testing.T) {
 		for err = range compareHeaders(request.Headers, wantHeaders) {
 			assert.Fail(t, err.Error())
 		}
-		require.Equal(t, "Hello, world!", request.Body)
+		body, err := request.Body.String()
+		require.NoError(t, err)
+		require.Equal(t, "Hello, world!", body)
 	})
 
 	t.Run("root head", func(t *testing.T) {
@@ -310,7 +312,7 @@ func TestFirstPhase(t *testing.T) {
 		resp, err := stdhttp.DefaultClient.Post(appURL+"/", "text/html", r)
 		require.NoError(t, err)
 		require.Equal(t, stdhttp.StatusOK, resp.StatusCode)
-		request, err := parseHTTP11Request(readFullBody(t, resp))
+		request, err := parse.HTTP11Request(readFullBody(t, resp))
 		require.NoError(t, err)
 
 		require.Equal(t, method.POST, request.Method)
@@ -322,7 +324,9 @@ func TestFirstPhase(t *testing.T) {
 		for err = range compareHeaders(request.Headers, wantHeaders) {
 			assert.Fail(t, err.Error())
 		}
-		require.Equal(t, "Hello, world!", request.Body)
+		body, err := request.Body.String()
+		require.NoError(t, err)
+		require.Equal(t, "Hello, world!", body)
 	})
 
 	t.Run("hijacking", func(t *testing.T) {
@@ -441,7 +445,7 @@ func TestFirstPhase(t *testing.T) {
 		}
 
 		for _, line := range headerLines {
-			require.True(t, contains(wantHeaderLines, line), "unwanted header line: "+line)
+			require.True(t, slices.Contains(wantHeaderLines, line), "unwanted header line: "+line)
 		}
 	})
 
@@ -691,8 +695,13 @@ func TestFirstPhase(t *testing.T) {
 
 	t.Run("forced stop", func(t *testing.T) {
 		app.Stop()
-		_, ok := chanRead(ch, 5*time.Second)
-		require.True(t, ok, "server did not shut down correctly")
+
+		timer := time.NewTimer(5 * time.Second)
+		select {
+		case <-ch:
+		case <-timer.C:
+			require.Fail(t, "server did not shut down correctly")
+		}
 	})
 }
 
@@ -705,7 +714,7 @@ func TestSecondPhase(t *testing.T) {
 	go func(app *App) {
 		r := getInbuiltRouter()
 		s := config.Default()
-		s.NET.ReadTimeout = 500 * time.Millisecond
+		s.NET.ReadTimeout = 1 * time.Second
 		_ = app.
 			Tune(s).
 			Codec(codec.NewGZIP()).
@@ -719,7 +728,6 @@ func TestSecondPhase(t *testing.T) {
 	}(app)
 
 	<-ch
-
 	waitForAvailability(t)
 
 	t.Run("accept encoding", func(t *testing.T) {
@@ -839,51 +847,6 @@ func waitForAvailability(t *testing.T) {
 	}
 }
 
-type Request struct {
-	http.Request
-	Body string
-}
-
-func parseHTTP11Request(data string) (Request, error) {
-	client := dummy.NewClient([]byte(data)).Once()
-	request := construct.Request(config.Default(), client)
-	suit := http1.New(config.Default(), nil, client, request, codecutil.NewCache(nil))
-	request.Body = http.NewBody(config.Default(), suit)
-
-	for {
-		done, extra, err := suit.Parse([]byte(data))
-		if err != nil {
-			return Request{}, err
-		}
-
-		client.Pushback(extra)
-
-		if done {
-			break
-		}
-	}
-
-	request.Body.Reset(request)
-	suit.Reset(request)
-
-	body, err := request.Body.String()
-
-	return Request{
-		Request: *request,
-		Body:    body,
-	}, err
-}
-
-func chanRead[T any](ch <-chan T, timeout time.Duration) (value T, ok bool) {
-	timer := time.NewTimer(timeout)
-	select {
-	case value = <-ch:
-		return value, true
-	case <-timer.C:
-		return value, false
-	}
-}
-
 func sendSimpleRequest(addr, path string) (net.Conn, error) {
 	conn, err := net.Dial("tcp", addr)
 	if err != nil {
@@ -899,8 +862,9 @@ func sendSimpleRequest(addr, path string) (net.Conn, error) {
 
 func compareHeaders(a, b http.Headers) iter.Seq[error] {
 	return func(yield func(error) bool) {
-		for _, key := range a.Keys() {
-			if slices.Compare(a.Values(key), b.Values(key)) != 0 {
+		for key := range a.Keys() {
+			av, bv := slices.Collect(a.Values(key)), slices.Collect(b.Values(key))
+			if slices.Compare(av, bv) != 0 {
 				if !yield(fmt.Errorf("%s: mismatching values", key)) {
 					return
 				}
@@ -934,14 +898,4 @@ func (c *circularReader) Read(b []byte) (int, error) {
 
 func (c *circularReader) Close() error {
 	return nil
-}
-
-func contains(strs []string, substr string) bool {
-	for _, str := range strs {
-		if str == substr {
-			return true
-		}
-	}
-
-	return false
 }
