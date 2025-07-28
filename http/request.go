@@ -87,7 +87,7 @@ func (r *Request) Cookies() (cookie.Jar, error) {
 	// in RFC 6265, 5.4 cookies are explicitly prohibited from being split into
 	// list, yet in HTTP/2 it's allowed. I have concerns of some user-agents may
 	// despite sending them as a list, even via HTTP/1.1
-	for _, value := range r.Headers.Values("cookie") {
+	for value := range r.Headers.Values("cookie") {
 		if err := cookie.Parse(r.jar, value); err != nil {
 			return nil, err
 		}

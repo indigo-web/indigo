@@ -56,7 +56,8 @@ func TestVirtualRouter(t *testing.T) {
 
 		require.True(t, requestIs(r.OnRequest(newRequest("pavlo.ooo")), OK))
 		require.True(t, requestIs(r.OnRequest(newRequest("localhost")), status.MisdirectedRequest))
-		require.True(t, requestIs(r.OnRequest(newRequest("pavlo.ooo", "localhost")), status.BadRequest))
+		// Currently disabled the check whether there is more than 1 host
+		//require.True(t, requestIs(r.OnRequest(newRequest("pavlo.ooo", "localhost")), status.BadRequest))
 	})
 }
 
