@@ -150,19 +150,16 @@ type Environment struct {
 type commonHeaders struct {
 	// Encoding holds an information about encoding, that was used to make the request
 	Encoding Encodings
-	// ContentLength obtains the value from Content-Length header. It holds the value of 0
-	// if isn't presented.
-	//
-	// NOTE: you shouldn't rely on this value, as it may be anything (mostly 0) if any
-	// Transfer-Encoding were applied.
+	// ContentLength holds the Content-Length header value. It isn't recommended to rely solely on this
+	// value, as it can be whatever (but most likely zero) if Request.Encoding.Chunked is true.
 	ContentLength int
-	// ContentType obtains Content-Type header value
+	// ContentType holds the Content-Type header value.
 	ContentType string
 	// Connection holds the Connection header value. It isn't normalized, so can be anything
 	// and in any case. So in order to compare it, highly recommended to do it case-insensibly
 	Connection string
-	// Upgrade is the protocol token, which is set by default to proto.Unknown. In
-	// case it is anything else, then Upgrade header was received
+	// Upgrade holds the `Upgrade` header value. It's set to anything but proto.Unknown only when
+	// an upgrade request is received.
 	Upgrade proto.Protocol
 }
 
