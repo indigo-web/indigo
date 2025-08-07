@@ -18,6 +18,10 @@ func Now() time.Time {
 const Resolution = 500 * time.Millisecond
 
 func init() {
+	// In real world this won't matter, however removing the line causes the timer test fail
+	// in about half of all runs.
+	Time.Store(time.Now().UnixMilli())
+
 	go func() {
 		for {
 			Time.Store(time.Now().UnixMilli())
