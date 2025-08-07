@@ -18,9 +18,8 @@ type Instance interface {
 }
 
 type Compressor interface {
+	io.WriteCloser
 	ResetCompressor(w io.Writer)
-	io.Writer
-	Flush() error
 }
 
 type Decompressor interface {
