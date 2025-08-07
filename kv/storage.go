@@ -46,6 +46,12 @@ func NewFromMap(m map[string][]string) *Storage {
 	return kv
 }
 
+// NewFromPairs returns a new instance backed by the passed pairs as-is, without copying it.
+// Use this method with care.
+func NewFromPairs(pairs []Pair) *Storage {
+	return &Storage{pairs: pairs}
+}
+
 // Add adds a new pair of key and value.
 func (s *Storage) Add(key, value string) *Storage {
 	// TODO: if `s.deleted` > 0, try to insert the key into the deleted fields
