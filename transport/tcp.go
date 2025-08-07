@@ -1,13 +1,14 @@
 package transport
 
 import (
-	"github.com/indigo-web/indigo/config"
-	"github.com/indigo-web/indigo/internal/timer"
 	"net"
 	"os"
 	"sync"
 	"sync/atomic"
 	"time"
+
+	"github.com/indigo-web/indigo/config"
+	"github.com/indigo-web/indigo/internal/timer"
 )
 
 type listener interface {

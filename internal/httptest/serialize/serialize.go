@@ -1,8 +1,9 @@
 package serialize
 
 import (
-	"github.com/indigo-web/indigo/http"
 	"strconv"
+
+	"github.com/indigo-web/indigo/http"
 )
 
 func Headers(request *http.Request) string {

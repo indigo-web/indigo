@@ -2,11 +2,12 @@ package inbuilt
 
 import (
 	"fmt"
+	"os"
+	"strings"
+
 	"github.com/indigo-web/indigo/http"
 	"github.com/indigo-web/indigo/http/mime"
 	"github.com/indigo-web/indigo/http/status"
-	"os"
-	"strings"
 )
 
 // Static adds a catcher of prefix, that automatically returns files from defined root

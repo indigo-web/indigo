@@ -1,10 +1,11 @@
 package http1
 
 import (
-	"github.com/indigo-web/indigo/http/status"
-	"github.com/stretchr/testify/require"
 	"io"
 	"testing"
+
+	"github.com/indigo-web/indigo/http/status"
+	"github.com/stretchr/testify/require"
 )
 
 func feed(c *chunkedParser, input []byte) (output, extra []byte, err error) {

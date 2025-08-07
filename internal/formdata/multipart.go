@@ -1,14 +1,15 @@
 package formdata
 
 import (
+	"iter"
+	"strings"
+
 	"github.com/flrdv/uf"
 	"github.com/indigo-web/indigo/config"
 	"github.com/indigo-web/indigo/http/form"
 	"github.com/indigo-web/indigo/http/status"
 	"github.com/indigo-web/indigo/internal/hexconv"
 	"github.com/indigo-web/indigo/internal/strutil"
-	"iter"
-	"strings"
 )
 
 type header struct {

@@ -1,9 +1,10 @@
 package serialize
 
 import (
+	"testing"
+
 	"github.com/indigo-web/indigo/internal/httptest/parse"
 	"github.com/stretchr/testify/require"
-	"testing"
 )
 
 func TestDump(t *testing.T) {

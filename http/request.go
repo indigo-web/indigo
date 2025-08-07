@@ -2,13 +2,14 @@ package http
 
 import (
 	"context"
+	"net"
+
 	"github.com/indigo-web/indigo/config"
 	"github.com/indigo-web/indigo/http/cookie"
 	"github.com/indigo-web/indigo/http/method"
 	"github.com/indigo-web/indigo/http/proto"
 	"github.com/indigo-web/indigo/kv"
 	"github.com/indigo-web/indigo/transport"
-	"net"
 )
 
 var zeroContext = context.Background()

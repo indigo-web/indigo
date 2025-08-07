@@ -1,12 +1,13 @@
 package construct
 
 import (
+	"net"
+
 	"github.com/indigo-web/indigo/config"
 	"github.com/indigo-web/indigo/http"
 	"github.com/indigo-web/indigo/internal/buffer"
 	"github.com/indigo-web/indigo/kv"
 	"github.com/indigo-web/indigo/transport"
-	"net"
 )
 
 func Request(cfg *config.Config, client transport.Client) *http.Request {

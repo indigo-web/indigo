@@ -1,9 +1,10 @@
 package buffer
 
 import (
-	"github.com/stretchr/testify/require"
 	"strings"
 	"testing"
+
+	"github.com/stretchr/testify/require"
 )
 
 func pushSegment(t *testing.T, buff *Buffer, text string) *Buffer {

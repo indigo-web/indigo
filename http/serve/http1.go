@@ -1,13 +1,14 @@
 package serve
 
 import (
+	"net"
+
 	"github.com/indigo-web/indigo/config"
 	"github.com/indigo-web/indigo/http"
 	"github.com/indigo-web/indigo/internal/codecutil"
 	"github.com/indigo-web/indigo/internal/construct"
 	"github.com/indigo-web/indigo/internal/protocol/http1"
 	"github.com/indigo-web/indigo/router"
-	"net"
 )
 
 // HTTP1 setups and serves an HTTP/1.1 server until it stops. Note that the connection isn't

@@ -2,9 +2,11 @@ package http1
 
 import (
 	"bytes"
+	"io"
+	"strings"
+
 	"github.com/indigo-web/indigo/http/status"
 	"github.com/indigo-web/indigo/internal/hexconv"
-	"io"
 )
 
 type chunkedParserState uint8

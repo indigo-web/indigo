@@ -1,9 +1,10 @@
 package codec
 
 import (
+	"io"
+
 	"github.com/indigo-web/indigo/http"
 	"github.com/klauspost/compress/gzip"
-	"io"
 )
 
 // TODO: pass this via parameters?

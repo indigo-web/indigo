@@ -1,8 +1,9 @@
 package config
 
 import (
-	"github.com/indigo-web/indigo/http/mime"
 	"time"
+
+	"github.com/indigo-web/indigo/http/mime"
 )
 
 type (

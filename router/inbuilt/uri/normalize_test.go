@@ -1,8 +1,9 @@
 package uri
 
 import (
-	"github.com/stretchr/testify/require"
 	"testing"
+
+	"github.com/stretchr/testify/require"
 )
 
 func TestNormalize(t *testing.T) {

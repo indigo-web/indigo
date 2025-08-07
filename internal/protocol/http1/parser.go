@@ -2,6 +2,8 @@ package http1
 
 import (
 	"bytes"
+	"strings"
+
 	"github.com/flrdv/uf"
 	"github.com/indigo-web/indigo/config"
 	"github.com/indigo-web/indigo/http"
@@ -11,7 +13,6 @@ import (
 	"github.com/indigo-web/indigo/internal/buffer"
 	"github.com/indigo-web/indigo/internal/hexconv"
 	"github.com/indigo-web/indigo/internal/strutil"
-	"strings"
 )
 
 type parserState uint8

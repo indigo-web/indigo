@@ -2,11 +2,12 @@ package formdata
 
 import (
 	"fmt"
+	"strings"
+	"testing"
+
 	"github.com/indigo-web/indigo/http/form"
 	"github.com/indigo-web/indigo/http/status"
 	"github.com/stretchr/testify/require"
-	"strings"
-	"testing"
 )
 
 func BenchmarkParse(b *testing.B) {

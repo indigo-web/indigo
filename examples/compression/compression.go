@@ -2,12 +2,13 @@ package main
 
 import (
 	"fmt"
+	"log"
+	"strconv"
+
 	"github.com/indigo-web/indigo"
 	"github.com/indigo-web/indigo/http"
 	"github.com/indigo-web/indigo/http/codec"
 	"github.com/indigo-web/indigo/router/inbuilt"
-	"log"
-	"strconv"
 )
 
 func Shout(r *http.Request) *http.Response {

@@ -1,13 +1,14 @@
 package inbuilt
 
 import (
+	"testing"
+
 	"github.com/indigo-web/indigo/config"
 	"github.com/indigo-web/indigo/http/method"
 	"github.com/indigo-web/indigo/http/status"
 	"github.com/indigo-web/indigo/internal/construct"
 	"github.com/indigo-web/indigo/transport/dummy"
 	"github.com/stretchr/testify/require"
-	"testing"
 
 	"github.com/indigo-web/indigo/http"
 )

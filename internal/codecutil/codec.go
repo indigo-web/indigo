@@ -1,9 +1,10 @@
 package codecutil
 
 import (
+	"iter"
+
 	"github.com/indigo-web/indigo/http/codec"
 	"github.com/indigo-web/indigo/internal/strutil"
-	"iter"
 )
 
 type Cache struct {

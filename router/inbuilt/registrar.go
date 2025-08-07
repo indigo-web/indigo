@@ -2,10 +2,11 @@ package inbuilt
 
 import (
 	"fmt"
+	"strings"
+
 	"github.com/indigo-web/indigo/http/method"
 	"github.com/indigo-web/indigo/router/inbuilt/internal/radix"
 	"github.com/indigo-web/indigo/router/inbuilt/uri"
-	"strings"
 )
 
 type registrar struct {

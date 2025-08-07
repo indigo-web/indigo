@@ -1,6 +1,8 @@
 package http
 
 import (
+	"io"
+
 	"github.com/flrdv/uf"
 	"github.com/indigo-web/indigo/config"
 	"github.com/indigo-web/indigo/http/form"
@@ -9,7 +11,6 @@ import (
 	"github.com/indigo-web/indigo/internal/formdata"
 	"github.com/indigo-web/indigo/internal/strutil"
 	json "github.com/json-iterator/go"
-	"io"
 )
 
 type BodyCallback func([]byte) error

@@ -2,6 +2,7 @@ package indigo
 
 import (
 	"crypto/tls"
+
 	"github.com/indigo-web/indigo/config"
 	"github.com/indigo-web/indigo/http/codec"
 	"github.com/indigo-web/indigo/internal/strutil"

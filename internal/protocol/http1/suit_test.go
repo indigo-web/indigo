@@ -3,6 +3,13 @@ package http1
 import (
 	"bytes"
 	"fmt"
+	"io"
+	"net/http/httputil"
+	"slices"
+	"strconv"
+	"strings"
+	"testing"
+
 	"github.com/indigo-web/indigo/config"
 	"github.com/indigo-web/indigo/http"
 	"github.com/indigo-web/indigo/http/codec"
@@ -17,11 +24,6 @@ import (
 	"github.com/indigo-web/indigo/transport/dummy"
 	"github.com/klauspost/compress/gzip"
 	"github.com/stretchr/testify/require"
-	"io"
-	"slices"
-	"strconv"
-	"strings"
-	"testing"
 )
 
 func generateHeaders(n int) http.Headers {

@@ -1,6 +1,11 @@
 package http1
 
 import (
+	"io"
+	"strconv"
+	"strings"
+	"testing"
+
 	"github.com/indigo-web/indigo/config"
 	"github.com/indigo-web/indigo/http"
 	"github.com/indigo-web/indigo/http/status"
@@ -9,10 +14,6 @@ import (
 	"github.com/indigo-web/indigo/transport"
 	"github.com/indigo-web/indigo/transport/dummy"
 	"github.com/stretchr/testify/require"
-	"io"
-	"strconv"
-	"strings"
-	"testing"
 )
 
 func getBody(client transport.Client) *body {

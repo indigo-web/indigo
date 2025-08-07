@@ -1,9 +1,10 @@
 package mutator
 
 import (
+	"log"
+
 	"github.com/indigo-web/indigo/http"
 	"github.com/indigo-web/indigo/router/inbuilt/internal"
-	"log"
 )
 
 type Logger interface {

@@ -1,9 +1,10 @@
 package strutil
 
 import (
-	"github.com/stretchr/testify/require"
 	"iter"
 	"testing"
+
+	"github.com/stretchr/testify/require"
 )
 
 type strpair struct {

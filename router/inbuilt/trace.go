@@ -1,8 +1,9 @@
 package inbuilt
 
 import (
-	"github.com/indigo-web/indigo/http"
 	"strings"
+
+	"github.com/indigo-web/indigo/http"
 )
 
 /*

@@ -1,8 +1,9 @@
 package codec
 
 import (
-	"github.com/indigo-web/indigo/http"
 	"io"
+
+	"github.com/indigo-web/indigo/http"
 )
 
 type Codec interface {

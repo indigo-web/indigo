@@ -1,9 +1,10 @@
 package kv
 
 import (
-	"github.com/indigo-web/indigo/internal/strutil"
 	"iter"
 	"slices"
+
+	"github.com/indigo-web/indigo/internal/strutil"
 )
 
 type Pair struct {

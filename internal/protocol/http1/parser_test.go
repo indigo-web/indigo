@@ -3,6 +3,10 @@ package http1
 import (
 	"errors"
 	"fmt"
+	"slices"
+	"strings"
+	"testing"
+
 	"github.com/dchest/uniuri"
 	"github.com/indigo-web/indigo/config"
 	"github.com/indigo-web/indigo/http"
@@ -14,9 +18,6 @@ import (
 	"github.com/indigo-web/indigo/transport/dummy"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"slices"
-	"strings"
-	"testing"
 )
 
 func getParser(cfg *config.Config) (*Parser, *http.Request) {

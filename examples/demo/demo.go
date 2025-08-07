@@ -1,16 +1,18 @@
 package main
 
 import (
+	"log"
+	"strconv"
+	"time"
+
 	"github.com/indigo-web/indigo"
 	"github.com/indigo-web/indigo/config"
 	"github.com/indigo-web/indigo/http"
+	"github.com/indigo-web/indigo/http/codec"
 	"github.com/indigo-web/indigo/http/method"
 	"github.com/indigo-web/indigo/http/status"
 	"github.com/indigo-web/indigo/router/inbuilt"
 	"github.com/indigo-web/indigo/router/inbuilt/middleware"
-	"log"
-	"strconv"
-	"time"
 )
 
 func IndexSay(request *http.Request) *http.Response {

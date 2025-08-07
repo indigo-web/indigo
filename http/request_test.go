@@ -1,12 +1,13 @@
 package http
 
 import (
+	"testing"
+
 	"github.com/indigo-web/indigo/config"
 	"github.com/indigo-web/indigo/http/cookie"
 	"github.com/indigo-web/indigo/kv"
 	"github.com/indigo-web/indigo/transport/dummy"
 	"github.com/stretchr/testify/require"
-	"testing"
 )
 
 func getRequest() *Request {

@@ -1,6 +1,8 @@
 package http1
 
 import (
+	"maps"
+
 	"github.com/indigo-web/indigo/config"
 	"github.com/indigo-web/indigo/http"
 	"github.com/indigo-web/indigo/http/proto"
@@ -11,7 +13,6 @@ import (
 	"github.com/indigo-web/indigo/internal/strutil"
 	"github.com/indigo-web/indigo/router"
 	"github.com/indigo-web/indigo/transport"
-	"maps"
 )
 
 type Suit struct {

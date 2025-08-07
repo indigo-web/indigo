@@ -1,8 +1,9 @@
 package mime
 
 import (
-	"github.com/indigo-web/indigo/internal/strutil"
 	"path/filepath"
+
+	"github.com/indigo-web/indigo/internal/strutil"
 )
 
 // Unset explicitly tells to omit the Charset or MIME. It's working for both, exploiting the fact

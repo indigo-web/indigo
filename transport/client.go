@@ -1,9 +1,10 @@
 package transport
 
 import (
-	"github.com/indigo-web/indigo/internal/timer"
 	"net"
 	"time"
+
+	"github.com/indigo-web/indigo/internal/timer"
 )
 
 type Client interface {

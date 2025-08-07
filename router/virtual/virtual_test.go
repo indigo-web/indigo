@@ -1,6 +1,8 @@
 package virtual
 
 import (
+	"testing"
+
 	"github.com/indigo-web/indigo/config"
 	"github.com/indigo-web/indigo/http"
 	"github.com/indigo-web/indigo/http/status"
@@ -8,7 +10,6 @@ import (
 	"github.com/indigo-web/indigo/router/inbuilt"
 	"github.com/indigo-web/indigo/transport/dummy"
 	"github.com/stretchr/testify/require"
-	"testing"
 )
 
 func newRequest(hosts ...string) *http.Request {

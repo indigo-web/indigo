@@ -1,8 +1,9 @@
 package transport
 
 import (
-	"github.com/indigo-web/indigo/config"
 	"net"
+
+	"github.com/indigo-web/indigo/config"
 )
 
 type Transport interface {

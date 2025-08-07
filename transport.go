@@ -8,6 +8,12 @@ import (
 	"crypto/x509/pkix"
 	"encoding/pem"
 	"fmt"
+	"math/big"
+	"net"
+	"os"
+	"path/filepath"
+	"time"
+
 	"github.com/indigo-web/indigo/config"
 	"github.com/indigo-web/indigo/http/codec"
 	"github.com/indigo-web/indigo/http/serve"
@@ -15,11 +21,6 @@ import (
 	"github.com/indigo-web/indigo/router"
 	"github.com/indigo-web/indigo/transport"
 	"golang.org/x/crypto/acme/autocert"
-	"math/big"
-	"net"
-	"os"
-	"path/filepath"
-	"time"
 )
 
 type Transport struct {
