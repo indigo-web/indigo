@@ -27,11 +27,3 @@ var Extension = map[string]MIME{
 	".zstd": ZSTD,
 	".ico":  ICO,
 }
-
-// DefaultCharset defines charsets, used by default for MIMEs unless explicitly set.
-var DefaultCharset = map[MIME]Charset{
-	CSS:        UTF8,
-	HTML:       UTF8,
-	JAVASCRIPT: UTF8,
-	XML:        UTF8,
-}
