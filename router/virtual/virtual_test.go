@@ -63,5 +63,5 @@ func TestVirtualRouter(t *testing.T) {
 }
 
 func requestIs(resp *http.Response, code status.Code) bool {
-	return resp.Reveal().Code == code
+	return resp.Expose().Code == code
 }

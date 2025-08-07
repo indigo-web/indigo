@@ -85,7 +85,7 @@ func TestMiddlewares(t *testing.T) {
 	t.Run("/", func(t *testing.T) {
 		request := getRequest(method.GET, "/")
 		response := r.OnRequest(request)
-		require.Equal(t, status.OK, response.Reveal().Code)
+		require.Equal(t, status.OK, response.Expose().Code)
 		require.Equal(t, []middleware{m1, m2}, stack.Chain())
 		stack.Clear()
 	})
@@ -93,7 +93,7 @@ func TestMiddlewares(t *testing.T) {
 	t.Run("/api/v1/hello", func(t *testing.T) {
 		request := getRequest(method.GET, "/api/v1/hello")
 		response := r.OnRequest(request)
-		require.Equal(t, status.OK, response.Reveal().Code)
+		require.Equal(t, status.OK, response.Expose().Code)
 		require.Equal(t, []middleware{m1, m3, m4, m6}, stack.Chain())
 		stack.Clear()
 	})
@@ -101,7 +101,7 @@ func TestMiddlewares(t *testing.T) {
 	t.Run("/api/v2/world", func(t *testing.T) {
 		request := getRequest(method.GET, "/api/v2/world")
 		response := r.OnRequest(request)
-		require.Equal(t, status.OK, response.Reveal().Code)
+		require.Equal(t, status.OK, response.Expose().Code)
 		require.Equal(t, []middleware{m1, m3, m5, m7}, stack.Chain())
 		stack.Clear()
 	})
