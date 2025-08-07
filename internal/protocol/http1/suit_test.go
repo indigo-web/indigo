@@ -147,40 +147,7 @@ func BenchmarkSuit(b *testing.B) {
 
 	b.Run("POST hello world", func(b *testing.B) {
 		raw := []byte("POST / HTTP/1.1\r\nContent-Length: 13\r\n\r\nHello, world!")
-		client := dummy.NewMockClient(scatter(raw, config.Default().NET.ReadBufferSize)...).Journaling(false)
-		server, request := getSuit(client)
-		b.SetBytes(int64(len(raw)))
-		b.ReportAllocs()
-		b.ResetTimer()
-
-		for i := 0; i < b.N; i++ {
-			server.ServeOnce()
-			request.Reset()
-		}
-	})
-
-	b.Run("POST 10mib", func(b *testing.B) {
-		body := strings.Repeat("a", 10_000_000)
-		raw := []byte("POST / HTTP/1.1\r\nContent-Length: 10000000\r\n\r\n" + body)
-		client := dummy.NewMockClient(scatter(raw, config.Default().NET.ReadBufferSize)...).Journaling(false)
-		server, request := getSuit(client)
-		b.SetBytes(int64(len(raw)))
-		b.ReportAllocs()
-		b.ResetTimer()
-
-		for i := 0; i < b.N; i++ {
-			server.ServeOnce()
-			request.Reset()
-		}
-	})
-
-	b.Run("POST 10mib chunked", func(b *testing.B) {
-		const chunkSize = 0xfffe
-		const numberOfChunks = 10_000_000 / chunkSize
-		chunk := "fffe\r\n" + strings.Repeat("a", chunkSize) + "\r\n"
-		chunked := strings.Repeat(chunk, numberOfChunks) + "0\r\n\r\n"
-		raw := []byte("POST / HTTP/1.1\r\nTransfer-Encoding: chunked\r\n\r\n" + chunked)
-		client := dummy.NewMockClient(scatter(raw, config.Default().NET.ReadBufferSize)...).Journaling(false)
+		client := dummy.NewMockClient(scatter(raw, config.Default().NET.ReadBufferSize)...)
 		server, request := getSuit(client)
 		b.SetBytes(int64(len(raw)))
 		b.ReportAllocs()
@@ -214,16 +181,19 @@ func scatter(data []byte, n int) (parts [][]byte) {
 }
 
 func encodeChunked(input []byte) []byte {
-	w := new(JournalingClient)
-	s := getSerializer(nil, &http.Request{Method: method.GET}, w)
-
-	r := bytes.NewReader(input)
-	err := s.writeChunked(r)
+	out := new(bytes.Buffer)
+	w := httputil.NewChunkedWriter(out)
+	_, err := w.Write(input)
 	if err != nil {
 		panic(err)
 	}
 
-	return w.Data
+	err = w.Close()
+	if err != nil {
+		panic(err)
+	}
+
+	return out.Bytes()
 }
 
 func encodeGZIP(text string) []byte {
