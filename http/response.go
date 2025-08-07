@@ -1,27 +1,26 @@
 package http
 
 import (
+	"io"
+	"os"
+
 	"github.com/flrdv/uf"
 	"github.com/indigo-web/indigo/http/cookie"
 	"github.com/indigo-web/indigo/http/mime"
 	"github.com/indigo-web/indigo/http/status"
 	"github.com/indigo-web/indigo/internal/response"
-	"github.com/indigo-web/indigo/internal/strutil"
 	"github.com/indigo-web/indigo/kv"
 	json "github.com/json-iterator/go"
-	"io"
-	"os"
 )
-
-type ResponseWriter func(b []byte) error
 
 const (
 	// why 7? I honestly don't know. There's no theory nor researches behind this.
 	// It can be adjusted to 10 as well, but why would you?
-	preallocRespHeaders = 7
+	preallocateResponseHeaders = 7
 )
 
 type Response struct {
+	body   sliceReader
 	fields response.Fields
 }
 
@@ -31,11 +30,14 @@ type Response struct {
 // clear reason otherwise
 func NewResponse() *Response {
 	fields := response.Fields{
-		Headers: make([]kv.Pair, 0, preallocRespHeaders),
+		Headers: make([]kv.Pair, 0, preallocateResponseHeaders),
 	}
 	fields.Clear()
 
-	return &Response{fields}
+	return &Response{
+		body:   sliceReader{},
+		fields: fields,
+	}
 }
 
 // Code sets a Response code and a corresponding status.
@@ -54,38 +56,31 @@ func (r *Response) Status(status status.Status) *Response {
 	return r
 }
 
-// ContentType sets a custom Content-Type header value. If a charset isn't explicitly set,
-// it'll be set to a default one (if) defined in mime.DefaultCharsets. It can be explicitly
-// unset using the mime.Unset value.
+// ContentType is a shorthand for Header("Content-Type", value) with an option of setting
+// a charset. If more than 1 is set, only the first one is used.
 func (r *Response) ContentType(value mime.MIME, charset ...mime.Charset) *Response {
-	r.fields.ContentType = value
+	if value == mime.Unset {
+		return r
+	}
 
 	if len(charset) > 0 {
-		r.fields.CharsetSet = true
 		r.fields.Charset = charset[0]
 	}
 
+	return r.Header("Content-Type", value)
+}
+
+// Compress sets the Content-Encoding value and compresses the outcoming body. Passing the compression
+// token that isn't recognized is a no-op.
+func (r *Response) Compress(token string) *Response {
+	r.fields.ContentEncoding = token
 	return r
 }
 
-// Encoding sets the Content-Encoding value. If the passed token corresponds to any of registered codecs,
-// the body stream will be automatically compressed by the codec.
-func (r *Response) Encoding(value string) *Response {
-	r.fields.Encoding = value
-	return r
-}
-
-// Header appends a key-values pair into the list of headers to be sent in the response.
-//
-// If Content-Type or Transfer-Encoding are passed, respective methods will be used instead.
+// Header appends a key-values pair into the list of headers to be sent in the response. Passing
+// Content-Encoding isn't equivalent to calling Compress() and ultimately results in no encodings
+// being automatically applied. Can be used in order to use own compressors.
 func (r *Response) Header(key string, values ...string) *Response {
-	switch {
-	case strutil.CmpFoldFast(key, "content-type"):
-		return r.ContentType(values[0])
-	case strutil.CmpFoldFast(key, "content-encoding"):
-		return r.Encoding(values[0])
-	}
-
 	for i := range values {
 		r.fields.Headers = append(r.fields.Headers, kv.Pair{
 			Key:   key,
@@ -110,21 +105,21 @@ func (r *Response) Headers(headers map[string][]string) *Response {
 	return resp
 }
 
-// String sets the response's body to the passed string
+// String sets the response body.
 func (r *Response) String(body string) *Response {
 	return r.Bytes(uf.S2B(body))
 }
 
-// Bytes sets the response's body to passed slice WITHOUT COPYING. Changing
-// the passed slice later will affect the response by itself
+// Bytes sets the response body without copying it.
 func (r *Response) Bytes(body []byte) *Response {
-	r.fields.BufferedBody = body
-	return r
+	return r.SizedStream(r.body.Reset(body), int64(len(body)))
 }
 
 // Write implements io.Reader interface. It always returns n=len(b) and err=nil
 func (r *Response) Write(b []byte) (n int, err error) {
-	r.fields.BufferedBody = append(r.fields.BufferedBody, b...)
+	r.fields.Buffer = append(r.fields.Buffer, b...)
+	r.Bytes(r.fields.Buffer)
+
 	return len(b), nil
 }
 
@@ -171,7 +166,7 @@ func (r *Response) Stream(reader io.Reader) *Response {
 
 // SizedStream receives a hint of the stream's future size. This helps, for example, uploading files,
 // as in this case we can rely on io.WriterTo interface, which might use more effective kernel mechanisms
-// available, e.g. sendfile(2) for Linux.
+// available, e.g. sendfile(2) for Linux. Passing the size of -1 is effectively equivalent to just Stream().
 func (r *Response) SizedStream(reader io.Reader, size int64) *Response {
 	r.fields.Stream = reader
 	r.fields.StreamSize = size
@@ -187,7 +182,6 @@ func (r *Response) Cookie(cookies ...cookie.Cookie) *Response {
 // TryJSON receives a model (must be a pointer to the structure) and returns a new Response
 // object and an error
 func (r *Response) TryJSON(model any) (*Response, error) {
-	r.fields.BufferedBody = r.fields.BufferedBody[:0]
 	stream := json.ConfigDefault.BorrowStream(r)
 	stream.WriteVal(model)
 	err := stream.Flush()
@@ -231,18 +225,18 @@ func (r *Response) Error(err error, code ...status.Code) *Response {
 		String(err.Error())
 }
 
-// Reveal returns a struct with values, filled by builder. Used mostly in internal purposes
-func (r *Response) Reveal() *response.Fields {
+// Expose gives direct access to internal builder fields.
+func (r *Response) Expose() *response.Fields {
 	return &r.fields
 }
 
-// Clear discards everything was done with Response object before
+// Clear discards everything was done with Response object before.
 func (r *Response) Clear() *Response {
 	r.fields.Clear()
 	return r
 }
 
-// Respond is a shorthand for request.Respond(). May be used as a dummy handler
+// Respond is a shorthand for request.Respond(). May be used as a dummy handler.
 func Respond(request *Request) *Response {
 	return request.Respond()
 }
@@ -290,4 +284,23 @@ func JSON(request *Request, model any) *Response {
 // will discard all except the first one.
 func Error(request *Request, err error, code ...status.Code) *Response {
 	return request.Respond().Error(err, code...)
+}
+
+type sliceReader struct {
+	data []byte
+}
+
+func (s *sliceReader) Read(b []byte) (n int, err error) {
+	n = copy(b, s.data)
+	s.data = s.data[n:]
+	if len(s.data) == 0 {
+		err = io.EOF
+	}
+
+	return n, err
+}
+
+func (s *sliceReader) Reset(data []byte) *sliceReader {
+	s.data = data
+	return s
 }
