@@ -31,9 +31,7 @@ func IndexSay(request *http.Request) *http.Response {
 }
 
 func World(request *http.Request) *http.Response {
-	return request.Respond().String(
-		`<h1>Hello, world!</h1>`,
-	)
+	return http.String(request, `<h1>Hello, world!</h1>`)
 }
 
 func Easter(request *http.Request) *http.Response {
@@ -64,6 +62,7 @@ func main() {
 	app := indigo.New(":8080").
 		TLS(":8443", indigo.LocalCert()).
 		Tune(s).
+		Codec(codec.NewGZIP()).
 		OnBind(func(addr string) {
 			log.Printf("running on %s\n", addr)
 		})
