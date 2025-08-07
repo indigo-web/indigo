@@ -108,7 +108,7 @@ chunkExt:
 		if c.chunkLength == 0 {
 			goto trailer
 		}
-		
+
 		goto chunkBody
 	}
 
@@ -216,3 +216,11 @@ chunkTrailerFieldLine:
 		goto trailer
 	}
 }
+
+var (
+	// chunkExtZeroFill is used to fill the gap between chunk length and chunk content. The count
+	// 64/4 represents 64 bits - the maximal uint size, and 4 - bits per hex value, therefore
+	// resulting in 15 characters (plus semicolon) total.
+	chunkExtZeroFill = ";" + strings.Repeat("0", 64/4-1)
+	chunkZeroTrailer = []byte("0\r\n\r\n")
+)

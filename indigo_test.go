@@ -390,11 +390,11 @@ func TestFirstPhase(t *testing.T) {
 	}
 
 	t.Run("request static html", func(t *testing.T) {
-		testStatic(t, "index.html", "text/html;charset=utf8")
+		testStatic(t, "index.html", "text/html")
 	})
 
 	t.Run("request static css", func(t *testing.T) {
-		testStatic(t, "styles.css", "text/css;charset=utf8")
+		testStatic(t, "styles.css", "text/css")
 	})
 
 	t.Run("request static non-standard extension", func(t *testing.T) {
