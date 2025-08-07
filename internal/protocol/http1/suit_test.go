@@ -54,7 +54,7 @@ func getInbuiltRouter() router.Router {
 		Get("/with-header", func(request *http.Request) *http.Response {
 			return request.Respond().Header("Hello", "World")
 		}).
-		Get("/echo", func(request *http.Request) *http.Response {
+		Post("/echo", func(request *http.Request) *http.Response {
 			return http.Stream(request, request.Body)
 		})
 
@@ -68,7 +68,7 @@ func getInbuiltRouter() router.Router {
 func BenchmarkSuit(b *testing.B) {
 	b.Run("GET root 5 headers", func(b *testing.B) {
 		raw := generateRequest("", generateHeaders(5))
-		client := dummy.NewMockClient(raw).Journaling(false)
+		client := dummy.NewMockClient(raw)
 		server, request := getSuit(client)
 		b.SetBytes(int64(len(raw)))
 		b.ReportAllocs()
@@ -82,7 +82,7 @@ func BenchmarkSuit(b *testing.B) {
 
 	b.Run("GET long path 5 headers", func(b *testing.B) {
 		data := generateRequest(longPath, generateHeaders(5))
-		client := dummy.NewMockClient(data).Journaling(false)
+		client := dummy.NewMockClient(data)
 		server, request := getSuit(client)
 		b.SetBytes(int64(len(data)))
 		b.ReportAllocs()
@@ -97,7 +97,7 @@ func BenchmarkSuit(b *testing.B) {
 	b.Run("GET long path 10 headers", func(b *testing.B) {
 		raw := generateRequest(longPath, generateHeaders(10))
 		dispersed := scatter(raw, config.Default().NET.ReadBufferSize)
-		client := dummy.NewMockClient(dispersed...).Journaling(false)
+		client := dummy.NewMockClient(dispersed...)
 		server, request := getSuit(client)
 		b.SetBytes(int64(len(raw)))
 		b.ReportAllocs()
@@ -114,7 +114,7 @@ func BenchmarkSuit(b *testing.B) {
 	b.Run("50 headers", func(b *testing.B) {
 		raw := generateRequest(longPath, generateHeaders(50))
 		dispersed := scatter(raw, config.Default().NET.ReadBufferSize)
-		client := dummy.NewMockClient(dispersed...).Journaling(false)
+		client := dummy.NewMockClient(dispersed...)
 		server, request := getSuit(client)
 		b.SetBytes(int64(len(raw)))
 		b.ReportAllocs()
@@ -131,7 +131,7 @@ func BenchmarkSuit(b *testing.B) {
 	b.Run("heavily escaped", func(b *testing.B) {
 		raw := generateRequest(strings.Repeat("%20", 500), generateHeaders(10))
 		dispersed := scatter(raw, config.Default().NET.ReadBufferSize)
-		client := dummy.NewMockClient(dispersed...).Journaling(false)
+		client := dummy.NewMockClient(dispersed...)
 		server, request := getSuit(client)
 		b.SetBytes(int64(len(raw)))
 		b.ReportAllocs()
@@ -259,12 +259,11 @@ func TestSuit(t *testing.T) {
 
 	t.Run("echo", func(t *testing.T) {
 		const body = "Hello, world!"
-		data := generateRequest(method.GET, "/echo", kv.New(), body)
-		client := dummy.NewMockClient([]byte(data)).Once()
+		data := generateRequest(method.POST, "/echo", kv.New(), body)
+		client := dummy.NewMockClient([]byte(data)).Journaling()
 		server, _ := getSuit(client)
 		require.True(t, server.ServeOnce())
-		fmt.Println("written:", strconv.Quote(client.Written()))
-		resp, err := parseHTTP11Response("GET", []byte(client.Written()))
+		resp, err := parseHTTP11Response("POST", client.Written())
 		require.NoError(t, err)
 		require.Equal(t, 200, resp.StatusCode)
 		b, err := io.ReadAll(resp.Body)
@@ -273,18 +272,17 @@ func TestSuit(t *testing.T) {
 	})
 
 	t.Run("decompress gzip", func(t *testing.T) {
-
 		gzipped := encodeGZIP("Hello, world!")
 		chunked := encodeChunked(gzipped)
 		headers := kv.New().
 			Add("Transfer-Encoding", "chunked").
 			Add("Content-Encoding", "gzip")
-		request := generateRequest(method.GET, "/echo", headers, string(chunked))
-		client := dummy.NewMockClient([]byte(request)).Once()
+		request := generateRequest(method.POST, "/echo", headers, string(chunked))
+		client := dummy.NewMockClient([]byte(request)).Journaling()
 		server, _ := getSuit(client, codec.NewGZIP())
 
 		require.True(t, server.ServeOnce())
-		resp, err := parseHTTP11Response("GET", []byte(client.Written()))
+		resp, err := parseHTTP11Response("POST", client.Written())
 		require.Equal(t, 200, resp.StatusCode)
 		require.Equal(t, []string{"gzip"}, resp.Header["Accept-Encoding"])
 		b, err := io.ReadAll(resp.Body)
@@ -300,7 +298,7 @@ func TestPOST(t *testing.T) {
 
 	t.Run("POST hello world", func(t *testing.T) {
 		raw := []byte("POST / HTTP/1.1\r\nContent-Length: 13\r\n\r\nHello, world!")
-		client := dummy.NewMockClient(scatter(raw, config.Default().NET.ReadBufferSize)...)
+		client := dummy.NewMockClient(scatter(raw, config.Default().NET.ReadBufferSize)...).LoopReads()
 		server, _ := getSuit(client)
 
 		for i := 0; i < N; i++ {
@@ -312,7 +310,7 @@ func TestPOST(t *testing.T) {
 		body := strings.Repeat("a", 10_000_000)
 		raw := []byte("POST / HTTP/1.1\r\nContent-Length: 10000000\r\n\r\n" + body)
 		dispersed := scatter(raw, config.Default().NET.ReadBufferSize)
-		client := dummy.NewMockClient(dispersed...)
+		client := dummy.NewMockClient(dispersed...).LoopReads()
 		server, _ := getSuit(client)
 
 		for i := 0; i < N; i++ {
@@ -329,7 +327,7 @@ func TestPOST(t *testing.T) {
 		chunked := strings.Repeat(chunk, numberOfChunks) + "0\r\n\r\n"
 		raw := []byte("POST / HTTP/1.1\r\nTransfer-Encoding: chunked\r\n\r\n" + chunked)
 		dispersed := scatter(raw, config.Default().NET.ReadBufferSize)
-		client := dummy.NewMockClient(dispersed...)
+		client := dummy.NewMockClient(dispersed...).LoopReads()
 		server, _ := getSuit(client)
 
 		for i := 0; i < N; i++ {

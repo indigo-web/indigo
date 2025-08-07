@@ -10,7 +10,7 @@ import (
 )
 
 func HTTP11Request(data string) (*http.Request, error) {
-	client := dummy.NewMockClient([]byte(data)).Once()
+	client := dummy.NewMockClient([]byte(data))
 	request := construct.Request(config.Default(), client)
 	suit := http1.New(config.Default(), nil, client, request, codecutil.NewCache(nil))
 	request.Body = http.NewBody(config.Default(), suit)

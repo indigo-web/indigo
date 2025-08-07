@@ -22,7 +22,7 @@ func getBody(client transport.Client) *body {
 
 func getRequestWithBody(chunked bool, body ...[]byte) (*http.Request, *body) {
 	cfg := config.Default()
-	client := dummy.NewMockClient(body...).Once()
+	client := dummy.NewMockClient(body...)
 	req := construct.Request(cfg, client)
 	b := getBody(client)
 	req.Body = http.NewBody(cfg, b)
