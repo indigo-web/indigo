@@ -32,6 +32,7 @@ type gzipCodec struct {
 	adapter *readerAdapter
 	w       *gzip.Writer // compressor
 	r       gzip.Reader  // decompressor
+	wout    io.Closer
 	buff    []byte
 }
 
@@ -45,14 +46,29 @@ func newGZIPCodec(buff []byte) *gzipCodec {
 
 func (g *gzipCodec) ResetCompressor(w io.Writer) {
 	g.w.Reset(w)
+
+	if c, ok := w.(io.Closer); ok {
+		g.wout = c
+	}
 }
 
 func (g *gzipCodec) Write(p []byte) (n int, err error) {
+	// TODO: the compressor spams with Write() calls. This will cause significant performance downgrade,
+	// TODO: as each individual Write() call results in transferring the passed data over the network.
+	// TODO: Buffer this somewhere to at least 4096 (by default). Make the behaviour disable-able.
 	return g.w.Write(p)
 }
 
-func (g *gzipCodec) Flush() error {
-	return g.w.Close()
+func (g *gzipCodec) Close() error {
+	if err := g.w.Close(); err != nil {
+		return err
+	}
+
+	if g.wout != nil {
+		return g.wout.Close()
+	}
+
+	return nil
 }
 
 func (g *gzipCodec) ResetDecompressor(source http.Fetcher) error {
