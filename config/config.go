@@ -28,7 +28,7 @@ type (
 		DefaultContentType mime.MIME
 	}
 
-	HTTPResponseBuffer struct {
+	NETWriteBufferSize struct {
 		Default, Maximal int
 	}
 
@@ -77,19 +77,6 @@ type (
 		Form BodyForm
 	}
 
-	HTTP struct {
-		// ResponseBuffer is used to store the byte-representation of a response, ready to be sent
-		// over the network.
-		//
-		// Response buffer growth rules:
-		//  1) If the stream is sized (1) and its size overflows current buffer length (2),
-		//   grow it to contain the whole stream at once, but limit the size to at most
-		//   `HTTP.ResponseBuffer.Maximal`
-		//  2) If the stream is unsized (1) and the previous write used more than ~98.44% of its total
-		//   capacity (2), the capacity doubles.
-		ResponseBuffer HTTPResponseBuffer
-	}
-
 	NET struct {
 		// ReadBufferSize is a size of buffer in bytes which will be used to read from
 		// socket
@@ -100,19 +87,27 @@ type (
 		// AcceptLoopInterruptPeriod controls how often will the Accept() call be interrupted
 		// in order to check whether it's time to stop. Defaults to 5 seconds.
 		AcceptLoopInterruptPeriod time.Duration
+		// WriteBufferSize stores the HTTP response, which is going to be transmitted.
+		//
+		// The buffer growth rules are:
+		//  1) If a stream is sized (1) and its size overflows current buffer size (2),
+		//   the buffer grows to contain the whole stream at once, but limited by the
+		//   `HTTP.ResponseBuffer.Maximal`
+		//  2) If a stream is unsized (1) and the previous write used more than ~98.44% of its
+		//   capacity (2), the capacity doubles.
+		WriteBufferSize NETWriteBufferSize
 	}
 )
 
 // Config holds settings used across various parts of indigo, mainly restrictions, limitations
 // and pre-allocations.
 //
-// Please note: ALWAYS modify defaults (returned via Default()) and NEVER try to initialize the
-// config manually, as this will result in highly ambiguous errors.
+// You must ALWAYS modify defaults (returned via Default()) and NEVER try to initialize the
+// config manually, because most likely this will result in ambiguous errors.
 type Config struct {
 	URI     URI
 	Headers Headers
 	Body    Body
-	HTTP    HTTP
 	NET     NET
 }
 
@@ -155,16 +150,14 @@ func Default() *Config {
 				DefaultContentType: mime.Plain,
 			},
 		},
-		HTTP: HTTP{
-			ResponseBuffer: HTTPResponseBuffer{
-				Default: 1024,
-				Maximal: 64 * 1024,
-			},
-		},
 		NET: NET{
 			ReadBufferSize:            4 * 1024, // 4kb is more than enough for ordinary requests.
 			ReadTimeout:               90 * time.Second,
 			AcceptLoopInterruptPeriod: 5 * time.Second,
+			WriteBufferSize: NETWriteBufferSize{
+				Default: 1024,
+				Maximal: 64 * 1024,
+			},
 		},
 	}
 }

@@ -56,7 +56,7 @@ func New(
 	codecs codecutil.Cache,
 ) *Suit {
 	headersBuff, statusBuff := construct.Buffers(cfg)
-	respBuff := make([]byte, 0, cfg.HTTP.ResponseBuffer.Default)
+	respBuff := make([]byte, 0, cfg.NET.WriteBufferSize.Default)
 	b := newBody(client, cfg.Body)
 
 	return newSuit(cfg, r, request, client, b, codecs, headersBuff, statusBuff, respBuff)
