@@ -5,6 +5,7 @@ import (
 	"bytes"
 	"io"
 	stdhttp "net/http"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -371,7 +372,7 @@ func TestSerializer(t *testing.T) {
 
 		const helloworld = "Hello, world!"
 
-		t.Run("sized stream", func(t *testing.T) {
+		t.Run("sized", func(t *testing.T) {
 			w.Reset()
 			request.Method = method.GET
 			resp := http.NewResponse().String(helloworld)
@@ -379,7 +380,7 @@ func TestSerializer(t *testing.T) {
 			testSized(t, "GET", len(helloworld), helloworld)
 		})
 
-		t.Run("unsized stream", func(t *testing.T) {
+		t.Run("unsized", func(t *testing.T) {
 			w.Reset()
 			request.Method = method.GET
 			resp := http.NewResponse().Stream(strings.NewReader(helloworld))
@@ -387,7 +388,7 @@ func TestSerializer(t *testing.T) {
 			testUnsized(t, "GET", helloworld)
 		})
 
-		t.Run("HEAD sized stream", func(t *testing.T) {
+		t.Run("HEAD sized", func(t *testing.T) {
 			w.Reset()
 			request.Method = method.HEAD
 			resp := http.NewResponse().String(helloworld)
@@ -395,7 +396,7 @@ func TestSerializer(t *testing.T) {
 			testSized(t, "HEAD", len(helloworld), "")
 		})
 
-		t.Run("HEAD unsized stream", func(t *testing.T) {
+		t.Run("HEAD unsized", func(t *testing.T) {
 			w.Reset()
 			request.Method = method.HEAD
 			resp := http.NewResponse().Stream(strings.NewReader(helloworld))
@@ -416,28 +417,62 @@ func TestSerializer(t *testing.T) {
 		//	require.True(t, stream.Closed)
 		//})
 
-		t.Run("sized GZIP", func(t *testing.T) {
+		testGZIP := func(t *testing.T, resp *http.Response) {
 			w.Reset()
 			request.Method = method.GET
-			resp := http.NewResponse().
-				String(helloworld).
-				Compress("gzip")
 
-			require.NoError(t, s.Write(proto.HTTP11, resp))
-
+			require.NoError(t, s.Write(proto.HTTP11, resp.Compress("gzip")))
 			wantBody := encodeGZIP(helloworld)
 			testUnsized(t, "GET", string(wantBody), "gzip")
+		}
+
+		t.Run("sized GZIP", func(t *testing.T) {
+			testGZIP(t, http.NewResponse().String(helloworld))
 		})
 
 		t.Run("unsized GZIP", func(t *testing.T) {
-			w.Reset()
-			request.Method = method.GET
-			resp := http.NewResponse().
-				Stream(strings.NewReader(helloworld)).
-				Compress("gzip")
+			testGZIP(t, http.NewResponse().Stream(strings.NewReader(helloworld)))
+		})
 
-			require.NoError(t, s.Write(proto.HTTP11, resp))
-			testUnsized(t, "GET", string(encodeGZIP(helloworld)), "gzip")
+		t.Run("sized buffer growth", func(t *testing.T) {
+			writeResp := func(t *testing.T, resp *http.Response, buffsize int, cfg *config.Config) (*serializer, string) {
+				s, w := getSerializer(nil, newRequest(method.GET), noCodecs)
+				s.buff = make([]byte, 0, buffsize)
+				require.NoError(t, s.Write(proto.HTTP11, resp))
+
+				return s, string(w.Written())
+			}
+
+			t.Run("fill the buffer exactly full", func(t *testing.T) {
+				// estimate headers length, so we can know how many bytes of body we need to trigger the growth
+				const buffsize = 128
+				s, defaultResponse := writeResp(t, http.NewResponse(), buffsize, config.Default())
+				want := strings.Repeat("a", cap(s.buff)-len(defaultResponse)-1)
+				s, _ = writeResp(t, http.NewResponse().String(want), buffsize, config.Default())
+				require.Equal(t, cap(s.buff), buffsize)
+			})
+
+			t.Run("slight growth", func(t *testing.T) {
+				const buffsize = 128
+				s, defaultResponse := writeResp(t, http.NewResponse(), buffsize, config.Default())
+				want := strings.Repeat("a", cap(s.buff)-len(defaultResponse)+1)
+				s, _ = writeResp(t, http.NewResponse().String(want), buffsize, config.Default())
+				require.Greater(t, cap(s.buff), buffsize)
+			})
+
+			t.Run("limit growth by max size", func(t *testing.T) {
+				const buffsize = 128
+				cfg := config.Default()
+				cfg.NET.WriteBufferSize.Maximal = buffsize
+				b := strings.Repeat("a", buffsize)
+				s, _ := writeResp(t, http.NewResponse().String(b), buffsize-1, cfg)
+				wantBuffsize := cap(slices.Grow(make([]byte, buffsize-1), 1))
+				require.Equal(t, wantBuffsize, cap(s.buff))
+			})
+		})
+
+		t.Run("sized buffer flush", func(t *testing.T) {
+
 		})
 	})
 

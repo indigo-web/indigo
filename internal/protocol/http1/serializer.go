@@ -108,12 +108,8 @@ func (s *serializer) writeStream(resp *response.Fields) (err error) {
 	} else {
 		// TODO: examine src for WriterTo
 
-		if length >= int64(cap(s.buff)) {
-			newSize := min(s.cfg.NET.WriteBufferSize.Maximal, int(length))
-			s.buff = slices.Grow(s.buff, newSize-cap(s.buff))
-		}
-
 		s.appendContentLength(length)
+		s.growToContain(int(length) + len(crlf)) // because CRLF wasn't written yet
 		encoder = identityWriter{s}
 	}
 
@@ -173,6 +169,18 @@ func (s *serializer) writeStream(resp *response.Fields) (err error) {
 			return err
 		}
 	}
+}
+
+func (s *serializer) growToContain(n int) {
+	deficit := min(s.cfg.NET.WriteBufferSize.Maximal-cap(s.buff), n)
+	if deficit < 0 {
+		// surplus is possible and in fact isn't a bug, because slices.Grow doesn't guarantee
+		// that the grown slice will have a specific capacity. It is guaranteed to be _enough_
+		// to hold n new values. It's anyway not that bad to have a few extra bytes, after all.
+		deficit = 0
+	}
+
+	s.buff = slices.Grow(s.buff, deficit)
 }
 
 func (s *serializer) getCompressor(token string) codec.Compressor {
@@ -261,15 +269,6 @@ func (s *serializer) appendHeaders(fields *response.Fields) {
 
 		s.buff = append(s.buff, header.Full...)
 	}
-}
-
-func (s *serializer) appendCharset(charset string) {
-	if charset == mime.Unset {
-		return
-	}
-
-	s.buff = append(s.buff, ";charset="...)
-	s.buff = append(s.buff, charset...)
 }
 
 // appendHeader writes a complete header field line excluding the trailing CRLF.
