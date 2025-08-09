@@ -8,7 +8,7 @@ import (
 
 type (
 	HeadersNumber struct {
-		Default, Maximal int32
+		Default, Maximal int
 	}
 
 	HeadersSpace struct {
@@ -18,8 +18,8 @@ type (
 	BodyForm struct {
 		// EntriesPrealloc is the number of preallocated seats for form.Form in body entity.
 		EntriesPrealloc uint64
-		// BufferPrealloc defines the initial length of the buffer when the whole body at once
-		// is requested (normally via String() or Bytes() methods.)
+		// BufferPrealloc is the initial length for a buffer storing a whole request body, if its
+		// length isn't known in advance (e.g. chunked transfer encoding.)
 		BufferPrealloc uint64
 		// DefaultCoding sets the default content encoding unless one is explicitly set.
 		DefaultCoding mime.Charset
@@ -151,11 +151,11 @@ func Default() *Config {
 			},
 		},
 		NET: NET{
-			ReadBufferSize:            4 * 1024, // 4kb is more than enough for ordinary requests.
+			ReadBufferSize:            2 * 1024, // 4kb is more than enough for ordinary requests.
 			ReadTimeout:               90 * time.Second,
 			AcceptLoopInterruptPeriod: 5 * time.Second,
 			WriteBufferSize: NETWriteBufferSize{
-				Default: 1024,
+				Default: 2 * 1024,
 				Maximal: 64 * 1024,
 			},
 		},
