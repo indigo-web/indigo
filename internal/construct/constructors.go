@@ -1,16 +1,17 @@
 package construct
 
 import (
+	"net"
+
 	"github.com/indigo-web/indigo/config"
 	"github.com/indigo-web/indigo/http"
 	"github.com/indigo-web/indigo/internal/buffer"
 	"github.com/indigo-web/indigo/kv"
 	"github.com/indigo-web/indigo/transport"
-	"net"
 )
 
 func Request(cfg *config.Config, client transport.Client) *http.Request {
-	headers := kv.NewPrealloc(cfg.Headers.Number.Default)
+	headers := kv.NewPrealloc(int(cfg.Headers.Number.Default))
 	params := kv.NewPrealloc(cfg.URI.ParamsPrealloc)
 	vars := kv.New()
 	request := http.NewRequest(cfg, http.NewResponse(), client, headers, params, vars)
@@ -24,8 +25,7 @@ func Client(cfg config.NET, conn net.Conn) transport.Client {
 	return transport.NewClient(conn, cfg.ReadTimeout, readBuff)
 }
 
-func Buffers(s *config.Config) (keysBuff, valsBuff, requestLineBuff buffer.Buffer) {
-	return buffer.New(s.Headers.KeySpace.Default, s.Headers.KeySpace.Maximal),
-		buffer.New(s.Headers.ValueSpace.Default, s.Headers.ValueSpace.Maximal),
-		buffer.New(s.URI.RequestLineSize.Default, s.URI.RequestLineSize.Maximal)
+func Buffers(s *config.Config) (statusBuff, headersBuff *buffer.Buffer) {
+	return buffer.New(s.URI.RequestLineSize.Default, s.URI.RequestLineSize.Maximal),
+		buffer.New(s.Headers.Space.Default, s.Headers.Space.Maximal)
 }

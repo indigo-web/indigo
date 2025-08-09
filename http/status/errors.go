@@ -18,7 +18,6 @@ func (h HTTPError) Error() string {
 
 var (
 	ErrCloseConnection = NewError(CloseConnection, "actively closing the connection")
-	ErrShutdown        = NewError(CloseConnection, "shutdown")
 
 	ErrBadRequest                    = NewError(BadRequest, "bad request")
 	ErrTooLongRequestLine            = NewError(BadRequest, "request line is too long")

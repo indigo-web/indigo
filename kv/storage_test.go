@@ -1,75 +1,93 @@
 package kv
 
 import (
-	"github.com/stretchr/testify/require"
+	"slices"
 	"testing"
+
+	"github.com/stretchr/testify/require"
 )
 
-func TestKeyValueStorage(t *testing.T) {
-	testValues := func(t *testing.T, kv *Storage) {
-		for _, tc := range []struct {
-			Key    string
-			Values []string
-		}{
-			{
-				Key:    "Hello",
-				Values: []string{"world"},
-			},
-			{
-				Key:    "Some",
-				Values: []string{"multiple", "values"},
-			},
-			{
-				Key:    "sOME",
-				Values: []string{"multiple", "values"},
-			},
-		} {
-			value, found := kv.Get(tc.Key)
-			require.True(t, found)
-			require.Equal(t, tc.Values[0], value)
-
-			values := kv.Values(tc.Key)
-			require.Equal(t, tc.Values, values)
-		}
+func TestStorage(t *testing.T) {
+	getHeaders := func() *Storage {
+		return New().
+			Add("Foo", "bar").
+			Add("Hello", "World").
+			Add("Lorem", "ipsum").
+			Add("hello", "Pavlo")
 	}
 
-	t.Run("Value with manual filling", func(t *testing.T) {
-		kv := New()
-		kv.Add("Hello", "world")
-		kv.Add("Some", "multiple")
-		kv.Add("Some", "values")
-		testValues(t, kv)
+	t.Run("delete", func(t *testing.T) {
+		kv := getHeaders().Delete("HELLO")
+
+		want := []Pair{
+			{"Foo", "bar"},
+			{"Lorem", "ipsum"},
+		}
+
+		require.Equal(t, len(want), kv.Len())
+		for _, p := range want {
+			require.Equal(t, []string{p.Value}, slices.Collect(kv.Values(p.Key)))
+		}
+
+		indexOf := func(key string) int {
+			for i, p := range want {
+				if p.Key == key {
+					return i
+				}
+			}
+
+			return -1
+		}
+
+		for key, value := range kv.Pairs() {
+			idx := indexOf(key)
+			require.NotEqual(t, -1, idx)
+			require.Equal(t, want[idx].Value, value)
+		}
 	})
 
-	t.Run("Value with map instantiation", func(t *testing.T) {
-		kv := NewFromMap(map[string][]string{
-			"Hello": {"world"},
-			"Some":  {"multiple", "values"},
-		})
-		testValues(t, kv)
+	t.Run("set", func(t *testing.T) {
+		kv := getHeaders().Set("HELLO", "no more Pavlo")
+
+		want := []Pair{
+			{"Foo", "bar"},
+			{"HELLO", "no more Pavlo"},
+			{"Lorem", "ipsum"},
+		}
+
+		require.Equal(t, len(want), kv.Len())
+		for _, p := range want {
+			require.Equal(t, []string{p.Value}, slices.Collect(kv.Values(p.Key)))
+		}
 	})
 
-	t.Run("Has", func(t *testing.T) {
-		kv := New()
-		kv.Add("Hello", "world")
-		require.True(t, kv.Has("Hello"))
-		require.True(t, kv.Has("hELLO"))
-		require.False(t, kv.Has("random"))
+	t.Run("set new key", func(t *testing.T) {
+		kv := New().
+			Add("Pavlo", "the best").
+			Set("Glory to", "Ukraine")
+
+		want := []Pair{
+			{"Pavlo", "the best"},
+			{"Glory to", "Ukraine"},
+		}
+
+		require.Equal(t, len(want), kv.Len())
+		for _, p := range want {
+			require.Equal(t, []string{p.Value}, slices.Collect(kv.Values(p.Key)))
+		}
 	})
 
-	t.Run("Keys", func(t *testing.T) {
-		kv := New()
-		kv.Add("Hello", "world")
-		kv.Add("sOME", "multiple")
-		kv.Add("Some", "values")
-		kv.Add("hELLO", "nether")
-		require.Equal(t, []string{"Hello", "sOME"}, kv.Keys())
+	t.Run("keys", func(t *testing.T) {
+		kv := getHeaders().Delete("hello")
+		require.Equal(t, []string{"Foo", "Lorem"}, slices.Collect(kv.Keys()))
 	})
 
-	t.Run("Empty", func(t *testing.T) {
-		kv := New()
+	t.Run("empty", func(t *testing.T) {
+		kv := getHeaders()
+		for key := range kv.Keys() {
+			kv.Delete(key)
+		}
+
 		require.True(t, kv.Empty())
-		kv.Add("hello", "world")
-		require.False(t, kv.Empty())
 	})
 }

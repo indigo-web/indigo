@@ -1,14 +1,14 @@
 package serve
 
 import (
+	"net"
+
 	"github.com/indigo-web/indigo/config"
 	"github.com/indigo-web/indigo/http"
-	"github.com/indigo-web/indigo/http/encryption"
 	"github.com/indigo-web/indigo/internal/codecutil"
 	"github.com/indigo-web/indigo/internal/construct"
 	"github.com/indigo-web/indigo/internal/protocol/http1"
 	"github.com/indigo-web/indigo/router"
-	"net"
 )
 
 // HTTP1 setups and serves an HTTP/1.1 server until it stops. Note that the connection isn't
@@ -16,15 +16,14 @@ import (
 func HTTP1(
 	cfg *config.Config,
 	conn net.Conn,
-	enc encryption.Token,
+	enc uint16,
 	r router.Router,
-	// compressors codecutil.Cache[http.Compressor],
-	// decompressors codecutil.Cache[http.Decompressor],
+	codecs codecutil.Cache,
 ) {
 	client := construct.Client(cfg.NET, conn)
 	request := construct.Request(cfg, client)
 	request.Env.Encryption = enc
-	suit := http1.New(cfg, r, client, request, codecutil.NewCache[http.Decompressor](nil))
-	request.Body = http.NewBody(cfg, suit)
+	suit := http1.New(cfg, r, client, request, codecs)
+	request.Body = http.NewBody(suit)
 	suit.Serve()
 }

@@ -105,19 +105,13 @@ func (r *runtimeRouter) OnError(request *http.Request, err error) *http.Response
 // the error response all together. So be careful to always check the nilness of the returned
 // router first
 func (r *runtimeRouter) getRouter(request *http.Request) (router.Router, *http.Response) {
-	hosts := request.Headers.Values("host")
-	switch len(hosts) {
-	case 0:
+	host, found := request.Headers.Lookup("Host")
+	if !found {
 		return r.defaultRouter, http.Code(request, status.BadRequest)
-	case 1:
-	default:
-		return nil, http.Code(request, status.BadRequest)
 	}
 
-	host := hosts[0]
-
 	for _, virtRouter := range r.routers {
-		if strutil.CmpFold(virtRouter.Domain, host) {
+		if strutil.CmpFoldSafe(virtRouter.Domain, host) {
 			return virtRouter.Router, nil
 		}
 	}

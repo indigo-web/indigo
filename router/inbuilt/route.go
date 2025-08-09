@@ -22,6 +22,8 @@ func (r *Router) Route(
 	return r
 }
 
+// TODO: update the error handling mechanism. It should be more modifications-prone
+
 // RouteError adds an error handler for a corresponding HTTP error code.
 //
 // The following error codes may be registered:

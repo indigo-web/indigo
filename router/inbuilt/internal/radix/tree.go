@@ -2,8 +2,9 @@ package radix
 
 import (
 	"errors"
-	"github.com/indigo-web/indigo/kv"
 	"strings"
+
+	"github.com/indigo-web/indigo/kv"
 )
 
 var (

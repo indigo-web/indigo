@@ -1,12 +1,13 @@
 package buffer
 
 import (
-	"github.com/stretchr/testify/require"
 	"strings"
 	"testing"
+
+	"github.com/stretchr/testify/require"
 )
 
-func pushSegment(t *testing.T, buff Buffer, text string) Buffer {
+func pushSegment(t *testing.T, buff *Buffer, text string) *Buffer {
 	ok := buff.Append([]byte(text))
 	require.True(t, ok)
 	segment := buff.Finish()

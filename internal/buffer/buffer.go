@@ -8,8 +8,8 @@ type Buffer struct {
 	maxSize int
 }
 
-func New(initialSize, maxSize int) Buffer {
-	return Buffer{
+func New(initialSize, maxSize int) *Buffer {
+	return &Buffer{
 		memory:  make([]byte, 0, initialSize),
 		maxSize: maxSize,
 	}
@@ -73,6 +73,11 @@ func (b *Buffer) Finish() []byte {
 	b.begin = len(b.memory)
 
 	return segment
+}
+
+// Len returns the number of total bytes stored.
+func (b *Buffer) Len() int {
+	return len(b.memory)
 }
 
 // Clear just resets the pointers, so old values may be overridden by new ones.

@@ -1,10 +1,11 @@
 package middleware
 
 import (
+	"strings"
+
 	"github.com/indigo-web/indigo/http"
 	"github.com/indigo-web/indigo/http/status"
 	"github.com/indigo-web/indigo/router/inbuilt"
-	"strings"
 )
 
 type HTTPOnlyParams struct {
@@ -22,7 +23,7 @@ func HTTPSOnly(optionalParams ...HTTPOnlyParams) inbuilt.Middleware {
 	params := optional(optionalParams, HTTPOnlyParams{})
 
 	return func(next inbuilt.Handler, request *http.Request) *http.Response {
-		if request.Env.Encryption.IsSafe() {
+		if request.Env.Encryption != 0 {
 			return next(request)
 		}
 

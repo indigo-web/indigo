@@ -1,9 +1,10 @@
 package config
 
 import (
-	"github.com/stretchr/testify/assert"
 	"reflect"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
 )
 
 func TestNoZeroFields(t *testing.T) {

@@ -2,11 +2,12 @@ package radix
 
 import (
 	"fmt"
-	"github.com/indigo-web/indigo/kv"
-	"github.com/stretchr/testify/require"
 	"strconv"
 	"strings"
 	"testing"
+
+	"github.com/indigo-web/indigo/kv"
+	"github.com/stretchr/testify/require"
 )
 
 func BenchmarkTreeMatch(b *testing.B) {

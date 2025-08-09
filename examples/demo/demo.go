@@ -1,16 +1,18 @@
 package main
 
 import (
+	"log"
+	"strconv"
+	"time"
+
 	"github.com/indigo-web/indigo"
 	"github.com/indigo-web/indigo/config"
 	"github.com/indigo-web/indigo/http"
+	"github.com/indigo-web/indigo/http/codec"
 	"github.com/indigo-web/indigo/http/method"
 	"github.com/indigo-web/indigo/http/status"
 	"github.com/indigo-web/indigo/router/inbuilt"
 	"github.com/indigo-web/indigo/router/inbuilt/middleware"
-	"log"
-	"strconv"
-	"time"
 )
 
 func IndexSay(request *http.Request) *http.Response {
@@ -29,9 +31,7 @@ func IndexSay(request *http.Request) *http.Response {
 }
 
 func World(request *http.Request) *http.Response {
-	return request.Respond().String(
-		`<h1>Hello, world!</h1>`,
-	)
+	return http.String(request, `<h1>Hello, world!</h1>`)
 }
 
 func Easter(request *http.Request) *http.Response {
@@ -62,6 +62,7 @@ func main() {
 	app := indigo.New(":8080").
 		TLS(":8443", indigo.LocalCert()).
 		Tune(s).
+		Codec(codec.NewGZIP()).
 		OnBind(func(addr string) {
 			log.Printf("running on %s\n", addr)
 		})
@@ -70,7 +71,7 @@ func main() {
 		Use(middleware.LogRequests()).
 		Alias("/", "/static/index.html", method.GET).
 		Alias("/favicon.ico", "/static/favicon.ico", method.GET).
-		Static("/static", "examples/combined/static")
+		Static("/static", "examples/demo/static")
 
 	r.Get("/stress", Stressful, middleware.Recover)
 

@@ -8,16 +8,18 @@ import (
 	"github.com/indigo-web/indigo/internal/buffer"
 	"github.com/indigo-web/indigo/internal/codecutil"
 	"github.com/indigo-web/indigo/internal/construct"
+	"github.com/indigo-web/indigo/internal/strutil"
 	"github.com/indigo-web/indigo/router"
 	"github.com/indigo-web/indigo/transport"
 )
 
 type Suit struct {
-	*parser
+	*Parser
 	*body
 	*serializer
 	router router.Router
 	client transport.Client
+	codecs codecutil.Cache
 }
 
 func newSuit(
@@ -26,33 +28,36 @@ func newSuit(
 	request *http.Request,
 	client transport.Client,
 	body *body,
-	keysBuff, valsBuff, requestLineBuff buffer.Buffer,
+	codecs codecutil.Cache,
+	statusBuff, headersBuff *buffer.Buffer,
 	respBuff []byte,
 ) *Suit {
 	return &Suit{
-		parser:     newParser(cfg, request, keysBuff, valsBuff, requestLineBuff),
+		Parser:     NewParser(cfg, request, statusBuff, headersBuff),
 		body:       body,
-		serializer: newSerializer(cfg, client, respBuff, cfg.Headers.Default, request),
+		serializer: newSerializer(cfg, request, client, codecs, respBuff),
 		router:     r,
 		client:     client,
+		codecs:     codecs,
 	}
 }
 
 // New instantiates an HTTP/1 protocol suit.
 func New(
-	cfg *config.Config, r router.Router, client transport.Client,
-	req *http.Request, decoders codecutil.Cache[http.Decompressor],
+	cfg *config.Config,
+	r router.Router,
+	client transport.Client,
+	request *http.Request,
+	codecs codecutil.Cache,
 ) *Suit {
-	keysBuff, valsBuff, requestLineBuff := construct.Buffers(cfg)
-	respBuff := make([]byte, 0, cfg.HTTP.ResponseBuffer.Default)
-	body := newBody(client, cfg.Body, decoders)
+	statusBuff, headersBuff := construct.Buffers(cfg)
+	respBuff := make([]byte, 0, cfg.NET.WriteBufferSize.Default)
+	b := newBody(client, cfg.Body)
 
-	return newSuit(
-		cfg, r, req, client, body, keysBuff, valsBuff, requestLineBuff, respBuff,
-	)
+	return newSuit(cfg, r, request, client, b, codecs, statusBuff, headersBuff, respBuff)
 }
 
-func (s *Suit) ServeOnce() bool {
+func (s *Suit) ServeOnce() (ok bool) {
 	return s.serve(true)
 }
 
@@ -62,7 +67,7 @@ func (s *Suit) Serve() {
 
 func (s *Suit) serve(once bool) (ok bool) {
 	client := s.client
-	request := s.parser.request
+	request := s.Parser.request
 
 	for {
 		data, err := client.Read()
@@ -81,17 +86,38 @@ func (s *Suit) serve(once bool) (ok bool) {
 		}
 
 		if !done {
+			if once {
+				return true
+			}
+
 			continue
 		}
 
 		client.Pushback(extra)
-
 		request.Body.Reset(request)
-		if err = s.body.Reset(request); err != nil {
-			// an error could occur here only if there were applied unrecognized encodings.
-			// Unfortunately, as the client made a decision to bravely ignore the list of
-			// encodings we do support, we don't want to read all the crap he sent us either.
-			s.router.OnError(request, err)
+		s.body.Reset(request)
+
+		transferEncoding := request.Encoding.Transfer
+		if !validateTransferEncodingTokens(transferEncoding) {
+			resp := respond(request, s.router.OnError(request, status.ErrUnsupportedEncoding))
+			_ = s.Write(request.Protocol, resp)
+			return false
+		}
+
+		if len(transferEncoding) > 0 {
+			// get rid of the trailing chunked encoding as it is already built-in.
+			if err = s.applyDecoders(transferEncoding[:len(transferEncoding)-1]); err != nil {
+				// even if the connection is going to be upgraded in advance, the error happened with the
+				// request prior to upgrade.
+				resp := respond(request, s.router.OnError(request, err))
+				_ = s.Write(request.Protocol, resp)
+				return false
+			}
+		}
+
+		if err = s.applyDecoders(request.Encoding.Content); err != nil {
+			resp := respond(request, s.router.OnError(request, err))
+			_ = s.Write(request.Protocol, resp)
 			return false
 		}
 
@@ -109,22 +135,78 @@ func (s *Suit) serve(once bool) (ok bool) {
 		}
 
 		if err = s.Write(version, resp); err != nil {
-			// if error happened during writing the response, it makes no sense to try
-			// to write anything again
+			// considering any write errors could occur due to broken connection, it makes
+			// thereby no sense to try to write any error back. Moreover, there could be an
+			// already sent data, which would overlay and result in a complete mess at the
+			// client side.
 			s.router.OnError(request, status.ErrCloseConnection)
 			return false
 		}
 
-		request.Reset()
 		if err = request.Body.Discard(); err != nil {
-			s.router.OnError(request, status.ErrCloseConnection)
+			resp = s.router.OnError(request, status.ErrCloseConnection)
+			_ = s.Write(request.Protocol, resp)
 			return false
+		}
+
+		if !isKeepAlive(version, request) {
+			s.router.OnError(request, status.ErrCloseConnection)
+			return true
 		}
 
 		if once {
 			return true
 		}
+
+		request.Reset()
 	}
+}
+
+func isKeepAlive(protocol proto.Protocol, req *http.Request) bool {
+	switch protocol {
+	case proto.HTTP10:
+		return strutil.CmpFoldSafe(req.Connection, "keep-alive")
+	case proto.HTTP11:
+		// in case of HTTP/1.1, keep-alive may be only disabled
+		return !strutil.CmpFoldSafe(req.Connection, "close")
+	default:
+		// as the protocol is unknown and the code was probably caused by some sort
+		// of bug, consider closing it
+		return false
+	}
+}
+
+func validateTransferEncodingTokens(tokens []string) bool {
+	if len(tokens) == 0 {
+		return true
+	}
+
+	for _, token := range tokens[:len(tokens)-1] {
+		if token == "chunked" {
+			return false
+		}
+	}
+
+	return tokens[len(tokens)-1] == "chunked"
+}
+
+func (s *Suit) applyDecoders(tokens []string) error {
+	request := s.Parser.request
+
+	for i := len(tokens); i > 0; i-- {
+		c := s.codecs.Get(tokens[i-1])
+		if c == nil {
+			return status.ErrUnsupportedEncoding
+		}
+
+		if err := c.ResetDecompressor(request.Body.Fetcher); err != nil {
+			return status.ErrInternalServerError
+		}
+
+		request.Body.Fetcher = c
+	}
+
+	return nil
 }
 
 // respond ensures the passed resp is not nil, otherwise http.Respond(req) is returned

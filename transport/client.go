@@ -3,6 +3,8 @@ package transport
 import (
 	"net"
 	"time"
+
+	"github.com/indigo-web/indigo/internal/timer"
 )
 
 type Client interface {
@@ -39,8 +41,7 @@ func (c *client) Read() ([]byte, error) {
 		return pending, nil
 	}
 
-	// TODO: use internal/timer?
-	if err := c.conn.SetReadDeadline(time.Now().Add(c.timeout)); err != nil {
+	if err := c.conn.SetReadDeadline(timer.Now().Add(c.timeout)); err != nil {
 		return nil, err
 	}
 

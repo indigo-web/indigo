@@ -1,33 +1,31 @@
 package http1
 
 import (
+	"io"
+	"strconv"
+	"strings"
+	"testing"
+
 	"github.com/indigo-web/indigo/config"
 	"github.com/indigo-web/indigo/http"
 	"github.com/indigo-web/indigo/http/status"
-	"github.com/indigo-web/indigo/internal/codecutil"
 	"github.com/indigo-web/indigo/internal/construct"
 	"github.com/indigo-web/indigo/kv"
 	"github.com/indigo-web/indigo/transport"
 	"github.com/indigo-web/indigo/transport/dummy"
 	"github.com/stretchr/testify/require"
-	"io"
-	"strconv"
-	"strings"
-	"testing"
 )
 
 func getBody(client transport.Client) *body {
-	cfg := config.Default()
-
-	return newBody(client, cfg.Body, codecutil.NewCache[http.Decompressor](nil))
+	return newBody(client, config.Default().Body)
 }
 
 func getRequestWithBody(chunked bool, body ...[]byte) (*http.Request, *body) {
 	cfg := config.Default()
-	client := dummy.NewCircularClient(body...).OneTime()
+	client := dummy.NewMockClient(body...)
 	req := construct.Request(cfg, client)
 	b := getBody(client)
-	req.Body = http.NewBody(cfg, b)
+	req.Body = http.NewBody(b)
 
 	var (
 		contentLength = 0
@@ -72,23 +70,20 @@ func readall(b *body) ([]byte, error) {
 	}
 }
 
-func TestBody_Plain(t *testing.T) {
+func TestBody(t *testing.T) {
 	t.Run("zero length", func(t *testing.T) {
 		req, b := getRequestWithBody(false)
-		require.NoError(t, b.Reset(req))
+		b.Reset(req)
 
 		data, err := b.Fetch()
 		require.EqualError(t, err, io.EOF.Error())
 		require.Empty(t, data)
 	})
 
-}
-
-func TestBodyReader_Plain(t *testing.T) {
 	t.Run("all at once", func(t *testing.T) {
 		sample := []byte("Hello, world!")
 		request, b := getRequestWithBody(false, sample)
-		require.NoError(t, b.Reset(request))
+		b.Reset(request)
 
 		actualBody, err := b.Fetch()
 		require.EqualError(t, err, io.EOF.Error())
@@ -105,7 +100,7 @@ func TestBodyReader_Plain(t *testing.T) {
 		bodyString := "Hello, world!"
 
 		req, b := getRequestWithBody(false, sample...)
-		require.NoError(t, b.Reset(req))
+		b.Reset(req)
 		actualBody, err := readall(b)
 		require.NoError(t, err)
 		require.Equal(t, bodyString, string(actualBody))
@@ -118,11 +113,11 @@ func TestBodyReader_Plain(t *testing.T) {
 			second = strings.Repeat("b", buffSize)
 		)
 
-		client := dummy.NewCircularClient([]byte(first + second))
+		client := dummy.NewMockClient([]byte(first + second))
 		request := construct.Request(config.Default(), dummy.NewNopClient())
 		request.ContentLength = buffSize
 		b := getBody(client)
-		require.NoError(t, b.Reset(request))
+		b.Reset(request)
 
 		data, err := b.Fetch()
 		require.Equal(t, first, string(data))
@@ -140,11 +135,11 @@ func TestBodyReader_Plain(t *testing.T) {
 	t.Run("too big plain body", func(t *testing.T) {
 		data := strings.Repeat("a", 10)
 		request, _ := getRequestWithBody(false, []byte(data))
-		client := dummy.NewCircularClient([]byte(data))
+		client := dummy.NewMockClient([]byte(data))
 		s := config.Default().Body
 		s.MaxSize = 9
-		b := newBody(client, s, codecutil.NewCache[http.Decompressor](nil))
-		require.NoError(t, b.Reset(request))
+		b := newBody(client, s)
+		b.Reset(request)
 
 		_, err := readall(b)
 		require.EqualError(t, err, status.ErrBodyTooLarge.Error())
@@ -156,7 +151,7 @@ func TestBodyReader_Chunked(t *testing.T) {
 		chunked := []byte("7\r\nMozilla\r\n9\r\nDeveloper\r\n7\r\nNetwork\r\n0\r\n\r\n")
 		wantBody := "MozillaDeveloperNetwork"
 		request, b := getRequestWithBody(true, chunked)
-		require.NoError(t, b.Reset(request))
+		b.Reset(request)
 
 		actualBody, err := readall(b)
 		require.NoError(t, err)
@@ -164,10 +159,10 @@ func TestBodyReader_Chunked(t *testing.T) {
 	})
 }
 
-func TestBodyReader_TillEOF(t *testing.T) {
+func TestBodyReader_ConnectionClose(t *testing.T) {
 	request, b := getRequestWithBody(false, []byte("Hello, "), []byte("world!"))
 	request.Connection = "close"
-	require.NoError(t, b.Reset(request))
+	b.Reset(request)
 
 	actualBody, err := readall(b)
 	require.NoError(t, err)

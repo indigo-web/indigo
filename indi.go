@@ -2,14 +2,16 @@ package indigo
 
 import (
 	"crypto/tls"
+
 	"github.com/indigo-web/indigo/config"
+	"github.com/indigo-web/indigo/http/codec"
 	"github.com/indigo-web/indigo/internal/strutil"
 	"github.com/indigo-web/indigo/router"
 	"github.com/indigo-web/indigo/router/inbuilt"
 	"github.com/indigo-web/indigo/transport"
 )
 
-const Version = "0.17.1"
+const Version = "0.17.2"
 
 // App is just a struct with addr and shutdown channel that is currently
 // not used. Planning to replace it with context.WithCancel()
@@ -20,6 +22,7 @@ type App struct {
 		OnBind  func(addr string)
 		OnStop  func()
 	}
+	codecs     []codec.Codec
 	transports []Transport
 	supervisor transport.Supervisor
 }
@@ -56,6 +59,12 @@ func (a *App) OnBind(cb func(addr string)) *App {
 // and all the clients are already disconnected.
 func (a *App) OnStop(cb func()) *App {
 	a.hooks.OnStop = cb
+	return a
+}
+
+// Codec appends a new codec into the list of supported.
+func (a *App) Codec(codec codec.Codec) *App {
+	a.codecs = append(a.codecs, codec)
 	return a
 }
 
@@ -100,10 +109,12 @@ func (a *App) Serve(r router.Builder) error {
 }
 
 func (a *App) run(r router.Router) error {
-	tryInvoke(a.hooks.OnStart)
+	if a.hooks.OnStart != nil {
+		a.hooks.OnStart()
+	}
 
 	for _, t := range a.transports {
-		if err := a.supervisor.Add(t.addr, t.inner, t.spawnCallback(a.cfg, r)); err != nil {
+		if err := a.supervisor.Add(t.addr, t.inner, t.spawnCallback(a.cfg, r, a.codecs)); err != nil {
 			return err
 		}
 
@@ -113,7 +124,9 @@ func (a *App) run(r router.Router) error {
 	}
 
 	err := a.supervisor.Run(a.cfg.NET)
-	tryInvoke(a.hooks.OnStop)
+	if a.hooks.OnStop != nil {
+		a.hooks.OnStop()
+	}
 
 	return err
 }
@@ -121,10 +134,4 @@ func (a *App) run(r router.Router) error {
 // Stop stops the whole application immediately and waits until it _really_ stops.
 func (a *App) Stop() {
 	a.supervisor.Stop()
-}
-
-func tryInvoke(f func()) {
-	if f != nil {
-		f()
-	}
 }

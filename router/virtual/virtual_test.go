@@ -1,6 +1,8 @@
 package virtual
 
 import (
+	"testing"
+
 	"github.com/indigo-web/indigo/config"
 	"github.com/indigo-web/indigo/http"
 	"github.com/indigo-web/indigo/http/status"
@@ -8,7 +10,6 @@ import (
 	"github.com/indigo-web/indigo/router/inbuilt"
 	"github.com/indigo-web/indigo/transport/dummy"
 	"github.com/stretchr/testify/require"
-	"testing"
 )
 
 func newRequest(hosts ...string) *http.Request {
@@ -56,10 +57,11 @@ func TestVirtualRouter(t *testing.T) {
 
 		require.True(t, requestIs(r.OnRequest(newRequest("pavlo.ooo")), OK))
 		require.True(t, requestIs(r.OnRequest(newRequest("localhost")), status.MisdirectedRequest))
-		require.True(t, requestIs(r.OnRequest(newRequest("pavlo.ooo", "localhost")), status.BadRequest))
+		// Currently disabled the check whether there is more than 1 host
+		//require.True(t, requestIs(r.OnRequest(newRequest("pavlo.ooo", "localhost")), status.BadRequest))
 	})
 }
 
 func requestIs(resp *http.Response, code status.Code) bool {
-	return resp.Reveal().Code == code
+	return resp.Expose().Code == code
 }

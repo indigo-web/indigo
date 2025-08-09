@@ -1,76 +1,47 @@
 package http1
 
 import (
+	"io"
+	"math"
+
 	"github.com/indigo-web/indigo/config"
 	"github.com/indigo-web/indigo/http"
 	"github.com/indigo-web/indigo/http/status"
-	"github.com/indigo-web/indigo/internal/codecutil"
 	"github.com/indigo-web/indigo/transport"
-	"io"
-	"math"
 )
 
 type body struct {
 	maxLen        uint64
 	counter       uint64
-	reader        func() ([]byte, error)
+	reader        func(*body) ([]byte, error)
 	chunkedParser chunkedParser
 	client        transport.Client
-	decoders      codecutil.Cache[http.Decompressor]
 }
 
-func newBody(
-	client transport.Client,
-	s config.Body,
-	decoders codecutil.Cache[http.Decompressor],
-) *body {
+func newBody(client transport.Client, s config.Body) *body {
 	return &body{
 		reader:        nop,
 		client:        client,
 		maxLen:        s.MaxSize,
 		chunkedParser: newChunkedParser(),
-		decoders:      decoders,
 	}
 }
 
 func (b *body) Fetch() ([]byte, error) {
-	return b.reader()
+	return b.reader(b)
 }
 
-func (b *body) Reset(request *http.Request) error {
+func (b *body) Reset(request *http.Request) {
 	if request.Encoding.Chunked {
 		b.initChunked()
-		b.reader = b.readChunked
+		b.reader = (*body).readChunked
 	} else if request.Connection == "close" {
 		b.initEOFReader()
-		b.reader = b.readTillEOF
+		b.reader = (*body).readTillEOF
 	} else {
 		b.initPlain(uint64(request.ContentLength))
-		b.reader = b.readPlain
+		b.reader = (*body).readPlain
 	}
-
-	if len(request.Encoding.Transfer) == 0 {
-		return nil
-	}
-
-	base := http.Fetcher(b)
-
-	for i := len(request.Encoding.Transfer); i > 0; i-- {
-		decoder, found := b.decoders.Get(request.Encoding.Transfer[i-1])
-		if !found {
-			return status.ErrNotImplemented
-		}
-
-		if err := decoder.Reset(base); err != nil {
-			// TODO: WHAT THE FUCK ARE WE SUPPOSED TO DO IF A DECOMPRESSOR HAS FAILED TO INITIALIZE
-			return status.ErrInternalServerError
-		}
-
-		base = decoder
-	}
-
-	b.reader = base.Fetch
-	return nil
 }
 
 func (b *body) initPlain(totalLen uint64) {
@@ -146,6 +117,6 @@ func (b *body) readChunked() (body []byte, err error) {
 	return chunk, err
 }
 
-func nop() ([]byte, error) {
+func nop(*body) ([]byte, error) {
 	return nil, io.EOF
 }

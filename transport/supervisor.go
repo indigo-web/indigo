@@ -1,9 +1,18 @@
 package transport
 
 import (
-	"github.com/indigo-web/indigo/config"
 	"net"
+
+	"github.com/indigo-web/indigo/config"
 )
+
+type Transport interface {
+	Bind(addr string) error
+	Listen(cfg config.NET, cb func(conn net.Conn)) error
+	Stop()
+	Close()
+	Wait()
+}
 
 type Supervisor struct {
 	ts     []boundTransport

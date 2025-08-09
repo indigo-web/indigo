@@ -2,6 +2,7 @@ package middleware
 
 import (
 	"context"
+
 	"github.com/indigo-web/indigo/http"
 	"github.com/indigo-web/indigo/router/inbuilt"
 )

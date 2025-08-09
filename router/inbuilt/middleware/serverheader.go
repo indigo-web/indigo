@@ -1,9 +1,10 @@
 package middleware
 
 import (
+	"strings"
+
 	"github.com/indigo-web/indigo/http"
 	"github.com/indigo-web/indigo/router/inbuilt"
-	"strings"
 )
 
 const DefaultServerHeader = "indigo"

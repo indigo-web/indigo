@@ -2,6 +2,8 @@ package http1
 
 import (
 	"bytes"
+	"strings"
+
 	"github.com/flrdv/uf"
 	"github.com/indigo-web/indigo/config"
 	"github.com/indigo-web/indigo/http"
@@ -11,7 +13,6 @@ import (
 	"github.com/indigo-web/indigo/internal/buffer"
 	"github.com/indigo-web/indigo/internal/hexconv"
 	"github.com/indigo-web/indigo/internal/strutil"
-	"strings"
 )
 
 type parserState uint8
@@ -35,43 +36,39 @@ const (
 	eHeaderValueCRLFCR
 )
 
-type parser struct {
-	urlEncodedChar    uint8
-	state             parserState
-	cfg               *config.Config
-	request           *http.Request
-	headersNumber     int
-	contentLength     int
-	key               string
-	transferEncodings []string
-	contentEncodings  []string
-	requestLine       *buffer.Buffer
-	headerKeys        *buffer.Buffer
-	headerValues      *buffer.Buffer
+type Parser struct {
+	urlEncodedChar      uint8
+	state               parserState
+	metTransferEncoding bool
+	headersNumber       int
+	contentLength       int64
+	cfg                 *config.Config
+	request             *http.Request
+	requestLine         *buffer.Buffer
+	headers             *buffer.Buffer
+	key                 string
+	acceptEncodings     []string
+	encodings           []string
 }
 
-func newParser(
-	cfg *config.Config, request *http.Request, headerKeys, headerValues, requestLine buffer.Buffer,
-) *parser {
-	return &parser{
+func NewParser(cfg *config.Config, request *http.Request, statusBuff, headers *buffer.Buffer) *Parser {
+	return &Parser{
 		cfg:     cfg,
 		state:   eMethod,
 		request: request,
 		// TODO: pass these through arguments instead of allocating in-place
-		transferEncodings: make([]string, 0, cfg.Headers.MaxEncodingTokens),
-		contentEncodings:  make([]string, 0, cfg.Headers.MaxEncodingTokens),
-		requestLine:       &requestLine,
-		headerKeys:        &headerKeys,
-		headerValues:      &headerValues,
+		acceptEncodings: make([]string, 0, cfg.Headers.MaxAcceptEncodingTokens),
+		encodings:       make([]string, 0, cfg.Headers.MaxEncodingTokens),
+		requestLine:     statusBuff,
+		headers:         headers,
 	}
 }
 
-func (p *parser) Parse(data []byte) (done bool, extra []byte, err error) {
+func (p *Parser) Parse(data []byte) (done bool, extra []byte, err error) {
 	_ = *p.request
 	request := p.request
 	requestLine := p.requestLine
-	headerKeys := p.headerKeys
-	headerValues := p.headerValues
+	headers := p.headers
 	headersCfg := p.cfg.Headers
 
 	switch p.state {
@@ -167,13 +164,14 @@ path:
 					if !requestLine.AppendByte(c) {
 						return true, nil, status.ErrURITooLong
 					}
+
+					i += 2
+					checkpoint = i + 1
 				} else {
 					// slow path
+					data = data[i+1:]
 					goto pathDecode1Char
 				}
-
-				i += 2
-				checkpoint = i + 1
 			case ' ':
 				if !requestLine.Append(data[checkpoint:i]) {
 					return true, nil, status.ErrURITooLong
@@ -219,7 +217,8 @@ pathDecode1Char:
 		return false, nil, nil
 	}
 
-	p.urlEncodedChar, data = data[0], data[1:]
+	p.urlEncodedChar = data[0]
+	data = data[1:]
 	// fallthrough to pathDecode2Char
 
 pathDecode2Char:
@@ -275,6 +274,8 @@ paramsKey:
 			request.Params.Add(uf.B2S(requestLine.Finish()), "")
 			data = data[i+1:]
 			goto protocol
+		case '#':
+			return true, nil, status.ErrBadRequest
 		default:
 			if isProhibitedChar(char) {
 				return true, nil, status.ErrBadParams
@@ -285,6 +286,9 @@ paramsKey:
 			}
 		}
 	}
+
+	p.state = eParamsKey
+	return false, nil, nil
 
 paramsKeyDecode1Char:
 	if len(data) == 0 {
@@ -312,6 +316,7 @@ paramsKeyDecode2Char:
 			return true, nil, status.ErrTooLongRequestLine
 		}
 
+		data = data[1:]
 		goto paramsKey
 	}
 
@@ -402,6 +407,7 @@ paramsValueDecode2Char:
 			return true, nil, status.ErrTooLongRequestLine
 		}
 
+		data = data[1:]
 		goto paramsValue
 	}
 
@@ -456,7 +462,7 @@ headerKey:
 
 		colon := bytes.IndexByte(data, ':')
 		if colon == -1 {
-			if !headerKeys.Append(data) {
+			if !headers.Append(data) {
 				return true, nil, status.ErrHeaderFieldsTooLarge
 			}
 
@@ -464,11 +470,11 @@ headerKey:
 			return false, nil, nil
 		}
 
-		if !headerKeys.Append(data[:colon]) {
+		if !headers.Append(data[:colon]) {
 			return true, nil, status.ErrHeaderFieldsTooLarge
 		}
 
-		key := uf.B2S(headerKeys.Finish())
+		key := uf.B2S(headers.Finish())
 		p.key = key
 		data = data[colon+1:]
 
@@ -476,12 +482,7 @@ headerKey:
 			return true, nil, status.ErrTooManyHeaders
 		}
 
-		if len(key) == len("content-length") &&
-			cContent == encodeU64(
-				key[0]|0x20, key[1]|0x20, key[2]|0x20, key[3]|0x20, key[4]|0x20, key[5]|0x20, key[6]|0x20, key[7]|0x20,
-			) && cLength == encodeU64(
-			key[8]|0x20, key[9]|0x20, key[10]|0x20, key[11]|0x20, key[12]|0x20, key[13]|0x20, 0, 0,
-		) {
+		if strutil.CmpFoldFast(key, "Content-Length") {
 			goto contentLength
 		}
 
@@ -492,11 +493,7 @@ headerValue:
 	{
 		lf := bytes.IndexByte(data, '\n')
 		if lf == -1 {
-			if !headerValues.Append(data) {
-				return true, nil, status.ErrHeaderFieldsTooLarge
-			}
-
-			if headerValues.SegmentLength() > headersCfg.MaxValueLength {
+			if !headers.Append(data) {
 				return true, nil, status.ErrHeaderFieldsTooLarge
 			}
 
@@ -504,72 +501,65 @@ headerValue:
 			return false, nil, nil
 		}
 
-		if !headerValues.Append(data[:lf]) {
+		if !headers.Append(data[:lf]) {
 			return true, nil, status.ErrHeaderFieldsTooLarge
 		}
 
-		if headerValues.Preview()[headerValues.SegmentLength()-1] == '\r' {
-			headerValues.Trunc(1)
-		}
-
-		if headerValues.SegmentLength() > headersCfg.MaxValueLength {
-			return true, nil, status.ErrHeaderFieldsTooLarge
+		if headers.Preview()[headers.SegmentLength()-1] == '\r' {
+			headers.Trunc(1)
 		}
 
 		data = data[lf+1:]
-		value := uf.B2S(trimPrefixSpaces(headerValues.Finish()))
+		value := uf.B2S(trimPrefixSpaces(headers.Finish()))
 
 		key := p.key
 		request.Headers.Add(key, value)
 
 		switch len(key) {
 		case 7:
-			if cUpgrade == encodeU64(
-				key[0]|0x20, key[1]|0x20, key[2]|0x20, key[3]|0x20, key[4]|0x20, key[5]|0x20, key[6]|0x20, 0,
-			) {
+			if strutil.CmpFoldFast(key, "Upgrade") {
 				request.Upgrade = proto.ChooseUpgrade(value)
 			}
 		case 10:
-			if cConnecti == encodeU64(
-				key[0]|0x20, key[1]|0x20, key[2]|0x20, key[3]|0x20, key[4]|0x20, key[5]|0x20, key[6]|0x20, key[7]|0x20,
-			) && cOn == encodeU16(key[8]|0x20, key[9]|0x20) {
+			if strutil.CmpFoldFast(key, "Connection") {
 				request.Connection = value
 			}
 		case 12:
-			if cContent == encodeU64(
-				key[0]|0x20, key[1]|0x20, key[2]|0x20, key[3]|0x20, key[4]|0x20, key[5]|0x20, key[6]|0x20, key[7]|0x20,
-			) && cType == encodeU32(
-				key[8]|0x20, key[9]|0x20, key[10]|0x20, key[11]|0x20,
-			) {
+			if strutil.CmpFoldFast(key, "Content-Type") {
 				request.ContentType = value
 			}
+		case 15:
+			if strutil.CmpFoldFast(key, "Accept-Encoding") {
+				p.acceptEncodings, request.Encoding.Accept, err = splitTokens(p.acceptEncodings, value)
+			}
 		case 16:
-			if cContent == encodeU64(
-				key[0]|0x20, key[1]|0x20, key[2]|0x20, key[3]|0x20, key[4]|0x20, key[5]|0x20, key[6]|0x20, key[7]|0x20,
-			) && cEncoding == encodeU64(
-				key[8]|0x20, key[9]|0x20, key[10]|0x20, key[11]|0x20, key[12]|0x20, key[13]|0x20, key[14]|0x20, key[15]|0x20,
-			) {
-				request.Encoding.Content, _, err = parseEncodingString(p.contentEncodings, value)
+			if strutil.CmpFoldFast(key, "Content-Encoding") {
+				p.encodings, request.Encoding.Content, err = splitTokens(p.encodings, value)
 				if err != nil {
 					return true, nil, err
 				}
 			}
 		case 17:
-			if cTransfer == encodeU64(
-				key[0]|0x20, key[1]|0x20, key[2]|0x20, key[3]|0x20, key[4]|0x20, key[5]|0x20, key[6]|0x20, key[7]|0x20,
-			) && cEncodin == encodeU64(
-				key[8]|0x20, key[9]|0x20, key[10]|0x20, key[11]|0x20, key[12]|0x20, key[13]|0x20, key[14]|0x20, key[15]|0x20,
-			) && key[16]|0x20 == 'g' {
-				request.Encoding.Transfer, request.Encoding.Chunked, err = parseEncodingString(p.transferEncodings, value)
-				if err != nil {
-					return true, nil, err
-				}
-				t := request.Encoding.Transfer
-				if len(t) > 0 && (!request.Encoding.Chunked || !strutil.CmpFold(t[len(t)-1], "chunked")) {
+			if strutil.CmpFoldFast(key, "Transfer-Encoding") {
+				if p.metTransferEncoding {
 					return true, nil, status.ErrBadEncoding
 				}
 
-				request.Encoding.Transfer = t[:len(t)-1]
+				p.metTransferEncoding = true
+
+				p.encodings, request.Encoding.Transfer, err = splitTokens(p.encodings, value)
+				if err != nil {
+					return true, nil, err
+				}
+
+				te := request.Encoding.Transfer
+				if len(te) > 0 {
+					if te[len(te)-1] != "chunked" {
+						return true, nil, status.ErrBadEncoding
+					}
+
+					request.Encoding.Chunked = true
+				}
 			}
 		}
 
@@ -601,7 +591,7 @@ contentLength:
 			goto contentLengthEnd
 		}
 
-		p.contentLength = p.contentLength*10 + int(char-'0')
+		p.contentLength = p.contentLength*10 + int64(char-'0')
 	}
 
 	p.state = eContentLength
@@ -612,7 +602,7 @@ contentLengthEnd:
 	// The proof is, that this code is reachable ONLY if loop has reached a non-digit
 	// ascii symbol. In case loop has finished peacefully, as no more data left, but also no
 	// character found to satisfy the exit condition, this code will never be reached
-	request.ContentLength = p.contentLength
+	request.ContentLength = int(p.contentLength)
 
 	switch data[0] {
 	case '\r':
@@ -639,19 +629,20 @@ contentLengthCR:
 	goto headerKey
 }
 
-func (p *parser) cleanup() {
+func (p *Parser) cleanup() {
+	p.metTransferEncoding = false
 	p.headersNumber = 0
 	p.requestLine.Clear()
-	p.headerKeys.Clear()
-	p.headerValues.Clear()
+	p.headers.Clear()
 	p.contentLength = 0
-	p.transferEncodings = p.transferEncodings[:0]
-	p.contentEncodings = p.contentEncodings[:0]
+	p.acceptEncodings = p.acceptEncodings[:0]
+	p.encodings = p.encodings[:0]
 	p.state = eMethod
 }
 
-func parseEncodingString(buff []string, value string) (toks []string, chunked bool, err error) {
+func splitTokens(buff []string, value string) (alteredBuff, toks []string, err error) {
 	var token string
+	offset := len(buff)
 
 	for len(value) > 0 {
 		comma := strings.IndexByte(value, ',')
@@ -661,45 +652,23 @@ func parseEncodingString(buff []string, value string) (toks []string, chunked bo
 			token, value = value[:comma], value[comma+1:]
 		}
 
-		token = trimSpaces(token)
+		token = trimSpaces(trimQualifier(token))
 		if len(token) == 0 {
-			continue
-		}
-
-		if strutil.CmpFold(token, "chunked") {
-			if chunked {
-				// chunked cannot be wrapped into chunked
-				return nil, false, status.ErrBadEncoding
-			}
-
-			chunked = true
+			return buff, nil, status.ErrUnsupportedEncoding
 		}
 
 		if len(buff) >= cap(buff) {
-			return nil, false, status.ErrTooManyEncodingTokens
+			return buff, nil, status.ErrTooManyEncodingTokens
+		}
+
+		if strutil.CmpFoldFast(token, "identity") {
+			continue
 		}
 
 		buff = append(buff, token)
 	}
 
-	return buff, chunked, nil
-}
-
-func trimSpaces(s string) string {
-	for i, char := range s {
-		if char != ' ' {
-			s = s[i:]
-			break
-		}
-	}
-
-	for i := len(s); i > 0; i-- {
-		if s[i-1] != ' ' {
-			return s[:i]
-		}
-	}
-
-	return s[:0]
+	return buff, buff[offset:], nil
 }
 
 func trimPrefixSpaces(b []byte) []byte {
@@ -712,6 +681,27 @@ func trimPrefixSpaces(b []byte) []byte {
 	return b[:0]
 }
 
+func trimSpaces(s string) string {
+	s = uf.B2S(trimPrefixSpaces(uf.S2B(s)))
+
+	for i := len(s); i > 0; i-- {
+		if s[i-1] != ' ' {
+			return s[:i]
+		}
+	}
+
+	return s[:0]
+}
+
+func trimQualifier(s string) string {
+	q := strings.IndexByte(s, ';')
+	if q == -1 {
+		return s
+	}
+
+	return s[:q]
+}
+
 func stripCR(b []byte) []byte {
 	if len(b) > 0 && b[len(b)-1] == '\r' {
 		return b[:len(b)-1]
@@ -722,29 +712,4 @@ func stripCR(b []byte) []byte {
 
 func isProhibitedChar(c byte) bool {
 	return c < 0x20 || c > 0x7e
-}
-
-var (
-	cUpgrade  = encodeU64('u', 'p', 'g', 'r', 'a', 'd', 'e', 0)
-	cContent  = encodeU64('c', 'o', 'n', 't', 'e', 'n', 't', '-')
-	cConnecti = encodeU64('c', 'o', 'n', 'n', 'e', 'c', 't', 'i')
-	cOn       = encodeU16('o', 'n')
-	cLength   = encodeU64('l', 'e', 'n', 'g', 't', 'h', 0, 0)
-	cType     = encodeU32('t', 'y', 'p', 'e')
-	cEncoding = encodeU64('e', 'n', 'c', 'o', 'd', 'i', 'n', 'g')
-	cTransfer = encodeU64('t', 'r', 'a', 'n', 's', 'f', 'e', 'r')
-	cEncodin  = encodeU64('-', 'e', 'n', 'c', 'o', 'd', 'i', 'n')
-)
-
-func encodeU64(a, b, c, d, e, f, g, h uint8) uint64 {
-	return (uint64(h) << 56) | (uint64(g) << 48) | (uint64(f) << 40) | (uint64(e) << 32) |
-		(uint64(d) << 24) | (uint64(c) << 16) | (uint64(b) << 8) | uint64(a)
-}
-
-func encodeU32(a, b, c, d uint8) uint32 {
-	return (uint32(d) << 24) | (uint32(c) << 16) | (uint32(b) << 8) | uint32(a)
-}
-
-func encodeU16(a, b uint8) uint16 {
-	return (uint16(b) << 8) | uint16(a)
 }

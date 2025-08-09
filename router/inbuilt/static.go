@@ -2,10 +2,12 @@ package inbuilt
 
 import (
 	"fmt"
-	"github.com/indigo-web/indigo/http"
-	"github.com/indigo-web/indigo/http/status"
 	"os"
 	"strings"
+
+	"github.com/indigo-web/indigo/http"
+	"github.com/indigo-web/indigo/http/mime"
+	"github.com/indigo-web/indigo/http/status"
 )
 
 // Static adds a catcher of prefix, that automatically returns files from defined root
@@ -30,17 +32,21 @@ func (r *Router) Static(prefix, root string, mwares ...Middleware) *Router {
 
 		file, err := fs.Open(path)
 		if err != nil {
-			return http.Error(request, status.ErrNotFound).
+			return http.
+				Error(request, status.ErrNotFound).
 				String(err.(*os.PathError).Err.Error())
 		}
 
 		fstat, err := file.Stat()
 		if err != nil {
-			return http.Error(request, status.ErrInternalServerError).
+			return http.
+				Error(request, status.ErrInternalServerError).
 				String(err.(*os.PathError).Err.Error())
 		}
 
-		return http.SizedStream(request, file, fstat.Size())
+		return http.
+			SizedStream(request, file, fstat.Size()).
+			ContentType(mime.Guess(path))
 	}, mwares...)
 }
 

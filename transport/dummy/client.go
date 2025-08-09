@@ -1,46 +1,41 @@
 package dummy
 
 import (
-	"github.com/indigo-web/indigo/transport"
 	"io"
 	"net"
+
+	"github.com/indigo-web/indigo/transport"
 )
 
-var _ transport.Client = new(CircularClient)
+var _ transport.Client = new(Client)
 
-// CircularClient is a client that on every read-operation returns the same data as it
-// was initialised with. This is used mainly for benchmarking
-type CircularClient struct {
-	data            [][]byte
-	tmp             []byte
-	pointer         int
-	closed, oneTime bool
+// Client is a full-blown client implementation intended for mock tests, thereby providing relatively
+// reach functionality.
+type Client struct {
+	closed    bool
+	loopReads bool
+	pointer   int
+	conn      *Conn
+	pending   []byte
+	data      [][]byte
 }
 
-func NewCircularClient(data ...[]byte) *CircularClient {
-	return &CircularClient{
-		data:    data,
-		pointer: 0,
+func NewMockClient(data ...[]byte) *Client {
+	return &Client{
+		data: data,
+		conn: new(Conn).Nop(),
 	}
 }
 
-func NewNopClient() *CircularClient {
-	return NewCircularClient(nil)
-}
-
-func (c *CircularClient) Read() (data []byte, err error) {
-	if c.closed {
-		return nil, io.EOF
-	}
-
-	if len(c.tmp) > 0 {
-		data, c.tmp = c.tmp, nil
+func (c *Client) Read() (data []byte, err error) {
+	if len(c.pending) > 0 {
+		data, c.pending = c.pending, nil
 
 		return data, nil
 	}
 
 	if c.pointer >= len(c.data) {
-		if c.oneTime {
+		if !c.loopReads {
 			c.closed = true
 			return nil, io.EOF
 		}
@@ -54,32 +49,85 @@ func (c *CircularClient) Read() (data []byte, err error) {
 	return piece, nil
 }
 
-func (c *CircularClient) Fetch() (data []byte, err error) {
+func (c *Client) Fetch() (data []byte, err error) {
 	return c.Read()
 }
 
-func (c *CircularClient) Pushback(takeback []byte) {
-	c.tmp = takeback
+func (c *Client) Pushback(takeback []byte) {
+	c.pending = takeback
 }
 
-func (c *CircularClient) Write(p []byte) (int, error) {
-	return len(p), nil
+func (c *Client) Write(p []byte) (int, error) {
+	return c.conn.Write(p)
 }
 
-func (c *CircularClient) Conn() net.Conn {
-	return new(Conn).Nop()
+func (c *Client) Written() []byte {
+	if c.conn.nop {
+		panic("mock client: cannot access written data: journaling is disabled!")
+	}
+
+	return c.conn.Data
 }
 
-func (*CircularClient) Remote() net.Addr {
+func (c *Client) Conn() net.Conn {
+	return c.conn
+}
+
+func (*Client) Remote() net.Addr {
 	return nil
 }
 
-func (c *CircularClient) Close() error {
+func (c *Client) Close() error {
 	c.closed = true
 	return nil
 }
 
-func (c *CircularClient) OneTime() *CircularClient {
-	c.oneTime = true
+func (c *Client) Closed() bool {
+	return c.closed
+}
+
+func (c *Client) Journaling() *Client {
+	c.conn.nop = false
 	return c
+}
+
+// LoopReads disables returning io.EOF on data exhaustion, instead starting from the
+// beginning.
+func (c *Client) LoopReads() *Client {
+	c.loopReads = true
+	return c
+}
+
+func (c *Client) Reset() {
+	c.conn.Data = c.conn.Data[:0]
+}
+
+var _ transport.Client = NopClient{}
+
+type NopClient struct{}
+
+func NewNopClient() NopClient {
+	return NopClient{}
+}
+
+func (n NopClient) Read() ([]byte, error) {
+	return nil, io.EOF
+}
+
+func (n NopClient) Pushback([]byte) {}
+
+func (n NopClient) Write(b []byte) (int, error) {
+	return len(b), nil
+}
+
+func (n NopClient) Conn() net.Conn {
+	return new(Conn).Nop()
+}
+
+func (n NopClient) Remote() net.Addr {
+	return nil
+}
+
+func (n NopClient) Close() error {
+	return nil
 }

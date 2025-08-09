@@ -8,31 +8,33 @@ import (
 	"crypto/x509/pkix"
 	"encoding/pem"
 	"fmt"
-	"github.com/indigo-web/indigo/config"
-	"github.com/indigo-web/indigo/http/encryption"
-	"github.com/indigo-web/indigo/http/serve"
-	"github.com/indigo-web/indigo/router"
-	"github.com/indigo-web/indigo/transport"
-	"golang.org/x/crypto/acme/autocert"
 	"math/big"
 	"net"
 	"os"
 	"path/filepath"
 	"time"
+
+	"github.com/indigo-web/indigo/config"
+	"github.com/indigo-web/indigo/http/codec"
+	"github.com/indigo-web/indigo/http/serve"
+	"github.com/indigo-web/indigo/internal/codecutil"
+	"github.com/indigo-web/indigo/router"
+	"github.com/indigo-web/indigo/transport"
+	"golang.org/x/crypto/acme/autocert"
 )
 
 type Transport struct {
-	addr          string // must be left intact. Used by App entity only
+	addr          string
 	inner         transport.Transport
-	spawnCallback func(cfg *config.Config, r router.Router) func(net.Conn)
+	spawnCallback func(cfg *config.Config, r router.Router, c []codec.Codec) func(net.Conn)
 }
 
 func TCP() Transport {
 	return Transport{
 		inner: transport.NewTCP(),
-		spawnCallback: func(cfg *config.Config, r router.Router) func(net.Conn) {
+		spawnCallback: func(cfg *config.Config, r router.Router, c []codec.Codec) func(net.Conn) {
 			return func(conn net.Conn) {
-				serve.HTTP1(cfg, conn, encryption.Plain, r)
+				serve.HTTP1(cfg, conn, 0, r, codecutil.NewCache(c))
 			}
 		},
 	}
@@ -102,29 +104,12 @@ func Cert(cert, key string) tls.Certificate {
 func newTLSTransport(cfg *tls.Config) Transport {
 	return Transport{
 		inner: transport.NewTLS(cfg),
-		spawnCallback: func(cfg *config.Config, r router.Router) func(net.Conn) {
+		spawnCallback: func(cfg *config.Config, r router.Router, c []codec.Codec) func(net.Conn) {
 			return func(conn net.Conn) {
 				ver := conn.(*tls.Conn).ConnectionState().Version
-				serve.HTTP1(cfg, conn, mapTLS(ver), r)
+				serve.HTTP1(cfg, conn, ver, r, codecutil.NewCache(c))
 			}
 		},
-	}
-}
-
-func mapTLS(ver uint16) encryption.Token {
-	switch ver {
-	case tls.VersionTLS10:
-		return encryption.TLSv10
-	case tls.VersionTLS11:
-		return encryption.TLSv11
-	case tls.VersionTLS12:
-		return encryption.TLSv12
-	case tls.VersionTLS13:
-		return encryption.TLSv13
-	case tls.VersionSSL30:
-		return encryption.SSL
-	default:
-		return encryption.Unknown
 	}
 }
 

@@ -1,24 +1,23 @@
 package kv
 
 import (
-	"github.com/indigo-web/indigo/internal/strutil"
 	"iter"
+	"slices"
+
+	"github.com/indigo-web/indigo/internal/strutil"
 )
 
 type Pair struct {
 	Key, Value string
 }
 
-// TODO: add `deleted` attribute to pairs, so by that we can delete and update already existing
-// TODO: entries
-
 // Storage is an associative structure for storing (string, string) pairs. It acts as a map but
 // uses linear search instead, which proves to be more efficient on relatively low amount of
 // entries, which often enough is the case.
 type Storage struct {
+	deleted    int
 	pairs      []Pair
-	uniqueBuff []string
-	valuesBuff []string
+	uniqueKeys []string
 }
 
 func New() *Storage {
@@ -36,10 +35,6 @@ func NewPrealloc(n int) *Storage {
 // Note: as maps are unordered, resulting underlying structure will also contain unordered
 // pairs.
 func NewFromMap(m map[string][]string) *Storage {
-	// this actually doesn't always allocate exactly enough sized slice, as we don't
-	// count amount of _values_, only _keys_, where each key may contain more  (or less)
-	// than 1 value. But this doesn't actually matter, as this job is made just once
-	// per client, so considered not to be a hot path
 	kv := NewPrealloc(len(m))
 
 	for key, values := range m {
@@ -51,8 +46,15 @@ func NewFromMap(m map[string][]string) *Storage {
 	return kv
 }
 
+// NewFromPairs returns a new instance backed by the passed pairs as-is, without copying it.
+// Use this method with care.
+func NewFromPairs(pairs []Pair) *Storage {
+	return &Storage{pairs: pairs}
+}
+
 // Add adds a new pair of key and value.
 func (s *Storage) Add(key, value string) *Storage {
+	// TODO: if `s.deleted` > 0, try to insert the key into the deleted fields
 	s.pairs = append(s.pairs, Pair{
 		Key:   key,
 		Value: value,
@@ -60,99 +62,123 @@ func (s *Storage) Add(key, value string) *Storage {
 	return s
 }
 
+// Set removes all the entries corresponding the key and sets the new value.
+func (s *Storage) Set(key, value string) *Storage {
+	freeIdx := s.delete(key)
+	if freeIdx == -1 {
+		return s.Add(key, value)
+	}
+
+	s.pairs[freeIdx] = Pair{key, value}
+	s.deleted-- // as one of the deleted entries we've just overwritten
+	return s
+}
+
+// Delete quasi removes all the entries corresponding the key. In fact, an empty key is assigned
+// to each eligible pair.
+func (s *Storage) Delete(key string) *Storage {
+	s.delete(key)
+	return s
+}
+
+func (s *Storage) delete(key string) (firstDeleted int) {
+	firstDeleted = -1
+
+	for i, pair := range s.pairs {
+		if strutil.CmpFoldFast(pair.Key, key) {
+			s.pairs[i].Key = ""
+			s.deleted++
+
+			if firstDeleted == -1 {
+				firstDeleted = i
+			}
+		}
+	}
+
+	return firstDeleted
+}
+
 // Value returns the first value, corresponding to the key. Otherwise, empty string is returned
 func (s *Storage) Value(key string) string {
 	return s.ValueOr(key, "")
 }
 
-// ValueOr returns either the first value corresponding to the key or custom value, defined
-// via the second parameter.
-func (s *Storage) ValueOr(key, or string) string {
-	value, found := s.Get(key)
-	if !found {
-		return or
+// ValueOr returns either the first found value or the second parameter.
+func (s *Storage) ValueOr(key, otherwise string) string {
+	if value, found := s.Lookup(key); found {
+		return value
 	}
 
-	return value
+	return otherwise
 }
 
-// Get returns a value and a bool, indicating whether the value was found. If it wasn't, it'll
-// be an empty string.
-func (s *Storage) Get(key string) (value string, found bool) {
-	for _, pair := range s.pairs {
-		if strutil.CmpFold(key, pair.Key) {
-			return pair.Value, true
-		}
+// Lookup returns the first found value and indicates the success via a bool flag.
+func (s *Storage) Lookup(key string) (value string, found bool) {
+	if i := s.findNext(key, 0); i != -1 {
+		return s.pairs[i].Value, true
 	}
 
 	return "", false
 }
 
-// Values returns all values by the key. Returns nil if key doesn't exist.
-//
-// WARNING: calling it twice will override values, returned by the first call. Consider
-// copying the returned slice for safe use.
-func (s *Storage) Values(key string) (values []string) {
-	s.valuesBuff = s.valuesBuff[:0]
-
-	for _, pair := range s.pairs {
-		if strutil.CmpFold(pair.Key, key) {
-			s.valuesBuff = append(s.valuesBuff, pair.Value)
-		}
-	}
-
-	if len(s.valuesBuff) == 0 {
-		return nil
-	}
-
-	return s.valuesBuff
-}
-
-// Keys returns all unique presented keys.
-//
-// WARNING: calling it twice will override values, returned by the first call. Consider
-// copying the returned slice for safe use.
-func (s *Storage) Keys() []string {
-	s.uniqueBuff = s.uniqueBuff[:0]
-
-	for _, pair := range s.pairs {
-		if contains(s.uniqueBuff, pair.Key) {
-			continue
-		}
-
-		s.uniqueBuff = append(s.uniqueBuff, pair.Key)
-	}
-
-	return s.uniqueBuff
-}
-
-// Iter returns an iterator over the pairs.
-func (s *Storage) Iter() iter.Seq2[string, string] {
-	return func(yield func(string, string) bool) {
+// Values returns an iterator over all the values corresponding the given key.
+func (s *Storage) Values(key string) iter.Seq[string] {
+	return func(yield func(string) bool) {
 		for _, pair := range s.pairs {
-			if !yield(pair.Key, pair.Value) {
-				break
+			if strutil.CmpFoldFast(pair.Key, key) {
+				if !yield(pair.Value) {
+					break
+				}
 			}
 		}
+	}
+}
 
-		return
+// Keys returns an iterator over all the unique non-normalized keys.
+func (s *Storage) Keys() iter.Seq[string] {
+	return func(yield func(string) bool) {
+		s.uniqueKeys = s.uniqueKeys[:0]
+
+		for key := range s.Pairs() {
+			if contains(s.uniqueKeys, key) {
+				continue
+			}
+
+			if !yield(key) {
+				return
+			}
+
+			s.uniqueKeys = append(s.uniqueKeys, key)
+		}
+	}
+}
+
+// Pairs return an iterator over all the header field pairs presented. Multiple values are
+// represented by occupying multiple pairs sharing the same key. Array values can occupy
+// non-consecutive pairs.
+func (s *Storage) Pairs() iter.Seq2[string, string] {
+	return func(yield func(string, string) bool) {
+		for _, pair := range s.pairs {
+			if len(pair.Key) == 0 {
+				continue
+			}
+
+			if !yield(pair.Key, pair.Value) {
+				return
+			}
+		}
 	}
 }
 
 // Has indicates, whether there's an entry of the key.
 func (s *Storage) Has(key string) bool {
-	for _, pair := range s.pairs {
-		if strutil.CmpFold(key, pair.Key) {
-			return true
-		}
-	}
-
-	return false
+	_, found := s.Lookup(key)
+	return found
 }
 
-// Len returns a number of stored pairs.
+// Len returns a number of stored pairs. Duplicate key entries are counted in.
 func (s *Storage) Len() int {
-	return len(s.pairs)
+	return len(s.pairs) - s.deleted
 }
 
 func (s *Storage) Empty() bool {
@@ -163,13 +189,12 @@ func (s *Storage) Empty() bool {
 // it comes at cost of multiple allocations.
 func (s *Storage) Clone() *Storage {
 	return &Storage{
-		pairs:      clone(s.pairs),
-		uniqueBuff: clone(s.uniqueBuff),
-		valuesBuff: clone(s.valuesBuff),
+		pairs: slices.Clone(s.pairs),
 	}
 }
 
-// Expose exposes the underlying pairs slice.
+// Expose exposes the underlying pairs slice. Unlike Pairs, it also contains all the deleted
+// empty-key pairs
 func (s *Storage) Expose() []Pair {
 	return s.pairs
 }
@@ -177,34 +202,26 @@ func (s *Storage) Expose() []Pair {
 // Clear all the entries. However, all the allocated space won't be freed.
 func (s *Storage) Clear() *Storage {
 	s.pairs = s.pairs[:0]
+	s.deleted = 0
 	return s
 }
 
-func (s *Storage) ensureNotNil(buff []string) []string {
-	if buff == nil {
-		buff = make([]string, 0, len(s.pairs))
+func (s *Storage) findNext(key string, startAt int) int {
+	for i := startAt; i < len(s.pairs); i++ {
+		if strutil.CmpFoldFast(s.pairs[i].Key, key) {
+			return i
+		}
 	}
 
-	return buff
+	return -1
 }
 
 func contains(collection []string, key string) bool {
 	for _, element := range collection {
-		if strutil.CmpFold(element, key) {
+		if strutil.CmpFoldFast(element, key) {
 			return true
 		}
 	}
 
 	return false
-}
-
-func clone[T any](source []T) []T {
-	if len(source) == 0 {
-		return nil
-	}
-
-	newSlice := make([]T, len(source))
-	copy(newSlice, source)
-
-	return newSlice
 }

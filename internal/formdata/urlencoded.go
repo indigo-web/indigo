@@ -7,12 +7,12 @@ import (
 	"github.com/indigo-web/indigo/internal/hexconv"
 )
 
-// ParseURLEncoded implements parser for key-value pairs similar to request path parameters. The only
+// ParseFormURLEncoded implements parser for key-value pairs similar to request path parameters. The only
 // difference is that this parser is greedy, as is intended to parse an already received body.
 //
 // It prohibits any non-printable characters in keys but allows such in values, therefore printing them
 // might cause unwanted effects (e.g. beeping terminal.)
-func ParseURLEncoded(into form.Form, data, buff []byte) (result form.Form, buffer []byte, err error) {
+func ParseFormURLEncoded(into form.Form, data, buff []byte) (result form.Form, buffer []byte, err error) {
 	var (
 		key     string
 		escaped bool

@@ -1,18 +1,17 @@
 package http
 
 import (
+	"io"
+	"slices"
+
 	"github.com/flrdv/uf"
-	"github.com/indigo-web/indigo/config"
 	"github.com/indigo-web/indigo/http/form"
 	"github.com/indigo-web/indigo/http/mime"
 	"github.com/indigo-web/indigo/http/status"
 	"github.com/indigo-web/indigo/internal/formdata"
 	"github.com/indigo-web/indigo/internal/strutil"
 	json "github.com/json-iterator/go"
-	"io"
 )
-
-type BodyCallback func([]byte) error
 
 // Fetcher abstracts the underlying protocol-dependant body source. Even though the signature
 // is identical to transport.Client.Read(), it is named differently in order to highlight the
@@ -25,22 +24,19 @@ type Fetcher interface {
 type Body struct {
 	Fetcher
 
-	cfg         *config.Config
-	contentType string
-	buff        []byte
-	formbuff    []byte
-	pending     []byte
-	form        form.Form
-	error       error
+	request  *Request
+	error    error
+	buff     []byte
+	formbuff []byte
+	pending  []byte
+	form     form.Form
 }
 
-// TODO: body entity can be passed by value, as it is anyway going to be stored in the request entity,
-// TODO: which is in turn is already on heap.
+// TODO: body entity can be passed by value (?)
 
-func NewBody(cfg *config.Config, src Fetcher) *Body {
+func NewBody(src Fetcher) *Body {
 	return &Body{
 		Fetcher: src,
-		cfg:     cfg,
 	}
 }
 
@@ -50,7 +46,7 @@ func NewBody(cfg *config.Config, src Fetcher) *Body {
 // occurred.
 //
 // Please note: this method can be used only once.
-func (b *Body) Callback(cb BodyCallback) error {
+func (b *Body) Callback(cb func([]byte) error) error {
 	if b.error != nil {
 		return b.error
 	}
@@ -82,9 +78,12 @@ func (b *Body) Bytes() ([]byte, error) {
 		return nil, b.error
 	}
 
-	if b.buff == nil {
-		b.buff = make([]byte, 0, b.cfg.Body.Form.BufferPrealloc)
+	newSize := int(b.request.cfg.Body.Form.BufferPrealloc)
+	if !b.request.Encoding.Chunked {
+		newSize = min(b.request.ContentLength, int(b.request.cfg.Body.MaxSize))
 	}
+
+	b.buff = slices.Grow(b.buff[:0], newSize)
 
 	for {
 		var data []byte
@@ -130,7 +129,7 @@ func (b *Body) Read(into []byte) (n int, err error) {
 //
 // TODO: make possible to choose and use different from json-iterator json marshall/unmarshall
 func (b *Body) JSON(model any) error {
-	if !mime.Complies(mime.JSON, b.contentType) {
+	if !mime.Complies(mime.JSON, b.request.ContentType) {
 		return status.ErrUnsupportedMediaType
 	}
 
@@ -151,13 +150,11 @@ func (b *Body) JSON(model any) error {
 // returns parsed key-value pairs. If the request's MIME type is defined and is different
 // from mime.FormUrlencoded, status.ErrUnsupportedMediaType is returned
 func (b *Body) Form() (f form.Form, err error) {
-	// lazily allocate both in order to avoid wasting RAM when we don't really need it.
-	// Must add no runtime penalty, as the operation is done once
 	if b.form == nil {
-		b.form = make(form.Form, b.cfg.Body.Form.EntriesPrealloc)
+		b.form = make(form.Form, b.request.cfg.Body.Form.EntriesPrealloc)
 	}
 	if b.formbuff == nil {
-		b.formbuff = make([]byte, b.cfg.Body.Form.BufferPrealloc)
+		b.formbuff = make([]byte, b.request.cfg.Body.Form.BufferPrealloc)
 	}
 
 	raw, err := b.Bytes()
@@ -166,16 +163,16 @@ func (b *Body) Form() (f form.Form, err error) {
 	}
 
 	switch {
-	case mime.Complies(mime.FormUrlencoded, b.contentType):
-		f, b.formbuff, err = formdata.ParseURLEncoded(b.form[:0], raw, b.formbuff[:0])
+	case mime.Complies(mime.FormUrlencoded, b.request.ContentType):
+		f, b.formbuff, err = formdata.ParseFormURLEncoded(b.form[:0], raw, b.formbuff[:0])
 		return f, err
-	case mime.Complies(mime.Multipart, b.contentType):
+	case mime.Complies(mime.Multipart, b.request.ContentType):
 		boundary, ok := b.multipartBoundary()
 		if !ok {
 			return nil, status.ErrBadRequest
 		}
 
-		return formdata.ParseMultipart(b.cfg, b.form[:0], raw, b.formbuff[:0], boundary)
+		return formdata.ParseMultipart(b.request.cfg, b.form[:0], raw, b.formbuff[:0], boundary)
 	default:
 		return nil, status.ErrUnsupportedMediaType
 	}
@@ -194,20 +191,16 @@ func (b *Body) Discard() error {
 	return b.error
 }
 
-// Error returns a previously encountered error, otherwise nil.
-func (b *Body) Error() error {
-	return b.error
-}
-
 // Reset resets the body state. Should never be used as serves internal purposes only.
 func (b *Body) Reset(request *Request) {
 	b.error = nil
 	b.buff = b.buff[:0]
-	b.contentType = request.ContentType
+	b.pending = b.pending[:0]
+	b.request = request
 }
 
 func (b *Body) multipartBoundary() (boundary string, ok bool) {
-	for key, value := range strutil.WalkKV(strutil.CutParams(b.contentType)) {
+	for key, value := range strutil.WalkKV(strutil.CutParams(b.request.ContentType)) {
 		if key == "boundary" {
 			if len(boundary) != 0 {
 				return "", false

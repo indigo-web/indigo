@@ -1,12 +1,14 @@
-<p align="center">
-<img src="https://gist.githubusercontent.com/flrdv/08395567a602992be0c72f445589cb90/raw/248c01ff18936b36629e520b2164ef6d78f0f57f/indigo-logo.svg" alt="This is just a logo" title="What are you looking for?" width="40%" height="40%"/>
-</p>
+# indigo
 
-Indigo is a web-framework focusing at performance, elegancy and robustness.
+<img align="right" width="159" alt="image" src="https://gist.githubusercontent.com/flrdv/e610c73096af43b11ba3db5ec52b4194/raw/eb1b50202c8d4c7ce4709dd0af997df03dfee63d/indigo-logo-mini.svg" />
+
+Elegance, conciseness, flexibility and extensibility — that’s what Indigo is about. The goal is to create a mini ecosystem in which you can focus on actual tasks rather than reimplementing the same things over and over again. Everything you need to get started is already included, and whatever isn’t is trivially pluggable.
+
+FastHTTP-grade performance, stream-based body processing, fine-tuning of nearly every parameter — including memory consumption control — and a full-fledged built-in router are the icing on the cake.
 
 # Documentation
 
-Documentation is available [here](https://floordiv.gitbook.io/indigo/). It might be incomplete. In this case, feel free to open an issue.
+Documentation is available [here](https://floordiv.gitbook.io/indigo/). It might be incomplete however, feel free to open issues.
 
 # Hello, world!
 

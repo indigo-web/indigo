@@ -1,14 +1,15 @@
 package formdata
 
 import (
+	"iter"
+	"strings"
+
 	"github.com/flrdv/uf"
 	"github.com/indigo-web/indigo/config"
 	"github.com/indigo-web/indigo/http/form"
 	"github.com/indigo-web/indigo/http/status"
 	"github.com/indigo-web/indigo/internal/hexconv"
 	"github.com/indigo-web/indigo/internal/strutil"
-	"iter"
-	"strings"
 )
 
 type header struct {
@@ -41,8 +42,6 @@ func ParseMultipart(cfg *config.Config, into form.Form, data, buff []byte, b str
 		if len(hdr.Name) == 0 {
 			return nil, status.ErrBadRequest
 		}
-
-		// TODO: DecodeString doesn't decode plus-symbols as spaces, but we need it
 
 		var ok bool
 		hdr.Name, buff, ok = urldecode(hdr.Name, buff)
@@ -287,7 +286,7 @@ func (s *stream) CompareFold(offset int, str string) bool {
 		return false
 	}
 
-	return strutil.CmpFold(string(*s)[offset:offset+len(str)], str)
+	return strutil.CmpFoldSafe(string(*s)[offset:offset+len(str)], str)
 }
 
 func (s *stream) Consume(str string) bool {

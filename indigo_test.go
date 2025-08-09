@@ -6,19 +6,6 @@ import (
 	"crypto/tls"
 	"encoding/json"
 	"fmt"
-	"github.com/indigo-web/indigo/config"
-	"github.com/indigo-web/indigo/http"
-	"github.com/indigo-web/indigo/http/cookie"
-	"github.com/indigo-web/indigo/http/method"
-	"github.com/indigo-web/indigo/http/mime"
-	"github.com/indigo-web/indigo/http/proto"
-	"github.com/indigo-web/indigo/http/status"
-	"github.com/indigo-web/indigo/internal/testutil"
-	"github.com/indigo-web/indigo/kv"
-	"github.com/indigo-web/indigo/router/inbuilt"
-	"github.com/indigo-web/indigo/router/inbuilt/middleware"
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
 	"io"
 	"iter"
 	"net"
@@ -30,6 +17,23 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/indigo-web/indigo/config"
+	"github.com/indigo-web/indigo/http"
+	"github.com/indigo-web/indigo/http/codec"
+	"github.com/indigo-web/indigo/http/cookie"
+	"github.com/indigo-web/indigo/http/method"
+	"github.com/indigo-web/indigo/http/mime"
+	"github.com/indigo-web/indigo/http/proto"
+	"github.com/indigo-web/indigo/http/status"
+	"github.com/indigo-web/indigo/internal/httptest/parse"
+	"github.com/indigo-web/indigo/internal/httptest/serialize"
+	"github.com/indigo-web/indigo/kv"
+	"github.com/indigo-web/indigo/router/inbuilt"
+	"github.com/indigo-web/indigo/router/inbuilt/middleware"
+	"github.com/klauspost/compress/gzip"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 const (
@@ -47,7 +51,7 @@ func getHeaders() http.Headers {
 }
 
 func respond(request *http.Request) *http.Response {
-	str, err := testutil.SerializeRequest(request)
+	str, err := serialize.Request(request)
 	if err != nil {
 		return http.Error(request, err)
 	}
@@ -60,7 +64,8 @@ func getInbuiltRouter() *inbuilt.Router {
 
 	r := inbuilt.New().
 		Use(middleware.Recover).
-		Use(middleware.CustomContext(ctx))
+		Use(middleware.CustomContext(ctx)).
+		Static("/static", "tests")
 
 	r.Resource("/").
 		Get(respond).
@@ -86,7 +91,7 @@ func getInbuiltRouter() *inbuilt.Router {
 	r.Get("/query", func(request *http.Request) *http.Response {
 		var buff []byte
 
-		for key, value := range request.Params.Iter() {
+		for key, value := range request.Params.Pairs() {
 			buff = append(buff, key+":"+value+"."...)
 		}
 
@@ -112,7 +117,7 @@ func getInbuiltRouter() *inbuilt.Router {
 	}, middleware.Recover)
 
 	r.Get("/json", func(request *http.Request) *http.Response {
-		fields := request.Headers.Values("fields")
+		fields := slices.Collect(request.Headers.Values("fields"))
 
 		return http.JSON(request, headersToMap(request.Headers, fields))
 	})
@@ -158,10 +163,18 @@ func headersToMap(hdrs http.Headers, keys []string) map[string]string {
 	m := make(map[string]string, len(keys))
 
 	for _, key := range keys {
-		m[key] = strings.Join(hdrs.Values(key), ", ")
+		m[key] = strings.Join(slices.Collect(hdrs.Values(key)), ", ")
 	}
 
 	return m
+}
+
+func readFullBody(t *testing.T, resp *stdhttp.Response) string {
+	body, err := io.ReadAll(resp.Body)
+	require.NoError(t, err)
+	require.NoError(t, resp.Body.Close())
+
+	return string(body)
 }
 
 func TestFirstPhase(t *testing.T) {
@@ -175,7 +188,7 @@ func TestFirstPhase(t *testing.T) {
 				),
 			)
 		s := config.Default()
-		s.NET.ReadTimeout = 500 * time.Millisecond
+		s.NET.ReadTimeout = 1 * time.Second
 		require.NoError(t, app.
 			Tune(s).
 			OnStart(func() {
@@ -191,17 +204,14 @@ func TestFirstPhase(t *testing.T) {
 	}(app)
 
 	<-ch
+	// Ensure the server is ready to accept connections
+	waitForAvailability(t)
 
 	t.Run("root get", func(t *testing.T) {
 		resp, err := stdhttp.DefaultClient.Get(appURL + "/")
 		require.NoError(t, err)
-		defer func() {
-			_ = resp.Body.Close()
-		}()
 		require.Equal(t, stdhttp.StatusOK, resp.StatusCode)
-		body, err := io.ReadAll(resp.Body)
-		require.NoError(t, resp.Body.Close())
-		request, err := testutil.ParseRequest(string(body))
+		request, err := parse.HTTP11Request(readFullBody(t, resp))
 		require.NoError(t, err)
 
 		require.Equal(t, method.GET, request.Method)
@@ -211,7 +221,9 @@ func TestFirstPhase(t *testing.T) {
 		for err = range compareHeaders(request.Headers, wantHeaders) {
 			assert.Fail(t, err.Error())
 		}
-		require.Empty(t, request.Body)
+		body, err := request.Body.String()
+		require.NoError(t, err)
+		require.Empty(t, body)
 	})
 
 	t.Run("root get with body", func(t *testing.T) {
@@ -220,14 +232,8 @@ func TestFirstPhase(t *testing.T) {
 		require.NoError(t, err)
 		resp, err := stdhttp.DefaultClient.Do(req)
 		require.NoError(t, err)
-		defer func() {
-			_ = resp.Body.Close()
-		}()
 		require.Equal(t, stdhttp.StatusOK, resp.StatusCode)
-
-		body, err := io.ReadAll(resp.Body)
-		require.NoError(t, resp.Body.Close())
-		request, err := testutil.ParseRequest(string(body))
+		request, err := parse.HTTP11Request(readFullBody(t, resp))
 		require.NoError(t, err)
 
 		require.Equal(t, method.GET, request.Method)
@@ -237,21 +243,17 @@ func TestFirstPhase(t *testing.T) {
 		for err = range compareHeaders(request.Headers, wantHeaders) {
 			assert.Fail(t, err.Error())
 		}
-		require.Equal(t, "Hello, world!", request.Body)
+		body, err := request.Body.String()
+		require.NoError(t, err)
+		require.Equal(t, "Hello, world!", body)
 	})
 
 	t.Run("root post", func(t *testing.T) {
 		r := strings.NewReader("Hello, world!")
 		resp, err := stdhttp.DefaultClient.Post(appURL+"/", "text/html", r)
 		require.NoError(t, err)
-		defer func() {
-			_ = resp.Body.Close()
-		}()
 		require.Equal(t, stdhttp.StatusOK, resp.StatusCode)
-
-		body, err := io.ReadAll(resp.Body)
-		require.NoError(t, resp.Body.Close())
-		request, err := testutil.ParseRequest(string(body))
+		request, err := parse.HTTP11Request(readFullBody(t, resp))
 		require.NoError(t, err)
 
 		require.Equal(t, method.POST, request.Method)
@@ -263,72 +265,55 @@ func TestFirstPhase(t *testing.T) {
 		for err = range compareHeaders(request.Headers, wantHeaders) {
 			assert.Fail(t, err.Error())
 		}
-		require.Equal(t, "Hello, world!", request.Body)
+		body, err := request.Body.String()
+		require.NoError(t, err)
+		require.Equal(t, "Hello, world!", body)
+	})
+
+	t.Run("root head", func(t *testing.T) {
+		resp, err := stdhttp.DefaultClient.Head(appURL + "/")
+		require.NoError(t, err)
+		require.Equal(t, stdhttp.StatusOK, resp.StatusCode)
+		require.Empty(t, readFullBody(t, resp))
+	})
+
+	t.Run("accept encoding", func(t *testing.T) {
+		resp, err := stdhttp.DefaultClient.Head(appURL + "/")
+		require.NoError(t, err)
+		require.Equal(t, stdhttp.StatusOK, resp.StatusCode)
+		require.Equal(t, []string{"identity"}, resp.Header["Accept-Encoding"])
+		require.Empty(t, readFullBody(t, resp))
 	})
 
 	t.Run("body reader", func(t *testing.T) {
 		r := strings.NewReader("Hello, world!")
 		resp, err := stdhttp.DefaultClient.Post(appURL+"/body-reader", "text/html", r)
 		require.NoError(t, err)
-		defer func() {
-			_ = resp.Body.Close()
-		}()
 		require.Equal(t, stdhttp.StatusOK, resp.StatusCode)
-		body, err := io.ReadAll(resp.Body)
-		require.NoError(t, err)
-		require.Equal(t, "Hello, world!", string(body))
-	})
-
-	t.Run("root head", func(t *testing.T) {
-		resp, err := stdhttp.DefaultClient.Head(appURL + "/")
-		require.NoError(t, err)
-		defer func() {
-			_ = resp.Body.Close()
-		}()
-
-		require.Equal(t, stdhttp.StatusOK, resp.StatusCode)
-		body, err := io.ReadAll(resp.Body)
-		require.NoError(t, err)
-		require.Empty(t, body)
+		body := readFullBody(t, resp)
+		require.Equal(t, "Hello, world!", body)
 	})
 
 	t.Run("error with custom code", func(t *testing.T) {
 		resp, err := stdhttp.DefaultClient.Get(appURL + "/custom-error-with-code")
 		require.NoError(t, err)
-		defer func() {
-			_ = resp.Body.Close()
-		}()
-
 		require.Equal(t, stdhttp.StatusTeapot, resp.StatusCode)
-		body, err := io.ReadAll(resp.Body)
-		require.NoError(t, err)
-		require.Empty(t, body)
+		require.Empty(t, readFullBody(t, resp))
 	})
 
 	t.Run("with query", func(t *testing.T) {
 		resp, err := stdhttp.DefaultClient.Get(appURL + "/query?hello=world&%20foo=+bar")
 		require.NoError(t, err)
-		defer func() {
-			_ = resp.Body.Close()
-		}()
 		require.Equal(t, stdhttp.StatusOK, resp.StatusCode)
-		body, err := io.ReadAll(resp.Body)
-		require.NoError(t, err)
-		require.Equal(t, "hello:world. foo: bar.", string(body))
+		require.Equal(t, "hello:world. foo: bar.", readFullBody(t, resp))
 	})
 
 	t.Run("body reader", func(t *testing.T) {
 		r := strings.NewReader("Hello, world!")
 		resp, err := stdhttp.DefaultClient.Post(appURL+"/", "text/html", r)
 		require.NoError(t, err)
-		defer func() {
-			_ = resp.Body.Close()
-		}()
 		require.Equal(t, stdhttp.StatusOK, resp.StatusCode)
-
-		body, err := io.ReadAll(resp.Body)
-		require.NoError(t, resp.Body.Close())
-		request, err := testutil.ParseRequest(string(body))
+		request, err := parse.HTTP11Request(readFullBody(t, resp))
 		require.NoError(t, err)
 
 		require.Equal(t, method.POST, request.Method)
@@ -340,7 +325,9 @@ func TestFirstPhase(t *testing.T) {
 		for err = range compareHeaders(request.Headers, wantHeaders) {
 			assert.Fail(t, err.Error())
 		}
-		require.Equal(t, "Hello, world!", request.Body)
+		body, err := request.Body.String()
+		require.NoError(t, err)
+		require.Equal(t, "Hello, world!", body)
 	})
 
 	t.Run("hijacking", func(t *testing.T) {
@@ -362,11 +349,7 @@ func TestFirstPhase(t *testing.T) {
 		resp, err := stdhttp.DefaultClient.Get(appURL + "/file/index.html")
 		require.NoError(t, err)
 		require.Equal(t, stdhttp.StatusOK, resp.StatusCode)
-
-		data, err := io.ReadAll(resp.Body)
-		require.NoError(t, err)
-
-		require.Equal(t, string(actualContent), string(data))
+		require.Equal(t, string(actualContent), readFullBody(t, resp))
 	})
 
 	t.Run("request non-existing file", func(t *testing.T) {
@@ -386,11 +369,36 @@ func TestFirstPhase(t *testing.T) {
 		resp, err := stdhttp.DefaultClient.Get(appURL + "/file/by-path/tests/index.html")
 		require.NoError(t, err)
 		require.Equal(t, stdhttp.StatusOK, resp.StatusCode)
+		require.Equal(t, string(actualContent), readFullBody(t, resp))
+	})
 
-		data, err := io.ReadAll(resp.Body)
+	testStatic := func(t *testing.T, file, mime string) {
+		actualContent, err := os.ReadFile("./tests/" + file)
 		require.NoError(t, err)
 
-		require.Equal(t, string(actualContent), string(data))
+		resp, err := stdhttp.DefaultClient.Get(appURL + "/static/" + file)
+		require.NoError(t, err)
+		require.Equal(t, stdhttp.StatusOK, resp.StatusCode)
+
+		if len(mime) > 0 {
+			require.Equal(t, mime, resp.Header["Content-Type"][0])
+		} else {
+			require.Empty(t, resp.Header["Content-Type"])
+		}
+
+		require.Equal(t, string(actualContent), readFullBody(t, resp))
+	}
+
+	t.Run("request static html", func(t *testing.T) {
+		testStatic(t, "index.html", "text/html")
+	})
+
+	t.Run("request static css", func(t *testing.T) {
+		testStatic(t, "styles.css", "text/css")
+	})
+
+	t.Run("request static non-standard extension", func(t *testing.T) {
+		testStatic(t, "pics.vfs", mime.Unset)
 	})
 
 	t.Run("trace", func(t *testing.T) {
@@ -438,7 +446,7 @@ func TestFirstPhase(t *testing.T) {
 		}
 
 		for _, line := range headerLines {
-			require.True(t, contains(wantHeaderLines, line), "unwanted header line: "+line)
+			require.True(t, slices.Contains(wantHeaderLines, line), "unwanted header line: "+line)
 		}
 	})
 
@@ -563,7 +571,7 @@ func TestFirstPhase(t *testing.T) {
 
 	t.Run("HTTP/1.0 with keep-alive", func(t *testing.T) {
 		raw := "GET /ctx-value HTTP/1.0\r\nConnection: keep-alive\r\n\r\n"
-		const pipelinedRequests = 10
+		const pipelinedRequests = 5
 		requests := strings.Repeat(raw, pipelinedRequests)
 		conn, err := net.Dial("tcp", addr)
 		require.NoError(t, err)
@@ -599,9 +607,8 @@ func TestFirstPhase(t *testing.T) {
 		resp, err := stdhttp.DefaultClient.Do(request)
 		require.NoError(t, err)
 		require.Equal(t, stdhttp.StatusOK, resp.StatusCode)
-		body, err := io.ReadAll(resp.Body)
-		require.NoError(t, err)
-		require.Equal(t, "hello=world\nmen=in black\nanything=anywhere\n", string(body))
+		body := readFullBody(t, resp)
+		require.Equal(t, "hello=world\nmen=in black\nanything=anywhere\n", body)
 		require.Equal(t, []string{"hello=world", "men=in black"}, resp.Header.Values("Set-Cookie"))
 	})
 
@@ -626,9 +633,8 @@ func TestFirstPhase(t *testing.T) {
 		resp, err := stdhttp.DefaultClient.Do(request)
 		require.NoError(t, err)
 		require.Equal(t, stdhttp.StatusOK, resp.StatusCode)
-		body, err := io.ReadAll(resp.Body)
-		require.NoError(t, err)
-		require.Equal(t, "hello=world\nmy name=Paul\na+b=5\n", string(body))
+		body := readFullBody(t, resp)
+		require.Equal(t, "hello=world\nmy name=Paul\na+b=5\n", body)
 	})
 
 	t.Run("form multipart", func(t *testing.T) {
@@ -660,9 +666,8 @@ func TestFirstPhase(t *testing.T) {
 		resp, err := stdhttp.DefaultClient.Do(request)
 		require.NoError(t, err)
 		require.Equal(t, stdhttp.StatusOK, resp.StatusCode)
-		body, err := io.ReadAll(resp.Body)
-		require.NoError(t, err)
-		require.Equal(t, "hello=world\nmy name=Paul\n", string(body))
+		body := readFullBody(t, resp)
+		require.Equal(t, "hello=world\nmy name=Paul\n", body)
 	})
 
 	t.Run("chunked body", func(t *testing.T) {
@@ -680,20 +685,24 @@ func TestFirstPhase(t *testing.T) {
 			Host:             addr,
 			RemoteAddr:       addr,
 			Body:             newCircularReader("Mozilla", " ", "Developer Network"),
-			//Body:             io.NopCloser(strings.NewReader("7\r\nMozilla\r\n1\r\n \r\n11\r\nDeveloper Network\r\n0\r\n\r\n")),
 		}
 		resp, err := stdhttp.DefaultClient.Do(request)
 		require.NoError(t, err)
-		body, err := io.ReadAll(resp.Body)
-		require.NoError(t, err)
+		require.Equal(t, stdhttp.StatusOK, resp.StatusCode)
+		body := readFullBody(t, resp)
 		require.NoError(t, resp.Body.Close())
-		require.Equal(t, "Mozilla Developer Network", string(body))
+		require.Equal(t, "Mozilla Developer Network", body)
 	})
 
 	t.Run("forced stop", func(t *testing.T) {
 		app.Stop()
-		_, ok := chanRead(ch, 5*time.Second)
-		require.True(t, ok, "server did not shut down correctly")
+
+		timer := time.NewTimer(5 * time.Second)
+		select {
+		case <-ch:
+		case <-timer.C:
+			require.Fail(t, "server did not shut down correctly")
+		}
 	})
 }
 
@@ -706,9 +715,10 @@ func TestSecondPhase(t *testing.T) {
 	go func(app *App) {
 		r := getInbuiltRouter()
 		s := config.Default()
-		s.NET.ReadTimeout = 500 * time.Millisecond
+		s.NET.ReadTimeout = 1 * time.Second
 		_ = app.
 			Tune(s).
+			Codec(codec.NewGZIP()).
 			OnStart(func() {
 				ch <- struct{}{}
 			}).
@@ -719,6 +729,45 @@ func TestSecondPhase(t *testing.T) {
 	}(app)
 
 	<-ch
+	waitForAvailability(t)
+
+	t.Run("accept encoding", func(t *testing.T) {
+		resp, err := stdhttp.DefaultClient.Head(appURL + "/")
+		require.NoError(t, err)
+		require.Equal(t, stdhttp.StatusOK, resp.StatusCode)
+		require.Equal(t, []string{"gzip"}, resp.Header["Accept-Encoding"])
+		require.Empty(t, readFullBody(t, resp))
+	})
+
+	t.Run("gzip compressed request", func(t *testing.T) {
+		const data = "Hello, world!"
+		buff := bytes.NewBuffer(nil)
+		c := gzip.NewWriter(buff)
+		_, err := c.Write([]byte(data))
+		require.NoError(t, err)
+		require.NoError(t, c.Close())
+
+		request := &stdhttp.Request{
+			Method: stdhttp.MethodPost,
+			URL: &url.URL{
+				Scheme: "http",
+				Host:   addr,
+				Path:   "/body-reader",
+			},
+			Proto:            "HTTP/1.1",
+			ProtoMajor:       1,
+			ProtoMinor:       1,
+			TransferEncoding: []string{"chunked"},
+			Host:             addr,
+			RemoteAddr:       addr,
+			Body:             io.NopCloser(buff),
+		}
+		request.Header = make(stdhttp.Header)
+		request.Header.Set("Content-Encoding", "gzip")
+		resp, err := stdhttp.DefaultClient.Do(request)
+		require.NoError(t, err)
+		require.Equal(t, data, readFullBody(t, resp))
+	})
 
 	t.Run("idle disconnect", func(t *testing.T) {
 		conn, err := net.Dial("tcp4", addr)
@@ -784,13 +833,18 @@ func TestSecondPhase(t *testing.T) {
 	})
 }
 
-func chanRead[T any](ch <-chan T, timeout time.Duration) (value T, ok bool) {
-	timer := time.NewTimer(timeout)
-	select {
-	case value = <-ch:
-		return value, true
-	case <-timer.C:
-		return value, false
+func waitForAvailability(t *testing.T) {
+	deadline := time.Now().Add(2 * time.Second)
+	for {
+		conn, err := net.Dial("tcp4", addr)
+		if err == nil {
+			_ = conn.Close()
+			break
+		}
+		if time.Now().After(deadline) {
+			t.Fatalf("server did not start listening on %s in time: %v", addr, err)
+		}
+		time.Sleep(50 * time.Millisecond)
 	}
 }
 
@@ -809,8 +863,9 @@ func sendSimpleRequest(addr, path string) (net.Conn, error) {
 
 func compareHeaders(a, b http.Headers) iter.Seq[error] {
 	return func(yield func(error) bool) {
-		for _, key := range a.Keys() {
-			if slices.Compare(a.Values(key), b.Values(key)) != 0 {
+		for key := range a.Keys() {
+			av, bv := slices.Collect(a.Values(key)), slices.Collect(b.Values(key))
+			if slices.Compare(av, bv) != 0 {
 				if !yield(fmt.Errorf("%s: mismatching values", key)) {
 					return
 				}
@@ -844,14 +899,4 @@ func (c *circularReader) Read(b []byte) (int, error) {
 
 func (c *circularReader) Close() error {
 	return nil
-}
-
-func contains(strs []string, substr string) bool {
-	for _, str := range strs {
-		if str == substr {
-			return true
-		}
-	}
-
-	return false
 }

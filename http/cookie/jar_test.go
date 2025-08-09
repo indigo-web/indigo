@@ -1,9 +1,10 @@
 package cookie
 
 import (
+	"testing"
+
 	"github.com/indigo-web/indigo/kv"
 	"github.com/stretchr/testify/require"
-	"testing"
 )
 
 func TestParse(t *testing.T) {

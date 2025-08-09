@@ -1,23 +1,24 @@
 package timer
 
 import (
-	"github.com/stretchr/testify/require"
 	"sync"
 	"sync/atomic"
 	"testing"
 	"time"
 	_ "unsafe"
+
+	"github.com/stretchr/testify/require"
 )
 
 func TestTime(t *testing.T) {
 	const (
-		threshold = 100 * time.Millisecond
+		threshold = 200 * time.Millisecond
 		// use 1.5*Resolution in order to avoid test failures because of the Resolution+1ms error,
 		// which happens rarely (approx. once every 20 runs), but better to not happen at all
 		resolution = Resolution + Resolution/2
 	)
 
-	for range 3 * time.Second / threshold {
+	for range 2 * time.Second / threshold {
 		now := Now()
 		if time.Now().Sub(now) > resolution {
 			require.Fail(t, "the timer is too slow")

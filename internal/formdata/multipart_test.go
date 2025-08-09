@@ -1,12 +1,13 @@
 package formdata
 
 import (
+	"testing"
+
 	"github.com/indigo-web/indigo/config"
 	"github.com/indigo-web/indigo/http/form"
 	"github.com/indigo-web/indigo/http/mime"
 	"github.com/indigo-web/indigo/http/status"
 	"github.com/stretchr/testify/require"
-	"testing"
 )
 
 func TestMultipart(t *testing.T) {

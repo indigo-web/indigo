@@ -1,9 +1,10 @@
 package inbuilt
 
 import (
+	"path"
+
 	"github.com/indigo-web/indigo/http/method"
 	"github.com/indigo-web/indigo/router/inbuilt/mutator"
-	"path"
 )
 
 // Alias makes an implicitly redirects to other endpoint by changing request path

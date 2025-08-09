@@ -1,5 +1,11 @@
 package status
 
+import (
+	"strconv"
+
+	"github.com/flrdv/uf"
+)
+
 /*
 INFO: this is copy-paste from net/http/status.go. Added because
 of unwanted name collisions between indigo/http and net/http
@@ -11,7 +17,7 @@ type (
 	Status = string
 )
 
-// HTTP status codes as registered with IANA.
+// HTTP status codes.
 // See: https://www.iana.org/assignments/http-status-codes/http-status-codes.xhtml
 const (
 	Continue           Code = 100 // RFC 9110, 15.2.1
@@ -82,270 +88,133 @@ const (
 	LoopDetected                  Code = 508 // RFC 5842, 7.2
 	NotExtended                   Code = 510 // RFC 2774, 7
 	NetworkAuthenticationRequired Code = 511 // RFC 6585, 6
+
+	// must be updated when new codes are added
+	maxCodeValue = 512
+	minCodeValue = 100
 )
 
-// Text returns a text for the HTTP status code. It returns the empty
-// string if the code is unknown.
-func Text(code Code) Status {
-	switch code {
-	case Continue:
-		return "Continue"
-	case SwitchingProtocols:
-		return "Switching Protocols"
-	case Processing:
-		return "Processing"
-	case EarlyHints:
-		return "Early Hints"
-	case OK:
-		return "OK"
-	case Created:
-		return "Created"
-	case Accepted:
-		return "Accepted"
-	case NonAuthoritativeInfo:
-		return "Non-Authoritative Information"
-	case NoContent:
-		return "No Content"
-	case ResetContent:
-		return "Reset Content"
-	case PartialContent:
-		return "Partial Content"
-	case MultiStatus:
-		return "Multi-Status"
-	case AlreadyReported:
-		return "Already Reported"
-	case IMUsed:
-		return "IM Used"
-	case MultipleChoices:
-		return "Multiple Choices"
-	case MovedPermanently:
-		return "Moved Permanently"
-	case Found:
-		return "Found"
-	case SeeOther:
-		return "See Other"
-	case NotModified:
-		return "Not Modified"
-	case UseProxy:
-		return "Use Proxy"
-	case TemporaryRedirect:
-		return "Temporary Redirect"
-	case PermanentRedirect:
-		return "Permanent Redirect"
-	case BadRequest:
-		return "Bad Request"
-	case Unauthorized:
-		return "Unauthorized"
-	case PaymentRequired:
-		return "Payment Required"
-	case Forbidden:
-		return "Forbidden"
-	case NotFound:
-		return "Not Found"
-	case MethodNotAllowed:
-		return "Method Not Allowed"
-	case NotAcceptable:
-		return "Not Acceptable"
-	case ProxyAuthRequired:
-		return "Proxy Authentication Required"
-	case RequestTimeout:
-		return "Request Timeout"
-	case Conflict:
-		return "Conflict"
-	case Gone:
-		return "Gone"
-	case LengthRequired:
-		return "Length Required"
-	case PreconditionFailed:
-		return "Precondition Failed"
-	case RequestEntityTooLarge:
-		return "Request Entity Too Large"
-	case RequestURITooLong:
-		return "Request URI Too Long"
-	case UnsupportedMediaType:
-		return "Unsupported Media Type"
-	case RequestedRangeNotSatisfiable:
-		return "Requested Range Not Satisfiable"
-	case ExpectationFailed:
-		return "Expectation Failed"
-	case Teapot:
-		return "I'm a teapot"
-	case MisdirectedRequest:
-		return "Misdirected Request"
-	case UnprocessableEntity:
-		return "Unprocessable Entity"
-	case Locked:
-		return "Locked"
-	case FailedDependency:
-		return "Failed Dependency"
-	case TooEarly:
-		return "Too Early"
-	case UpgradeRequired:
-		return "Upgrade Required"
-	case PreconditionRequired:
-		return "Precondition Required"
-	case TooManyRequests:
-		return "Too Many Requests"
-	case HeaderFieldsTooLarge:
-		return "Request Header Fields Too Large"
-	case UnavailableForLegalReasons:
-		return "Unavailable For Legal Reasons"
-	case InternalServerError:
-		return "Internal Server Error"
-	case NotImplemented:
-		return "Not Implemented"
-	case BadGateway:
-		return "Bad Gateway"
-	case ServiceUnavailable:
-		return "Service Unavailable"
-	case GatewayTimeout:
-		return "Gateway Timeout"
-	case HTTPVersionNotSupported:
-		return "HTTP Version Not Supported"
-	case VariantAlsoNegotiates:
-		return "Variant Also Negotiates"
-	case InsufficientStorage:
-		return "Insufficient Storage"
-	case LoopDetected:
-		return "Loop Detected"
-	case NotExtended:
-		return "Not Extended"
-	case NetworkAuthenticationRequired:
-		return "Network Authentication Required"
-	default:
-		return "Unknown Status Code"
+var Statuses = [maxCodeValue]string{
+	Continue:                      "Continue",
+	SwitchingProtocols:            "Switching Protocols",
+	Processing:                    "Processing",
+	EarlyHints:                    "Early Hints",
+	OK:                            "OK",
+	Created:                       "Created",
+	Accepted:                      "Accepted",
+	NonAuthoritativeInfo:          "Non-Authoritative Information",
+	NoContent:                     "No Content",
+	ResetContent:                  "Reset Content",
+	PartialContent:                "Partial Content",
+	MultiStatus:                   "Multi-Status",
+	AlreadyReported:               "Already Reported",
+	IMUsed:                        "IM Used",
+	MultipleChoices:               "Multiple Choices",
+	MovedPermanently:              "Moved Permanently",
+	Found:                         "Found",
+	SeeOther:                      "See Other",
+	NotModified:                   "Not Modified",
+	UseProxy:                      "Use Proxy",
+	TemporaryRedirect:             "Temporary Redirect",
+	PermanentRedirect:             "Permanent Redirect",
+	BadRequest:                    "Bad Request",
+	Unauthorized:                  "Unauthorized",
+	PaymentRequired:               "Payment Required",
+	Forbidden:                     "Forbidden",
+	NotFound:                      "Not Found",
+	MethodNotAllowed:              "Method Not Allowed",
+	NotAcceptable:                 "Not Acceptable",
+	ProxyAuthRequired:             "Proxy Authentication Required",
+	RequestTimeout:                "Request Timeout",
+	Conflict:                      "Conflict",
+	Gone:                          "Gone",
+	LengthRequired:                "Length Required",
+	PreconditionFailed:            "Precondition Failed",
+	RequestEntityTooLarge:         "Request Entity Too Large",
+	RequestURITooLong:             "Request URI Too Long",
+	UnsupportedMediaType:          "Unsupported Media Type",
+	RequestedRangeNotSatisfiable:  "Requested Range Not Satisfiable",
+	ExpectationFailed:             "Expectation Failed",
+	Teapot:                        "I'm a teapot",
+	MisdirectedRequest:            "Misdirected Request",
+	UnprocessableEntity:           "Unprocessable Entity",
+	Locked:                        "Locked",
+	FailedDependency:              "Failed Dependency",
+	TooEarly:                      "Too Early",
+	UpgradeRequired:               "Upgrade Required",
+	PreconditionRequired:          "Precondition Required",
+	TooManyRequests:               "Too Many Requests",
+	HeaderFieldsTooLarge:          "Request Header Fields Too Large",
+	UnavailableForLegalReasons:    "Unavailable For Legal Reasons",
+	InternalServerError:           "Internal Server Error",
+	NotImplemented:                "Not Implemented",
+	BadGateway:                    "Bad Gateway",
+	ServiceUnavailable:            "Service Unavailable",
+	GatewayTimeout:                "Gateway Timeout",
+	HTTPVersionNotSupported:       "HTTP Version Not Supported",
+	VariantAlsoNegotiates:         "Variant Also Negotiates",
+	InsufficientStorage:           "Insufficient Storage",
+	LoopDetected:                  "Loop Detected",
+	NotExtended:                   "Not Extended",
+	NetworkAuthenticationRequired: "Network Authentication Required",
+}
+
+func FromCode(code Code) string {
+	const nonstandard = "Nonstandard"
+
+	if int(code) >= len(Statuses) {
+		return nonstandard
+	}
+
+	if status := Statuses[code]; len(status) > 0 {
+		return status
+	}
+
+	return nonstandard
+}
+
+var (
+	KnownCodes  []Code
+	stringCodes string
+)
+
+func StringCode(code Code) string {
+	if code >= maxCodeValue {
+		return ""
+	}
+
+	i := (code - 100) * 3
+	return stringCodes[i : i+3]
+}
+
+func initKnownCodes() {
+	// there are currently 62 of known status codes. Should be updated when
+	// new codes are added.
+	const knownCodes = 62
+	KnownCodes = make([]Code, 0, knownCodes)
+
+	for code, value := range Statuses {
+		if len(value) > 0 {
+			KnownCodes = append(KnownCodes, Code(code))
+		}
 	}
 }
 
-// Line returns the whole status line with code included. Be aware, that the returned string also
-// has CRLF in the end
-func Line(code Code) string {
-	switch code {
-	case Continue:
-		return "100 Continue\r\n"
-	case SwitchingProtocols:
-		return "101 Switching Protocol\r\n"
-	case Processing:
-		return "102 Processing\r\n"
-	case EarlyHints:
-		return "103 Early Hints\r\n"
-	case OK:
-		return "200 OK\r\n"
-	case Created:
-		return "201 Created\r\n"
-	case Accepted:
-		return "202 Accepted\r\n"
-	case NonAuthoritativeInfo:
-		return "203 Non-Authoritative Information\r\n"
-	case NoContent:
-		return "204 No Content\r\n"
-	case ResetContent:
-		return "205 Reset Content\r\n"
-	case PartialContent:
-		return "206 Partial Content\r\n"
-	case MultiStatus:
-		return "207 Multi-Status\r\n"
-	case AlreadyReported:
-		return "208 Already Reported\r\n"
-	case IMUsed:
-		return "226 IM Used\r\n"
-	case MultipleChoices:
-		return "300 Multiple Choices\r\n"
-	case MovedPermanently:
-		return "301 Moved Permanently\r\n"
-	case Found:
-		return "302 Found\r\n"
-	case SeeOther:
-		return "303 See Other\r\n"
-	case NotModified:
-		return "304 Not Modified\r\n"
-	case UseProxy:
-		return "305 Use Proxy\r\n"
-	case TemporaryRedirect:
-		return "307 Temporary Redirect\r\n"
-	case PermanentRedirect:
-		return "308 Permanent Redirect\r\n"
-	case BadRequest:
-		return "400 Bad Request\r\n"
-	case Unauthorized:
-		return "401 Unauthorized\r\n"
-	case PaymentRequired:
-		return "402 Payment Required\r\n"
-	case Forbidden:
-		return "403 Forbidden\r\n"
-	case NotFound:
-		return "404 Not Found\r\n"
-	case MethodNotAllowed:
-		return "405 Method Not Allowed\r\n"
-	case NotAcceptable:
-		return "406 Not Acceptable\r\n"
-	case ProxyAuthRequired:
-		return "407 Proxy Authentication Required\r\n"
-	case RequestTimeout:
-		return "408 Request Timeout\r\n"
-	case Conflict:
-		return "409 Conflict\r\n"
-	case Gone:
-		return "410 Gone\r\n"
-	case LengthRequired:
-		return "411 Length Required\r\n"
-	case PreconditionFailed:
-		return "412 Precondition Failed\r\n"
-	case RequestEntityTooLarge:
-		return "413 Request Entity Too Large\r\n"
-	case RequestURITooLong:
-		return "414 Request URI Too Long\r\n"
-	case UnsupportedMediaType:
-		return "415 Unsupported Media Type\r\n"
-	case RequestedRangeNotSatisfiable:
-		return "416 Requested Range Not Satisfiable\r\n"
-	case ExpectationFailed:
-		return "417 Expectation Failed\r\n"
-	case Teapot:
-		return "418 I'm a teapot\r\n"
-	case MisdirectedRequest:
-		return "421 Misdirected Request\r\n"
-	case UnprocessableEntity:
-		return "422 Unprocessable Entity\r\n"
-	case Locked:
-		return "423 Locked\r\n"
-	case FailedDependency:
-		return "424 Failed Dependency\r\n"
-	case TooEarly:
-		return "425 Too Early\r\n"
-	case UpgradeRequired:
-		return "426 Upgrade Required\r\n"
-	case PreconditionRequired:
-		return "428 Precondition Required\r\n"
-	case TooManyRequests:
-		return "429 Too Many Requests\r\n"
-	case HeaderFieldsTooLarge:
-		return "431 Request Header Fields Too Large\r\n"
-	case UnavailableForLegalReasons:
-		return "451 Unavailable For Legal Reasons\r\n"
-	case InternalServerError:
-		return "500 Internal Server Error\r\n"
-	case NotImplemented:
-		return "501 Not Implemented\r\n"
-	case BadGateway:
-		return "502 Bad Gateway\r\n"
-	case ServiceUnavailable:
-		return "503 Service Unavailable\r\n"
-	case GatewayTimeout:
-		return "504 Gateway Timeout\r\n"
-	case HTTPVersionNotSupported:
-		return "505 HTTP Version Not Supported\r\n"
-	case VariantAlsoNegotiates:
-		return "506 Variant Also Negotiates\r\n"
-	case InsufficientStorage:
-		return "507 Insufficient Storage\r\n"
-	case LoopDetected:
-		return "508 Loop Detected\r\n"
-	case NotExtended:
-		return "510 Not Extended\r\n"
-	case NetworkAuthenticationRequired:
-		return "511 Network Authentication Required\r\n"
-	default:
-		return ""
+func initStringCodes() {
+	// all stringified codes are stored sequentially in a long string one by one.
+	// According to benchmarks on my machine, it is significantly faster than using
+	// a map.
+
+	window := maxCodeValue - minCodeValue
+	container := make([]byte, 0, window*3)
+	for code := range window {
+		container = strconv.AppendUint(container, uint64(code+minCodeValue), 10)
 	}
+
+	stringCodes = uf.B2S(container)
+}
+
+func init() {
+	initKnownCodes()
+	initStringCodes()
 }

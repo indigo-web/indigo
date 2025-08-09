@@ -93,3 +93,45 @@ func (r Resource) Patch(handler Handler, mwares ...Middleware) Resource {
 	r.group.Patch("", handler, mwares...)
 	return r
 }
+
+// Mkcol registers a handler for MKCOL-requests
+func (r Resource) Mkcol(handler Handler, mwares ...Middleware) Resource {
+	r.group.Mkcol("", handler, mwares...)
+	return r
+}
+
+// Move registers a handler for MOVE-requests
+func (r Resource) Move(handler Handler, mwares ...Middleware) Resource {
+	r.group.Move("", handler, mwares...)
+	return r
+}
+
+// Copy registers a handler for COPY-requests
+func (r Resource) Copy(handler Handler, mwares ...Middleware) Resource {
+	r.group.Copy("", handler, mwares...)
+	return r
+}
+
+// Lock registers a handler for LOCK-requests
+func (r Resource) Lock(handler Handler, mwares ...Middleware) Resource {
+	r.group.Lock("", handler, mwares...)
+	return r
+}
+
+// Unlock registers a handler for UNLOCK-requests
+func (r Resource) Unlock(handler Handler, mwares ...Middleware) Resource {
+	r.group.Unlock("", handler, mwares...)
+	return r
+}
+
+// Propfind registers a handler for PROPFIND-requests
+func (r Resource) Propfind(handler Handler, mwares ...Middleware) Resource {
+	r.group.Propfind("", handler, mwares...)
+	return r
+}
+
+// Proppatch registers a handler for PROPPATCH-requests
+func (r Resource) Proppatch(handler Handler, mwares ...Middleware) Resource {
+	r.group.Proppatch("", handler, mwares...)
+	return r
+}

@@ -6,8 +6,8 @@ import (
 )
 
 type TLS struct {
-	cfg *tls.Config
 	TCP
+	cfg *tls.Config
 }
 
 func NewTLS(cfg *tls.Config) *TLS {

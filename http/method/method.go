@@ -14,17 +14,26 @@ const (
 	OPTIONS
 	TRACE
 	PATCH
+	MKCOL
+	MOVE
+	COPY
+	LOCK
+	UNLOCK
+	PROPFIND
+	PROPPATCH
 
 	// Count represents the maximal value an integer representation of a method can have.
 	Count = iota - 1
 )
 
 // List enlists all known request methods, excluding Unknown.
-var List = []Method{GET, HEAD, POST, PUT, DELETE, CONNECT, OPTIONS, TRACE, PATCH}
+var List = []Method{
+	GET, HEAD, POST, PUT, DELETE, CONNECT, OPTIONS, TRACE, PATCH, MKCOL, MOVE, COPY, LOCK, UNLOCK, PROPFIND, PROPPATCH,
+}
 
 func Parse(str string) Method {
-	// TODO: benchmark this against the dumb wall of if's. I doubt there's a difference, however
-	// TODO: there definitely is in readability and cognitive difficulty
+	// TODO: this doesn't seem to differ much from just an ordinary wall of if's in terms of performance,
+	// TODO: whose however would effectively reduce the visual complexity of this crap.
 	switch len(str) {
 	case 3:
 		if str == "GET" {
@@ -37,22 +46,40 @@ func Parse(str string) Method {
 			return POST
 		} else if str == "HEAD" {
 			return HEAD
+		} else if str == "MOVE" {
+			return MOVE
+		} else if str == "COPY" {
+			return COPY
+		} else if str == "LOCK" {
+			return LOCK
 		}
 	case 5:
 		if str == "PATCH" {
 			return PATCH
 		} else if str == "TRACE" {
 			return TRACE
+		} else if str == "MKCOL" {
+			return MKCOL
 		}
 	case 6:
 		if str == "DELETE" {
 			return DELETE
+		} else if str == "UNLOCK" {
+			return UNLOCK
 		}
 	case 7:
 		if str == "CONNECT" {
 			return CONNECT
 		} else if str == "OPTIONS" {
 			return OPTIONS
+		}
+	case 8:
+		if str == "PROPFIND" {
+			return PROPFIND
+		}
+	case 9:
+		if str == "PROPPATCH" {
+			return PROPPATCH
 		}
 	}
 

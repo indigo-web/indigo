@@ -2,14 +2,14 @@ package http
 
 import (
 	"context"
+	"net"
+
 	"github.com/indigo-web/indigo/config"
 	"github.com/indigo-web/indigo/http/cookie"
-	"github.com/indigo-web/indigo/http/encryption"
 	"github.com/indigo-web/indigo/http/method"
 	"github.com/indigo-web/indigo/http/proto"
 	"github.com/indigo-web/indigo/kv"
 	"github.com/indigo-web/indigo/transport"
-	"net"
 )
 
 var zeroContext = context.Background()
@@ -21,7 +21,7 @@ type (
 	Vars    = *kv.Storage
 )
 
-// Request represents HTTP request
+// Request is the HTTP request representation.
 type Request struct {
 	// Method is an enum representing the request method.
 	Method method.Method
@@ -62,7 +62,6 @@ func NewRequest(
 	headers, params, vars *kv.Storage,
 ) *Request {
 	return &Request{
-		Method:   method.Unknown,
 		Protocol: proto.HTTP11,
 		Params:   params,
 		Vars:     vars,
@@ -88,7 +87,7 @@ func (r *Request) Cookies() (cookie.Jar, error) {
 	// in RFC 6265, 5.4 cookies are explicitly prohibited from being split into
 	// list, yet in HTTP/2 it's allowed. I have concerns of some user-agents may
 	// despite sending them as a list, even via HTTP/1.1
-	for _, value := range r.Headers.Values("cookie") {
+	for value := range r.Headers.Values("cookie") {
 		if err := cookie.Parse(r.jar, value); err != nil {
 			return nil, err
 		}
@@ -123,7 +122,7 @@ func (r *Request) Hijacked() bool {
 	return r.hijacked
 }
 
-// Reset the request
+// Reset clears all the request fields to its zero values. This also includes resetting the context.
 func (r *Request) Reset() {
 	r.Params.Clear()
 	r.Vars.Clear()
@@ -139,9 +138,9 @@ type Environment struct {
 	// AllowedMethods is used to pass a string containing all the allowed methods for a
 	// specific endpoint. Has non-zero-value only when 405 Method Not Allowed raises
 	AllowedMethods string
-	// Encryption is a token that corresponds to the used encryption method. May be
-	// extended by custom values
-	Encryption encryption.Token
+	// Encryption represents the cryptographic protocol on top of the connection. They're
+	// comparable against the tls.Version... enums. Zero value means no encryption.
+	Encryption uint16
 	// AliasFrom contains the original request path, in case it was replaced via alias
 	// aka implicit redirect
 	AliasFrom string
@@ -150,28 +149,27 @@ type Environment struct {
 type commonHeaders struct {
 	// Encoding holds an information about encoding, that was used to make the request
 	Encoding Encodings
-	// ContentLength obtains the value from Content-Length header. It holds the value of 0
-	// if isn't presented.
-	//
-	// NOTE: you shouldn't rely on this value, as it may be anything (mostly 0) if any
-	// Transfer-Encoding were applied.
+	// ContentLength holds the Content-Length header value. It isn't recommended to rely solely on this
+	// value, as it can be whatever (but most likely zero) if Request.Encoding.Chunked is true.
 	ContentLength int
-	// ContentType obtains Content-Type header value
+	// ContentType holds the Content-Type header value.
 	ContentType string
 	// Connection holds the Connection header value. It isn't normalized, so can be anything
 	// and in any case. So in order to compare it, highly recommended to do it case-insensibly
 	Connection string
-	// Upgrade is the protocol token, which is set by default to proto.Unknown. In
-	// case it is anything else, then Upgrade header was received
+	// Upgrade holds the `Upgrade` header value. It's set to anything but proto.Unknown only when
+	// an upgrade request is received.
 	Upgrade proto.Protocol
 }
 
 type Encodings struct {
-	// Transfer contains all applied Transfer-Encoding codings in their original order, except
-	// the chunked. Chunked Transfer Encoding has its own boolean flag.
+	// Accept is the list of accepted by client tokens.
+	Accept []string
+	// Transfer is the list of tokens used for this request from `Transfer-Encoding` header value.
 	Transfer []string
-	// Content contains all applied Content-Encoding codings in their original order.
+	// Content is the list of tokens used for this request from `Content-Encoding` header value.
 	Content []string
-	// Chunked doesn't belong to any of encodings, as it is still must be processed individually
+	// Chunked describes whether the Transfer attribute is not empty and ends with the `chunked`
+	// encoding.
 	Chunked bool
 }

@@ -2,11 +2,12 @@ package formdata
 
 import (
 	"fmt"
+	"strings"
+	"testing"
+
 	"github.com/indigo-web/indigo/http/form"
 	"github.com/indigo-web/indigo/http/status"
 	"github.com/stretchr/testify/require"
-	"strings"
-	"testing"
 )
 
 func BenchmarkParse(b *testing.B) {
@@ -28,7 +29,7 @@ func benchmark(data []byte) func(b *testing.B) {
 		b.ResetTimer()
 
 		for i := 0; i < b.N; i++ {
-			_, _, _ = ParseURLEncoded(dst, data, buff)
+			_, _, _ = ParseFormURLEncoded(dst, data, buff)
 		}
 	}
 }
@@ -50,7 +51,7 @@ func generatePairs(n int) string {
 func TestParseURLEncoded(t *testing.T) {
 	t.Run("single pair", func(t *testing.T) {
 		sample := "hello=world"
-		result, _, err := ParseURLEncoded([]form.Data{}, []byte(sample), []byte{})
+		result, _, err := ParseFormURLEncoded([]form.Data{}, []byte(sample), []byte{})
 		require.NoError(t, err)
 		require.Equal(t, form.Form{
 			{Name: "hello", Value: "world"},
@@ -59,7 +60,7 @@ func TestParseURLEncoded(t *testing.T) {
 
 	t.Run("two pairs", func(t *testing.T) {
 		sample := "hello=world&lorem=ipsum"
-		result, _, err := ParseURLEncoded([]form.Data{}, []byte(sample), []byte{})
+		result, _, err := ParseFormURLEncoded([]form.Data{}, []byte(sample), []byte{})
 		require.NoError(t, err)
 		require.Equal(t, form.Form{
 			{Name: "hello", Value: "world"},
@@ -69,7 +70,7 @@ func TestParseURLEncoded(t *testing.T) {
 
 	t.Run("empty value before ampersand", func(t *testing.T) {
 		sample := "hello=&another=pair"
-		result, _, err := ParseURLEncoded([]form.Data{}, []byte(sample), []byte{})
+		result, _, err := ParseFormURLEncoded([]form.Data{}, []byte(sample), []byte{})
 		require.NoError(t, err)
 		require.Equal(t, form.Form{
 			{Name: "hello"},
@@ -79,7 +80,7 @@ func TestParseURLEncoded(t *testing.T) {
 
 	t.Run("single entry without value", func(t *testing.T) {
 		sample := "hello="
-		result, _, err := ParseURLEncoded([]form.Data{}, []byte(sample), []byte{})
+		result, _, err := ParseFormURLEncoded([]form.Data{}, []byte(sample), []byte{})
 		require.NoError(t, err)
 		require.Equal(t, form.Form{
 			{Name: "hello"},
@@ -88,13 +89,13 @@ func TestParseURLEncoded(t *testing.T) {
 
 	t.Run("empty key", func(t *testing.T) {
 		sample := "=world"
-		_, _, err := ParseURLEncoded([]form.Data{}, []byte(sample), []byte{})
+		_, _, err := ParseFormURLEncoded([]form.Data{}, []byte(sample), []byte{})
 		require.EqualError(t, err, status.ErrBadEncoding.Error())
 	})
 
 	t.Run("ampersand without continuation at the end", func(t *testing.T) {
 		sample := "hello=world&"
-		result, _, err := ParseURLEncoded([]form.Data{}, []byte(sample), []byte{})
+		result, _, err := ParseFormURLEncoded([]form.Data{}, []byte(sample), []byte{})
 		require.NoError(t, err)
 		require.Equal(t, form.Form{
 			{Name: "hello", Value: "world"},
@@ -103,7 +104,7 @@ func TestParseURLEncoded(t *testing.T) {
 
 	t.Run("flag", func(t *testing.T) {
 		{
-			result, _, err := ParseURLEncoded([]form.Data{}, []byte("lorem&hello=world&foo=bar"), []byte{})
+			result, _, err := ParseFormURLEncoded([]form.Data{}, []byte("lorem&hello=world&foo=bar"), []byte{})
 			require.NoError(t, err)
 			require.Equal(t, form.Form{
 				{Name: "lorem"},
@@ -113,7 +114,7 @@ func TestParseURLEncoded(t *testing.T) {
 		}
 
 		{
-			result, _, err := ParseURLEncoded([]form.Data{}, []byte("hello=world&lorem&foo=bar"), []byte{})
+			result, _, err := ParseFormURLEncoded([]form.Data{}, []byte("hello=world&lorem&foo=bar"), []byte{})
 			require.NoError(t, err)
 			require.Equal(t, form.Form{
 				{Name: "hello", Value: "world"},
@@ -123,7 +124,7 @@ func TestParseURLEncoded(t *testing.T) {
 		}
 
 		{
-			result, _, err := ParseURLEncoded([]form.Data{}, []byte("hello=world&foo=bar&lorem"), []byte{})
+			result, _, err := ParseFormURLEncoded([]form.Data{}, []byte("hello=world&foo=bar&lorem"), []byte{})
 			require.NoError(t, err)
 			require.Equal(t, form.Form{
 				{Name: "hello", Value: "world"},
@@ -135,14 +136,14 @@ func TestParseURLEncoded(t *testing.T) {
 
 	t.Run("single flag", func(t *testing.T) {
 		sample := "lorem"
-		result, _, err := ParseURLEncoded([]form.Data{}, []byte(sample), []byte{})
+		result, _, err := ParseFormURLEncoded([]form.Data{}, []byte(sample), []byte{})
 		require.NoError(t, err)
 		require.Equal(t, form.Form{{Name: "lorem"}}, result)
 	})
 
 	t.Run("encoded spaces", func(t *testing.T) {
 		sample := "hel+lo=wo+rld"
-		result, _, err := ParseURLEncoded([]form.Data{}, []byte(sample), []byte{})
+		result, _, err := ParseFormURLEncoded([]form.Data{}, []byte(sample), []byte{})
 		require.NoError(t, err)
 		require.Equal(t, form.Form{
 			{Name: "hel lo", Value: "wo rld"},
@@ -151,7 +152,7 @@ func TestParseURLEncoded(t *testing.T) {
 
 	t.Run("url encoded", func(t *testing.T) {
 		sample := "hel%20lo=wo%20rld%21"
-		result, _, err := ParseURLEncoded([]form.Data{}, []byte(sample), []byte{})
+		result, _, err := ParseFormURLEncoded([]form.Data{}, []byte(sample), []byte{})
 		require.NoError(t, err)
 		require.Equal(t, form.Form{
 			{Name: "hel lo", Value: "wo rld!"},
@@ -160,7 +161,7 @@ func TestParseURLEncoded(t *testing.T) {
 
 	t.Run("encoded plus char", func(t *testing.T) {
 		sample := "hel%2blo=wo%2brld"
-		result, _, err := ParseURLEncoded([]form.Data{}, []byte(sample), []byte{})
+		result, _, err := ParseFormURLEncoded([]form.Data{}, []byte(sample), []byte{})
 		require.NoError(t, err)
 		require.Equal(t, form.Form{
 			{Name: "hel+lo", Value: "wo+rld"},
@@ -173,14 +174,14 @@ func TestParseURLEncoded(t *testing.T) {
 			"he%5=ok",
 			"hello=%5",
 		} {
-			_, _, err := ParseURLEncoded([]form.Data{}, []byte(tc), []byte{})
+			_, _, err := ParseFormURLEncoded([]form.Data{}, []byte(tc), []byte{})
 			require.EqualError(t, err, status.ErrBadEncoding.Error(), tc)
 		}
 	})
 
 	t.Run("nonprintable in value", func(t *testing.T) {
 		sample := "hello=%07"
-		result, _, err := ParseURLEncoded([]form.Data{}, []byte(sample), []byte{})
+		result, _, err := ParseFormURLEncoded([]form.Data{}, []byte(sample), []byte{})
 		require.NoError(t, err)
 		require.Equal(t, form.Form{
 			{Name: "hello", Value: "\x07"},

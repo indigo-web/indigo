@@ -1,10 +1,11 @@
 package middleware
 
 import (
+	"log"
+
 	"github.com/indigo-web/indigo/http"
 	"github.com/indigo-web/indigo/http/status"
 	"github.com/indigo-web/indigo/router/inbuilt"
-	"log"
 )
 
 type Logger interface {
@@ -18,12 +19,12 @@ func LogRequests(loggers ...Logger) inbuilt.Middleware {
 
 	return func(next inbuilt.Handler, request *http.Request) *http.Response {
 		response := next(request)
-		if response.Reveal().Code == status.CloseConnection {
+		if response.Expose().Code == status.CloseConnection {
 			return response
 		}
 
 		for _, logger := range loggers {
-			logger.Printf("%s %s %d", request.Method.String(), request.Path, response.Reveal().Code)
+			logger.Printf("%s %s %d", request.Method.String(), request.Path, response.Expose().Code)
 		}
 
 		return response

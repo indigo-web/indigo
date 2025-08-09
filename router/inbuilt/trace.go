@@ -1,8 +1,9 @@
 package inbuilt
 
 import (
-	"github.com/indigo-web/indigo/http"
 	"strings"
+
+	"github.com/indigo-web/indigo/http"
 )
 
 /*
@@ -43,7 +44,7 @@ func requestURIParams(params http.Params, buff []byte) []byte {
 
 	buff = append(buff, '?')
 
-	for key, val := range params.Iter() {
+	for key, val := range params.Pairs() {
 		buff = append(buff, key...)
 		if len(val) > 0 {
 			buff = append(buff, '=')

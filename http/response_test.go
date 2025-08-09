@@ -1,10 +1,10 @@
 package http
 
 import (
-	"errors"
-	"github.com/indigo-web/indigo/http/status"
-	"github.com/stretchr/testify/require"
 	"testing"
+
+	"github.com/indigo-web/indigo/kv"
+	"github.com/stretchr/testify/require"
 )
 
 func TestResponse(t *testing.T) {
@@ -13,25 +13,8 @@ func TestResponse(t *testing.T) {
 		m := []int{1, 2, 3}
 		resp, err := response.TryJSON(m)
 		require.NoError(t, err)
-		require.Equal(t, "[1,2,3]", string(resp.Reveal().BufferedBody))
-		require.Equal(t, "application/json", resp.Reveal().ContentType)
-	})
-}
-
-func BenchmarkResponse_WithError(b *testing.B) {
-	resp := NewResponse()
-	knownErr := status.ErrBadRequest
-	unknownErr := errors.New("some crap happened, unable to recover")
-
-	b.Run("KnownError", func(b *testing.B) {
-		for i := 0; i < b.N; i++ {
-			resp.Error(knownErr)
-		}
-	})
-
-	b.Run("UnknownError", func(b *testing.B) {
-		for i := 0; i < b.N; i++ {
-			resp.Error(unknownErr)
-		}
+		require.Equal(t, "[1,2,3]", string(resp.fields.Buffer))
+		contentType := kv.NewFromPairs(resp.fields.Headers).Value("Content-Type")
+		require.Equal(t, "application/json", contentType)
 	})
 }

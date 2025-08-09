@@ -2,8 +2,9 @@ package cookie
 
 import (
 	"errors"
-	"github.com/indigo-web/indigo/kv"
 	"strings"
+
+	"github.com/indigo-web/indigo/kv"
 )
 
 // Jar is a key-value storage for cookies. Key-value pairs consists of strings,
