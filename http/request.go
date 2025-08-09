@@ -62,7 +62,6 @@ func NewRequest(
 	headers, params, vars *kv.Storage,
 ) *Request {
 	return &Request{
-		Method:   method.Unknown,
 		Protocol: proto.HTTP11,
 		Params:   params,
 		Vars:     vars,

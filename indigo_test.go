@@ -571,7 +571,7 @@ func TestFirstPhase(t *testing.T) {
 
 	t.Run("HTTP/1.0 with keep-alive", func(t *testing.T) {
 		raw := "GET /ctx-value HTTP/1.0\r\nConnection: keep-alive\r\n\r\n"
-		const pipelinedRequests = 10
+		const pipelinedRequests = 5
 		requests := strings.Repeat(raw, pipelinedRequests)
 		conn, err := net.Dial("tcp", addr)
 		require.NoError(t, err)

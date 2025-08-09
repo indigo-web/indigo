@@ -8,12 +8,15 @@ import (
 )
 
 type Cache struct {
+	accept    string
 	codecs    []codec.Codec
 	instances []codec.Instance
 }
 
 func NewCache(codecs []codec.Codec) Cache {
 	return Cache{
+		// TODO: we're still allocating a string on every connection. Which we actually can avoid.
+		accept:    acceptEncodings(codecs),
 		codecs:    codecs,
 		instances: make([]codec.Instance, len(codecs)),
 	}
@@ -45,14 +48,15 @@ func (c Cache) Get(token string) codec.Instance {
 }
 
 func (c Cache) AcceptEncodings() string {
-	// TODO: somehow cache the value so we don't have to build the string every time
-	// TODO: a new connection establishes?
+	return c.accept
+}
 
-	if len(c.codecs) == 0 {
+func acceptEncodings(codecs []codec.Codec) string {
+	if len(codecs) == 0 {
 		return "identity"
 	}
 
-	return strutil.Join(traverseTokens(c.codecs), ",")
+	return strutil.Join(traverseTokens(codecs), ", ")
 }
 
 func traverseTokens(codecs []codec.Codec) iter.Seq[string] {

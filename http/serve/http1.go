@@ -24,6 +24,6 @@ func HTTP1(
 	request := construct.Request(cfg, client)
 	request.Env.Encryption = enc
 	suit := http1.New(cfg, r, client, request, codecs)
-	request.Body = http.NewBody(cfg, suit)
+	request.Body = http.NewBody(suit)
 	suit.Serve()
 }

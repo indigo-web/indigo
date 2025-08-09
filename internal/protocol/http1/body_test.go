@@ -25,7 +25,7 @@ func getRequestWithBody(chunked bool, body ...[]byte) (*http.Request, *body) {
 	client := dummy.NewMockClient(body...)
 	req := construct.Request(cfg, client)
 	b := getBody(client)
-	req.Body = http.NewBody(cfg, b)
+	req.Body = http.NewBody(b)
 
 	var (
 		contentLength = 0
