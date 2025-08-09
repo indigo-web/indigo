@@ -40,8 +40,8 @@ type Parser struct {
 	urlEncodedChar      uint8
 	state               parserState
 	metTransferEncoding bool
-	headersNumber       int32
-	contentLength       int32
+	headersNumber       int
+	contentLength       int64
 	cfg                 *config.Config
 	request             *http.Request
 	requestLine         *buffer.Buffer
@@ -582,7 +582,7 @@ contentLength:
 			goto contentLengthEnd
 		}
 
-		p.contentLength = p.contentLength*10 + int32(char-'0')
+		p.contentLength = p.contentLength*10 + int64(char-'0')
 	}
 
 	p.state = eContentLength
