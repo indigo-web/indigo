@@ -70,12 +70,8 @@ chunkLength:
 			data = data[i+1:]
 			goto chunkLengthCR
 		case '\n':
-			data = data[i+1:]
-			if c.chunkLength == 0 {
-				goto trailer
-			}
-
-			goto chunkBody
+			data = data[i:]
+			goto chunkLengthCR
 		case ';':
 			data = data[i+1:]
 			goto chunkExt
