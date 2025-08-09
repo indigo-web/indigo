@@ -51,7 +51,7 @@ type Parser struct {
 	encodings           []string
 }
 
-func NewParser(cfg *config.Config, request *http.Request, requestLine, headers *buffer.Buffer) *Parser {
+func NewParser(cfg *config.Config, request *http.Request, statusBuff, headers *buffer.Buffer) *Parser {
 	return &Parser{
 		cfg:     cfg,
 		state:   eMethod,
@@ -59,7 +59,7 @@ func NewParser(cfg *config.Config, request *http.Request, requestLine, headers *
 		// TODO: pass these through arguments instead of allocating in-place
 		acceptEncodings: make([]string, 0, cfg.Headers.MaxAcceptEncodingTokens),
 		encodings:       make([]string, 0, cfg.Headers.MaxEncodingTokens),
-		requestLine:     requestLine,
+		requestLine:     statusBuff,
 		headers:         headers,
 	}
 }
@@ -164,13 +164,14 @@ path:
 					if !requestLine.AppendByte(c) {
 						return true, nil, status.ErrURITooLong
 					}
+
+					i += 2
+					checkpoint = i + 1
 				} else {
 					// slow path
+					data = data[i+1:]
 					goto pathDecode1Char
 				}
-
-				i += 2
-				checkpoint = i + 1
 			case ' ':
 				if !requestLine.Append(data[checkpoint:i]) {
 					return true, nil, status.ErrURITooLong
@@ -216,7 +217,8 @@ pathDecode1Char:
 		return false, nil, nil
 	}
 
-	p.urlEncodedChar, data = data[0], data[1:]
+	p.urlEncodedChar = data[0]
+	data = data[1:]
 	// fallthrough to pathDecode2Char
 
 pathDecode2Char:
@@ -272,6 +274,8 @@ paramsKey:
 			request.Params.Add(uf.B2S(requestLine.Finish()), "")
 			data = data[i+1:]
 			goto protocol
+		case '#':
+			return true, nil, status.ErrBadRequest
 		default:
 			if isProhibitedChar(char) {
 				return true, nil, status.ErrBadParams
@@ -282,6 +286,9 @@ paramsKey:
 			}
 		}
 	}
+
+	p.state = eParamsKey
+	return false, nil, nil
 
 paramsKeyDecode1Char:
 	if len(data) == 0 {
@@ -309,6 +316,7 @@ paramsKeyDecode2Char:
 			return true, nil, status.ErrTooLongRequestLine
 		}
 
+		data = data[1:]
 		goto paramsKey
 	}
 
@@ -399,6 +407,7 @@ paramsValueDecode2Char:
 			return true, nil, status.ErrTooLongRequestLine
 		}
 
+		data = data[1:]
 		goto paramsValue
 	}
 
