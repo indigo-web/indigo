@@ -75,6 +75,11 @@ func (b *Buffer) Finish() []byte {
 	return segment
 }
 
+// Len returns the number of total bytes stored.
+func (b *Buffer) Len() int {
+	return len(b.memory)
+}
+
 // Clear just resets the pointers, so old values may be overridden by new ones.
 func (b *Buffer) Clear() {
 	b.begin = 0
