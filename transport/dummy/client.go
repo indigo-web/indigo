@@ -9,22 +9,21 @@ import (
 
 var _ transport.Client = new(Client)
 
-// Client is a full-blown client implementation intended for mocking things. It
+// Client is a full-blown client implementation intended for mock tests, thereby providing relatively
+// reach functionality.
 type Client struct {
-	closed     bool
-	loopReads  bool
-	journaling bool
-	pointer    int
-	conn       *Conn
-	pending    []byte
-	written    []byte
-	data       [][]byte
+	closed    bool
+	loopReads bool
+	pointer   int
+	conn      *Conn
+	pending   []byte
+	data      [][]byte
 }
 
 func NewMockClient(data ...[]byte) *Client {
 	return &Client{
 		data: data,
-		conn: new(Conn),
+		conn: new(Conn).Nop(),
 	}
 }
 
@@ -59,19 +58,15 @@ func (c *Client) Pushback(takeback []byte) {
 }
 
 func (c *Client) Write(p []byte) (int, error) {
-	if c.journaling {
-		c.written = append(c.written, p...)
-	}
-
-	return len(p), nil
+	return c.conn.Write(p)
 }
 
 func (c *Client) Written() []byte {
-	if !c.journaling {
+	if c.conn.nop {
 		panic("mock client: cannot access written data: journaling is disabled!")
 	}
 
-	return c.written
+	return c.conn.Data
 }
 
 func (c *Client) Conn() net.Conn {
@@ -92,7 +87,7 @@ func (c *Client) Closed() bool {
 }
 
 func (c *Client) Journaling() *Client {
-	c.journaling = true
+	c.conn.nop = false
 	return c
 }
 
@@ -104,7 +99,7 @@ func (c *Client) LoopReads() *Client {
 }
 
 func (c *Client) Reset() {
-	c.written = c.written[:0]
+	c.conn.Data = c.conn.Data[:0]
 }
 
 var _ transport.Client = NopClient{}
