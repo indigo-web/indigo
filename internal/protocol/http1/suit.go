@@ -29,11 +29,11 @@ func newSuit(
 	client transport.Client,
 	body *body,
 	codecs codecutil.Cache,
-	headersBuff, statusBuff *buffer.Buffer,
+	statusBuff, headersBuff *buffer.Buffer,
 	respBuff []byte,
 ) *Suit {
 	return &Suit{
-		Parser:     NewParser(cfg, request, headersBuff, statusBuff),
+		Parser:     NewParser(cfg, request, statusBuff, headersBuff),
 		body:       body,
 		serializer: newSerializer(cfg, request, client, codecs, respBuff),
 		router:     r,
@@ -50,11 +50,11 @@ func New(
 	request *http.Request,
 	codecs codecutil.Cache,
 ) *Suit {
-	headersBuff, statusBuff := construct.Buffers(cfg)
+	statusBuff, headersBuff := construct.Buffers(cfg)
 	respBuff := make([]byte, 0, cfg.NET.WriteBufferSize.Default)
 	b := newBody(client, cfg.Body)
 
-	return newSuit(cfg, r, request, client, b, codecs, headersBuff, statusBuff, respBuff)
+	return newSuit(cfg, r, request, client, b, codecs, statusBuff, headersBuff, respBuff)
 }
 
 func (s *Suit) ServeOnce() (ok bool) {
@@ -77,7 +77,7 @@ func (s *Suit) serve(once bool) (ok bool) {
 			s.router.OnError(request, status.ErrCloseConnection)
 			return false
 		}
-		
+
 		done, extra, err := s.Parse(data)
 		if err != nil {
 			resp := respond(request, s.router.OnError(request, err))

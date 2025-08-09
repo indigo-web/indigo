@@ -25,7 +25,7 @@ func Client(cfg config.NET, conn net.Conn) transport.Client {
 	return transport.NewClient(conn, cfg.ReadTimeout, readBuff)
 }
 
-func Buffers(s *config.Config) (headersBuff, statusBuff *buffer.Buffer) {
-	return buffer.New(s.Headers.Space.Default, s.Headers.Space.Maximal),
-		buffer.New(s.URI.RequestLineSize.Default, s.URI.RequestLineSize.Maximal)
+func Buffers(s *config.Config) (statusBuff, headersBuff *buffer.Buffer) {
+	return buffer.New(s.URI.RequestLineSize.Default, s.URI.RequestLineSize.Maximal),
+		buffer.New(s.Headers.Space.Default, s.Headers.Space.Maximal)
 }
