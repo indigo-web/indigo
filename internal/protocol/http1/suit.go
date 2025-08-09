@@ -1,8 +1,6 @@
 package http1
 
 import (
-	"maps"
-
 	"github.com/indigo-web/indigo/config"
 	"github.com/indigo-web/indigo/http"
 	"github.com/indigo-web/indigo/http/proto"
@@ -34,13 +32,10 @@ func newSuit(
 	headersBuff, statusBuff *buffer.Buffer,
 	respBuff []byte,
 ) *Suit {
-	defHeaders := maps.Clone(cfg.Headers.Default)
-	defHeaders["Accept-Encoding"] = codecs.AcceptEncodings()
-
 	return &Suit{
 		Parser:     NewParser(cfg, request, headersBuff, statusBuff),
 		body:       body,
-		serializer: newSerializer(cfg, request, client, codecs, respBuff, defHeaders),
+		serializer: newSerializer(cfg, request, client, codecs, respBuff),
 		router:     r,
 		client:     client,
 		codecs:     codecs,
@@ -82,7 +77,7 @@ func (s *Suit) serve(once bool) (ok bool) {
 			s.router.OnError(request, status.ErrCloseConnection)
 			return false
 		}
-
+		
 		done, extra, err := s.Parse(data)
 		if err != nil {
 			resp := respond(request, s.router.OnError(request, err))
