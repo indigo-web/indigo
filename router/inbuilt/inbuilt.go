@@ -252,10 +252,16 @@ func (r *runtimeRouter) OnError(request *http.Request, err error) *http.Response
 }
 
 func (r *runtimeRouter) onError(request *http.Request, err error) *http.Response {
-	if request.Method == method.TRACE && err == status.ErrMethodNotAllowed {
-		r.traceBuff = renderHTTPRequest(request, r.traceBuff)
+	switch {
+	case isServerWideOptions(request):
+		return request.Respond().Header("Allow", r.serverOptions)
+	case request.Method == method.TRACE:
+		if !r.enableTRACE {
+			err = status.ErrMethodNotAllowed
+			break
+		}
 
-		return traceResponse(request.Respond(), r.traceBuff)
+		return traceHandler(request)
 	}
 
 	httpErr, ok := err.(status.HTTPError)

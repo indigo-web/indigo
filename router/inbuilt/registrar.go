@@ -10,9 +10,8 @@ import (
 )
 
 type registrar struct {
-	endpoints   map[string]map[method.Method]Handler
-	usedMethods [method.Count]bool
-	isDynamic   bool
+	endpoints map[string]map[method.Method]Handler
+	isDynamic bool
 }
 
 func newRegistrar() *registrar {
@@ -115,4 +114,49 @@ func (r *registrar) AsRadixTree() radixTree {
 	}
 
 	return tree
+}
+
+func (r *registrar) Options(includeTRACE bool) string {
+	var (
+		totalEndpoints   int
+		methodsStatistic [method.Count + 1]int
+	)
+
+	for _, ep := range r.endpoints {
+		totalEndpoints++
+
+		for m := range ep {
+			methodsStatistic[m]++
+		}
+	}
+
+	if totalEndpoints == 0 {
+		// a server with no endpoints at all. Must be rare enough, I guess.
+		return ""
+	}
+
+	// As OPTIONS is supported, it must appear unconditionally
+	methodsStatistic[method.OPTIONS] = totalEndpoints
+
+	if includeTRACE {
+		methodsStatistic[method.TRACE] = totalEndpoints
+	}
+
+	if methodsStatistic[method.GET] == totalEndpoints {
+		// HEAD requests must also be unconditionally enabled, if GET
+		// are also supported, as HEAD are automatically redirected to
+		// GET handlers if weren't explicitly redefined.
+		methodsStatistic[method.HEAD] = totalEndpoints
+	}
+
+	options := make([]string, 0, method.Count)
+
+	for m, usage := range methodsStatistic {
+		if usage == totalEndpoints {
+			// EACH endpoint supports this method
+			options = append(options, method.Method(m).String())
+		}
+	}
+
+	return strings.Join(options, ", ")
 }
