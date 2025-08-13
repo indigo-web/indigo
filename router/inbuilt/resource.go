@@ -13,13 +13,6 @@ type Resource struct {
 	group *Router
 }
 
-// Resource returns a new Resource object for a provided resource path
-func (r *Router) Resource(path string) Resource {
-	return Resource{
-		group: r.Group(path),
-	}
-}
-
 // Use applies middlewares to the resource, wrapping all the already registered
 // and registered in future handlers
 func (r Resource) Use(middlewares ...Middleware) Resource {
