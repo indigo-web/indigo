@@ -33,13 +33,26 @@ func (r routesMap) Add(path string, m method.Method, handler Handler) {
 }
 
 func getAllowString(methods methodLUT) (allowed string) {
+	// FIXME: this must also include TRACE if it's enabled
+	// By now it's disabled by default and I highly doubt anyone would intentionally turn
+	// it on. Therefore, the fix can temporarily wait.
+
+	definedMethods := make([]string, 0, method.Count)
+
 	for i, handler := range methods {
 		if handler == nil {
 			continue
 		}
 
-		allowed += method.Method(i).String() + ","
+		definedMethods = append(definedMethods, method.Method(i).String())
+		if method.Method(i) == method.GET && methods[method.HEAD] == nil {
+			// append HEAD automatically even if they aren't explicitly supported.
+			// Actually, we could do this after the loop, but then we'd have the HEAD
+			// in the end, probably away from the GET, which looks suboptimal.
+			// Aesthetics is always important.
+			definedMethods = append(definedMethods, method.HEAD.String())
+		}
 	}
 
-	return strings.TrimRight(allowed, ",")
+	return strings.Join(definedMethods, ", ")
 }
