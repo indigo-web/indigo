@@ -463,7 +463,7 @@ func TestSerializer(t *testing.T) {
 		t.Run("unsized", func(t *testing.T) {
 			w.Reset()
 			request.Method = method.GET
-			resp := http.NewResponse().Stream(strings.NewReader(helloworld))
+			resp := http.NewResponse().Stream(strings.NewReader(helloworld), -1)
 			require.NoError(t, s.Write(proto.HTTP11, resp))
 			testUnsized(t, "GET", helloworld)
 		})
@@ -479,7 +479,7 @@ func TestSerializer(t *testing.T) {
 		t.Run("HEAD unsized", func(t *testing.T) {
 			w.Reset()
 			request.Method = method.HEAD
-			resp := http.NewResponse().Stream(strings.NewReader(helloworld))
+			resp := http.NewResponse().Stream(strings.NewReader(helloworld), -1)
 			require.NoError(t, s.Write(proto.HTTP11, resp))
 			testUnsized(t, "HEAD", "")
 		})
@@ -489,7 +489,7 @@ func TestSerializer(t *testing.T) {
 		t.Run("HEAD WriterTo", func(t *testing.T) {
 			w.Reset()
 			request.Method = method.HEAD
-			resp := http.NewResponse().SizedStream(strings.NewReader(helloworld), int64(len(helloworld)))
+			resp := http.NewResponse().Stream(strings.NewReader(helloworld))
 			require.NoError(t, s.Write(proto.HTTP11, resp))
 
 			testSized(t, "HEAD", len(helloworld), "")
@@ -509,13 +509,13 @@ func TestSerializer(t *testing.T) {
 		})
 
 		t.Run("unsized GZIP", func(t *testing.T) {
-			testGZIP(t, http.NewResponse().Stream(strings.NewReader(helloworld)))
+			testGZIP(t, http.NewResponse().Stream(strings.NewReader(helloworld), -1))
 		})
 
 		t.Run("sized WriterTo", func(t *testing.T) {
 			w.Reset()
 			request.Method = method.GET
-			resp := http.NewResponse().SizedStream(strings.NewReader(helloworld), int64(len(helloworld)))
+			resp := http.NewResponse().Stream(strings.NewReader(helloworld))
 			require.NoError(t, s.Write(proto.HTTP11, resp))
 
 			testSized(t, "GET", len(helloworld), helloworld)

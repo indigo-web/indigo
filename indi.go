@@ -11,7 +11,7 @@ import (
 	"github.com/indigo-web/indigo/transport"
 )
 
-const Version = "0.17.2"
+const Version = "0.17.3"
 
 // App is just a struct with addr and shutdown channel that is currently
 // not used. Planning to replace it with context.WithCancel()

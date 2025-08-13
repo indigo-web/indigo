@@ -45,7 +45,7 @@ func (r *Router) Static(prefix, root string, mwares ...Middleware) *Router {
 		}
 
 		return http.
-			SizedStream(request, file, fstat.Size()).
+			Stream(request, file, fstat.Size()).
 			ContentType(mime.Guess(path))
 	}, mwares...)
 }

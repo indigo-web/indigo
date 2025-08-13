@@ -112,7 +112,7 @@ func (r *Response) String(body string) *Response {
 
 // Bytes sets the response body without copying it.
 func (r *Response) Bytes(body []byte) *Response {
-	return r.SizedStream(r.body.Reset(body), int64(len(body)))
+	return r.Stream(r.body.Reset(body), int64(len(body)))
 }
 
 // Write implements io.Reader interface. It always returns n=len(b) and err=nil
@@ -141,7 +141,7 @@ func (r *Response) TryFile(path string) (*Response, error) {
 
 	return r.
 		ContentType(mime.Guess(path, mime.HTML)).
-		SizedStream(fd, stat.Size()), nil
+		Stream(fd, stat.Size()), nil
 }
 
 // File opens a file for reading and returns a new Response with attachment, set to the file
@@ -155,21 +155,23 @@ func (r *Response) File(path string) *Response {
 	return resp
 }
 
-// Stream sets a reader to be the source of the response's body.
-func (r *Response) Stream(reader io.Reader) *Response {
-	// TODO: we can check whether the reader implements Len() int interface and in that
-	// TODO: case elide the chunked transfer encoding
-	r.fields.Stream = reader
-	r.fields.StreamSize = -1
-	return r
-}
+// Stream sets a reader to be the source of the response's body. If no size is provided AND the reader
+// doesn't have the Len() int method, the stream is considered unsized and therefore will be streamed
+// using chunked transfer encoding. Otherwise, plain transfer is used, unless a compression is applied.
+// Specifying the size of -1 forces the stream to be considered unsized.
+func (r *Response) Stream(reader io.Reader, size ...int64) *Response {
+	type Len interface {
+		Len() int
+	}
 
-// SizedStream receives a hint of the stream's future size. This helps, for example, uploading files,
-// as in this case we can rely on io.WriterTo interface, which might use more effective kernel mechanisms
-// available, e.g. sendfile(2) for Linux. Passing the size of -1 is effectively equivalent to just Stream().
-func (r *Response) SizedStream(reader io.Reader, size int64) *Response {
+	r.fields.StreamSize = -1
+	if len(size) > 0 {
+		r.fields.StreamSize = size[0]
+	} else if l, ok := reader.(Len); ok {
+		r.fields.StreamSize = int64(l.Len())
+	}
+
 	r.fields.Stream = reader
-	r.fields.StreamSize = size
 	return r
 }
 
@@ -246,6 +248,12 @@ func Code(request *Request, code status.Code) *Response {
 	return request.Respond().Code(code)
 }
 
+// ContentType is a shorthand for request.Respond().Header("Content-Type", value) with an option of setting
+// a charset. If more than 1 is set, only the first one is used.
+func ContentType(request *Request, contentType mime.MIME, charset ...mime.Charset) *Response {
+	return request.Respond().ContentType(contentType, charset...)
+}
+
 // String is a shorthand for request.Respond().String(...)
 func String(request *Request, str string) *Response {
 	return request.Respond().String(str)
@@ -262,13 +270,8 @@ func File(request *Request, path string) *Response {
 }
 
 // Stream is a shorthand for request.Respond().Stream(...)
-func Stream(request *Request, reader io.Reader) *Response {
-	return request.Respond().Stream(reader)
-}
-
-// SizedStream is a shorthand for request.Respond().SizedStream(...)
-func SizedStream(request *Request, reader io.Reader, size int64) *Response {
-	return request.Respond().SizedStream(reader, size)
+func Stream(request *Request, reader io.Reader, size ...int64) *Response {
+	return request.Respond().Stream(reader, size...)
 }
 
 // JSON is a shorthand for request.Respond().JSON(...)
