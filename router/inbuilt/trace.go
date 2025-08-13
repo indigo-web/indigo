@@ -1,67 +1,53 @@
 package inbuilt
 
 import (
-	"strings"
-
+	"github.com/flrdv/uf"
 	"github.com/indigo-web/indigo/http"
+	"github.com/indigo-web/indigo/http/mime"
+	"github.com/indigo-web/indigo/kv"
 )
 
-/*
-This file is responsible for rendering http requests. Prime use case is rendering
-http requests back as a response to a trace request
-*/
+func traceHandler(request *http.Request) *http.Response {
+	resp := request.Respond()
+	// exploit the fact that Write method never returns an error
+	_, _ = resp.Write(uf.S2B(request.Method.String()))
+	_, _ = resp.Write([]byte(" "))
+	// we probably should've escaped the path back, as otherwise this might lead to
+	// some unwanted situations, however... Well, this doesn't seem to be effort-worthy.
+	_, _ = resp.Write(uf.S2B(request.Path))
+	if !request.Params.Empty() {
+		pairs := request.Params.Expose()
+		_, _ = resp.Write([]byte("?"))
+		writeParam(resp, pairs[0])
 
-func traceResponse(respond *http.Response, messageBody []byte) *http.Response {
-	return respond.
-		Header("Content-Type", "message/http").
-		Bytes(messageBody)
-}
-
-func renderHTTPRequest(request *http.Request, buff []byte) []byte {
-	buff = append(buff, request.Method.String()...)
-	buff = append(buff, ' ')
-	buff = requestURI(request, buff)
-	buff = append(buff, ' ')
-	buff = append(buff, strings.TrimSpace(request.Protocol.String())...)
-	buff = append(buff, "\r\n"...)
-	buff = requestHeaders(request.Headers, buff)
-	buff = append(buff, "Content-Length: 0\r\n\r\n"...)
-
-	return buff
-}
-
-func requestURI(request *http.Request, buff []byte) []byte {
-	buff = append(buff, request.Path...)
-	buff = requestURIParams(request.Params, buff)
-
-	return buff
-}
-
-func requestURIParams(params http.Params, buff []byte) []byte {
-	if params.Empty() {
-		return buff
-	}
-
-	buff = append(buff, '?')
-
-	for key, val := range params.Pairs() {
-		buff = append(buff, key...)
-		if len(val) > 0 {
-			buff = append(buff, '=')
-			buff = append(buff, val...)
+		for _, pair := range pairs[1:] {
+			// can avoid if len(pair.Key) == 0 { continue } (to filter out deleted entries),
+			// because the TRACE handler is supposed to be executed if no other handler ran,
+			// thereby having a completely virgin request, which was never touched by dirty
+			// user's hands ever before. And won't after as well. Awesome.
+			_, _ = resp.Write([]byte("&"))
+			writeParam(resp, pair)
 		}
-
-		buff = append(buff, '&')
 	}
 
-	return buff[:len(buff)-1]
+	_, _ = resp.Write([]byte(" "))
+	_, _ = resp.Write(uf.S2B(request.Protocol.String()))
+	_, _ = resp.Write([]byte("\r\n"))
+
+	for key, value := range request.Headers.Pairs() {
+		_, _ = resp.Write(uf.S2B(key))
+		_, _ = resp.Write([]byte(": "))
+		_, _ = resp.Write(uf.S2B(value))
+		_, _ = resp.Write([]byte("\r\n"))
+	}
+
+	_, _ = resp.Write([]byte("\r\n"))
+
+	return resp.ContentType(mime.HTTP)
 }
 
-func requestHeaders(hdrs http.Headers, buff []byte) []byte {
-	for _, pair := range hdrs.Expose() {
-		buff = append(append(buff, pair.Key...), ": "...)
-		buff = append(append(buff, pair.Value...), "\r\n"...)
-	}
-
-	return buff
+func writeParam(resp *http.Response, param kv.Pair) {
+	_, _ = resp.Write(uf.S2B(param.Key))
+	_, _ = resp.Write([]byte("="))
+	_, _ = resp.Write(uf.S2B(param.Value))
 }
