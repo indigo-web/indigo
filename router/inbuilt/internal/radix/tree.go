@@ -1,7 +1,9 @@
 package radix
 
 import (
+	"cmp"
 	"errors"
+	"slices"
 	"strings"
 
 	"github.com/indigo-web/indigo/kv"
@@ -41,12 +43,11 @@ func (n *Node[T]) Lookup(key string, wildcards *kv.Storage) (value T, found bool
 
 loop:
 	for len(key) > 0 {
-		for _, p := range node.predecessors {
-			if strings.HasPrefix(key, p.value) {
-				key = key[len(p.value):]
-				node = p
-				continue loop
-			}
+		p, found := node.findPredecessor(key)
+		if found {
+			key = key[len(p.value):]
+			node = p
+			continue loop
 		}
 
 		if node.dyn == nil {
@@ -92,6 +93,34 @@ loop:
 	}
 
 	return node.payload, node.isLeaf
+}
+
+func (n *Node[T]) findPredecessor(key string) (*Node[T], bool) {
+	// Proudly stolen from sort package.
+	// Inlining is faster than calling BinarySearchFunc with a lambda.
+	u := len(n.predecessors)
+	// Define x[-1] < target and x[n] >= target.
+	// Invariant: x[i-1] < target, x[j] >= target.
+	i, j := 0, u
+	for i < j {
+		h := int(uint(i+j) >> 1) // avoid overflow when computing h
+		// i ≤ h < j
+		pred := n.predecessors[h]
+		keyprefix := min(len(key), len(pred.value))
+		if cmp.Less(pred.value, key[:keyprefix]) {
+			i = h + 1 // preserves x[i-1] < target
+		} else {
+			j = h // preserves x[j] >= target
+		}
+	}
+
+	if i >= u {
+		return nil, false
+	}
+
+	pred := n.predecessors[i]
+	// i == j, x[i-1] < target, and x[j] (= x[i]) >= target  =>  answer is i.
+	return pred, i < u && strings.HasPrefix(key, pred.value)
 }
 
 func addWildcard(wildcard, value string, into *kv.Storage) {
@@ -164,9 +193,20 @@ func (n *Node[T]) insert(segs []pathSegment, value T) error {
 	}
 
 	newNode := &Node[T]{value: seg.Value}
-	n.predecessors = append(n.predecessors, newNode)
+	n.appendPredecessor(newNode)
 
 	return newNode.insert(segs[1:], value)
+}
+
+func (n *Node[T]) appendPredecessor(node *Node[T]) {
+	for i, pred := range n.predecessors {
+		if node.value < pred.value {
+			n.predecessors = slices.Insert(n.predecessors, i, node)
+			return
+		}
+	}
+
+	n.predecessors = append(n.predecessors, node)
 }
 
 func IsDynamicTemplate(str string) bool {

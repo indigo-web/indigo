@@ -2,6 +2,8 @@ package radix
 
 import (
 	"fmt"
+	"iter"
+	"slices"
 	"strconv"
 	"strings"
 	"testing"
@@ -10,25 +12,105 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func BenchmarkTreeMatch(b *testing.B) {
-	tree := New[int]()
-	tree.Insert("/hello/world", 1)
-	tree.Insert("/hello/whopper", 2)
-	tree.Insert("/henry/world", 3)
-	tree.Insert("/hello/world/somewhere", 4)
-	b.SetBytes(int64(len("/hello/world/somewhere")))
-	b.ResetTimer()
+func nextstr(str []byte) {
+	for i := len(str); i > 0; i-- {
+		str[i-1]++
+		if str[i-1] <= 'Z' {
+			return
+		}
 
-	for range b.N {
-		_, _ = tree.Lookup("/hello/world/somewhere", nil)
+		str[i-1] = 'A'
 	}
-	//
-	//b.Run("10 static", func(b *testing.B) {
-	//	paths := make([]string, 0, 10)
-	//	for i := range 10 {
-	//
-	//	}
-	//})
+}
+
+func produceSegments(n, seglen int) []string {
+	segments := make([]string, n)
+	str := []byte(strings.Repeat("A", seglen))
+
+	for i := range n {
+		segments[i] = string(str)
+		nextstr(str)
+	}
+
+	return segments
+}
+
+func produceStrings(width, depth, strlen int) (iter.Seq[string], string) {
+	allSegs := produceSegments(width, strlen)
+	segments, carry := allSegs[:width-1], allSegs[width-1]
+
+	return func(yield func(string) bool) {
+		var base string
+
+		for i := 0; i < depth; i++ {
+			for _, segment := range segments {
+				if !yield(base + segment) {
+					break
+				}
+			}
+
+			base += carry
+		}
+
+		yield(base)
+	}, strings.Repeat(carry, depth)
+}
+
+func TestBench(t *testing.T) {
+	it, lastKey := produceStrings(3, 3, 2)
+	require.Equal(t, "ACACAC", lastKey)
+	require.Equal(t,
+		[]string{"AA", "AB", "ACAA", "ACAB", "ACACAA", "ACACAB", "ACACAC"},
+		slices.Collect(it),
+	)
+}
+
+func BenchmarkTree(b *testing.B) {
+	noError := func(err error) {
+		if err != nil {
+			panic(err.Error())
+		}
+	}
+
+	runBench := func(width, depth int) func(b *testing.B) {
+		return func(b *testing.B) {
+			const seglen = 8
+			tree := New[int]()
+			it, key := produceStrings(width, depth, seglen)
+			for str := range it {
+				noError(tree.Insert(str, 1))
+			}
+
+			b.ResetTimer()
+
+			for range b.N {
+				_, _ = tree.Lookup(key, nil)
+			}
+		}
+	}
+
+	b.Run("deep", func(b *testing.B) {
+		b.Run("1x128", runBench(1, 128))
+		b.Run("8x8", runBench(8, 8))
+		b.Run("8x64", runBench(8, 64))
+		b.Run("8x128", runBench(8, 128))
+		b.Run("8x256", runBench(68, 128))
+	})
+
+	b.Run("wide", func(b *testing.B) {
+		b.Run("128x1", runBench(128, 1))
+		b.Run("32x8", runBench(32, 8))
+		b.Run("64x8", runBench(64, 8))
+		b.Run("128x8", runBench(128, 8))
+		b.Run("256x8", runBench(256, 8))
+	})
+
+	b.Run("quadratic", func(b *testing.B) {
+		b.Run("16x16", runBench(16, 16))
+		b.Run("32x32", runBench(32, 32))
+		b.Run("64x64", runBench(64, 64))
+		b.Run("128x128", runBench(128, 64))
+	})
 }
 
 func TestTree(t *testing.T) {
@@ -148,6 +230,7 @@ func test(t *testing.T, tree *Node[int], path string, value int, wKey, wVal stri
 	require.Equal(t, wVal, w.Value(wKey))
 }
 
+// isn't used anymore. Left just in case the tree needs to be debugged.
 func printTree(node *Node[int], depth int) {
 	for _, p := range node.predecessors {
 		fmt.Print(strings.Repeat("-", depth))
