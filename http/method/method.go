@@ -32,8 +32,6 @@ var List = []Method{
 }
 
 func Parse(str string) Method {
-	// TODO: this doesn't seem to differ much from just an ordinary wall of if's in terms of performance,
-	// TODO: whose however would effectively reduce the visual complexity of this crap.
 	switch len(str) {
 	case 3:
 		if str == "GET" {
