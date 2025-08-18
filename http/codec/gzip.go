@@ -8,7 +8,7 @@ import (
 )
 
 // TODO: pass this via parameters?
-const decompressorBufferSize = 4096
+const gzipBufferSize = 4096
 
 var _ Codec = new(GZIP)
 
@@ -23,7 +23,7 @@ func (GZIP) Token() string {
 }
 
 func (g GZIP) New() Instance {
-	return newGZIPCodec(make([]byte, decompressorBufferSize))
+	return newGZIPCodec(make([]byte, gzipBufferSize))
 }
 
 var _ Instance = new(gzipCodec)

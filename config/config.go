@@ -73,6 +73,7 @@ type (
 		// In order to disable the setting, use the math.MaxUInt64 value.
 		MaxSize uint64
 		//// DecodingBufferSize is a size of a buffer, used to store decoded request's body
+		// TODO: use this option for codecs.
 		//DecodingBufferSize int
 		Form BodyForm
 	}

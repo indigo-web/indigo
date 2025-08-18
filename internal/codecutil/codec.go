@@ -47,7 +47,7 @@ func (c Cache) Get(token string) codec.Instance {
 	return inst
 }
 
-func (c Cache) AcceptEncodings() string {
+func (c Cache) AcceptEncoding() string {
 	return c.accept
 }
 
