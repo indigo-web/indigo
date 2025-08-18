@@ -40,12 +40,14 @@ func newSerializer(
 	buff []byte,
 ) *serializer {
 	return &serializer{
-		cfg:            cfg,
-		request:        request,
-		client:         client,
-		codecs:         codecs,
-		buff:           buff,
-		defaultHeaders: preprocessDefaultHeaders(cfg.Headers.Default, codecs.AcceptEncodings()),
+		cfg:     cfg,
+		request: request,
+		client:  client,
+		codecs:  codecs,
+		buff:    buff,
+		defaultHeaders: newDefaultHeaders(
+			pairsFromMap(cfg.Headers.Default, codecs.AcceptEncoding()),
+		),
 	}
 }
 
@@ -75,13 +77,11 @@ func (s *serializer) Write(protocol proto.Protocol, response *http.Response) err
 		return err
 	}
 
-	err = s.flush()
-	s.cleanup()
-
-	return err
+	return s.flush()
 }
 
 func (s *serializer) writeStream(resp *response.Fields) (err error) {
+	s.buffered = resp.Buffered
 	stream, length := resp.Stream, resp.StreamSize
 	if length == 0 {
 		s.appendKnownHeader("Content-Length: ", "0")
@@ -277,12 +277,14 @@ func (s *serializer) appendHeaders(fields *response.Fields) {
 		s.crlf()
 	}
 
-	for _, header := range s.defaultHeaders {
+	for i, header := range s.defaultHeaders {
 		if header.Excluded {
+			s.defaultHeaders[i].Excluded = false
 			continue
 		}
 
-		s.buff = append(s.buff, header.Full...)
+		s.appendHeader(header.Pair)
+		s.crlf()
 	}
 }
 
@@ -572,38 +574,41 @@ func (i identityWriter) Close() error {
 	return i.s.flush()
 }
 
-func preprocessDefaultHeaders(headers map[string]string, acceptEncoding string) defaultHeaders {
-	processed := make(defaultHeaders, 0, len(headers)+1)
+type excludablePair struct {
+	Excluded bool
+	kv.Pair
+}
 
-	for key, value := range headers {
-		serialized := key + ": " + value + crlf
-		processed = append(processed, defaultHeader{
-			// we let the GC release all the values of the map, as here we're using only
-			// the brand-new line without keeping the original string
-			Key:  serialized[:len(key)],
-			Full: serialized,
+func pairsFromMap(m map[string]string, acceptEncoding string) []excludablePair {
+	pairs := make([]excludablePair, 0, len(m))
+	pairs = append(pairs, excludablePair{
+		Pair: kv.Pair{Key: "Accept-Encoding", Value: acceptEncoding},
+	})
+
+	for key, value := range m {
+		pairs = append(pairs, excludablePair{
+			Pair: kv.Pair{Key: key, Value: value},
 		})
 	}
 
-	processed = append(processed, defaultHeader{
-		Key:  "Accept-Encoding",
-		Full: "Accept-Encoding: " + acceptEncoding + crlf,
+	return pairs
+}
+
+type defaultHeaders []excludablePair
+
+func newDefaultHeaders(pairs []excludablePair) defaultHeaders {
+	slices.SortFunc(pairs, func(a, b excludablePair) int {
+		return strings.Compare(a.Key, b.Key)
 	})
 
-	return processed
+	return pairs
 }
-
-type defaultHeader struct {
-	Excluded bool
-	Key      string
-	Full     string
-}
-
-type defaultHeaders []defaultHeader
 
 func (d defaultHeaders) Exclude(key string) {
-	// TODO: binary search
-
+	// it's a perfect candidate for binary search, however in reality it introduced any visible
+	// benefit only starting at 10 and more default headers. If less, the penalty is also significant.
+	// The only optimization left to try out is stopping the iteration when `header.Key > key`,
+	// considering the headers are still sorted.
 	for i, header := range d {
 		if strutil.CmpFoldFast(header.Key, key) {
 			header.Excluded = true
