@@ -227,6 +227,16 @@ func (r *Response) Error(err error, code ...status.Code) *Response {
 		String(err.Error())
 }
 
+// Buffered allows to enable or disable writes deferring. When enabled, data from body stream
+// is read until there is enough space available in an underlying buffer. If the data must be
+// flushed soon possible (e.g. polling or proxying), the option should be disabled.
+//
+// By default, the option is enabled.
+func (r *Response) Buffered(flag bool) *Response {
+	r.fields.Buffered = flag
+	return r
+}
+
 // Expose gives direct access to internal builder fields.
 func (r *Response) Expose() *response.Fields {
 	return &r.fields

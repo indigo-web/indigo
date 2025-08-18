@@ -5,6 +5,7 @@ import (
 	"math/bits"
 	"slices"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/indigo-web/indigo/config"
@@ -16,6 +17,7 @@ import (
 	"github.com/indigo-web/indigo/http/proto"
 	"github.com/indigo-web/indigo/http/status"
 	"github.com/indigo-web/indigo/internal/codecutil"
+	"github.com/indigo-web/indigo/internal/hexconv"
 	"github.com/indigo-web/indigo/internal/response"
 	"github.com/indigo-web/indigo/internal/strutil"
 	"github.com/indigo-web/indigo/kv"
@@ -23,6 +25,7 @@ import (
 )
 
 type serializer struct {
+	buffered       bool
 	cfg            *config.Config
 	request        *http.Request
 	client         transport.Client
@@ -392,16 +395,8 @@ func (s *serializer) crlf() {
 	s.buff = append(s.buff, crlf...)
 }
 
-func (s *serializer) cleanup() {
-	s.defaultHeaders.Reset()
-}
-
 type chunkedWriter struct {
 	s *serializer
-}
-
-func (c chunkedWriter) maxhex(n int) int {
-	return (bits.Len64(uint64(n))-1)>>2 + 1
 }
 
 func (c chunkedWriter) ReadFrom(r io.Reader) (total int64, err error) {
@@ -409,17 +404,22 @@ func (c chunkedWriter) ReadFrom(r io.Reader) (total int64, err error) {
 
 	for {
 		var (
-			buff         = c.s.buff[len(c.s.buff):cap(c.s.buff)]
-			maxHexLength = c.maxhex(len(buff))
-			dataOffset   = maxHexLength + crlflen
+			buff       = c.s.buff[len(c.s.buff):cap(c.s.buff)]
+			maxHexLen  = hexlen(len(buff))
+			dataOffset = maxHexLen + crlflen
 		)
 
 		n, err := r.Read(buff[dataOffset : len(buff)-crlflen])
 		if n > 0 {
 			total += int64(n)
 
-			if err := c.writechunk(maxHexLength, n); err != nil {
+			if err := c.writechunk(maxHexLen, n); err != nil {
 				return 0, err
+			}
+
+			if n+dataOffset+crlflen >= (cap(c.s.buff) - cap(c.s.buff)>>6) {
+				// if the chunk solely occupies ~98.44% of the whole buffer capacity, double the size
+				c.grow(cap(c.s.buff) << 1)
 			}
 		}
 
@@ -438,19 +438,17 @@ func (c chunkedWriter) Write(b []byte) (n int, err error) {
 	const crlflen = len(crlf)
 	blen := len(b)
 
-	// TODO: add optional but enabled by default buffering chunks.
-	// otherwise, cap(b) = cap(c.s.buff) => 7 bytes leftover, which will be sent
-	// as an independent chunk. Highly inefficient. However, making buffering a default behaviour
-	// completely disables the possibility to implement longpolling based on chunked transfer encoding.
-	// Also undesired. But by default very little people do really use it like that or anyhow rely on
-	// lag-free chunk upload or on their consistency. Therefore, enabling buffering by default would result
-	// in a great choice.
+	// knowing the size of b in advance, grow to contain it fully if needed
+	c.grow(hexlen(cap(c.s.buff)) + crlflen + blen + crlflen + 1)
 
 	for len(b) > 0 {
-		buff := c.s.buff[len(c.s.buff):cap(c.s.buff)]
-		maxHexLen := c.maxhex(len(buff))
+		var (
+			buff       = c.s.buff[len(c.s.buff):cap(c.s.buff)]
+			maxHexLen  = hexlen(len(buff))
+			dataOffset = maxHexLen + crlflen
+		)
 
-		n = copy(buff[maxHexLen+crlflen:len(buff)-crlflen], b)
+		n = copy(buff[dataOffset:len(buff)-crlflen], b)
 		if err = c.writechunk(maxHexLen, n); err != nil {
 			return 0, err
 		}
@@ -464,18 +462,9 @@ func (c chunkedWriter) Write(b []byte) (n int, err error) {
 func (c chunkedWriter) writechunk(maxHexLen, datalen int) error {
 	const crlflen = len(crlf)
 
-	// TODO: add optional but enabled by default buffering chunks.
-	// otherwise, cap(b) = cap(c.s.buff) => 7 bytes leftover, which will be sent
-	// as an independent chunk. Highly inefficient. However, making buffering a default behaviour
-	// completely disables the possibility to implement longpolling based on chunked transfer encoding.
-	// Also undesired. But by default very little people do really use it like that or anyhow rely on
-	// lag-free chunk upload or on their consistency. Therefore, enabling buffering by default would result
-	// in a great choice.
-
 	for {
 		var (
 			buff       = c.s.buff[len(c.s.buff):cap(c.s.buff)]
-			buffOffset = 0
 			dataOffset = maxHexLen + crlflen
 		)
 
@@ -493,40 +482,24 @@ func (c chunkedWriter) writechunk(maxHexLen, datalen int) error {
 				return err
 			}
 
-			// TODO: buffer chunks here
 			continue
 		}
 
-		hexlen := len(strconv.AppendUint(buff[:0], uint64(datalen), 16)) // chunk length
-
-		if len(c.s.buff) > 0 {
-			// if there was any data in the buffer before, we must fill the gap in between.
-			// The best way to do it is via an extension.
-			copy(buff[hexlen:maxHexLen], chunkExtZeroFill)
-		} else {
-			// otherwise, we can save a couple of bytes by simply truncating the unused prefix slots.
-			buffOffset = maxHexLen - hexlen
-			copy(buff[buffOffset:], buff[:hexlen])
+		// write the zero-filled hex length
+		chunklen := datalen
+		for i := maxHexLen; i > 0; i-- {
+			buff[i-1] = hexconv.Char[chunklen&0b1111]
+			chunklen >>= 4
 		}
 
 		copy(buff[maxHexLen:], crlf)          // CRLF between length and data
 		copy(buff[dataOffset+datalen:], crlf) // CRLF at the end of the data
 
-		restore := c.s.buff[:0]
-		c.s.buff = c.s.buff[buffOffset : len(c.s.buff)+dataOffset+datalen+crlflen] // extend buffer to include the written data
-		if err := c.s.flush(); err != nil {
-			return err
-		}
-		c.s.buff = restore
+		// extend the buffer to include the written data
+		c.s.buff = c.s.buff[:len(c.s.buff)+dataOffset+datalen+crlflen]
 
-		if cap(c.s.buff)-dataOffset-datalen-crlflen <= cap(c.s.buff)>>6 {
-			// if free space left after the whole chunk was written is less than
-			// ~1.56% of the buffer total capacity, double the buffer size.
-			newsize := min(c.s.cfg.NET.WriteBufferSize.Maximal, cap(c.s.buff)<<1)
-			// the growth can be triggered even the buffer is already at its maximal size. Do nothing then.
-			if newsize > cap(c.s.buff) {
-				c.s.buff = make([]byte, 0, newsize)
-			}
+		if !c.s.buffered || len(c.s.buff) >= 3*cap(c.s.buff)>>2 {
+			return c.s.flush()
 		}
 
 		return nil
@@ -534,11 +507,19 @@ func (c chunkedWriter) writechunk(maxHexLen, datalen int) error {
 }
 
 func (c chunkedWriter) Close() error {
-	if err := c.s.safeAppend(chunkZeroTrailer); err != nil {
+	if err := c.s.safeAppend([]byte("0\r\n\r\n")); err != nil {
 		return err
 	}
 
 	return c.s.flush()
+}
+
+func (c chunkedWriter) grow(n int) {
+	newsize := min(c.s.cfg.NET.WriteBufferSize.Maximal, n)
+	// the growth can be triggered even the buffer is already at its maximal size. Do nothing then.
+	if newsize > cap(c.s.buff) {
+		c.s.buff = make([]byte, 0, newsize)
+	}
 }
 
 type identityWriter struct {
@@ -547,6 +528,7 @@ type identityWriter struct {
 
 func (i identityWriter) ReadFrom(r io.Reader) (total int64, err error) {
 	for {
+		// TODO: add buffering
 		n, err := r.Read(i.s.buff[len(i.s.buff):cap(i.s.buff)])
 		total += int64(n)
 		i.s.buff = i.s.buff[0 : len(i.s.buff)+n]
@@ -567,6 +549,12 @@ func (i identityWriter) ReadFrom(r io.Reader) (total int64, err error) {
 
 func (i identityWriter) Write(p []byte) (int, error) {
 	err := i.s.safeAppend(p)
+	if !i.s.buffered {
+		if flusherr := i.s.flush(); flusherr != nil && err == nil {
+			err = flusherr
+		}
+	}
+
 	return len(p), err
 }
 
@@ -618,8 +606,6 @@ func (d defaultHeaders) Exclude(key string) {
 	}
 }
 
-func (d defaultHeaders) Reset() {
-	for i := range d {
-		d[i].Excluded = false
-	}
+func hexlen(n int) int {
+	return (bits.Len64(uint64(n))-1)>>2 + 1
 }

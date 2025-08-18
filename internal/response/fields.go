@@ -10,6 +10,7 @@ import (
 )
 
 type Fields struct {
+	Buffered        bool
 	Code            status.Code
 	Status          status.Status
 	ContentEncoding string
