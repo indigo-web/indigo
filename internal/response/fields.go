@@ -24,9 +24,10 @@ type Fields struct {
 
 func (f *Fields) Clear() {
 	*f = Fields{
-		Code:    status.OK,
-		Buffer:  f.Buffer[:0],
-		Headers: f.Headers[:0],
-		Cookies: f.Cookies[:0],
+		Code:     status.OK,
+		Buffered: true,
+		Buffer:   f.Buffer[:0],
+		Headers:  f.Headers[:0],
+		Cookies:  f.Cookies[:0],
 	}
 }
