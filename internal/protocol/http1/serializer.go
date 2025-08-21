@@ -548,14 +548,7 @@ func (i identityWriter) ReadFrom(r io.Reader) (total int64, err error) {
 }
 
 func (i identityWriter) Write(p []byte) (int, error) {
-	err := i.s.safeAppend(p)
-	if !i.s.buffered {
-		if flusherr := i.s.flush(); flusherr != nil && err == nil {
-			err = flusherr
-		}
-	}
-
-	return len(p), err
+	return len(p), i.s.safeAppend(p)
 }
 
 func (i identityWriter) Close() error {
