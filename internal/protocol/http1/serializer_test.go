@@ -34,9 +34,9 @@ func BenchmarkSerializer(b *testing.B) {
 		return request
 	}
 
-	getSerializer := func(cfg *config.Config, m method.Method) *serializer {
+	getSerializer := func(cfg *config.Config, m method.Method, codecs ...codec.Codec) *serializer {
 		buff := make([]byte, 0, cfg.NET.WriteBufferSize.Default)
-		return newSerializer(cfg, getRequest(cfg, method.GET), new(dummy.NopClient), noCodecs, buff)
+		return newSerializer(cfg, getRequest(cfg, method.GET), new(dummy.NopClient), codecutil.NewCache(codecs), buff)
 	}
 
 	getResponseWithHeaders := func(n int) *http.Response {
@@ -122,21 +122,26 @@ func BenchmarkSerializer(b *testing.B) {
 			}
 		}
 
-		benchUnsized := func(n, chunklen int) func(b *testing.B) {
+		benchUnsized := func(n, chunklen int, compression ...string) func(b *testing.B) {
 			return func(b *testing.B) {
+				compress := ""
+				if len(compression) > 0 {
+					compress = compression[0]
+				}
+
 				r := &circularReader{
 					n:    n,
 					data: []byte(strings.Repeat("a", chunklen)),
 				}
 				resp := http.NewResponse()
-				s := getSerializer(config.Default(), method.GET)
+				s := getSerializer(config.Default(), method.GET, codec.NewGZIP())
 				b.SetBytes(int64(n * chunklen))
 				b.ReportAllocs()
 				b.ResetTimer()
 
 				for range b.N {
 					r.n = n
-					_ = s.Write(proto.HTTP11, resp.Stream(r))
+					_ = s.Write(proto.HTTP11, resp.Stream(r).Compress(compress))
 				}
 			}
 		}
@@ -146,6 +151,7 @@ func BenchmarkSerializer(b *testing.B) {
 		b.Run("unsized 8x64", benchUnsized(8, 64))
 		b.Run("sized 262144b", benchSized(262144))
 		b.Run("unsized 16x16384", benchUnsized(16, 16384))
+		b.Run("gzipped 16x16384", benchUnsized(16, 16384, "gzip"))
 		b.Run("unsized 8x32768", benchUnsized(8, 32768))
 	})
 }
