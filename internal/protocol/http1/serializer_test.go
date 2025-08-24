@@ -20,6 +20,7 @@ import (
 	"github.com/indigo-web/indigo/http/proto"
 	"github.com/indigo-web/indigo/internal/codecutil"
 	"github.com/indigo-web/indigo/internal/construct"
+	respfields "github.com/indigo-web/indigo/internal/response"
 	"github.com/indigo-web/indigo/kv"
 	"github.com/indigo-web/indigo/transport/dummy"
 	"github.com/stretchr/testify/require"
@@ -482,12 +483,19 @@ func TestSerializer(t *testing.T) {
 				return s, string(w.Written())
 			}
 
+			testResp := func(t *testing.T, resp string) {
+				// the point is to make sure the written response is a valid HTTP
+				_, err := parseHTTP11Response("GET", []byte(resp))
+				require.NoError(t, err)
+			}
+
 			t.Run("fill the buffer exactly full", func(t *testing.T) {
 				// estimate headers length, so we can know how many bytes of body we need to trigger the growth
 				const buffsize = 128
 				s, defaultResponse := writeResp(t, http.NewResponse(), buffsize, config.Default())
 				want := strings.Repeat("a", cap(s.buff)-len(defaultResponse)-1)
-				s, _ = writeResp(t, http.NewResponse().String(want), buffsize, config.Default())
+				s, resp := writeResp(t, http.NewResponse().String(want), buffsize, config.Default())
+				testResp(t, resp)
 				require.Equal(t, cap(s.buff), buffsize)
 			})
 
@@ -495,7 +503,8 @@ func TestSerializer(t *testing.T) {
 				const buffsize = 128
 				s, defaultResponse := writeResp(t, http.NewResponse(), buffsize, config.Default())
 				want := strings.Repeat("a", cap(s.buff)-len(defaultResponse)+1)
-				s, _ = writeResp(t, http.NewResponse().String(want), buffsize, config.Default())
+				s, resp := writeResp(t, http.NewResponse().String(want), buffsize, config.Default())
+				testResp(t, resp)
 				require.Greater(t, cap(s.buff), buffsize)
 			})
 
@@ -504,7 +513,8 @@ func TestSerializer(t *testing.T) {
 				cfg := config.Default()
 				cfg.NET.WriteBufferSize.Maximal = buffsize
 				b := strings.Repeat("a", buffsize)
-				s, _ := writeResp(t, http.NewResponse().String(b), buffsize-1, cfg)
+				s, resp := writeResp(t, http.NewResponse().String(b), buffsize-1, cfg)
+				testResp(t, resp)
 				wantBuffsize := cap(slices.Grow(make([]byte, buffsize-1), 1))
 				require.Equal(t, wantBuffsize, cap(s.buff))
 			})
@@ -516,7 +526,7 @@ func TestSerializer(t *testing.T) {
 			t.Run("flush buffered", func(t *testing.T) {
 				s, w := getSerializer(nil, newRequest(method.GET), noCodecs)
 				s.buff = make([]byte, 0, 16)
-				s.buffered = true
+				s.response = &respfields.Fields{Buffered: true}
 				writer := identityWriter{s}
 				_, err := writer.Write(bytes.Repeat([]byte("a"), 10))
 				require.NoError(t, err)
@@ -533,6 +543,7 @@ func TestSerializer(t *testing.T) {
 				client := dummy.NewMockClient().Journaling()
 				buff := make([]byte, 0, cfg.NET.WriteBufferSize.Default)
 				s := newSerializer(cfg, newRequest(method.GET), client, codecs, buff)
+				s.response = http.NewResponse().Expose()
 
 				return s, client
 			}
@@ -604,7 +615,7 @@ func TestSerializer(t *testing.T) {
 				cfg.NET.WriteBufferSize.Default = writeBufferSize
 				cfg.NET.WriteBufferSize.Maximal = writeBufferSize
 				s, w := init(cfg, noCodecs)
-				s.buffered = true
+				s.response = &respfields.Fields{Buffered: true}
 				writer := chunkedWriter{s}
 
 				writeChunks := func(t *testing.T, data ...string) {
