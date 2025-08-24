@@ -10,46 +10,27 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestGZIP(t *testing.T) {
-	t.Run("default", func(t *testing.T) {
-		text, err := gunzip(gzipped("Hello, world!"))
-		require.NoError(t, err)
-		require.Equal(t, "Hello, world!", text)
-	})
+func compress(inst Instance, text string) []byte {
+	loopback := dummy.NewMockClient().Journaling()
+	inst.ResetCompressor(loopback)
 
-	t.Run("scattered", func(t *testing.T) {
-		text := strings.Repeat("Hello, world! Lorem ipsum! ", 100)
-		scattered := scatter(gzipped(text), 2)
-		result, err := gunzip(scattered...)
-		require.NoError(t, err)
-		require.Equal(t, text, result)
-	})
-}
-
-func gzipped(text string) []byte {
-	c := NewGZIP().New()
-	sinkhole := dummy.NewMockClient().Journaling()
-	c.ResetCompressor(sinkhole)
-
-	if _, err := c.Write([]byte(text)); err != nil {
+	if _, err := inst.Write([]byte(text)); err != nil {
 		panic(err)
 	}
 
-	if err := c.Close(); err != nil {
+	if err := inst.Close(); err != nil {
 		panic(err)
 	}
 
-	return sinkhole.Written()
+	return loopback.Written()
 }
 
-func gunzip(gzipped ...[]byte) (string, error) {
-	dc := NewGZIP().New()
-	err := dc.ResetDecompressor(dummy.NewMockClient(gzipped...))
-	if err != nil {
+func decompress(inst Instance, data ...[]byte) (string, error) {
+	if err := inst.ResetDecompressor(dummy.NewMockClient(data...)); err != nil {
 		return "", err
 	}
 
-	return fetchAll(dc)
+	return fetchAll(inst)
 }
 
 func fetchAll(source http.Fetcher) (string, error) {
@@ -74,4 +55,24 @@ func scatter(b []byte, step int) (pieces [][]byte) {
 	}
 
 	return pieces
+}
+
+func testCodec(t *testing.T, inst Instance) {
+	t.Run("identity", func(t *testing.T) {
+		result, err := decompress(inst, compress(inst, "Hello, world!"))
+		require.NoError(t, err)
+		require.Equal(t, "Hello, world!", result)
+	})
+
+	t.Run("stream", func(t *testing.T) {
+		text := strings.Repeat("Hello, world! Lorem ipsum! ", 100)
+		scattered := scatter(compress(inst, text), 2)
+		result, err := decompress(inst, scattered...)
+		require.NoError(t, err)
+		require.Equal(t, text, result)
+	})
+}
+
+func TestGZIP(t *testing.T) {
+	testCodec(t, NewGZIP().New())
 }
