@@ -23,6 +23,6 @@ type Compressor interface {
 }
 
 type Decompressor interface {
-	ResetDecompressor(source http.Fetcher) error
 	http.Fetcher
+	ResetDecompressor(source http.Fetcher) error
 }

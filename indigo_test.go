@@ -696,6 +696,8 @@ func TestSecondPhase(t *testing.T) {
 		_ = app.
 			Tune(s).
 			Codec(codec.NewGZIP()).
+			Codec(codec.NewDeflate()).
+			Codec(codec.NewZSTD()).
 			OnStart(func() {
 				ch <- struct{}{}
 			}).
@@ -734,7 +736,7 @@ func TestSecondPhase(t *testing.T) {
 		resp, err := stdhttp.DefaultClient.Head(appURL + "/")
 		require.NoError(t, err)
 		require.Equal(t, stdhttp.StatusOK, resp.StatusCode)
-		require.Equal(t, []string{"gzip"}, resp.Header["Accept-Encoding"])
+		require.Equal(t, []string{"gzip, deflate, zstd"}, resp.Header["Accept-Encoding"])
 		require.Empty(t, readFullBody(t, resp))
 	})
 
