@@ -84,9 +84,8 @@ func (r *Request) Cookies() (cookie.Jar, error) {
 
 	r.jar.Clear()
 
-	// in RFC 6265, 5.4 cookies are explicitly prohibited from being split into
-	// list, yet in HTTP/2 it's allowed. I have concerns of some user-agents may
-	// despite sending them as a list, even via HTTP/1.1
+	// even though RFC 6265, 5.4 prohibits the Cookie header from being split into a list,
+	// some user-agents still might do so in order to fit each value into the 8K limit.
 	for value := range r.Headers.Values("cookie") {
 		if err := cookie.Parse(r.jar, value); err != nil {
 			return nil, err
@@ -98,15 +97,14 @@ func (r *Request) Cookies() (cookie.Jar, error) {
 
 // Respond returns Response object.
 //
-// WARNING: this method clears the response builder under the hood. As it is passed
-// by reference, it'll be cleared EVERYWHERE along a handler
+// WARNING: the Response is cleared before being returned. Considering it is stored by pointer,
+// this action might affect your application if it was stored anywhere before.
 func (r *Request) Respond() *Response {
 	return r.response.Clear()
 }
 
-// Hijack the connection. Request body will be implicitly read (so if you need it you
-// should read it before) to the end. After handler exits, the connection will
-// be closed, so the connection can be hijacked at most once
+// Hijack hijacks an underlying connection. The request body is implicitly discarded before
+// exposing the transport. After the handler function terminates, the connection is closed automatically.
 func (r *Request) Hijack() (transport.Client, error) {
 	if err := r.Body.Discard(); err != nil {
 		return nil, err
@@ -117,7 +115,7 @@ func (r *Request) Hijack() (transport.Client, error) {
 	return r.client, nil
 }
 
-// Hijacked tells whether the connection was hijacked or not
+// Hijacked tells whether the connection was hijacked.
 func (r *Request) Hijacked() bool {
 	return r.hijacked
 }
