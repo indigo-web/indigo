@@ -145,8 +145,15 @@ type Environment struct {
 }
 
 type commonHeaders struct {
-	// Encoding holds an information about encoding, that was used to make the request
-	Encoding Encodings
+	// AcceptEncoding is the list of accepted by client tokens.
+	AcceptEncoding []string
+	// TransferEncoding is the list of tokens used for this request from `Transfer-Encoding` header value.
+	TransferEncoding []string
+	// Chunked describes whether the Transfer attribute is not empty and ends with the `chunked`
+	// encoding.
+	Chunked bool
+	// ContentEncoding is the list of tokens used for this request from `Content-Encoding` header value.
+	ContentEncoding []string
 	// ContentLength holds the Content-Length header value. It isn't recommended to rely solely on this
 	// value, as it can be whatever (but most likely zero) if Request.Encoding.Chunked is true.
 	ContentLength int
@@ -158,16 +165,4 @@ type commonHeaders struct {
 	// Upgrade holds the `Upgrade` header value. It's set to anything but proto.Unknown only when
 	// an upgrade request is received.
 	Upgrade proto.Protocol
-}
-
-type Encodings struct {
-	// Accept is the list of accepted by client tokens.
-	Accept []string
-	// Transfer is the list of tokens used for this request from `Transfer-Encoding` header value.
-	Transfer []string
-	// Content is the list of tokens used for this request from `Content-Encoding` header value.
-	Content []string
-	// Chunked describes whether the Transfer attribute is not empty and ends with the `chunked`
-	// encoding.
-	Chunked bool
 }

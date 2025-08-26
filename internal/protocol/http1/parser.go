@@ -530,11 +530,11 @@ headerValue:
 			}
 		case 15:
 			if strutil.CmpFoldFast(key, "Accept-Encoding") {
-				p.acceptEncodings, request.Encoding.Accept, err = splitTokens(p.acceptEncodings, value)
+				p.acceptEncodings, request.AcceptEncoding, err = splitTokens(p.acceptEncodings, value)
 			}
 		case 16:
 			if strutil.CmpFoldFast(key, "Content-Encoding") {
-				p.encodings, request.Encoding.Content, err = splitTokens(p.encodings, value)
+				p.encodings, request.ContentEncoding, err = splitTokens(p.encodings, value)
 				if err != nil {
 					return true, nil, err
 				}
@@ -547,18 +547,18 @@ headerValue:
 
 				p.metTransferEncoding = true
 
-				p.encodings, request.Encoding.Transfer, err = splitTokens(p.encodings, value)
+				p.encodings, request.TransferEncoding, err = splitTokens(p.encodings, value)
 				if err != nil {
 					return true, nil, err
 				}
 
-				te := request.Encoding.Transfer
+				te := request.TransferEncoding
 				if len(te) > 0 {
 					if te[len(te)-1] != "chunked" {
 						return true, nil, status.ErrBadEncoding
 					}
 
-					request.Encoding.Chunked = true
+					request.Chunked = true
 				}
 			}
 		}

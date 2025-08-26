@@ -215,14 +215,10 @@ func TestSuit(t *testing.T) {
 		request := construct.Request(config.Default(), dummy.NewNopClient())
 		request.Method = m
 		request.Path = path
-		request.Headers = headers
+		request.Headers = headers.Add("Content-Length", strconv.Itoa(len(body)))
 
-		request.Encoding.Transfer = slices.Collect(headers.Values("Transfer-Encoding"))
-		request.Encoding.Content = slices.Collect(headers.Values("Content-Encoding"))
-
-		if len(request.Encoding.Transfer) == 0 {
-			request.ContentLength = len(body)
-		}
+		request.TransferEncoding = slices.Collect(headers.Values("Transfer-Encoding"))
+		request.ContentEncoding = slices.Collect(headers.Values("Content-Encoding"))
 
 		return serialize.Headers(request) + body
 	}

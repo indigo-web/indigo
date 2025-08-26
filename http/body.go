@@ -79,7 +79,7 @@ func (b *Body) Bytes() ([]byte, error) {
 	}
 
 	newSize := int(b.request.cfg.Body.Form.BufferPrealloc)
-	if !b.request.Encoding.Chunked {
+	if !b.request.Chunked {
 		newSize = min(b.request.ContentLength, int(b.request.cfg.Body.MaxSize))
 	}
 

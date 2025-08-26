@@ -48,7 +48,7 @@ func getRequestWithBody(chunked bool, body ...[]byte) (*http.Request, *body) {
 
 	req.Headers = hdrs
 	req.ContentLength = contentLength
-	req.Encoding.Chunked = chunked
+	req.Chunked = chunked
 	req.Body.Reset(req)
 
 	return req, b

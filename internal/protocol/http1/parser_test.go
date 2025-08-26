@@ -310,9 +310,9 @@ func TestParser(t *testing.T) {
 		require.NoError(t, err)
 		require.True(t, done)
 		require.Empty(t, string(extra))
-		require.Equal(t, []string{"chunked"}, request.Encoding.Transfer)
-		require.True(t, request.Encoding.Chunked)
-		require.Equal(t, []string{"gzip", "deflate"}, request.Encoding.Content)
+		require.Equal(t, []string{"chunked"}, request.TransferEncoding)
+		require.True(t, request.Chunked)
+		require.Equal(t, []string{"gzip", "deflate"}, request.ContentEncoding)
 		request.Reset()
 	})
 
