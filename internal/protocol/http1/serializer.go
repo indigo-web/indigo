@@ -87,6 +87,7 @@ func (s *serializer) Write(protocol proto.Protocol, response *http.Response) err
 func (s *serializer) writeStream(resp *response.Fields) (err error) {
 	s.response = resp
 	stream, length := resp.Stream, resp.StreamSize
+	unsized := length == -1
 	if length == 0 {
 		s.appendKnownHeader("Content-Length: ", "0")
 		s.crlf()
@@ -108,8 +109,16 @@ func (s *serializer) writeStream(resp *response.Fields) (err error) {
 
 	var encoder io.WriteCloser
 
-	compressor := s.getCompressor(resp.ContentEncoding)
-	if length != -1 && compressor != nil {
+	compression := resp.ContentEncoding
+	if resp.AutoCompress && (unsized || length >= s.cfg.NET.SmallBody) {
+		// if the stream is sized and the size is below limit (i.e. is considered a small one),
+		// do not compress it. It won't give much gain anyway, yet the performance is impacted,
+		// especially if we otherwise could use a zero-copy mechanism
+		compression = s.request.PreferredEncoding()
+	}
+
+	compressor := s.getCompressor(compression)
+	if !unsized && compressor != nil {
 		// if sized stream is compressed, convert it to unsized
 		length = -1
 	}
@@ -136,7 +145,7 @@ func (s *serializer) writeStream(resp *response.Fields) (err error) {
 		}
 
 		// +len(crlf) because it wasn't written yet, therefore not yet included in the len(s.buff)
-		s.growForExtra(len(crlf) + int(length))
+		s.growToContain(len(crlf) + int(length))
 	}
 
 	s.crlf() // finalize the headers block
@@ -200,13 +209,13 @@ func (s *serializer) grow(newsize int) {
 	}
 }
 
-func (s *serializer) growForExtra(n int) {
+func (s *serializer) growToContain(n int) {
 	newsize := min(s.cfg.NET.WriteBufferSize.Maximal-len(s.buff), n)
 	s.buff = slices.Grow(s.buff, newsize)
 }
 
 func (s *serializer) getCompressor(token string) codec.Compressor {
-	if len(token) == 0 {
+	if token == "" || token == "identity" {
 		return nil
 	}
 

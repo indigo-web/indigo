@@ -142,7 +142,7 @@ func BenchmarkSerializer(b *testing.B) {
 
 				for range b.N {
 					r.n = n
-					_ = s.Write(proto.HTTP11, resp.Stream(r).Compress(compress))
+					_ = s.Write(proto.HTTP11, resp.Stream(r).Compression(compress))
 				}
 			}
 		}
@@ -451,8 +451,11 @@ func TestSerializer(t *testing.T) {
 		testGZIP := func(t *testing.T, resp *http.Response) {
 			w.Reset()
 			request.Method = method.GET
+			request.AcceptEncoding = []string{"gzip"}
 
-			require.NoError(t, s.Write(proto.HTTP11, resp.Compress("gzip")))
+			// enforce gzip, because otherwise sized stream is unlikely to be compressed
+			// due to smallness.
+			require.NoError(t, s.Write(proto.HTTP11, resp.Compression("gzip")))
 			wantBody := encodeGZIP(helloworld)
 			testUnsized(t, "GET", string(wantBody), "gzip")
 		}

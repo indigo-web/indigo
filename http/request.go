@@ -8,6 +8,7 @@ import (
 	"github.com/indigo-web/indigo/http/cookie"
 	"github.com/indigo-web/indigo/http/method"
 	"github.com/indigo-web/indigo/http/proto"
+	"github.com/indigo-web/indigo/internal/strutil"
 	"github.com/indigo-web/indigo/kv"
 	"github.com/indigo-web/indigo/transport"
 )
@@ -165,4 +166,25 @@ type commonHeaders struct {
 	// Upgrade holds the `Upgrade` header value. It's set to anything but proto.Unknown only when
 	// an upgrade request is received.
 	Upgrade proto.Protocol
+}
+
+// PreferredEncoding chooses a preferred encoding from AcceptEncoding, respecting quality markers.
+func (c *commonHeaders) PreferredEncoding() string {
+	if len(c.AcceptEncoding) == 0 {
+		return "identity"
+	}
+
+	var prefer string
+	maxQ := -1
+
+	for _, str := range c.AcceptEncoding {
+		token, qualifier := strutil.CutHeader(str)
+		q := strutil.ParseQualifier(qualifier)
+		if q > maxQ {
+			maxQ = q
+			prefer = token
+		}
+	}
+
+	return prefer
 }

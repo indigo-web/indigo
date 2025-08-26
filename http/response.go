@@ -67,10 +67,18 @@ func (r *Response) ContentType(value mime.MIME, charset ...mime.Charset) *Respon
 	return r.Header("Content-Type", value)
 }
 
-// Compress sets the Content-Encoding value and compresses the outcoming body. The response
-// stays intact if the token is not recognized.
-func (r *Response) Compress(token string) *Response {
+// Compress chooses and sets the best suiting compression based on client preferences.
+func (r *Response) Compress() *Response {
+	r.fields.AutoCompress = true
+	r.fields.ContentEncoding = "" // to avoid conflicts, wins the last method applied.
+	return r
+}
+
+// Compression enforces a specific codec to be used, even if it isn't in Accept-Encoding.
+// The method is no-op if the token is not recognized.
+func (r *Response) Compression(token string) *Response {
 	r.fields.ContentEncoding = token
+	r.fields.AutoCompress = false
 	return r
 }
 

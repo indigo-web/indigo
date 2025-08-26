@@ -13,6 +13,7 @@ type Fields struct {
 	Buffered        bool
 	Code            status.Code
 	Status          status.Status
+	AutoCompress    bool
 	ContentEncoding string
 	Charset         mime.Charset
 	Stream          io.Reader
