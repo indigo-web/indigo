@@ -592,17 +592,17 @@ contentLength:
 		}
 
 		p.contentLength = p.contentLength*10 + int64(char-'0')
+		if !p.headers.AppendByte(char) {
+			return true, nil, status.ErrHeaderFieldsTooLarge
+		}
 	}
 
 	p.state = eContentLength
 	return false, nil, nil
 
 contentLengthEnd:
-	// guaranteed, that data at this point contains AT LEAST 1 byte.
-	// The proof is, that this code is reachable ONLY if loop has reached a non-digit
-	// ascii symbol. In case loop has finished peacefully, as no more data left, but also no
-	// character found to satisfy the exit condition, this code will never be reached
 	request.ContentLength = int(p.contentLength)
+	request.Headers.Add("Content-Length", uf.B2S(p.headers.Finish()))
 
 	switch data[0] {
 	case '\r':

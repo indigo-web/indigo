@@ -1,8 +1,6 @@
 package serialize
 
 import (
-	"strconv"
-
 	"github.com/indigo-web/indigo/http"
 )
 
@@ -32,13 +30,6 @@ func Headers(request *http.Request) string {
 
 	for _, h := range request.Headers.Expose() {
 		buff = header(buff, h)
-	}
-
-	if !request.Encoding.Chunked {
-		buff = header(buff, http.Header{
-			Key:   "Content-Length",
-			Value: strconv.Itoa(request.ContentLength),
-		})
 	}
 
 	buff = append(buff, '\r', '\n')
