@@ -17,5 +17,5 @@ func NewDeflate() Codec {
 		return r.(flate.Resetter).Reset(a, nil)
 	})
 
-	return newBaseCodec("deflate", gzipBufferSize, instantiator)
+	return newBaseCodec("deflate", instantiator)
 }

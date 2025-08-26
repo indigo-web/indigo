@@ -17,5 +17,5 @@ func NewZSTD() Codec {
 
 	instantiator := newBaseInstance(w, r, genericResetter)
 
-	return newBaseCodec("zstd", gzipBufferSize, instantiator)
+	return newBaseCodec("zstd", instantiator)
 }

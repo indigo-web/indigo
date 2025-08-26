@@ -8,19 +8,17 @@ import (
 
 var _ Codec = baseCodec{}
 
-type instantiator = func(buff []byte) Instance
+type instantiator = func() Instance
 
 type baseCodec struct {
-	token      string
-	bufferSize int
-	newInst    func([]byte) Instance
+	token   string
+	newInst instantiator
 }
 
-func newBaseCodec(token string, bufferSize int, newInst instantiator) baseCodec {
+func newBaseCodec(token string, newInst instantiator) baseCodec {
 	return baseCodec{
-		token:      token,
-		bufferSize: bufferSize,
-		newInst:    newInst,
+		token:   token,
+		newInst: newInst,
 	}
 }
 
@@ -29,9 +27,7 @@ func (b baseCodec) Token() string {
 }
 
 func (b baseCodec) New() Instance {
-	buffer := make([]byte, b.bufferSize)
-
-	return b.newInst(buffer)
+	return b.newInst()
 }
 
 var _ Instance = new(baseInstance)
@@ -55,13 +51,12 @@ type baseInstance struct {
 }
 
 func newBaseInstance(encoder writeResetter, decoder io.Reader, reset decoderResetter) instantiator {
-	return func(buff []byte) Instance {
+	return func() Instance {
 		return &baseInstance{
 			reset:   reset,
 			adapter: newAdapter(),
 			w:       encoder,
 			r:       decoder,
-			buff:    buff,
 		}
 	}
 }
@@ -91,7 +86,11 @@ func (b *baseInstance) Close() error {
 	return nil
 }
 
-func (b *baseInstance) ResetDecompressor(source http.Fetcher) error {
+func (b *baseInstance) ResetDecompressor(source http.Fetcher, bufferSize int) error {
+	if cap(b.buff) < bufferSize {
+		b.buff = make([]byte, bufferSize)
+	}
+
 	b.adapter.Reset(source)
 
 	return b.reset(b.r, b.adapter)

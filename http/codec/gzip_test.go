@@ -26,7 +26,7 @@ func compress(inst Instance, text string) []byte {
 }
 
 func decompress(inst Instance, data ...[]byte) (string, error) {
-	if err := inst.ResetDecompressor(dummy.NewMockClient(data...)); err != nil {
+	if err := inst.ResetDecompressor(dummy.NewMockClient(data...), 512); err != nil {
 		return "", err
 	}
 

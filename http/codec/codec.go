@@ -24,5 +24,5 @@ type Compressor interface {
 
 type Decompressor interface {
 	http.Fetcher
-	ResetDecompressor(source http.Fetcher) error
+	ResetDecompressor(source http.Fetcher, bufferSize int) error
 }
