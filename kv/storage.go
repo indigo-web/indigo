@@ -54,11 +54,18 @@ func NewFromPairs(pairs []Pair) *Storage {
 
 // Add adds a new pair of key and value.
 func (s *Storage) Add(key, value string) *Storage {
-	// TODO: if `s.deleted` > 0, try to insert the key into the deleted fields
-	s.pairs = append(s.pairs, Pair{
-		Key:   key,
-		Value: value,
-	})
+	if s.deleted == 0 {
+		s.pairs = append(s.pairs, Pair{key, value})
+		return s
+	}
+
+	for i, pair := range s.pairs {
+		if len(pair.Key) == 0 {
+			s.pairs[i] = Pair{key, value}
+			break
+		}
+	}
+
 	return s
 }
 
