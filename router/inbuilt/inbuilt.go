@@ -56,7 +56,7 @@ func (r *Router) Route(method method.Method, path string, handler Handler, middl
 	return r
 }
 
-// TODO: update the error handling mechanism. It should be more modifications-prone
+// TODO: update the error handling mechanism. It's way too tedious
 
 // RouteError adds an error handler for a corresponding HTTP error code.
 //
@@ -253,7 +253,7 @@ func (r *runtimeRouter) OnError(request *http.Request, err error) *http.Response
 
 func (r *runtimeRouter) onError(request *http.Request, err error) *http.Response {
 	switch {
-	case isServerWideOptions(request):
+	case request.Method == method.OPTIONS && request.Path == "*": // server-wide options
 		return request.Respond().Header("Allow", r.serverOptions)
 	case request.Method == method.TRACE:
 		if !r.enableTRACE {
@@ -284,8 +284,8 @@ func (r *runtimeRouter) onError(request *http.Request, err error) *http.Response
 }
 
 func (r *runtimeRouter) runMutators(request *http.Request) {
-	for _, mutator := range r.mutators {
-		mutator(request)
+	for _, mut := range r.mutators {
+		mut(request)
 	}
 }
 
@@ -326,8 +326,4 @@ func getHandler(reqMethod method.Method, mlut methodLUT) Handler {
 	}
 
 	return handler
-}
-
-func isServerWideOptions(req *http.Request) bool {
-	return req.Method == method.OPTIONS && req.Path == "*"
 }

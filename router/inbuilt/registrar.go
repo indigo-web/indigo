@@ -33,7 +33,7 @@ func (r *registrar) Add(path string, m method.Method, handler Handler) error {
 	}
 
 	if _, ok := methodsMap[m]; ok {
-		return fmt.Errorf("%s %s: already registered", m, path)
+		return fmt.Errorf("duplicate endpoint: %s %s", m, path)
 	}
 
 	methodsMap[m] = handler
@@ -53,7 +53,7 @@ func (r *registrar) Merge(another *registrar) error {
 			}
 
 			if r.endpoints[path][method_] != nil {
-				return fmt.Errorf("route already registered: %s %s", method_.String(), path)
+				return fmt.Errorf("duplicate endpoint: %s %s", method_, path)
 			}
 
 			r.endpoints[path][method_] = handler
@@ -91,10 +91,6 @@ func (r *registrar) AsRadixTree() radixTree {
 	tree := radix.New[endpoint]()
 
 	for path, e := range r.endpoints {
-		if len(path) == 0 {
-			panic("empty path")
-		}
-
 		var (
 			mlut  methodLUT
 			allow string

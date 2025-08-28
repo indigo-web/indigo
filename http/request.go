@@ -155,8 +155,8 @@ type commonHeaders struct {
 	Chunked bool
 	// ContentEncoding is the list of tokens used for this request from `Content-Encoding` header value.
 	ContentEncoding []string
-	// ContentLength holds the Content-Length header value. It isn't recommended to rely solely on this
-	// value, as it can be whatever (but most likely zero) if Request.Encoding.Chunked is true.
+	// ContentLength holds the Content-Length header value. It can be non-zero even if the request uses
+	// chunked transfer encoding. In that case, it serves more of a hint to approximate the body size.
 	ContentLength int
 	// ContentType holds the Content-Type header value.
 	ContentType string
