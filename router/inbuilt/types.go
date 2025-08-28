@@ -33,10 +33,6 @@ func (r routesMap) Add(path string, m method.Method, handler Handler) {
 }
 
 func getAllowString(methods methodLUT) (allowed string) {
-	// FIXME: this must also include TRACE if it's enabled
-	// By now it's disabled by default and I highly doubt anyone would intentionally turn
-	// it on. Therefore, the fix can temporarily wait.
-
 	definedMethods := make([]string, 0, method.Count)
 
 	for i, handler := range methods {
