@@ -59,8 +59,8 @@ func (s *serializer) Upgrade() {
 	s.appendProtocol(s.request.Protocol)
 	s.buff = append(s.buff, "101 Switching Protocol\r\n"...)
 
-	s.appendKnownHeader("Connection: ", "upgrade")
-	s.appendKnownHeader("Upgrade: ", s.request.Upgrade.String())
+	s.appendKnownHeader("Connection", "upgrade")
+	s.appendKnownHeader("Upgrade", s.request.Upgrade.String())
 
 	s.crlf()
 }
@@ -89,7 +89,7 @@ func (s *serializer) writeStream(resp *response.Fields) (err error) {
 	stream, length := resp.Stream, resp.StreamSize
 	unsized := length == -1
 	if length == 0 {
-		s.appendKnownHeader("Content-Length: ", "0")
+		s.appendKnownHeader("Content-Length", "0")
 		s.crlf()
 		return nil
 	}
@@ -99,11 +99,17 @@ func (s *serializer) writeStream(resp *response.Fields) (err error) {
 		return status.ErrInternalServerError
 	}
 
+	var closeConnection bool
+
 	defer func() {
 		if c, ok := stream.(io.Closer); ok {
 			if cerr := c.Close(); cerr != nil && err == nil {
 				err = cerr
 			}
+		}
+
+		if closeConnection && err == nil {
+			err = status.ErrCloseConnection
 		}
 	}()
 
@@ -124,8 +130,14 @@ func (s *serializer) writeStream(resp *response.Fields) (err error) {
 	}
 
 	if length == -1 {
-		encoder = chunkedWriter{s}
-		s.appendKnownHeader("Transfer-Encoding: ", "chunked")
+		if s.request.Protocol == proto.HTTP11 {
+			encoder = chunkedWriter{s}
+			s.appendKnownHeader("Transfer-Encoding", "chunked")
+		} else {
+			encoder = identityWriter{s}
+			s.appendKnownHeader("Connection", "close")
+			closeConnection = true
+		}
 	} else {
 		encoder = identityWriter{s}
 		s.appendContentLength(length)
@@ -221,7 +233,7 @@ func (s *serializer) getCompressor(token string) codec.Compressor {
 
 	compressor := s.codecs.Get(token)
 	if compressor != nil {
-		s.appendKnownHeader("Content-Encoding: ", token)
+		s.appendKnownHeader("Content-Encoding", token)
 	}
 
 	return compressor
@@ -250,11 +262,13 @@ func (s *serializer) safeAppend(data []byte) error {
 	return nil
 }
 
-func (s *serializer) flush() (err error) {
-	if len(s.buff) > 0 {
-		_, err = s.client.Write(s.buff)
-		s.buff = s.buff[:0]
+func (s *serializer) flush() error {
+	if len(s.buff) == 0 {
+		return nil
 	}
+
+	_, err := s.client.Write(s.buff)
+	s.buff = s.buff[:0]
 
 	return err
 }
@@ -315,6 +329,7 @@ func (s *serializer) appendHeader(header kv.Pair) {
 // have a colon and a space included.
 func (s *serializer) appendKnownHeader(key, value string) {
 	s.buff = append(s.buff, key...)
+	s.colonsp()
 	s.buff = append(s.buff, value...)
 	s.crlf()
 }
@@ -532,10 +547,18 @@ type identityWriter struct {
 }
 
 func (i identityWriter) ReadFrom(r io.Reader) (total int64, err error) {
-	streamSize := i.s.response.StreamSize // guaranteed to be >0
+	streamSize := i.s.response.StreamSize
+	// identityWriter is used to write unsized streams if chunked transfer encoding
+	// isn't available (e.g. HTTP/1.0 clients). The stream is finalized by the connection
+	// close in this case.
+	unsized := streamSize == -1
 
-	for total < streamSize {
-		boundary := min(cap(i.s.buff), int(streamSize-total)+len(i.s.buff))
+	for total < streamSize || unsized {
+		boundary := cap(i.s.buff)
+		if !unsized {
+			boundary = min(boundary, int(streamSize-total)+len(i.s.buff))
+		}
+
 		n, err := r.Read(i.s.buff[len(i.s.buff):boundary])
 		total += int64(n)
 
@@ -550,6 +573,11 @@ func (i identityWriter) ReadFrom(r io.Reader) (total int64, err error) {
 		switch err {
 		case nil:
 		case io.EOF:
+			if !unsized && total < streamSize {
+				// the stream is exhausted before it must have been. No good.
+				return total, status.ErrInternalServerError
+			}
+
 			return total, nil
 		default:
 			return 0, err
