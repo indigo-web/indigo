@@ -209,8 +209,9 @@ func (n *Node[T]) appendPredecessor(node *Node[T]) {
 	n.predecessors = append(n.predecessors, node)
 }
 
-func IsDynamicTemplate(str string) bool {
-	return strings.IndexByte(str, ':') != -1
+func IsDynamicTemplate(path string) bool {
+	segs := splitPath(path)
+	return len(segs) > 1 || segs[0].IsWildcard
 }
 
 func truncCommon(segs []pathSegment, length int) []pathSegment {
@@ -237,15 +238,26 @@ type pathSegment struct {
 	Value      string
 }
 
-func splitPath(str string) (result []pathSegment) {
+func splitPath(str string) (path []pathSegment) {
+	offset := 0
+
 	for len(str) > 0 {
-		colon := strings.IndexByte(str, ':')
+		colon := strings.IndexByte(str[offset:], ':')
 		if colon == -1 {
-			result = append(result, pathSegment{false, false, str})
+			path = append(path, pathSegment{false, false, str})
 			break
 		}
 
-		result = append(result, pathSegment{false, false, str[:colon]})
+		colon += offset
+
+		if colon > 0 && str[colon-1] == '\\' {
+			// escaped colon: isn't a wildcard, skip
+			str = str[:colon-1] + str[colon:]
+			offset = colon
+			continue
+		}
+
+		path = append(path, pathSegment{false, false, str[:colon]})
 		str = str[colon+1:]
 
 		boundary := strings.IndexByte(str, '/')
@@ -256,11 +268,11 @@ func splitPath(str string) (result []pathSegment) {
 		wildcard := str[:boundary]
 		greedy := false
 		if strings.HasSuffix(wildcard, "...") {
-			wildcard = wildcard[:len(wildcard)-3]
+			wildcard = wildcard[:len(wildcard)-len("...")]
 			greedy = true
 		}
 
-		result = append(result, pathSegment{true, greedy, wildcard})
+		path = append(path, pathSegment{true, greedy, wildcard})
 		if boundary < len(str) {
 			boundary++
 		}
@@ -268,5 +280,5 @@ func splitPath(str string) (result []pathSegment) {
 		str = str[boundary:]
 	}
 
-	return result
+	return path
 }
