@@ -546,20 +546,19 @@ headerValue:
 				}
 
 				p.metTransferEncoding = true
-
 				p.encodings, request.TransferEncoding, err = splitTokens(p.encodings, value)
 				if err != nil {
 					return true, nil, err
 				}
 
 				te := request.TransferEncoding
-				if len(te) > 0 {
-					if te[len(te)-1] != "chunked" {
-						return true, nil, status.ErrBadEncoding
-					}
-
-					request.Chunked = true
+				if len(te) == 0 || len(te) == 1 && te[0] == "identity" {
+					break
+				} else if len(te) > 0 && te[len(te)-1] != "chunked" {
+					return true, nil, status.ErrBadEncoding
 				}
+
+				request.Chunked = true
 			}
 		}
 
@@ -630,14 +629,18 @@ contentLengthCR:
 }
 
 func (p *Parser) cleanup() {
-	p.metTransferEncoding = false
-	p.headersNumber = 0
 	p.requestLine.Clear()
 	p.headers.Clear()
-	p.contentLength = 0
-	p.acceptEncodings = p.acceptEncodings[:0]
-	p.encodings = p.encodings[:0]
-	p.state = eMethod
+
+	*p = Parser{
+		state:           eMethod,
+		cfg:             p.cfg,
+		request:         p.request,
+		requestLine:     p.requestLine,
+		headers:         p.headers,
+		acceptEncodings: p.acceptEncodings[:0],
+		encodings:       p.encodings[:0],
+	}
 }
 
 func splitTokens(buff []string, value string) (alteredBuff, toks []string, err error) {
