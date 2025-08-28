@@ -32,8 +32,6 @@ type Body struct {
 	form     form.Form
 }
 
-// TODO: body entity can be passed by value (?)
-
 func NewBody(src Fetcher) *Body {
 	return &Body{
 		Fetcher: src,
@@ -176,6 +174,14 @@ func (b *Body) Form() (f form.Form, err error) {
 	default:
 		return nil, status.ErrUnsupportedMediaType
 	}
+}
+
+func (b *Body) Len() int {
+	if b.request.Chunked {
+		return -1
+	}
+
+	return b.request.ContentLength
 }
 
 // Discard sinkholes the rest of the body. Should not be used unless you know what you're doing.
