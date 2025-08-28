@@ -62,7 +62,7 @@ func main() {
 	app := indigo.New(":8080").
 		TLS(":8443", indigo.LocalCert()).
 		Tune(s).
-		Codec(codec.NewGZIP()).
+		Codec(codec.Suit()...).
 		OnBind(func(addr string) {
 			log.Printf("running on %s\n", addr)
 		})

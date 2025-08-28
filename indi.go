@@ -63,8 +63,8 @@ func (a *App) OnStop(cb func()) *App {
 }
 
 // Codec appends a new codec into the list of supported.
-func (a *App) Codec(codec codec.Codec) *App {
-	a.codecs = append(a.codecs, codec)
+func (a *App) Codec(codecs ...codec.Codec) *App {
+	a.codecs = append(a.codecs, codecs...)
 	return a
 }
 
