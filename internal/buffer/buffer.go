@@ -15,6 +15,11 @@ func New(initialSize, maxSize int) *Buffer {
 	}
 }
 
+// AppendBytes is a variadic version of Append.
+func (b *Buffer) AppendBytes(bytes ...byte) (ok bool) {
+	return b.Append(bytes)
+}
+
 // Append writes data, checking whether the new amount of elements (bytes) doesn't exceed the
 // limit, otherwise discarding the data and returning false.
 func (b *Buffer) Append(elements []byte) (ok bool) {

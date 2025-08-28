@@ -150,18 +150,18 @@ path:
 		for i := 0; i < len(data); i++ {
 			switch char := data[i]; char {
 			case '%':
-				if !requestLine.Append(data[checkpoint:i]) {
-					return true, nil, status.ErrURITooLong
-				}
-
 				if len(data[i+1:]) >= 2 {
 					// fast path
 					c := (hexconv.Halfbyte[data[i+1]] << 4) | hexconv.Halfbyte[data[i+2]]
+					if isUnsafeChar(c) {
+						i += 2
+						continue
+					}
 					if isProhibitedChar(c) {
 						return true, nil, status.ErrBadRequest
 					}
 
-					if !requestLine.AppendByte(c) {
+					if !requestLine.Append(data[checkpoint:i]) || !requestLine.AppendByte(c) {
 						return true, nil, status.ErrURITooLong
 					}
 
@@ -169,6 +169,10 @@ path:
 					checkpoint = i + 1
 				} else {
 					// slow path
+					if !requestLine.Append(data[checkpoint:i]) {
+						return true, nil, status.ErrURITooLong
+					}
+
 					data = data[i+1:]
 					goto pathDecode1Char
 				}
@@ -229,6 +233,13 @@ pathDecode2Char:
 		}
 
 		char := (hexconv.Halfbyte[p.urlEncodedChar] << 4) | hexconv.Halfbyte[data[0]]
+		if isUnsafeChar(char) {
+			if !requestLine.AppendBytes('%', p.urlEncodedChar) {
+				return true, nil, status.ErrURITooLong
+			}
+
+			goto path
+		}
 		if isProhibitedChar(char) {
 			return true, nil, status.ErrBadRequest
 		}
@@ -711,6 +722,11 @@ func stripCR(b []byte) []byte {
 	}
 
 	return b
+}
+
+func isUnsafeChar(c byte) bool {
+	// slash is the only symbol that influences path semantics if carelessly decoded
+	return c == '/'
 }
 
 func isProhibitedChar(c byte) bool {

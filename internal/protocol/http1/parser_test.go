@@ -151,21 +151,19 @@ func TestParser(t *testing.T) {
 		}
 
 		compareRequests(t, wanted, request)
-		request.Reset()
 	})
 
-	t.Run("simple GET with leading CRLF", func(t *testing.T) {
+	t.Run("leading CRLF", func(t *testing.T) {
 		raw := "\r\n\r\nGET / HTTP/1.1\r\n\r\n"
-		parser, request := getParser(cfg)
+		parser, _ := getParser(cfg)
 		done, extra, err := parser.Parse([]byte(raw))
 		// unfortunately, we don't support this. Such clients must die.
 		require.Error(t, err, status.ErrBadRequest.Error())
 		require.True(t, done)
 		require.Empty(t, extra)
-		request.Reset()
 	})
 
-	t.Run("normal GET", func(t *testing.T) {
+	t.Run("GET with headers", func(t *testing.T) {
 		raw := "GET / HTTP/1.1\r\nHello: World!\r\nEaster: Egg\r\n\r\n"
 		parser, request := getParser(cfg)
 		done, extra, err := parser.Parse([]byte(raw))
@@ -183,7 +181,6 @@ func TestParser(t *testing.T) {
 		}
 
 		compareRequests(t, wanted, request)
-		request.Reset()
 	})
 
 	t.Run("multiple header values", func(t *testing.T) {
@@ -204,7 +201,6 @@ func TestParser(t *testing.T) {
 		}
 
 		compareRequests(t, wanted, request)
-		request.Reset()
 	})
 
 	t.Run("only lf", func(t *testing.T) {
@@ -225,7 +221,6 @@ func TestParser(t *testing.T) {
 		}
 
 		compareRequests(t, wanted, request)
-		request.Reset()
 	})
 
 	t.Run("fuzz GET", func(t *testing.T) {
@@ -268,7 +263,6 @@ func TestParser(t *testing.T) {
 		}
 
 		compareRequests(t, wanted, request)
-		request.Reset()
 	})
 
 	t.Run("content length", func(t *testing.T) {
@@ -279,6 +273,7 @@ func TestParser(t *testing.T) {
 		require.True(t, done)
 		require.Equal(t, "Hello, world!", string(extra))
 		require.Equal(t, 13, request.ContentLength)
+		require.Equal(t, "13", request.Headers.Value("content-length"))
 		request.Reset()
 
 		raw = "GET / HTTP/1.1\r\nContent-Length: 13\r\nHi-Hi: ha-ha\r\n\r\nHello, world!"
@@ -287,9 +282,8 @@ func TestParser(t *testing.T) {
 		require.True(t, done)
 		require.Equal(t, "Hello, world!", string(extra))
 		require.Equal(t, 13, request.ContentLength)
-		require.True(t, request.Headers.Has("hi-hi"))
+		require.Equal(t, "13", request.Headers.Value("content-length"))
 		require.Equal(t, "ha-ha", request.Headers.Value("hi-hi"))
-		request.Reset()
 	})
 
 	t.Run("connection", func(t *testing.T) {
@@ -300,7 +294,6 @@ func TestParser(t *testing.T) {
 		require.True(t, done)
 		require.Empty(t, string(extra))
 		require.Equal(t, "Keep-Alive", request.Connection)
-		request.Reset()
 	})
 
 	t.Run("Transfer-Encoding and Content-Encoding", func(t *testing.T) {
@@ -313,22 +306,26 @@ func TestParser(t *testing.T) {
 		require.Equal(t, []string{"chunked"}, request.TransferEncoding)
 		require.True(t, request.Chunked)
 		require.Equal(t, []string{"gzip", "deflate"}, request.ContentEncoding)
-		request.Reset()
 	})
 
 	t.Run("urldecode", func(t *testing.T) {
-		parsePath := func(encodedPath string) (string, error) {
-			raw := fmt.Sprintf("GET %s ", encodedPath)
+		parseRequestLine := func(path string) (*http.Request, error) {
+			raw := fmt.Sprintf("GET %s ", path)
 			parser, request := getParser(cfg)
 
 			for i := 0; i < len(raw); i++ {
 				_, _, err := parser.Parse([]byte{raw[i]})
 				if err != nil {
-					return "", err
+					return request, err
 				}
 			}
 
-			return request.Path, nil
+			return request, nil
+		}
+
+		parsePath := func(path string) (string, error) {
+			request, err := parseRequestLine(path)
+			return request.Path, err
 		}
 
 		t.Run("path", func(t *testing.T) {
@@ -340,6 +337,26 @@ func TestParser(t *testing.T) {
 		t.Run("path nonprintable", func(t *testing.T) {
 			_, err := parsePath("/%41%07")
 			require.EqualError(t, err, status.ErrBadRequest.Error())
+		})
+
+		t.Run("unsafe", func(t *testing.T) {
+			test := func(t *testing.T, request *http.Request) {
+				require.Equal(t, "/ foo%2fbar#?", request.Path)
+				require.Equal(t, "bar", request.Params.Value("foo+="))
+			}
+
+			t.Run("slowpath", func(t *testing.T) {
+				request, err := parseRequestLine("/%20foo%2fbar%23%3f?foo%2b%3d=bar")
+				require.NoError(t, err)
+				test(t, request)
+			})
+
+			t.Run("fastpath", func(t *testing.T) {
+				parser, request := getParser(config.Default())
+				_, _, err := parser.Parse([]byte("GET /%20foo%2fbar%23%3f?foo%2b%3d=bar "))
+				require.NoError(t, err)
+				test(t, request)
+			})
 		})
 
 		t.Run("params", func(t *testing.T) {
