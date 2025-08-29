@@ -164,7 +164,7 @@ func getSuit(client transport.Client, codecs ...codec.Codec) (*Suit, *http.Reque
 	cfg := config.Default()
 	r := getInbuiltRouter()
 	req := construct.Request(cfg, client)
-	suit := New(cfg, r, client, req, codecutil.NewCache(codecs))
+	suit := New(cfg, r, client, req, codecutil.NewCache(codecs, codecutil.AcceptEncoding(codecs)))
 	req.Body = http.NewBody(suit)
 
 	return suit, req
@@ -215,14 +215,10 @@ func TestSuit(t *testing.T) {
 		request := construct.Request(config.Default(), dummy.NewNopClient())
 		request.Method = m
 		request.Path = path
-		request.Headers = headers
+		request.Headers = headers.Add("Content-Length", strconv.Itoa(len(body)))
 
-		request.Encoding.Transfer = slices.Collect(headers.Values("Transfer-Encoding"))
-		request.Encoding.Content = slices.Collect(headers.Values("Content-Encoding"))
-
-		if len(request.Encoding.Transfer) == 0 {
-			request.ContentLength = len(body)
-		}
+		request.TransferEncoding = slices.Collect(headers.Values("Transfer-Encoding"))
+		request.ContentEncoding = slices.Collect(headers.Values("Content-Encoding"))
 
 		return serialize.Headers(request) + body
 	}

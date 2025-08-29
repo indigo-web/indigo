@@ -33,8 +33,10 @@ func TCP() Transport {
 	return Transport{
 		inner: transport.NewTCP(),
 		spawnCallback: func(cfg *config.Config, r router.Router, c []codec.Codec) func(net.Conn) {
+			acceptString := codecutil.AcceptEncoding(c)
+
 			return func(conn net.Conn) {
-				serve.HTTP1(cfg, conn, 0, r, codecutil.NewCache(c))
+				serve.HTTP1(cfg, conn, 0, r, codecutil.NewCache(c, acceptString))
 			}
 		},
 	}
@@ -105,9 +107,11 @@ func newTLSTransport(cfg *tls.Config) Transport {
 	return Transport{
 		inner: transport.NewTLS(cfg),
 		spawnCallback: func(cfg *config.Config, r router.Router, c []codec.Codec) func(net.Conn) {
+			acceptString := codecutil.AcceptEncoding(c)
+
 			return func(conn net.Conn) {
 				ver := conn.(*tls.Conn).ConnectionState().Version
-				serve.HTTP1(cfg, conn, ver, r, codecutil.NewCache(c))
+				serve.HTTP1(cfg, conn, ver, r, codecutil.NewCache(c, acceptString))
 			}
 		},
 	}

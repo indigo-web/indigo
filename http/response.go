@@ -40,24 +40,21 @@ func NewResponse() *Response {
 	}
 }
 
-// Code sets a Response code and a corresponding status.
-// In case of unknown code, "Unknown Status Code" will be set as a status
-// code. In this case you should call Status explicitly
+// Code sets the response code. If the code is unrecognized, its default status string
+// is "Nonstandard". Otherwise, it will be chosen automatically unless overridden.
 func (r *Response) Code(code status.Code) *Response {
 	r.fields.Code = code
 	return r
 }
 
-// Status sets a custom status text. This text does not matter at all, and usually
-// totally ignored by client, so there is actually no reasons to use this except some
-// rare cases when you need to represent a Response status text somewhere
+// Status sets a custom status text.
 func (r *Response) Status(status status.Status) *Response {
 	r.fields.Status = status
 	return r
 }
 
 // ContentType is a shorthand for Header("Content-Type", value) with an option of setting
-// a charset. If more than 1 is set, only the first one is used.
+// a charset if at least one is specified. All others are ignored.
 func (r *Response) ContentType(value mime.MIME, charset ...mime.Charset) *Response {
 	if value == mime.Unset {
 		return r
@@ -70,10 +67,18 @@ func (r *Response) ContentType(value mime.MIME, charset ...mime.Charset) *Respon
 	return r.Header("Content-Type", value)
 }
 
-// Compress sets the Content-Encoding value and compresses the outcoming body. Passing the compression
-// token that isn't recognized is a no-op.
-func (r *Response) Compress(token string) *Response {
+// Compress chooses and sets the best suiting compression based on client preferences.
+func (r *Response) Compress() *Response {
+	r.fields.AutoCompress = true
+	r.fields.ContentEncoding = "" // to avoid conflicts, wins the last method applied.
+	return r
+}
+
+// Compression enforces a specific codec to be used, even if it isn't in Accept-Encoding.
+// The method is no-op if the token is not recognized.
+func (r *Response) Compression(token string) *Response {
 	r.fields.ContentEncoding = token
+	r.fields.AutoCompress = false
 	return r
 }
 
@@ -91,18 +96,13 @@ func (r *Response) Header(key string, values ...string) *Response {
 	return r
 }
 
-// Headers simply merges passed headers into Response. Also, it is the only
-// way to specify a quality marker of value. In case headers were not initialized
-// before, Response headers will be set to a passed map, so editing this map
-// will affect Response
+// Headers merges the map into the response headers.
 func (r *Response) Headers(headers map[string][]string) *Response {
-	resp := r
-
 	for k, v := range headers {
-		resp = resp.Header(k, v...)
+		r.Header(k, v...)
 	}
 
-	return resp
+	return r
 }
 
 // String sets the response body.
@@ -110,9 +110,10 @@ func (r *Response) String(body string) *Response {
 	return r.Bytes(uf.S2B(body))
 }
 
-// Bytes sets the response body without copying it.
+// Bytes sets the response body. Please note that the passed slice must not be modified
+// after being passed.
 func (r *Response) Bytes(body []byte) *Response {
-	return r.SizedStream(r.body.Reset(body), int64(len(body)))
+	return r.Stream(r.body.Reset(body), int64(len(body)))
 }
 
 // Write implements io.Reader interface. It always returns n=len(b) and err=nil
@@ -123,7 +124,8 @@ func (r *Response) Write(b []byte) (n int, err error) {
 	return len(b), nil
 }
 
-// TryFile tries to open a file for reading and returns a new Response with attachment.
+// TryFile tries to open a file by the path for reading and sets it as an upload stream if succeeded.
+// Otherwise, the error is returned.
 func (r *Response) TryFile(path string) (*Response, error) {
 	fd, err := os.Open(path)
 	if err != nil {
@@ -141,35 +143,33 @@ func (r *Response) TryFile(path string) (*Response, error) {
 
 	return r.
 		ContentType(mime.Guess(path, mime.HTML)).
-		SizedStream(fd, stat.Size()), nil
+		Stream(fd, stat.Size()), nil
 }
 
-// File opens a file for reading and returns a new Response with attachment, set to the file
-// descriptor.fields. If error occurred, it'll be silently returned
+// File opens a file by the path and sets it as an upload stream if succeeded. Otherwise, the error
+// is silently written instead.
 func (r *Response) File(path string) *Response {
 	resp, err := r.TryFile(path)
-	if err != nil {
-		return r.Error(err)
+	return resp.Error(err)
+}
+
+// Stream sets a reader to be the source of the response's body. If no size is provided AND the reader
+// doesn't have the Len() int method, the stream is considered unsized and therefore will be streamed
+// using chunked transfer encoding. Otherwise, plain transfer is used, unless a compression is applied.
+// Specifying the size of -1 forces the stream to be considered unsized.
+func (r *Response) Stream(reader io.Reader, size ...int64) *Response {
+	type Len interface {
+		Len() int
 	}
 
-	return resp
-}
-
-// Stream sets a reader to be the source of the response's body.
-func (r *Response) Stream(reader io.Reader) *Response {
-	// TODO: we can check whether the reader implements Len() int interface and in that
-	// TODO: case elide the chunked transfer encoding
-	r.fields.Stream = reader
 	r.fields.StreamSize = -1
-	return r
-}
+	if len(size) > 0 {
+		r.fields.StreamSize = size[0]
+	} else if l, ok := reader.(Len); ok {
+		r.fields.StreamSize = int64(l.Len())
+	}
 
-// SizedStream receives a hint of the stream's future size. This helps, for example, uploading files,
-// as in this case we can rely on io.WriterTo interface, which might use more effective kernel mechanisms
-// available, e.g. sendfile(2) for Linux. Passing the size of -1 is effectively equivalent to just Stream().
-func (r *Response) SizedStream(reader io.Reader, size int64) *Response {
 	r.fields.Stream = reader
-	r.fields.StreamSize = size
 	return r
 }
 
@@ -179,8 +179,7 @@ func (r *Response) Cookie(cookies ...cookie.Cookie) *Response {
 	return r
 }
 
-// TryJSON receives a model (must be a pointer to the structure) and returns a new Response
-// object and an error
+// TryJSON tries to serialize the model into JSON.
 func (r *Response) TryJSON(model any) (*Response, error) {
 	stream := json.ConfigDefault.BorrowStream(r)
 	stream.WriteVal(model)
@@ -190,21 +189,17 @@ func (r *Response) TryJSON(model any) (*Response, error) {
 	return r.ContentType(mime.JSON), err
 }
 
-// JSON does the same as TryJSON does, except returned error is being implicitly wrapped
-// by Error
+// JSON serializes the model into JSON and sets the Content-Type to application/json if succeeded.
+// Otherwise, the error is silently written instead.
 func (r *Response) JSON(model any) *Response {
 	resp, err := r.TryJSON(model)
-	if err != nil {
-		return r.Error(err)
-	}
-
-	return resp
+	return resp.Error(err)
 }
 
-// Error returns a response builder with an error set. If passed err is nil, nothing will happen.
-// If an instance of status.HTTPError is passed, error code will be automatically set. Custom
-// codes can be passed, however only first will be used. By default, the error is
-// status.ErrInternalServerError
+// Error returns the response builder with an error set. The nil value for error is a no-op.
+// If the error is an instance of status.HTTPError, its status code is used instead the default one.
+// The default code is status.ErrInternalServerError, which can be overridden if at least one code is
+// specified (all others are ignored).
 func (r *Response) Error(err error, code ...status.Code) *Response {
 	if err == nil {
 		return r
@@ -216,7 +211,6 @@ func (r *Response) Error(err error, code ...status.Code) *Response {
 
 	c := status.InternalServerError
 	if len(code) > 0 {
-		// peek the first, ignore the rest
 		c = code[0]
 	}
 
@@ -225,63 +219,81 @@ func (r *Response) Error(err error, code ...status.Code) *Response {
 		String(err.Error())
 }
 
+// Buffered allows to enable or disable writes deferring. When enabled, data from body stream
+// is read until there is enough space available in an underlying buffer. If the data must be
+// flushed soon possible (e.g. polling or proxying), the option should be disabled.
+//
+// By default, the option is enabled.
+func (r *Response) Buffered(flag bool) *Response {
+	r.fields.Buffered = flag
+	return r
+}
+
 // Expose gives direct access to internal builder fields.
 func (r *Response) Expose() *response.Fields {
 	return &r.fields
 }
 
-// Clear discards everything was done with Response object before.
+// Clear discards all changes.
 func (r *Response) Clear() *Response {
 	r.fields.Clear()
 	return r
 }
 
-// Respond is a shorthand for request.Respond(). May be used as a dummy handler.
+// Respond is a shorthand for request.Respond(). Can be used as a dummy handler.
 func Respond(request *Request) *Response {
 	return request.Respond()
 }
 
-// Code is a shorthand for request.Respond().Code(...)
+// Code sets the response code. If the code is unrecognized, its default status string
+// is "Nonstandard". Otherwise, it will be chosen automatically unless overridden.
 func Code(request *Request, code status.Code) *Response {
 	return request.Respond().Code(code)
 }
 
-// String is a shorthand for request.Respond().String(...)
+// ContentType is a shorthand for request.Respond().ContentType(...)
+//
+// ContentType itself is a shorthand for Header("Content-Type", value)
+// with an option of setting a charset, if at least one is specified. All others are ignored.
+func ContentType(request *Request, contentType mime.MIME, charset ...mime.Charset) *Response {
+	return request.Respond().ContentType(contentType, charset...)
+}
+
+// String sets the response body.
 func String(request *Request, str string) *Response {
 	return request.Respond().String(str)
 }
 
-// Bytes is a shorthand for request.Respond().Bytes(...)
+// Bytes sets the response body. Please note that the passed slice must not be modified
+// after being passed.
 func Bytes(request *Request, b []byte) *Response {
 	return request.Respond().Bytes(b)
 }
 
-// File is a shorthand for request.Respond().File(...)
+// File opens a file by the path and sets it as an upload stream if succeeded. Otherwise, the error
+// is silently written instead.
 func File(request *Request, path string) *Response {
 	return request.Respond().File(path)
 }
 
-// Stream is a shorthand for request.Respond().Stream(...)
-func Stream(request *Request, reader io.Reader) *Response {
-	return request.Respond().Stream(reader)
+// Stream sets a reader to be the source of the response's body. If no size is provided AND the reader
+// doesn't have the Len() int method, the stream is considered unsized and therefore will be streamed
+// using chunked transfer encoding. Otherwise, plain transfer is used, unless a compression is applied.
+// Specifying the size of -1 forces the stream to be considered unsized.
+func Stream(request *Request, reader io.Reader, size ...int64) *Response {
+	return request.Respond().Stream(reader, size...)
 }
 
-// SizedStream is a shorthand for request.Respond().SizedStream(...)
-func SizedStream(request *Request, reader io.Reader, size int64) *Response {
-	return request.Respond().SizedStream(reader, size)
-}
-
-// JSON is a shorthand for request.Respond().JSON(...)
+// JSON serializes the model into JSON and sets the Content-Type to application/json if succeeded.
+// Otherwise, the error is silently written instead.
 func JSON(request *Request, model any) *Response {
 	return request.Respond().JSON(model)
 }
 
-// Error is a shorthand for request.Respond().Error(...)
-//
-// Error returns the response builder with an error set. If passed err is nil, nothing will happen.
-// If an instance of status.HTTPError is passed, its status code is automatically set. Otherwise,
-// status.ErrInternalServerError is used. A custom code can be set. Passing multiple status codes
-// will discard all except the first one.
+// Error returns the response builder with an error set. The nil value for error is a no-op.
+// If the error is an instance of status.HTTPError, its status code is used instead the default one.
+// The default code is status.ErrInternalServerError, which can be overridden if at least one code is
+// specified (all others are ignored).
 func Error(request *Request, err error, code ...status.Code) *Response {
 	return request.Respond().Error(err, code...)
 }

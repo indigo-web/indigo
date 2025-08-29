@@ -30,6 +30,7 @@ func (r *Router) Static(prefix, root string, mwares ...Middleware) *Router {
 			return http.Error(request, status.ErrBadRequest)
 		}
 
+		// TODO: cache descriptors
 		file, err := fs.Open(path)
 		if err != nil {
 			return http.
@@ -45,7 +46,7 @@ func (r *Router) Static(prefix, root string, mwares ...Middleware) *Router {
 		}
 
 		return http.
-			SizedStream(request, file, fstat.Size()).
+			Stream(request, file, fstat.Size()).
 			ContentType(mime.Guess(path))
 	}, mwares...)
 }

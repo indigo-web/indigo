@@ -24,8 +24,8 @@ func init() {
 
 	go func() {
 		for {
-			Time.Store(time.Now().UnixMilli())
 			time.Sleep(Resolution)
+			Time.Store(time.Now().UnixMilli())
 		}
 	}()
 }

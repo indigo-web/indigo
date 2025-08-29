@@ -39,6 +39,7 @@ const (
 	SQL            MIME = "application/sql"
 	TZIF           MIME = "application/tzif"
 	XFDF           MIME = "application/xfdf"
+	HTTP           MIME = "message/http"
 )
 
 // Complies returns whether two MIMEs are compatible. Empty MIME is considered

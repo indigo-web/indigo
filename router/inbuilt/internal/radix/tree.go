@@ -1,9 +1,14 @@
 package radix
 
 import (
+	"cmp"
 	"errors"
+	"fmt"
+	"slices"
+	"strconv"
 	"strings"
 
+	"github.com/indigo-web/indigo/internal/strutil"
 	"github.com/indigo-web/indigo/kv"
 )
 
@@ -41,12 +46,11 @@ func (n *Node[T]) Lookup(key string, wildcards *kv.Storage) (value T, found bool
 
 loop:
 	for len(key) > 0 {
-		for _, p := range node.predecessors {
-			if strings.HasPrefix(key, p.value) {
-				key = key[len(p.value):]
-				node = p
-				continue loop
-			}
+		p, found := node.findPredecessor(key)
+		if found {
+			key = key[len(p.value):]
+			node = p
+			continue loop
 		}
 
 		if node.dyn == nil {
@@ -94,6 +98,34 @@ loop:
 	return node.payload, node.isLeaf
 }
 
+func (n *Node[T]) findPredecessor(key string) (*Node[T], bool) {
+	// Proudly stolen from sort package.
+	// Inlining is faster than calling BinarySearchFunc with a lambda.
+	u := len(n.predecessors)
+	// Define x[-1] < target and x[n] >= target.
+	// Invariant: x[i-1] < target, x[j] >= target.
+	i, j := 0, u
+	for i < j {
+		h := int(uint(i+j) >> 1) // avoid overflow when computing h
+		// i ≤ h < j
+		pred := n.predecessors[h]
+		keyprefix := min(len(key), len(pred.value))
+		if cmp.Less(pred.value, key[:keyprefix]) {
+			i = h + 1 // preserves x[i-1] < target
+		} else {
+			j = h // preserves x[j] >= target
+		}
+	}
+
+	if i >= u {
+		return nil, false
+	}
+
+	pred := n.predecessors[i]
+	// i == j, x[i-1] < target, and x[j] (= x[i]) >= target  =>  answer is i.
+	return pred, i < u && strings.HasPrefix(key, pred.value)
+}
+
 func addWildcard(wildcard, value string, into *kv.Storage) {
 	if len(wildcard) > 0 {
 		into.Add(wildcard, value)
@@ -101,7 +133,12 @@ func addWildcard(wildcard, value string, into *kv.Storage) {
 }
 
 func (n *Node[T]) Insert(key string, value T) error {
-	return n.insert(splitPath(key), value)
+	str, ok := strutil.URLDecode(key)
+	if !ok {
+		return fmt.Errorf("poorly encoded path: %s", strconv.Quote(key))
+	}
+
+	return n.insert(splitPath(str), value)
 }
 
 func (n *Node[T]) insert(segs []pathSegment, value T) error {
@@ -164,13 +201,25 @@ func (n *Node[T]) insert(segs []pathSegment, value T) error {
 	}
 
 	newNode := &Node[T]{value: seg.Value}
-	n.predecessors = append(n.predecessors, newNode)
+	n.appendPredecessor(newNode)
 
 	return newNode.insert(segs[1:], value)
 }
 
-func IsDynamicTemplate(str string) bool {
-	return strings.IndexByte(str, ':') != -1
+func (n *Node[T]) appendPredecessor(node *Node[T]) {
+	for i, pred := range n.predecessors {
+		if node.value < pred.value {
+			n.predecessors = slices.Insert(n.predecessors, i, node)
+			return
+		}
+	}
+
+	n.predecessors = append(n.predecessors, node)
+}
+
+func IsDynamicTemplate(path string) bool {
+	segs := splitPath(path)
+	return len(segs) > 1 || segs[0].IsWildcard
 }
 
 func truncCommon(segs []pathSegment, length int) []pathSegment {
@@ -197,15 +246,15 @@ type pathSegment struct {
 	Value      string
 }
 
-func splitPath(str string) (result []pathSegment) {
+func splitPath(str string) (path []pathSegment) {
 	for len(str) > 0 {
 		colon := strings.IndexByte(str, ':')
 		if colon == -1 {
-			result = append(result, pathSegment{false, false, str})
+			path = append(path, pathSegment{false, false, str})
 			break
 		}
 
-		result = append(result, pathSegment{false, false, str[:colon]})
+		path = append(path, pathSegment{false, false, str[:colon]})
 		str = str[colon+1:]
 
 		boundary := strings.IndexByte(str, '/')
@@ -216,11 +265,11 @@ func splitPath(str string) (result []pathSegment) {
 		wildcard := str[:boundary]
 		greedy := false
 		if strings.HasSuffix(wildcard, "...") {
-			wildcard = wildcard[:len(wildcard)-3]
+			wildcard = wildcard[:len(wildcard)-len("...")]
 			greedy = true
 		}
 
-		result = append(result, pathSegment{true, greedy, wildcard})
+		path = append(path, pathSegment{true, greedy, wildcard})
 		if boundary < len(str) {
 			boundary++
 		}
@@ -228,5 +277,5 @@ func splitPath(str string) (result []pathSegment) {
 		str = str[boundary:]
 	}
 
-	return result
+	return path
 }

@@ -16,7 +16,9 @@ func (f Form) Name(name string) iter.Seq[Data] {
 	return func(yield func(Data) bool) {
 		for _, entry := range f {
 			if entry.Name == name {
-				yield(entry)
+				if !yield(entry) {
+					break
+				}
 			}
 		}
 	}
@@ -26,7 +28,9 @@ func (f Form) File(name string) iter.Seq[Data] {
 	return func(yield func(Data) bool) {
 		for _, entry := range f {
 			if entry.Filename == name {
-				yield(entry)
+				if !yield(entry) {
+					break
+				}
 			}
 		}
 	}

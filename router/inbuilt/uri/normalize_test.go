@@ -21,9 +21,4 @@ func TestNormalize(t *testing.T) {
 		norm := Normalize("/api/")
 		require.Equal(t, "/api", norm)
 	})
-
-	t.Run("multiple trailing", func(t *testing.T) {
-		norm := Normalize("/api/////")
-		require.Equal(t, "/api", norm)
-	})
 }

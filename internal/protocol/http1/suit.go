@@ -97,7 +97,7 @@ func (s *Suit) serve(once bool) (ok bool) {
 		request.Body.Reset(request)
 		s.body.Reset(request)
 
-		transferEncoding := request.Encoding.Transfer
+		transferEncoding := request.TransferEncoding
 		if !validateTransferEncodingTokens(transferEncoding) {
 			resp := respond(request, s.router.OnError(request, status.ErrUnsupportedEncoding))
 			_ = s.Write(request.Protocol, resp)
@@ -115,7 +115,7 @@ func (s *Suit) serve(once bool) (ok bool) {
 			}
 		}
 
-		if err = s.applyDecoders(request.Encoding.Content); err != nil {
+		if err = s.applyDecoders(request.ContentEncoding); err != nil {
 			resp := respond(request, s.router.OnError(request, err))
 			_ = s.Write(request.Protocol, resp)
 			return false
@@ -192,6 +192,7 @@ func validateTransferEncodingTokens(tokens []string) bool {
 
 func (s *Suit) applyDecoders(tokens []string) error {
 	request := s.Parser.request
+	bufferSize := s.Parser.cfg.NET.ReadBufferSize
 
 	for i := len(tokens); i > 0; i-- {
 		c := s.codecs.Get(tokens[i-1])
@@ -199,7 +200,7 @@ func (s *Suit) applyDecoders(tokens []string) error {
 			return status.ErrUnsupportedEncoding
 		}
 
-		if err := c.ResetDecompressor(request.Body.Fetcher); err != nil {
+		if err := c.ResetDecompressor(request.Body.Fetcher, bufferSize); err != nil {
 			return status.ErrInternalServerError
 		}
 

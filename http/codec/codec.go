@@ -23,6 +23,14 @@ type Compressor interface {
 }
 
 type Decompressor interface {
-	ResetDecompressor(source http.Fetcher) error
 	http.Fetcher
+	ResetDecompressor(source http.Fetcher, bufferSize int) error
+}
+
+// Suit is a collection of out-of-the-box supported codecs. It contains:
+//   - gzip
+//   - deflate
+//   - zstd
+func Suit() []Codec {
+	return []Codec{NewGZIP(), NewDeflate(), NewZSTD()}
 }

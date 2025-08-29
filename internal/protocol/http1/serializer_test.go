@@ -20,12 +20,13 @@ import (
 	"github.com/indigo-web/indigo/http/proto"
 	"github.com/indigo-web/indigo/internal/codecutil"
 	"github.com/indigo-web/indigo/internal/construct"
+	respfields "github.com/indigo-web/indigo/internal/response"
 	"github.com/indigo-web/indigo/kv"
 	"github.com/indigo-web/indigo/transport/dummy"
 	"github.com/stretchr/testify/require"
 )
 
-var noCodecs = codecutil.NewCache(nil)
+var noCodecs = codecutil.NewCache(nil, "identity")
 
 func BenchmarkSerializer(b *testing.B) {
 	getRequest := func(cfg *config.Config, m method.Method) *http.Request {
@@ -34,9 +35,10 @@ func BenchmarkSerializer(b *testing.B) {
 		return request
 	}
 
-	getSerializer := func(cfg *config.Config, m method.Method) *serializer {
+	getSerializer := func(cfg *config.Config, m method.Method, codecs ...codec.Codec) *serializer {
 		buff := make([]byte, 0, cfg.NET.WriteBufferSize.Default)
-		return newSerializer(cfg, getRequest(cfg, method.GET), new(dummy.NopClient), noCodecs, buff)
+		cache := codecutil.NewCache(codecs, codecutil.AcceptEncoding(codecs))
+		return newSerializer(cfg, getRequest(cfg, method.GET), new(dummy.NopClient), cache, buff)
 	}
 
 	getResponseWithHeaders := func(n int) *http.Response {
@@ -107,100 +109,52 @@ func BenchmarkSerializer(b *testing.B) {
 	})
 
 	b.Run("stream", func(b *testing.B) {
-		b.Run("sized 512b", func(b *testing.B) {
-			content := strings.Repeat("a", 512)
-			resp := http.NewResponse()
-			s := getSerializer(config.Default(), method.GET)
-			b.SetBytes(512)
-			b.ReportAllocs()
-			b.ResetTimer()
+		benchSized := func(n int) func(b *testing.B) {
+			return func(b *testing.B) {
+				content := strings.Repeat("a", n)
+				resp := http.NewResponse()
+				s := getSerializer(config.Default(), method.GET)
+				b.SetBytes(int64(n))
+				b.ReportAllocs()
+				b.ResetTimer()
 
-			for range b.N {
-				_ = s.Write(proto.HTTP11, resp.String(content))
+				for range b.N {
+					_ = s.Write(proto.HTTP11, resp.String(content))
+				}
 			}
-		})
+		}
 
-		b.Run("unsized 32x16", func(b *testing.B) {
-			r := &circularReader{
-				n:    32,
-				data: []byte(strings.Repeat("a", 16)),
+		benchUnsized := func(n, chunklen int, compression ...string) func(b *testing.B) {
+			return func(b *testing.B) {
+				compress := ""
+				if len(compression) > 0 {
+					compress = compression[0]
+				}
+
+				r := &circularReader{
+					n:    n,
+					data: []byte(strings.Repeat("a", chunklen)),
+				}
+				resp := http.NewResponse()
+				s := getSerializer(config.Default(), method.GET, codec.NewGZIP())
+				b.SetBytes(int64(n * chunklen))
+				b.ReportAllocs()
+				b.ResetTimer()
+
+				for range b.N {
+					r.n = n
+					_ = s.Write(proto.HTTP11, resp.Stream(r).Compression(compress))
+				}
 			}
-			resp := http.NewResponse()
-			s := getSerializer(config.Default(), method.GET)
-			b.SetBytes(512)
-			b.ReportAllocs()
-			b.ResetTimer()
+		}
 
-			for range b.N {
-				r.n = 32
-				_ = s.Write(proto.HTTP11, resp.Stream(r))
-			}
-		})
-
-		b.Run("unsized 8x64", func(b *testing.B) {
-			r := &circularReader{
-				n:    8,
-				data: []byte(strings.Repeat("a", 64)),
-			}
-			resp := http.NewResponse()
-			s := getSerializer(config.Default(), method.GET)
-			b.SetBytes(512)
-			b.ReportAllocs()
-			b.ResetTimer()
-
-			for range b.N {
-				r.n = 8
-				_ = s.Write(proto.HTTP11, resp.Stream(r))
-			}
-		})
-
-		b.Run("sized 262144b", func(b *testing.B) {
-			// 262144 = 16 * 16384 = 8 * 32768
-			content := strings.Repeat("a", 262144)
-			resp := http.NewResponse()
-			s := getSerializer(config.Default(), method.GET)
-			b.SetBytes(262144)
-			b.ReportAllocs()
-			b.ResetTimer()
-
-			for range b.N {
-				_ = s.Write(proto.HTTP11, resp.String(content))
-			}
-		})
-
-		b.Run("unsized 16x16384", func(b *testing.B) {
-			r := &circularReader{
-				n:    16,
-				data: []byte(strings.Repeat("a", 16384)),
-			}
-			resp := http.NewResponse()
-			s := getSerializer(config.Default(), method.GET)
-			b.SetBytes(262144)
-			b.ReportAllocs()
-			b.ResetTimer()
-
-			for range b.N {
-				r.n = 16
-				_ = s.Write(proto.HTTP11, resp.Stream(r))
-			}
-		})
-
-		b.Run("unsized 8x32768", func(b *testing.B) {
-			r := &circularReader{
-				n:    8,
-				data: []byte(strings.Repeat("a", 32768)),
-			}
-			resp := http.NewResponse()
-			s := getSerializer(config.Default(), method.GET)
-			b.SetBytes(262144)
-			b.ReportAllocs()
-			b.ResetTimer()
-
-			for range b.N {
-				r.n = 8
-				_ = s.Write(proto.HTTP11, resp.Stream(r))
-			}
-		})
+		b.Run("sized 512b", benchSized(512))
+		b.Run("unsized 32x16", benchUnsized(32, 16))
+		b.Run("unsized 8x64", benchUnsized(8, 64))
+		b.Run("sized 262144b", benchSized(262144))
+		b.Run("unsized 16x16384", benchUnsized(16, 16384))
+		b.Run("gzipped 16x16384", benchUnsized(16, 16384, "gzip"))
+		b.Run("unsized 8x32768", benchUnsized(8, 32768))
 	})
 }
 
@@ -401,7 +355,7 @@ func TestSerializer(t *testing.T) {
 
 	t.Run("streams", func(t *testing.T) {
 		request := newRequest(method.GET)
-		codecs := codecutil.NewCache([]codec.Codec{codec.NewGZIP()})
+		codecs := codecutil.NewCache([]codec.Codec{codec.NewGZIP()}, codec.NewGZIP().Token())
 		s, w := getSerializer(nil, request, codecs)
 
 		testSized := func(t *testing.T, method string, contentLength int, body string, contentEncoding ...string) {
@@ -463,7 +417,7 @@ func TestSerializer(t *testing.T) {
 		t.Run("unsized", func(t *testing.T) {
 			w.Reset()
 			request.Method = method.GET
-			resp := http.NewResponse().Stream(strings.NewReader(helloworld))
+			resp := http.NewResponse().Stream(strings.NewReader(helloworld), -1)
 			require.NoError(t, s.Write(proto.HTTP11, resp))
 			testUnsized(t, "GET", helloworld)
 		})
@@ -479,7 +433,7 @@ func TestSerializer(t *testing.T) {
 		t.Run("HEAD unsized", func(t *testing.T) {
 			w.Reset()
 			request.Method = method.HEAD
-			resp := http.NewResponse().Stream(strings.NewReader(helloworld))
+			resp := http.NewResponse().Stream(strings.NewReader(helloworld), -1)
 			require.NoError(t, s.Write(proto.HTTP11, resp))
 			testUnsized(t, "HEAD", "")
 		})
@@ -489,7 +443,7 @@ func TestSerializer(t *testing.T) {
 		t.Run("HEAD WriterTo", func(t *testing.T) {
 			w.Reset()
 			request.Method = method.HEAD
-			resp := http.NewResponse().SizedStream(strings.NewReader(helloworld), int64(len(helloworld)))
+			resp := http.NewResponse().Stream(strings.NewReader(helloworld))
 			require.NoError(t, s.Write(proto.HTTP11, resp))
 
 			testSized(t, "HEAD", len(helloworld), "")
@@ -498,8 +452,11 @@ func TestSerializer(t *testing.T) {
 		testGZIP := func(t *testing.T, resp *http.Response) {
 			w.Reset()
 			request.Method = method.GET
+			request.AcceptEncoding = []string{"gzip"}
 
-			require.NoError(t, s.Write(proto.HTTP11, resp.Compress("gzip")))
+			// enforce gzip, because otherwise sized stream is unlikely to be compressed
+			// due to smallness.
+			require.NoError(t, s.Write(proto.HTTP11, resp.Compression("gzip")))
 			wantBody := encodeGZIP(helloworld)
 			testUnsized(t, "GET", string(wantBody), "gzip")
 		}
@@ -509,13 +466,13 @@ func TestSerializer(t *testing.T) {
 		})
 
 		t.Run("unsized GZIP", func(t *testing.T) {
-			testGZIP(t, http.NewResponse().Stream(strings.NewReader(helloworld)))
+			testGZIP(t, http.NewResponse().Stream(strings.NewReader(helloworld), -1))
 		})
 
 		t.Run("sized WriterTo", func(t *testing.T) {
 			w.Reset()
 			request.Method = method.GET
-			resp := http.NewResponse().SizedStream(strings.NewReader(helloworld), int64(len(helloworld)))
+			resp := http.NewResponse().Stream(strings.NewReader(helloworld))
 			require.NoError(t, s.Write(proto.HTTP11, resp))
 
 			testSized(t, "GET", len(helloworld), helloworld)
@@ -530,12 +487,19 @@ func TestSerializer(t *testing.T) {
 				return s, string(w.Written())
 			}
 
+			testResp := func(t *testing.T, resp string) {
+				// the point is to make sure the written response is a valid HTTP
+				_, err := parseHTTP11Response("GET", []byte(resp))
+				require.NoError(t, err)
+			}
+
 			t.Run("fill the buffer exactly full", func(t *testing.T) {
 				// estimate headers length, so we can know how many bytes of body we need to trigger the growth
 				const buffsize = 128
 				s, defaultResponse := writeResp(t, http.NewResponse(), buffsize, config.Default())
 				want := strings.Repeat("a", cap(s.buff)-len(defaultResponse)-1)
-				s, _ = writeResp(t, http.NewResponse().String(want), buffsize, config.Default())
+				s, resp := writeResp(t, http.NewResponse().String(want), buffsize, config.Default())
+				testResp(t, resp)
 				require.Equal(t, cap(s.buff), buffsize)
 			})
 
@@ -543,7 +507,8 @@ func TestSerializer(t *testing.T) {
 				const buffsize = 128
 				s, defaultResponse := writeResp(t, http.NewResponse(), buffsize, config.Default())
 				want := strings.Repeat("a", cap(s.buff)-len(defaultResponse)+1)
-				s, _ = writeResp(t, http.NewResponse().String(want), buffsize, config.Default())
+				s, resp := writeResp(t, http.NewResponse().String(want), buffsize, config.Default())
+				testResp(t, resp)
 				require.Greater(t, cap(s.buff), buffsize)
 			})
 
@@ -552,7 +517,8 @@ func TestSerializer(t *testing.T) {
 				cfg := config.Default()
 				cfg.NET.WriteBufferSize.Maximal = buffsize
 				b := strings.Repeat("a", buffsize)
-				s, _ := writeResp(t, http.NewResponse().String(b), buffsize-1, cfg)
+				s, resp := writeResp(t, http.NewResponse().String(b), buffsize-1, cfg)
+				testResp(t, resp)
 				wantBuffsize := cap(slices.Grow(make([]byte, buffsize-1), 1))
 				require.Equal(t, wantBuffsize, cap(s.buff))
 			})
@@ -561,9 +527,10 @@ func TestSerializer(t *testing.T) {
 
 	t.Run("writer", func(t *testing.T) {
 		t.Run("identity", func(t *testing.T) {
-			t.Run("flush", func(t *testing.T) {
+			t.Run("flush buffered", func(t *testing.T) {
 				s, w := getSerializer(nil, newRequest(method.GET), noCodecs)
 				s.buff = make([]byte, 0, 16)
+				s.response = &respfields.Fields{Buffered: true}
 				writer := identityWriter{s}
 				_, err := writer.Write(bytes.Repeat([]byte("a"), 10))
 				require.NoError(t, err)
@@ -580,6 +547,7 @@ func TestSerializer(t *testing.T) {
 				client := dummy.NewMockClient().Journaling()
 				buff := make([]byte, 0, cfg.NET.WriteBufferSize.Default)
 				s := newSerializer(cfg, newRequest(method.GET), client, codecs, buff)
+				s.response = http.NewResponse().Expose()
 
 				return s, client
 			}
@@ -609,18 +577,11 @@ func TestSerializer(t *testing.T) {
 				require.NoError(t, writer.Close())
 			}
 
-			t.Run("elide zerofill", func(t *testing.T) {
-				s, w := init(config.Default(), noCodecs)
-				encodeChunked(t, s, "Hello, ", "world!")
-				want := "7\r\nHello, \r\n6\r\nworld!\r\n0\r\n\r\n"
-				require.Equal(t, want, string(w.Written()))
-			})
-
-			t.Run("use zerofill", func(t *testing.T) {
+			t.Run("preserve prior data", func(t *testing.T) {
 				s, w := init(config.Default(), noCodecs)
 				s.buff = append(s.buff, "Foo! "...)
 				encodeChunked(t, s, "Hello, ", "world!")
-				want := "Foo! 7;0\r\nHello, \r\n6\r\nworld!\r\n0\r\n\r\n"
+				want := "Foo! 007\r\nHello, \r\n006\r\nworld!\r\n0\r\n\r\n"
 				require.Equal(t, want, string(w.Written()))
 			})
 
@@ -640,15 +601,41 @@ func TestSerializer(t *testing.T) {
 				cfg := config.Default()
 				cfg.NET.WriteBufferSize.Default = writeBufferSize
 				s, w := init(cfg, noCodecs)
-				encodeChunked(t, s, "Hello, world!")
-				want := "2\r\nHe\r\n9\r\nllo, worl\r\n2\r\nd!\r\n0\r\n\r\n"
+				encodeChunked2(t, s, "Hello, world!")
+				want := "2\r\nHe\r\n9\r\nllo, worl\r\n02\r\nd!\r\n0\r\n\r\n"
 				require.Equal(t, want, string(w.Written()))
 			})
 
 			t.Run("ReaderFrom", func(t *testing.T) {
 				s, w := init(config.Default(), noCodecs)
 				encodeChunked2(t, s, "Hello, ", "world!")
-				want := "7\r\nHello, \r\n6\r\nworld!\r\n0\r\n\r\n"
+				want := "007\r\nHello, \r\n006\r\nworld!\r\n0\r\n\r\n"
+				require.Equal(t, want, string(w.Written()))
+			})
+
+			t.Run("buffered", func(t *testing.T) {
+				const writeBufferSize = 32
+				cfg := config.Default()
+				cfg.NET.WriteBufferSize.Default = writeBufferSize
+				cfg.NET.WriteBufferSize.Maximal = writeBufferSize
+				s, w := init(cfg, noCodecs)
+				s.response = &respfields.Fields{Buffered: true}
+				writer := chunkedWriter{s}
+
+				writeChunks := func(t *testing.T, data ...string) {
+					for _, chunk := range data {
+						_, err := writer.Write([]byte(chunk))
+						require.NoError(t, err)
+					}
+				}
+
+				writeChunks(t, "a", "b", "c")
+				require.Empty(t, string(w.Written()))
+
+				bigchunk := strings.Repeat("a", writeBufferSize)
+				writeChunks(t, bigchunk)
+				require.NoError(t, writer.Close())
+				want := "01\r\na\r\n01\r\nb\r\n01\r\nc\r\n6\r\n" + bigchunk[:6] + "\r\n1a\r\n" + bigchunk[6:] + "\r\n0\r\n\r\n"
 				require.Equal(t, want, string(w.Written()))
 			})
 		})

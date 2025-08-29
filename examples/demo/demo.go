@@ -62,7 +62,7 @@ func main() {
 	app := indigo.New(":8080").
 		TLS(":8443", indigo.LocalCert()).
 		Tune(s).
-		Codec(codec.NewGZIP()).
+		Codec(codec.Suit()...).
 		OnBind(func(addr string) {
 			log.Printf("running on %s\n", addr)
 		})
@@ -71,9 +71,13 @@ func main() {
 		Use(middleware.LogRequests()).
 		Alias("/", "/static/index.html", method.GET).
 		Alias("/favicon.ico", "/static/favicon.ico", method.GET).
-		Static("/static", "examples/demo/static")
+		Static("/static", "examples/demo/static", middleware.Autocompress)
 
 	r.Get("/stress", Stressful, middleware.Recover)
+
+	r.Post("/echo", func(request *http.Request) *http.Response {
+		return http.Stream(request, request.Body)
+	})
 
 	r.Resource("/").
 		Post(IndexSay)

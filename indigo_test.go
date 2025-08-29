@@ -182,6 +182,7 @@ func TestFirstPhase(t *testing.T) {
 	app := New(addr)
 	go func(app *App) {
 		r := getInbuiltRouter().
+			EnableTRACE(true).
 			Use(
 				middleware.CustomContext(
 					context.WithValue(context.Background(), "easter", "egg"),
@@ -205,7 +206,7 @@ func TestFirstPhase(t *testing.T) {
 
 	<-ch
 	// Ensure the server is ready to accept connections
-	waitForAvailability(t)
+	waitForAvailability(t, addr, altAddr, httpsAddr)
 
 	t.Run("root get", func(t *testing.T) {
 		resp, err := stdhttp.DefaultClient.Get(appURL + "/")
@@ -401,13 +402,13 @@ func TestFirstPhase(t *testing.T) {
 		testStatic(t, "pics.vfs", mime.Unset)
 	})
 
-	t.Run("trace", func(t *testing.T) {
+	t.Run("TRACE", func(t *testing.T) {
 		request := &stdhttp.Request{
 			Method: stdhttp.MethodTrace,
 			URL: &url.URL{
 				Scheme: "http",
 				Host:   addr,
-				Path:   "/",
+				Path:   "/any-endpoint-is-good",
 			},
 			Proto:      "HTTP/1.1",
 			ProtoMajor: 1,
@@ -421,33 +422,9 @@ func TestFirstPhase(t *testing.T) {
 		resp, err := stdhttp.DefaultClient.Do(request)
 		require.NoError(t, err)
 		require.Equal(t, stdhttp.StatusOK, resp.StatusCode)
-		require.Contains(t, resp.Header, "Content-Type")
-		require.Equal(t, 1, len(resp.Header["Content-Type"]), "too many content-type values")
-		require.Equal(t, "message/http", resp.Header["Content-Type"][0])
-
-		dataBytes, err := io.ReadAll(resp.Body)
-		data := string(dataBytes)
-		require.NoError(t, err)
-
-		wantRequestLine := "TRACE / HTTP/1.1\r\n"
-		require.Greater(t, len(data), len(wantRequestLine))
-		require.Equal(t, wantRequestLine, data[:len(wantRequestLine)])
-
-		headerLines := strings.Split(data[len(wantRequestLine):], "\r\n")
-		// request is terminated with \r\n\r\n, so 2 last values in headerLines
-		// are empty strings. Remove them
-		headerLines = headerLines[:len(headerLines)-2]
-		wantHeaderLines := []string{
-			"Hello: World!",
-			"Host: " + addr,
-			"User-Agent: Go-http-client/1.1",
-			"Accept-Encoding: gzip",
-			"Content-Length: 0",
-		}
-
-		for _, line := range headerLines {
-			require.True(t, slices.Contains(wantHeaderLines, line), "unwanted header line: "+line)
-		}
+		require.Equal(t, []string{"message/http"}, resp.Header["Content-Type"])
+		// the actual content isn't that important, considering it's already covered by
+		// tests in router/inbuilt/trace_test.go. More importantly, we got a 200 OK response
 	})
 
 	t.Run("not allowed method", func(t *testing.T) {
@@ -718,7 +695,7 @@ func TestSecondPhase(t *testing.T) {
 		s.NET.ReadTimeout = 1 * time.Second
 		_ = app.
 			Tune(s).
-			Codec(codec.NewGZIP()).
+			Codec(codec.Suit()...).
 			OnStart(func() {
 				ch <- struct{}{}
 			}).
@@ -729,13 +706,35 @@ func TestSecondPhase(t *testing.T) {
 	}(app)
 
 	<-ch
-	waitForAvailability(t)
+	waitForAvailability(t, addr)
+
+	t.Run("TRACE", func(t *testing.T) {
+		request := &stdhttp.Request{
+			Method: stdhttp.MethodTrace,
+			URL: &url.URL{
+				Scheme: "http",
+				Host:   addr,
+				Path:   "/any-endpoint-is-good",
+			},
+			Proto:      "HTTP/1.1",
+			ProtoMajor: 1,
+			ProtoMinor: 1,
+			Header: stdhttp.Header{
+				"Hello": {"World!"},
+			},
+			Host:       addr,
+			RemoteAddr: addr,
+		}
+		resp, err := stdhttp.DefaultClient.Do(request)
+		require.NoError(t, err)
+		require.Equal(t, stdhttp.StatusMethodNotAllowed, resp.StatusCode)
+	})
 
 	t.Run("accept encoding", func(t *testing.T) {
 		resp, err := stdhttp.DefaultClient.Head(appURL + "/")
 		require.NoError(t, err)
 		require.Equal(t, stdhttp.StatusOK, resp.StatusCode)
-		require.Equal(t, []string{"gzip"}, resp.Header["Accept-Encoding"])
+		require.Equal(t, []string{"gzip, deflate, zstd"}, resp.Header["Accept-Encoding"])
 		require.Empty(t, readFullBody(t, resp))
 	})
 
@@ -833,18 +832,64 @@ func TestSecondPhase(t *testing.T) {
 	})
 }
 
-func waitForAvailability(t *testing.T) {
-	deadline := time.Now().Add(2 * time.Second)
-	for {
-		conn, err := net.Dial("tcp4", addr)
-		if err == nil {
-			_ = conn.Close()
-			break
+func TestEscaping(t *testing.T) {
+	runTest := func(dynamic bool) func(t *testing.T) {
+		return func(t *testing.T) {
+			app := New(addr)
+			go func(app *App) {
+				r := inbuilt.New().
+					Get("/foo%2fbar", func(request *http.Request) *http.Response {
+						return http.Code(request, 201)
+					}).
+					Get("/foo%3abar", func(request *http.Request) *http.Response {
+						return http.Code(request, 202)
+					})
+
+				if dynamic {
+					r.Get("/ :", http.Respond) // unreachable endpoint
+				}
+
+				_ = app.Serve(r)
+			}(app)
+
+			waitForAvailability(t, addr)
+
+			test := func(path string, wantCode int) func(t *testing.T) {
+				return func(t *testing.T) {
+					resp, err := stdhttp.Get(appURL + path)
+					require.NoError(t, err)
+					require.Equal(t, wantCode, resp.StatusCode)
+				}
+			}
+
+			t.Run("escaped slash", test("/foo%2fbar", 201))
+			t.Run("escaped unnormalized slash", test("/foo%2Fbar", 201))
+			t.Run("unescaped slash", test("/foo/bar", 404))
+
+			t.Run("escaped colon", test("/foo%3abar", 202))
+			t.Run("escaped unnormalized colon", test("/foo%3Abar", 202))
+			t.Run("unescaped colon", test("/foo:bar", 202))
 		}
-		if time.Now().After(deadline) {
-			t.Fatalf("server did not start listening on %s in time: %v", addr, err)
+	}
+
+	t.Run("static", runTest(false))
+	t.Run("dynamic", runTest(true))
+}
+
+func waitForAvailability(t *testing.T, addrs ...string) {
+	for _, addr := range addrs {
+		deadline := time.Now().Add(2 * time.Second)
+		for {
+			conn, err := net.Dial("tcp4", addr)
+			if err == nil {
+				_ = conn.Close()
+				break
+			}
+			if time.Now().After(deadline) {
+				t.Fatalf("server did not start listening on %s in time: %v", addr, err)
+			}
+			time.Sleep(50 * time.Millisecond)
 		}
-		time.Sleep(50 * time.Millisecond)
 	}
 }
 

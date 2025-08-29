@@ -23,7 +23,7 @@ func Shout(r *http.Request) *http.Response {
 
 func main() {
 	app := indigo.New(":8080").
-		Codec(codec.NewGZIP()).
+		Codec(codec.Suit()...).
 		OnBind(func(addr string) {
 			fmt.Println("Listening on", addr)
 		})

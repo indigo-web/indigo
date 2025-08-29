@@ -72,8 +72,8 @@ type (
 		// any request with body (each call to request's body will result in status.ErrBodyTooLarge).
 		// In order to disable the setting, use the math.MaxUInt64 value.
 		MaxSize uint64
-		//// DecodingBufferSize is a size of a buffer, used to store decoded request's body
-		//DecodingBufferSize int
+		// Form is either application/x-www-form-urlencoded or multipart/form-data. Due to their common
+		// nature, they are easy to be generalized.
 		Form BodyForm
 	}
 
@@ -96,6 +96,10 @@ type (
 		//  2) If a stream is unsized (1) and the previous write used more than ~98.44% of its
 		//   capacity (2), the capacity doubles.
 		WriteBufferSize NETWriteBufferSize
+		// SmallBody limits how big must a response body be in order to be compressed, if the
+		// auto compression option is enabled. This setting doesn't affect enforced compression
+		// options and unsized streams.
+		SmallBody int64
 	}
 )
 
@@ -158,6 +162,7 @@ func Default() *Config {
 				Default: 2 * 1024,
 				Maximal: 64 * 1024,
 			},
+			SmallBody: 4 * 1024,
 		},
 	}
 }

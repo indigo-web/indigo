@@ -1,52 +1,184 @@
 package inbuilt
 
 import (
+	"path"
+
 	"github.com/indigo-web/indigo/http"
 	"github.com/indigo-web/indigo/http/method"
 	"github.com/indigo-web/indigo/http/status"
 	"github.com/indigo-web/indigo/router"
-	"github.com/indigo-web/indigo/router/inbuilt/internal/radix"
+	"github.com/indigo-web/indigo/router/inbuilt/internal"
+	"github.com/indigo-web/indigo/router/inbuilt/mutator"
 	"github.com/indigo-web/indigo/router/inbuilt/uri"
 )
 
+// Middleware works like a chain of nested calls, next may be even directly
+// handler. But if we are not a closing middleware, we will call next
+// middleware that is simply a partial middleware with already provided next
+type Middleware func(next Handler, request *http.Request) *http.Response
+
 var _ router.Builder = new(Router)
 
-// Router is a built-in routing entity. It provides support for all the methods defined in
-// the methods package, including shortcuts for those. It also supports dynamic routing
-// (enabled automatically if dynamic path template is registered; otherwise more performant
-// static-routing implementation is used). It also provides custom error handlers for any
-// HTTP error that may occur during parsing the request or the routing of it by itself.
-// By default, TRACE requests are supported (if no handler is attached, the request will be
-// automatically processed), OPTIONS (including server-wide ones) and 405 Method Not Allowed
-// errors in compliance with their HTTP semantics.
+// Router is a recommended router for indigo. It features groups, middlewares, pre-middlewares,
+// resources, automatic OPTIONS and TRACE response capabilities and dynamic routing (enabled
+// automatically if any of routes is dynamic, otherwise more efficient map-based static routing
+// is used.)
 type Router struct {
-	isRoot      bool
-	prefix      string
-	mutators    []Mutator
-	middlewares []Middleware
-	registrar   *registrar
-	children    []*Router
-	errHandlers errorHandlers
+	enableTRACE  bool
+	prefix       string
+	mutators     []Mutator
+	middlewares  []Middleware
+	registrar    *registrar
+	children     []*Router
+	traceHandler Handler
+	errHandlers  errorHandlers
 }
 
 // New constructs a new instance of inbuilt router
 func New() *Router {
 	return &Router{
-		isRoot:      true,
 		registrar:   newRegistrar(),
 		errHandlers: newErrorHandlers(),
 	}
 }
 
-// runtimeRouter is the actual router that'll be running. The reason to separate Router from runtimeRouter
-// is the fact, that there is a lot of data that is used only at registering/initialization stage.
+// AllErrors tells the Router.RouteError to use the passed error handler as a generic
+// handler. A generic error handler is usually called only if no other was matched.
+const AllErrors = status.Code(0)
+
+// Route registers a new endpoint.
+func (r *Router) Route(method method.Method, path string, handler Handler, middlewares ...Middleware) *Router {
+	err := r.registrar.Add(r.prefix+path, method, compose(handler, middlewares))
+	if err != nil {
+		panic(err)
+	}
+
+	return r
+}
+
+// TODO: update the error handling mechanism. It's way too tedious
+
+// RouteError adds an error handler for a corresponding HTTP error code.
+//
+// The following error codes may be registered:
+//   - AllErrors (called only if no other error handlers found)
+//   - status.BadRequest
+//   - status.NotFound
+//   - status.MethodNotAllowed
+//   - status.RequestEntityTooLarge
+//   - status.CloseConnection
+//   - status.RequestURITooLong
+//   - status.HeaderFieldsTooLarge
+//   - status.HTTPVersionNotSupported
+//   - status.UnsupportedMediaType
+//   - status.NotImplemented
+//   - status.RequestTimeout
+//
+// Note: if handler returned one of error codes above, error handler WON'T be called.
+// Also, global middlewares, applied to the root router, will also be used for error handlers.
+// However, global middlewares defined on groups won't be used.
+//
+// WARNING: calling this method from groups will affect ALL routers, including root
+func (r *Router) RouteError(handler Handler, codes ...status.Code) *Router {
+	if len(codes) == 0 {
+		codes = append(codes, AllErrors)
+	}
+
+	for _, code := range codes {
+		r.errHandlers[code] = handler
+	}
+
+	return r
+}
+
+// Use registers a new middleware in the group.
+func (r *Router) Use(middlewares ...Middleware) *Router {
+	r.middlewares = append(r.middlewares, middlewares...)
+	return r
+}
+
+func (r *Router) applyMiddlewares() {
+	r.registrar.Apply(func(handler Handler) Handler {
+		return compose(handler, r.middlewares)
+	})
+}
+
+// Group creates a subrouter with its own scoping and path prefix. The scoping affects mainly
+// middleware application rules: a new group inherits its parental middlewares, but middlewares,
+// registered on the group, don't affect its parents ones. Parent middlewares are chained first,
+// therefore will also be called earlier than middlewares registered directly on the group.
+func (r *Router) Group(prefix string) *Router {
+	subrouter := &Router{
+		prefix:      r.prefix + prefix,
+		registrar:   newRegistrar(),
+		errHandlers: r.errHandlers,
+	}
+
+	r.children = append(r.children, subrouter)
+
+	return subrouter
+}
+
+func (r *Router) prepare() error {
+	for _, child := range r.children {
+		if err := child.prepare(); err != nil {
+			return err
+		}
+
+		if err := r.registrar.Merge(child.registrar); err != nil {
+			return err
+		}
+
+		r.mutators = append(r.mutators, child.mutators...)
+	}
+
+	r.applyMiddlewares()
+
+	return nil
+}
+
+// Resource returns a new Resource object for a provided resource path.
+func (r *Router) Resource(path string) Resource {
+	return Resource{
+		group: r.Group(path),
+	}
+}
+
+// Alias is an implicit redirect, made absolutely transparently before a specific handler is chosen.
+// The original path is stored in Request.Env.AliasFrom. Optionally only specific methods can be set
+// to be aliased. Otherwise, ANY requests matching alias will be aliased, which might not always be
+// the desired behavior.
+func (r *Router) Alias(from, to string, forMethods ...method.Method) *Router {
+	return r.Mutator(mutator.Alias(path.Join(r.prefix, from), to, forMethods...))
+}
+
+type Mutator = internal.Mutator
+
+// Mutator adds a new Mutator. Please note that groups scoping rules don't apply on them, only the
+// execution order is affected.
+func (r *Router) Mutator(mutator Mutator) *Router {
+	r.mutators = append(r.mutators, mutator)
+	return r
+}
+
+// EnableTRACE allows the router to automatically respond to TRACE requests if there is no
+// matching handler registered. To explore why it's better to keep the option disabled, see
+// https://owasp.org/www-community/attacks/Cross_Site_Tracing
+func (r *Router) EnableTRACE(flag bool) *Router {
+	r.enableTRACE = flag
+	return r
+}
+
+// runtimeRouter is a compiled router. Router represents a "dummy" builder, while the actual
+// action happens here.
 type runtimeRouter struct {
-	mutators    []Mutator
-	traceBuff   []byte
-	tree        *radix.Node[endpoint]
-	routesMap   routesMap
-	errHandlers errorHandlers
-	isStatic    bool
+	enableTRACE   bool
+	isStatic      bool
+	tree          radixTree
+	routesMap     routesMap
+	errHandlers   errorHandlers
+	serverOptions string
+	mutators      []Mutator
 }
 
 func (r *Router) Build() router.Router {
@@ -59,7 +191,7 @@ func (r *Router) Build() router.Router {
 	isDynamic := r.registrar.IsDynamic()
 	var (
 		rmap routesMap
-		tree *radix.Node[endpoint]
+		tree radixTree
 	)
 	if isDynamic {
 		tree = r.registrar.AsRadixTree()
@@ -68,20 +200,20 @@ func (r *Router) Build() router.Router {
 	}
 
 	return &runtimeRouter{
-		mutators:    r.mutators,
-		tree:        tree,
-		routesMap:   rmap,
-		errHandlers: r.errHandlers,
-		isStatic:    !isDynamic,
+		enableTRACE:   r.enableTRACE,
+		isStatic:      !isDynamic,
+		tree:          tree,
+		routesMap:     rmap,
+		errHandlers:   r.errHandlers,
+		serverOptions: r.registrar.Options(r.enableTRACE),
+		mutators:      r.mutators,
 	}
 }
 
 // OnRequest processes the request
 func (r *runtimeRouter) OnRequest(request *http.Request) *http.Response {
-	r.runMutators(request)
-
-	// TODO: should path normalization be implemented as a mutator?
 	request.Path = uri.Normalize(request.Path)
+	r.runMutators(request)
 
 	return r.onRequest(request)
 }
@@ -120,10 +252,16 @@ func (r *runtimeRouter) OnError(request *http.Request, err error) *http.Response
 }
 
 func (r *runtimeRouter) onError(request *http.Request, err error) *http.Response {
-	if request.Method == method.TRACE && err == status.ErrMethodNotAllowed {
-		r.traceBuff = renderHTTPRequest(request, r.traceBuff)
+	switch {
+	case request.Method == method.OPTIONS && request.Path == "*": // server-wide options
+		return request.Respond().Header("Allow", r.serverOptions)
+	case request.Method == method.TRACE:
+		if !r.enableTRACE {
+			err = status.ErrMethodNotAllowed
+			break
+		}
 
-		return traceResponse(request.Respond(), r.traceBuff)
+		return traceHandler(request)
 	}
 
 	httpErr, ok := err.(status.HTTPError)
@@ -146,8 +284,8 @@ func (r *runtimeRouter) onError(request *http.Request, err error) *http.Response
 }
 
 func (r *runtimeRouter) runMutators(request *http.Request) {
-	for _, mutator := range r.mutators {
-		mutator(request)
+	for _, mut := range r.mutators {
+		mut(request)
 	}
 }
 
@@ -166,6 +304,19 @@ func (r *Router) applyErrorHandlersMiddlewares() {
 	}
 }
 
+// compose produces an array of middlewares into the chain, represented by types.Handler
+func compose(handler Handler, middlewares []Middleware) Handler {
+	for i := len(middlewares) - 1; i >= 0; i-- {
+		handler = func(handler Handler, middleware Middleware) Handler {
+			return func(request *http.Request) *http.Response {
+				return middleware(handler, request)
+			}
+		}(handler, middlewares[i])
+	}
+
+	return handler
+}
+
 // getHandler looks up for a handler in the methodsMap. In case request method is HEAD, however
 // no matching handler is found, a handler for corresponding GET request will be retrieved
 func getHandler(reqMethod method.Method, mlut methodLUT) Handler {
@@ -175,9 +326,4 @@ func getHandler(reqMethod method.Method, mlut methodLUT) Handler {
 	}
 
 	return handler
-}
-
-// TODO: implement responding on such requests with a global list of all the available methods
-func isServerWideOptions(req *http.Request) bool {
-	return req.Method == method.OPTIONS && req.Path == "*"
 }

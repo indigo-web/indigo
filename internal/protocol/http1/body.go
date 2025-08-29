@@ -32,7 +32,7 @@ func (b *body) Fetch() ([]byte, error) {
 }
 
 func (b *body) Reset(request *http.Request) {
-	if request.Encoding.Chunked {
+	if request.Chunked {
 		b.initChunked()
 		b.reader = (*body).readChunked
 	} else if request.Connection == "close" {

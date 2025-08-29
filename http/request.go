@@ -8,6 +8,7 @@ import (
 	"github.com/indigo-web/indigo/http/cookie"
 	"github.com/indigo-web/indigo/http/method"
 	"github.com/indigo-web/indigo/http/proto"
+	"github.com/indigo-web/indigo/internal/strutil"
 	"github.com/indigo-web/indigo/kv"
 	"github.com/indigo-web/indigo/transport"
 )
@@ -84,9 +85,8 @@ func (r *Request) Cookies() (cookie.Jar, error) {
 
 	r.jar.Clear()
 
-	// in RFC 6265, 5.4 cookies are explicitly prohibited from being split into
-	// list, yet in HTTP/2 it's allowed. I have concerns of some user-agents may
-	// despite sending them as a list, even via HTTP/1.1
+	// even though RFC 6265, 5.4 prohibits the Cookie header from being split into a list,
+	// some user-agents still might do so in order to fit each value into the 8K limit.
 	for value := range r.Headers.Values("cookie") {
 		if err := cookie.Parse(r.jar, value); err != nil {
 			return nil, err
@@ -98,15 +98,14 @@ func (r *Request) Cookies() (cookie.Jar, error) {
 
 // Respond returns Response object.
 //
-// WARNING: this method clears the response builder under the hood. As it is passed
-// by reference, it'll be cleared EVERYWHERE along a handler
+// WARNING: the Response is cleared before being returned. Considering it is stored by pointer,
+// this action might affect your application if it was stored anywhere before.
 func (r *Request) Respond() *Response {
 	return r.response.Clear()
 }
 
-// Hijack the connection. Request body will be implicitly read (so if you need it you
-// should read it before) to the end. After handler exits, the connection will
-// be closed, so the connection can be hijacked at most once
+// Hijack hijacks an underlying connection. The request body is implicitly discarded before
+// exposing the transport. After the handler function terminates, the connection is closed automatically.
 func (r *Request) Hijack() (transport.Client, error) {
 	if err := r.Body.Discard(); err != nil {
 		return nil, err
@@ -117,7 +116,7 @@ func (r *Request) Hijack() (transport.Client, error) {
 	return r.client, nil
 }
 
-// Hijacked tells whether the connection was hijacked or not
+// Hijacked tells whether the connection was hijacked.
 func (r *Request) Hijacked() bool {
 	return r.hijacked
 }
@@ -147,10 +146,17 @@ type Environment struct {
 }
 
 type commonHeaders struct {
-	// Encoding holds an information about encoding, that was used to make the request
-	Encoding Encodings
-	// ContentLength holds the Content-Length header value. It isn't recommended to rely solely on this
-	// value, as it can be whatever (but most likely zero) if Request.Encoding.Chunked is true.
+	// AcceptEncoding is the list of accepted by client tokens.
+	AcceptEncoding []string
+	// TransferEncoding is the list of tokens used for this request from `Transfer-Encoding` header value.
+	TransferEncoding []string
+	// Chunked describes whether the Transfer attribute is not empty and ends with the `chunked`
+	// encoding.
+	Chunked bool
+	// ContentEncoding is the list of tokens used for this request from `Content-Encoding` header value.
+	ContentEncoding []string
+	// ContentLength holds the Content-Length header value. It can be non-zero even if the request uses
+	// chunked transfer encoding. In that case, it serves more of a hint to approximate the body size.
 	ContentLength int
 	// ContentType holds the Content-Type header value.
 	ContentType string
@@ -162,14 +168,23 @@ type commonHeaders struct {
 	Upgrade proto.Protocol
 }
 
-type Encodings struct {
-	// Accept is the list of accepted by client tokens.
-	Accept []string
-	// Transfer is the list of tokens used for this request from `Transfer-Encoding` header value.
-	Transfer []string
-	// Content is the list of tokens used for this request from `Content-Encoding` header value.
-	Content []string
-	// Chunked describes whether the Transfer attribute is not empty and ends with the `chunked`
-	// encoding.
-	Chunked bool
+// PreferredEncoding chooses a preferred encoding from AcceptEncoding, respecting quality markers.
+func (c *commonHeaders) PreferredEncoding() string {
+	if len(c.AcceptEncoding) == 0 {
+		return "identity"
+	}
+
+	var prefer string
+	maxQ := -1
+
+	for _, str := range c.AcceptEncoding {
+		token, qualifier := strutil.CutHeader(str)
+		q := strutil.ParseQualifier(qualifier)
+		if q > maxQ {
+			maxQ = q
+			prefer = token
+		}
+	}
+
+	return prefer
 }

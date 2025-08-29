@@ -53,10 +53,9 @@ type Parser struct {
 
 func NewParser(cfg *config.Config, request *http.Request, statusBuff, headers *buffer.Buffer) *Parser {
 	return &Parser{
-		cfg:     cfg,
-		state:   eMethod,
-		request: request,
-		// TODO: pass these through arguments instead of allocating in-place
+		cfg:             cfg,
+		state:           eMethod,
+		request:         request,
 		acceptEncodings: make([]string, 0, cfg.Headers.MaxAcceptEncodingTokens),
 		encodings:       make([]string, 0, cfg.Headers.MaxEncodingTokens),
 		requestLine:     statusBuff,
@@ -150,18 +149,20 @@ path:
 		for i := 0; i < len(data); i++ {
 			switch char := data[i]; char {
 			case '%':
-				if !requestLine.Append(data[checkpoint:i]) {
-					return true, nil, status.ErrURITooLong
-				}
-
 				if len(data[i+1:]) >= 2 {
 					// fast path
 					c := (hexconv.Halfbyte[data[i+1]] << 4) | hexconv.Halfbyte[data[i+2]]
-					if isProhibitedChar(c) {
+					if strutil.IsASCIINonprintable(c) {
 						return true, nil, status.ErrBadRequest
 					}
+					if strutil.IsURLUnsafeChar(c) {
+						data[i+1] |= 0x20
+						data[i+2] |= 0x20
+						i += 2
+						continue
+					}
 
-					if !requestLine.AppendByte(c) {
+					if !(requestLine.Append(data[checkpoint:i]) && requestLine.AppendByte(c)) {
 						return true, nil, status.ErrURITooLong
 					}
 
@@ -169,6 +170,10 @@ path:
 					checkpoint = i + 1
 				} else {
 					// slow path
+					if !requestLine.Append(data[checkpoint:i]) {
+						return true, nil, status.ErrURITooLong
+					}
+
 					data = data[i+1:]
 					goto pathDecode1Char
 				}
@@ -197,7 +202,7 @@ path:
 				// compact and not bloat it with unnecessary states, simply reject such requests.
 				return true, nil, status.ErrBadRequest
 			default:
-				if isProhibitedChar(char) {
+				if strutil.IsASCIINonprintable(char) {
 					return true, nil, status.ErrBadRequest
 				}
 			}
@@ -229,8 +234,16 @@ pathDecode2Char:
 		}
 
 		char := (hexconv.Halfbyte[p.urlEncodedChar] << 4) | hexconv.Halfbyte[data[0]]
-		if isProhibitedChar(char) {
+		if strutil.IsASCIINonprintable(char) {
 			return true, nil, status.ErrBadRequest
+		}
+		if strutil.IsURLUnsafeChar(char) {
+			if !requestLine.AppendBytes('%', p.urlEncodedChar|0x20, data[0]|0x20) {
+				return true, nil, status.ErrURITooLong
+			}
+
+			data = data[1:]
+			goto path
 		}
 
 		if !requestLine.AppendByte(char) {
@@ -252,7 +265,7 @@ paramsKey:
 			if len(data[i+1:]) >= 2 {
 				// fast path
 				c := (hexconv.Halfbyte[data[i+1]] << 4) | hexconv.Halfbyte[data[i+2]]
-				if isProhibitedChar(c) {
+				if strutil.IsASCIINonprintable(c) {
 					return true, nil, status.ErrBadParams
 				}
 
@@ -277,7 +290,7 @@ paramsKey:
 		case '#':
 			return true, nil, status.ErrBadRequest
 		default:
-			if isProhibitedChar(char) {
+			if strutil.IsASCIINonprintable(char) {
 				return true, nil, status.ErrBadParams
 			}
 
@@ -308,7 +321,7 @@ paramsKeyDecode2Char:
 		}
 
 		char := (hexconv.Halfbyte[p.urlEncodedChar] << 4) | hexconv.Halfbyte[data[0]]
-		if isProhibitedChar(char) {
+		if strutil.IsASCIINonprintable(char) {
 			return true, nil, status.ErrBadParams
 		}
 
@@ -337,7 +350,7 @@ paramsValue:
 				if len(data[i+1:]) >= 2 {
 					// fast path
 					c := (hexconv.Halfbyte[data[i+1]] << 4) | hexconv.Halfbyte[data[i+2]]
-					if isProhibitedChar(c) {
+					if strutil.IsASCIINonprintable(c) {
 						return true, nil, status.ErrBadParams
 					}
 
@@ -399,7 +412,7 @@ paramsValueDecode2Char:
 		}
 
 		char := (hexconv.Halfbyte[p.urlEncodedChar] << 4) | hexconv.Halfbyte[data[0]]
-		if isProhibitedChar(char) {
+		if strutil.IsASCIINonprintable(char) {
 			return true, nil, status.ErrBadParams
 		}
 
@@ -530,11 +543,11 @@ headerValue:
 			}
 		case 15:
 			if strutil.CmpFoldFast(key, "Accept-Encoding") {
-				p.acceptEncodings, request.Encoding.Accept, err = splitTokens(p.acceptEncodings, value)
+				p.acceptEncodings, request.AcceptEncoding, err = splitTokens(p.acceptEncodings, value)
 			}
 		case 16:
 			if strutil.CmpFoldFast(key, "Content-Encoding") {
-				p.encodings, request.Encoding.Content, err = splitTokens(p.encodings, value)
+				p.encodings, request.ContentEncoding, err = splitTokens(p.encodings, value)
 				if err != nil {
 					return true, nil, err
 				}
@@ -546,20 +559,19 @@ headerValue:
 				}
 
 				p.metTransferEncoding = true
-
-				p.encodings, request.Encoding.Transfer, err = splitTokens(p.encodings, value)
+				p.encodings, request.TransferEncoding, err = splitTokens(p.encodings, value)
 				if err != nil {
 					return true, nil, err
 				}
 
-				te := request.Encoding.Transfer
-				if len(te) > 0 {
-					if te[len(te)-1] != "chunked" {
-						return true, nil, status.ErrBadEncoding
-					}
-
-					request.Encoding.Chunked = true
+				te := request.TransferEncoding
+				if len(te) == 0 || len(te) == 1 && te[0] == "identity" {
+					break
+				} else if len(te) > 0 && te[len(te)-1] != "chunked" {
+					return true, nil, status.ErrBadEncoding
 				}
+
+				request.Chunked = true
 			}
 		}
 
@@ -592,17 +604,17 @@ contentLength:
 		}
 
 		p.contentLength = p.contentLength*10 + int64(char-'0')
+		if !p.headers.AppendByte(char) {
+			return true, nil, status.ErrHeaderFieldsTooLarge
+		}
 	}
 
 	p.state = eContentLength
 	return false, nil, nil
 
 contentLengthEnd:
-	// guaranteed, that data at this point contains AT LEAST 1 byte.
-	// The proof is, that this code is reachable ONLY if loop has reached a non-digit
-	// ascii symbol. In case loop has finished peacefully, as no more data left, but also no
-	// character found to satisfy the exit condition, this code will never be reached
 	request.ContentLength = int(p.contentLength)
+	request.Headers.Add("Content-Length", uf.B2S(p.headers.Finish()))
 
 	switch data[0] {
 	case '\r':
@@ -630,14 +642,18 @@ contentLengthCR:
 }
 
 func (p *Parser) cleanup() {
-	p.metTransferEncoding = false
-	p.headersNumber = 0
 	p.requestLine.Clear()
 	p.headers.Clear()
-	p.contentLength = 0
-	p.acceptEncodings = p.acceptEncodings[:0]
-	p.encodings = p.encodings[:0]
-	p.state = eMethod
+
+	*p = Parser{
+		state:           eMethod,
+		cfg:             p.cfg,
+		request:         p.request,
+		requestLine:     p.requestLine,
+		headers:         p.headers,
+		acceptEncodings: p.acceptEncodings[:0],
+		encodings:       p.encodings[:0],
+	}
 }
 
 func splitTokens(buff []string, value string) (alteredBuff, toks []string, err error) {
@@ -708,8 +724,4 @@ func stripCR(b []byte) []byte {
 	}
 
 	return b
-}
-
-func isProhibitedChar(c byte) bool {
-	return c < 0x20 || c > 0x7e
 }

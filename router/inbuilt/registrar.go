@@ -10,9 +10,8 @@ import (
 )
 
 type registrar struct {
-	endpoints   map[string]map[method.Method]Handler
-	usedMethods [method.Count]bool
-	isDynamic   bool
+	endpoints map[string]map[method.Method]Handler
+	isDynamic bool
 }
 
 func newRegistrar() *registrar {
@@ -26,7 +25,6 @@ func (r *registrar) Add(path string, m method.Method, handler Handler) error {
 		return fmt.Errorf("empty path")
 	}
 
-	// TODO: support urlencoded characters in endpoints.
 	path = uri.Normalize(path)
 	methodsMap := r.endpoints[path]
 	if methodsMap == nil {
@@ -34,7 +32,7 @@ func (r *registrar) Add(path string, m method.Method, handler Handler) error {
 	}
 
 	if _, ok := methodsMap[m]; ok {
-		return fmt.Errorf("%s %s: already registered", m, path)
+		return fmt.Errorf("duplicate endpoint: %s %s", m, path)
 	}
 
 	methodsMap[m] = handler
@@ -54,7 +52,7 @@ func (r *registrar) Merge(another *registrar) error {
 			}
 
 			if r.endpoints[path][method_] != nil {
-				return fmt.Errorf("route already registered: %s %s", method_.String(), path)
+				return fmt.Errorf("duplicate endpoint: %s %s", method_, path)
 			}
 
 			r.endpoints[path][method_] = handler
@@ -92,10 +90,6 @@ func (r *registrar) AsRadixTree() radixTree {
 	tree := radix.New[endpoint]()
 
 	for path, e := range r.endpoints {
-		if len(path) == 0 {
-			panic("empty path")
-		}
-
 		var (
 			mlut  methodLUT
 			allow string
@@ -115,4 +109,49 @@ func (r *registrar) AsRadixTree() radixTree {
 	}
 
 	return tree
+}
+
+func (r *registrar) Options(includeTRACE bool) string {
+	var (
+		totalEndpoints   int
+		methodsStatistic [method.Count + 1]int
+	)
+
+	for _, ep := range r.endpoints {
+		totalEndpoints++
+
+		for m := range ep {
+			methodsStatistic[m]++
+		}
+	}
+
+	if totalEndpoints == 0 {
+		// a server with no endpoints at all. Must be rare enough, I guess.
+		return ""
+	}
+
+	// As OPTIONS is supported, it must appear unconditionally
+	methodsStatistic[method.OPTIONS] = totalEndpoints
+
+	if includeTRACE {
+		methodsStatistic[method.TRACE] = totalEndpoints
+	}
+
+	if methodsStatistic[method.GET] == totalEndpoints {
+		// HEAD requests must also be unconditionally enabled, if GET
+		// are also supported, as HEAD are automatically redirected to
+		// GET handlers if weren't explicitly redefined.
+		methodsStatistic[method.HEAD] = totalEndpoints
+	}
+
+	options := make([]string, 0, method.Count)
+
+	for m, usage := range methodsStatistic {
+		if usage == totalEndpoints {
+			// EACH endpoint supports this method
+			options = append(options, method.Method(m).String())
+		}
+	}
+
+	return strings.Join(options, ", ")
 }

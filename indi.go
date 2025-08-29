@@ -11,7 +11,7 @@ import (
 	"github.com/indigo-web/indigo/transport"
 )
 
-const Version = "0.17.2"
+const Version = "0.17.3"
 
 // App is just a struct with addr and shutdown channel that is currently
 // not used. Planning to replace it with context.WithCancel()
@@ -63,8 +63,8 @@ func (a *App) OnStop(cb func()) *App {
 }
 
 // Codec appends a new codec into the list of supported.
-func (a *App) Codec(codec codec.Codec) *App {
-	a.codecs = append(a.codecs, codec)
+func (a *App) Codec(codecs ...codec.Codec) *App {
+	a.codecs = append(a.codecs, codecs...)
 	return a
 }
 

@@ -5,6 +5,7 @@ import (
 	"math/bits"
 	"slices"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/indigo-web/indigo/config"
@@ -16,6 +17,7 @@ import (
 	"github.com/indigo-web/indigo/http/proto"
 	"github.com/indigo-web/indigo/http/status"
 	"github.com/indigo-web/indigo/internal/codecutil"
+	"github.com/indigo-web/indigo/internal/hexconv"
 	"github.com/indigo-web/indigo/internal/response"
 	"github.com/indigo-web/indigo/internal/strutil"
 	"github.com/indigo-web/indigo/kv"
@@ -25,6 +27,7 @@ import (
 type serializer struct {
 	cfg            *config.Config
 	request        *http.Request
+	response       *response.Fields
 	client         transport.Client
 	buff           []byte
 	streamReadBuff []byte
@@ -40,12 +43,14 @@ func newSerializer(
 	buff []byte,
 ) *serializer {
 	return &serializer{
-		cfg:            cfg,
-		request:        request,
-		client:         client,
-		codecs:         codecs,
-		buff:           buff,
-		defaultHeaders: preprocessDefaultHeaders(cfg.Headers.Default, codecs.AcceptEncodings()),
+		cfg:     cfg,
+		request: request,
+		client:  client,
+		codecs:  codecs,
+		buff:    buff,
+		defaultHeaders: newDefaultHeaders(
+			pairsFromMap(cfg.Headers.Default, codecs.AcceptEncoding()),
+		),
 	}
 }
 
@@ -54,15 +59,16 @@ func (s *serializer) Upgrade() {
 	s.appendProtocol(s.request.Protocol)
 	s.buff = append(s.buff, "101 Switching Protocol\r\n"...)
 
-	s.appendKnownHeader("Connection: ", "upgrade")
-	s.appendKnownHeader("Upgrade: ", s.request.Upgrade.String())
+	s.appendKnownHeader("Connection", "upgrade")
+	s.appendKnownHeader("Upgrade", s.request.Upgrade.String())
 
 	s.crlf()
 }
 
 func (s *serializer) Write(protocol proto.Protocol, response *http.Response) error {
-	s.appendProtocol(protocol)
 	resp := response.Expose()
+
+	s.appendProtocol(protocol)
 	s.appendStatus(resp)
 	s.appendHeaders(resp)
 
@@ -75,16 +81,15 @@ func (s *serializer) Write(protocol proto.Protocol, response *http.Response) err
 		return err
 	}
 
-	err = s.flush()
-	s.cleanup()
-
-	return err
+	return s.flush()
 }
 
 func (s *serializer) writeStream(resp *response.Fields) (err error) {
+	s.response = resp
 	stream, length := resp.Stream, resp.StreamSize
+	unsized := length == -1
 	if length == 0 {
-		s.appendKnownHeader("Content-Length: ", "0")
+		s.appendKnownHeader("Content-Length", "0")
 		s.crlf()
 		return nil
 	}
@@ -94,25 +99,45 @@ func (s *serializer) writeStream(resp *response.Fields) (err error) {
 		return status.ErrInternalServerError
 	}
 
+	var closeConnection bool
+
 	defer func() {
 		if c, ok := stream.(io.Closer); ok {
 			if cerr := c.Close(); cerr != nil && err == nil {
 				err = cerr
 			}
 		}
+
+		if closeConnection && err == nil {
+			err = status.ErrCloseConnection
+		}
 	}()
 
 	var encoder io.WriteCloser
 
-	compressor := s.getCompressor(resp.ContentEncoding)
-	if length != -1 && compressor != nil {
+	compression := resp.ContentEncoding
+	if resp.AutoCompress && (unsized || length >= s.cfg.NET.SmallBody) {
+		// if the stream is sized and the size is below limit (i.e. is considered a small one),
+		// do not compress it. It won't give much gain anyway, yet the performance is impacted,
+		// especially if we otherwise could use a zero-copy mechanism
+		compression = s.request.PreferredEncoding()
+	}
+
+	compressor := s.getCompressor(compression)
+	if !unsized && compressor != nil {
 		// if sized stream is compressed, convert it to unsized
 		length = -1
 	}
 
 	if length == -1 {
-		encoder = chunkedWriter{s}
-		s.appendKnownHeader("Transfer-Encoding: ", "chunked")
+		if s.request.Protocol == proto.HTTP11 {
+			encoder = chunkedWriter{s}
+			s.appendKnownHeader("Transfer-Encoding", "chunked")
+		} else {
+			encoder = identityWriter{s}
+			s.appendKnownHeader("Connection", "close")
+			closeConnection = true
+		}
 	} else {
 		encoder = identityWriter{s}
 		s.appendContentLength(length)
@@ -131,7 +156,8 @@ func (s *serializer) writeStream(resp *response.Fields) (err error) {
 			return err
 		}
 
-		s.growToContain(int(length) + len(crlf)) // because CRLF wasn't written yet
+		// +len(crlf) because it wasn't written yet, therefore not yet included in the len(s.buff)
+		s.growToContain(len(crlf) + int(length))
 	}
 
 	s.crlf() // finalize the headers block
@@ -186,26 +212,28 @@ func (s *serializer) writeStream(resp *response.Fields) (err error) {
 	}
 }
 
-func (s *serializer) growToContain(n int) {
-	extra := min(s.cfg.NET.WriteBufferSize.Maximal-cap(s.buff), n)
-	if extra <= 0 {
-		// surplus is possible and in fact isn't a bug, because slices.Grow doesn't guarantee
-		// that the grown slice will have a specific capacity. It is guaranteed to be _enough_
-		// to hold n new values. It's anyway not that bad to have a few extra bytes, after all.
-		return
+func (s *serializer) grow(newsize int) {
+	// cap the size at its top value from the config.
+	newsize = min(s.cfg.NET.WriteBufferSize.Maximal, newsize)
+	// the growth can be triggered even the buffer is already at its maximal size. Do nothing then.
+	if newsize > cap(s.buff) {
+		s.buff = make([]byte, 0, newsize)
 	}
+}
 
-	s.buff = slices.Grow(s.buff, extra)
+func (s *serializer) growToContain(n int) {
+	newsize := min(s.cfg.NET.WriteBufferSize.Maximal-len(s.buff), n)
+	s.buff = slices.Grow(s.buff, newsize)
 }
 
 func (s *serializer) getCompressor(token string) codec.Compressor {
-	if len(token) == 0 {
+	if token == "" || token == "identity" {
 		return nil
 	}
 
 	compressor := s.codecs.Get(token)
 	if compressor != nil {
-		s.appendKnownHeader("Content-Encoding: ", token)
+		s.appendKnownHeader("Content-Encoding", token)
 	}
 
 	return compressor
@@ -234,11 +262,13 @@ func (s *serializer) safeAppend(data []byte) error {
 	return nil
 }
 
-func (s *serializer) flush() (err error) {
-	if len(s.buff) > 0 {
-		_, err = s.client.Write(s.buff)
-		s.buff = s.buff[:0]
+func (s *serializer) flush() error {
+	if len(s.buff) == 0 {
+		return nil
 	}
+
+	_, err := s.client.Write(s.buff)
+	s.buff = s.buff[:0]
 
 	return err
 }
@@ -277,12 +307,14 @@ func (s *serializer) appendHeaders(fields *response.Fields) {
 		s.crlf()
 	}
 
-	for _, header := range s.defaultHeaders {
+	for i, header := range s.defaultHeaders {
 		if header.Excluded {
+			s.defaultHeaders[i].Excluded = false
 			continue
 		}
 
-		s.buff = append(s.buff, header.Full...)
+		s.appendHeader(header.Pair)
+		s.crlf()
 	}
 }
 
@@ -297,6 +329,7 @@ func (s *serializer) appendHeader(header kv.Pair) {
 // have a colon and a space included.
 func (s *serializer) appendKnownHeader(key, value string) {
 	s.buff = append(s.buff, key...)
+	s.colonsp()
 	s.buff = append(s.buff, value...)
 	s.crlf()
 }
@@ -390,16 +423,8 @@ func (s *serializer) crlf() {
 	s.buff = append(s.buff, crlf...)
 }
 
-func (s *serializer) cleanup() {
-	s.defaultHeaders.Reset()
-}
-
 type chunkedWriter struct {
 	s *serializer
-}
-
-func (c chunkedWriter) maxhex(n int) int {
-	return (bits.Len64(uint64(n))-1)>>2 + 1
 }
 
 func (c chunkedWriter) ReadFrom(r io.Reader) (total int64, err error) {
@@ -407,17 +432,22 @@ func (c chunkedWriter) ReadFrom(r io.Reader) (total int64, err error) {
 
 	for {
 		var (
-			buff         = c.s.buff[len(c.s.buff):cap(c.s.buff)]
-			maxHexLength = c.maxhex(len(buff))
-			dataOffset   = maxHexLength + crlflen
+			buff       = c.s.buff[len(c.s.buff):cap(c.s.buff)]
+			maxHexLen  = hexlen(len(buff))
+			dataOffset = maxHexLen + crlflen
 		)
 
 		n, err := r.Read(buff[dataOffset : len(buff)-crlflen])
 		if n > 0 {
 			total += int64(n)
 
-			if err := c.writechunk(maxHexLength, n); err != nil {
+			if err := c.writechunk(maxHexLen, n); err != nil {
 				return 0, err
+			}
+
+			if n+dataOffset+crlflen >= cap(c.s.buff)-cap(c.s.buff)>>6 {
+				// if the chunk solely occupies ~98.44% of the whole buffer capacity, double the size
+				c.s.grow(cap(c.s.buff) << 1)
 			}
 		}
 
@@ -436,19 +466,17 @@ func (c chunkedWriter) Write(b []byte) (n int, err error) {
 	const crlflen = len(crlf)
 	blen := len(b)
 
-	// TODO: add optional but enabled by default buffering chunks.
-	// otherwise, cap(b) = cap(c.s.buff) => 7 bytes leftover, which will be sent
-	// as an independent chunk. Highly inefficient. However, making buffering a default behaviour
-	// completely disables the possibility to implement longpolling based on chunked transfer encoding.
-	// Also undesired. But by default very little people do really use it like that or anyhow rely on
-	// lag-free chunk upload or on their consistency. Therefore, enabling buffering by default would result
-	// in a great choice.
+	// knowing the size of b in advance, grow to contain it fully if needed
+	c.s.grow(hexlen(cap(c.s.buff)) + crlflen + blen + crlflen + 1)
 
 	for len(b) > 0 {
-		buff := c.s.buff[len(c.s.buff):cap(c.s.buff)]
-		maxHexLen := c.maxhex(len(buff))
+		var (
+			buff       = c.s.buff[len(c.s.buff):cap(c.s.buff)]
+			maxHexLen  = hexlen(len(buff))
+			dataOffset = maxHexLen + crlflen
+		)
 
-		n = copy(buff[maxHexLen+crlflen:len(buff)-crlflen], b)
+		n = copy(buff[dataOffset:len(buff)-crlflen], b)
 		if err = c.writechunk(maxHexLen, n); err != nil {
 			return 0, err
 		}
@@ -462,18 +490,9 @@ func (c chunkedWriter) Write(b []byte) (n int, err error) {
 func (c chunkedWriter) writechunk(maxHexLen, datalen int) error {
 	const crlflen = len(crlf)
 
-	// TODO: add optional but enabled by default buffering chunks.
-	// otherwise, cap(b) = cap(c.s.buff) => 7 bytes leftover, which will be sent
-	// as an independent chunk. Highly inefficient. However, making buffering a default behaviour
-	// completely disables the possibility to implement longpolling based on chunked transfer encoding.
-	// Also undesired. But by default very little people do really use it like that or anyhow rely on
-	// lag-free chunk upload or on their consistency. Therefore, enabling buffering by default would result
-	// in a great choice.
-
 	for {
 		var (
 			buff       = c.s.buff[len(c.s.buff):cap(c.s.buff)]
-			buffOffset = 0
 			dataOffset = maxHexLen + crlflen
 		)
 
@@ -491,40 +510,24 @@ func (c chunkedWriter) writechunk(maxHexLen, datalen int) error {
 				return err
 			}
 
-			// TODO: buffer chunks here
 			continue
 		}
 
-		hexlen := len(strconv.AppendUint(buff[:0], uint64(datalen), 16)) // chunk length
-
-		if len(c.s.buff) > 0 {
-			// if there was any data in the buffer before, we must fill the gap in between.
-			// The best way to do it is via an extension.
-			copy(buff[hexlen:maxHexLen], chunkExtZeroFill)
-		} else {
-			// otherwise, we can save a couple of bytes by simply truncating the unused prefix slots.
-			buffOffset = maxHexLen - hexlen
-			copy(buff[buffOffset:], buff[:hexlen])
+		// write the zero-filled hex length
+		chunklen := datalen
+		for i := maxHexLen; i > 0; i-- {
+			buff[i-1] = hexconv.Char[chunklen&0b1111]
+			chunklen >>= 4
 		}
 
 		copy(buff[maxHexLen:], crlf)          // CRLF between length and data
 		copy(buff[dataOffset+datalen:], crlf) // CRLF at the end of the data
 
-		restore := c.s.buff[:0]
-		c.s.buff = c.s.buff[buffOffset : len(c.s.buff)+dataOffset+datalen+crlflen] // extend buffer to include the written data
-		if err := c.s.flush(); err != nil {
-			return err
-		}
-		c.s.buff = restore
+		// extend the buffer to include the written data
+		c.s.buff = c.s.buff[:len(c.s.buff)+dataOffset+datalen+crlflen]
 
-		if cap(c.s.buff)-dataOffset-datalen-crlflen <= cap(c.s.buff)>>6 {
-			// if free space left after the whole chunk was written is less than
-			// ~1.56% of the buffer total capacity, double the buffer size.
-			newsize := min(c.s.cfg.NET.WriteBufferSize.Maximal, cap(c.s.buff)<<1)
-			// the growth can be triggered even the buffer is already at its maximal size. Do nothing then.
-			if newsize > cap(c.s.buff) {
-				c.s.buff = make([]byte, 0, newsize)
-			}
+		if !c.s.response.Buffered || len(c.s.buff) >= 3*cap(c.s.buff)>>2 {
+			return c.s.flush()
 		}
 
 		return nil
@@ -532,7 +535,7 @@ func (c chunkedWriter) writechunk(maxHexLen, datalen int) error {
 }
 
 func (c chunkedWriter) Close() error {
-	if err := c.s.safeAppend(chunkZeroTrailer); err != nil {
+	if err := c.s.safeAppend([]byte("0\r\n\r\n")); err != nil {
 		return err
 	}
 
@@ -544,66 +547,89 @@ type identityWriter struct {
 }
 
 func (i identityWriter) ReadFrom(r io.Reader) (total int64, err error) {
-	for {
-		n, err := r.Read(i.s.buff[len(i.s.buff):cap(i.s.buff)])
-		total += int64(n)
-		i.s.buff = i.s.buff[0 : len(i.s.buff)+n]
+	streamSize := i.s.response.StreamSize
+	// identityWriter is used to write unsized streams if chunked transfer encoding
+	// isn't available (e.g. HTTP/1.0 clients). The stream is finalized by the connection
+	// close in this case.
+	unsized := streamSize == -1
 
-		if err := i.s.flush(); err != nil {
-			return 0, err
+	for total < streamSize || unsized {
+		boundary := cap(i.s.buff)
+		if !unsized {
+			boundary = min(boundary, int(streamSize-total)+len(i.s.buff))
+		}
+
+		n, err := r.Read(i.s.buff[len(i.s.buff):boundary])
+		total += int64(n)
+
+		i.s.buff = i.s.buff[0 : len(i.s.buff)+n]
+		if !i.s.response.Buffered || len(i.s.buff) >= 3*cap(i.s.buff)>>2 {
+			// flush if unbuffered OR buffered and the buffer is >=3/4 full.
+			if ferr := i.s.flush(); ferr != nil {
+				return 0, ferr
+			}
 		}
 
 		switch err {
 		case nil:
 		case io.EOF:
+			if !unsized && total < streamSize {
+				// the stream is exhausted before it must have been. No good.
+				return total, status.ErrInternalServerError
+			}
+
 			return total, nil
 		default:
 			return 0, err
 		}
 	}
+
+	return total, nil
 }
 
 func (i identityWriter) Write(p []byte) (int, error) {
-	err := i.s.safeAppend(p)
-	return len(p), err
+	return len(p), i.s.safeAppend(p)
 }
 
 func (i identityWriter) Close() error {
 	return i.s.flush()
 }
 
-func preprocessDefaultHeaders(headers map[string]string, acceptEncoding string) defaultHeaders {
-	processed := make(defaultHeaders, 0, len(headers)+1)
+type excludablePair struct {
+	Excluded bool
+	kv.Pair
+}
 
-	for key, value := range headers {
-		serialized := key + ": " + value + crlf
-		processed = append(processed, defaultHeader{
-			// we let the GC release all the values of the map, as here we're using only
-			// the brand-new line without keeping the original string
-			Key:  serialized[:len(key)],
-			Full: serialized,
+func pairsFromMap(m map[string]string, acceptEncoding string) []excludablePair {
+	pairs := make([]excludablePair, 0, len(m)+1)
+	pairs = append(pairs, excludablePair{
+		Pair: kv.Pair{Key: "Accept-Encoding", Value: acceptEncoding},
+	})
+
+	for key, value := range m {
+		pairs = append(pairs, excludablePair{
+			Pair: kv.Pair{Key: key, Value: value},
 		})
 	}
 
-	processed = append(processed, defaultHeader{
-		Key:  "Accept-Encoding",
-		Full: "Accept-Encoding: " + acceptEncoding + crlf,
+	return pairs
+}
+
+type defaultHeaders []excludablePair
+
+func newDefaultHeaders(pairs []excludablePair) defaultHeaders {
+	slices.SortFunc(pairs, func(a, b excludablePair) int {
+		return strings.Compare(a.Key, b.Key)
 	})
 
-	return processed
+	return pairs
 }
-
-type defaultHeader struct {
-	Excluded bool
-	Key      string
-	Full     string
-}
-
-type defaultHeaders []defaultHeader
 
 func (d defaultHeaders) Exclude(key string) {
-	// TODO: binary search
-
+	// it's a perfect candidate for binary search, however in reality it introduced any visible
+	// benefit only starting at 10 and more default headers. If less, the penalty is also significant.
+	// The only optimization left to try out is stopping the iteration when `header.Key > key`,
+	// considering the headers are still sorted.
 	for i, header := range d {
 		if strutil.CmpFoldFast(header.Key, key) {
 			header.Excluded = true
@@ -613,8 +639,6 @@ func (d defaultHeaders) Exclude(key string) {
 	}
 }
 
-func (d defaultHeaders) Reset() {
-	for i := range d {
-		d[i].Excluded = false
-	}
+func hexlen(n int) int {
+	return (bits.Len64(uint64(n))-1)>>2 + 1
 }
