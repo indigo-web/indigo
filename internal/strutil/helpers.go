@@ -60,3 +60,7 @@ func Unquote(str string) string {
 
 	return str
 }
+
+func IsASCIINonprintable(c byte) bool {
+	return c < 0x20 || c > 0x7e
+}

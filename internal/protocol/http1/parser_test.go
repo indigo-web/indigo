@@ -341,21 +341,28 @@ func TestParser(t *testing.T) {
 
 		t.Run("unsafe", func(t *testing.T) {
 			test := func(t *testing.T, request *http.Request) {
-				require.Equal(t, "/ foo%2fbar#?", request.Path)
+				require.Equal(t, "/ foo%2f:bar#?", request.Path)
 				require.Equal(t, "bar", request.Params.Value("foo+="))
 			}
 
 			t.Run("slowpath", func(t *testing.T) {
-				request, err := parseRequestLine("/%20foo%2fbar%23%3f?foo%2b%3d=bar")
+				request, err := parseRequestLine("/%20foo%2f%3abar%23%3f?foo%2b%3d=bar")
 				require.NoError(t, err)
 				test(t, request)
 			})
 
 			t.Run("fastpath", func(t *testing.T) {
 				parser, request := getParser(config.Default())
-				_, _, err := parser.Parse([]byte("GET /%20foo%2fbar%23%3f?foo%2b%3d=bar "))
+				_, _, err := parser.Parse([]byte("GET /%20foo%2f%3abar%23%3f?foo%2b%3d=bar "))
 				require.NoError(t, err)
 				test(t, request)
+			})
+
+			t.Run("normalize", func(t *testing.T) {
+				parser, request := getParser(config.Default())
+				_, _, err := parser.Parse([]byte("GET /foo%2Fbar "))
+				require.NoError(t, err)
+				require.Equal(t, "/foo%2fbar", request.Path)
 			})
 		})
 

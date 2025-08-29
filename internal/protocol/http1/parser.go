@@ -152,15 +152,17 @@ path:
 				if len(data[i+1:]) >= 2 {
 					// fast path
 					c := (hexconv.Halfbyte[data[i+1]] << 4) | hexconv.Halfbyte[data[i+2]]
-					if isUnsafeChar(c) {
+					if strutil.IsASCIINonprintable(c) {
+						return true, nil, status.ErrBadRequest
+					}
+					if strutil.IsURLUnsafeChar(c) {
+						data[i+1] |= 0x20
+						data[i+2] |= 0x20
 						i += 2
 						continue
 					}
-					if isProhibitedChar(c) {
-						return true, nil, status.ErrBadRequest
-					}
 
-					if !requestLine.Append(data[checkpoint:i]) || !requestLine.AppendByte(c) {
+					if !(requestLine.Append(data[checkpoint:i]) && requestLine.AppendByte(c)) {
 						return true, nil, status.ErrURITooLong
 					}
 
@@ -200,7 +202,7 @@ path:
 				// compact and not bloat it with unnecessary states, simply reject such requests.
 				return true, nil, status.ErrBadRequest
 			default:
-				if isProhibitedChar(char) {
+				if strutil.IsASCIINonprintable(char) {
 					return true, nil, status.ErrBadRequest
 				}
 			}
@@ -232,15 +234,16 @@ pathDecode2Char:
 		}
 
 		char := (hexconv.Halfbyte[p.urlEncodedChar] << 4) | hexconv.Halfbyte[data[0]]
-		if isUnsafeChar(char) {
-			if !requestLine.AppendBytes('%', p.urlEncodedChar) {
+		if strutil.IsASCIINonprintable(char) {
+			return true, nil, status.ErrBadRequest
+		}
+		if strutil.IsURLUnsafeChar(char) {
+			if !requestLine.AppendBytes('%', p.urlEncodedChar|0x20, data[0]|0x20) {
 				return true, nil, status.ErrURITooLong
 			}
 
+			data = data[1:]
 			goto path
-		}
-		if isProhibitedChar(char) {
-			return true, nil, status.ErrBadRequest
 		}
 
 		if !requestLine.AppendByte(char) {
@@ -262,7 +265,7 @@ paramsKey:
 			if len(data[i+1:]) >= 2 {
 				// fast path
 				c := (hexconv.Halfbyte[data[i+1]] << 4) | hexconv.Halfbyte[data[i+2]]
-				if isProhibitedChar(c) {
+				if strutil.IsASCIINonprintable(c) {
 					return true, nil, status.ErrBadParams
 				}
 
@@ -287,7 +290,7 @@ paramsKey:
 		case '#':
 			return true, nil, status.ErrBadRequest
 		default:
-			if isProhibitedChar(char) {
+			if strutil.IsASCIINonprintable(char) {
 				return true, nil, status.ErrBadParams
 			}
 
@@ -318,7 +321,7 @@ paramsKeyDecode2Char:
 		}
 
 		char := (hexconv.Halfbyte[p.urlEncodedChar] << 4) | hexconv.Halfbyte[data[0]]
-		if isProhibitedChar(char) {
+		if strutil.IsASCIINonprintable(char) {
 			return true, nil, status.ErrBadParams
 		}
 
@@ -347,7 +350,7 @@ paramsValue:
 				if len(data[i+1:]) >= 2 {
 					// fast path
 					c := (hexconv.Halfbyte[data[i+1]] << 4) | hexconv.Halfbyte[data[i+2]]
-					if isProhibitedChar(c) {
+					if strutil.IsASCIINonprintable(c) {
 						return true, nil, status.ErrBadParams
 					}
 
@@ -409,7 +412,7 @@ paramsValueDecode2Char:
 		}
 
 		char := (hexconv.Halfbyte[p.urlEncodedChar] << 4) | hexconv.Halfbyte[data[0]]
-		if isProhibitedChar(char) {
+		if strutil.IsASCIINonprintable(char) {
 			return true, nil, status.ErrBadParams
 		}
 
@@ -721,13 +724,4 @@ func stripCR(b []byte) []byte {
 	}
 
 	return b
-}
-
-func isUnsafeChar(c byte) bool {
-	// slash is the only symbol that influences path semantics if carelessly decoded
-	return c == '/'
-}
-
-func isProhibitedChar(c byte) bool {
-	return c < 0x20 || c > 0x7e
 }
