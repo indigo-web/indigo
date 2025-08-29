@@ -1,10 +1,9 @@
 package codecutil
 
 import (
-	"iter"
+	"strings"
 
 	"github.com/indigo-web/indigo/http/codec"
-	"github.com/indigo-web/indigo/internal/strutil"
 )
 
 type Cache struct {
@@ -13,10 +12,9 @@ type Cache struct {
 	instances []codec.Instance
 }
 
-func NewCache(codecs []codec.Codec) Cache {
+func NewCache(codecs []codec.Codec, acceptString string) Cache {
 	return Cache{
-		// TODO: we're still allocating a string on every connection. Which we actually can avoid.
-		accept:    acceptEncodings(codecs),
+		accept:    acceptString,
 		codecs:    codecs,
 		instances: make([]codec.Instance, len(codecs)),
 	}
@@ -51,20 +49,18 @@ func (c Cache) AcceptEncoding() string {
 	return c.accept
 }
 
-func acceptEncodings(codecs []codec.Codec) string {
+func AcceptEncoding(codecs []codec.Codec) string {
 	if len(codecs) == 0 {
 		return "identity"
 	}
 
-	return strutil.Join(traverseTokens(codecs), ", ")
-}
+	var b strings.Builder
 
-func traverseTokens(codecs []codec.Codec) iter.Seq[string] {
-	return func(yield func(string) bool) {
-		for _, c := range codecs {
-			if !yield(c.Token()) {
-				break
-			}
-		}
+	b.WriteString(codecs[0].Token())
+	for _, c := range codecs[1:] {
+		b.WriteString(", ")
+		b.WriteString(c.Token())
 	}
+
+	return b.String()
 }

@@ -26,7 +26,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-var noCodecs = codecutil.NewCache(nil)
+var noCodecs = codecutil.NewCache(nil, "identity")
 
 func BenchmarkSerializer(b *testing.B) {
 	getRequest := func(cfg *config.Config, m method.Method) *http.Request {
@@ -37,7 +37,8 @@ func BenchmarkSerializer(b *testing.B) {
 
 	getSerializer := func(cfg *config.Config, m method.Method, codecs ...codec.Codec) *serializer {
 		buff := make([]byte, 0, cfg.NET.WriteBufferSize.Default)
-		return newSerializer(cfg, getRequest(cfg, method.GET), new(dummy.NopClient), codecutil.NewCache(codecs), buff)
+		cache := codecutil.NewCache(codecs, codecutil.AcceptEncoding(codecs))
+		return newSerializer(cfg, getRequest(cfg, method.GET), new(dummy.NopClient), cache, buff)
 	}
 
 	getResponseWithHeaders := func(n int) *http.Response {
@@ -354,7 +355,7 @@ func TestSerializer(t *testing.T) {
 
 	t.Run("streams", func(t *testing.T) {
 		request := newRequest(method.GET)
-		codecs := codecutil.NewCache([]codec.Codec{codec.NewGZIP()})
+		codecs := codecutil.NewCache([]codec.Codec{codec.NewGZIP()}, codec.NewGZIP().Token())
 		s, w := getSerializer(nil, request, codecs)
 
 		testSized := func(t *testing.T, method string, contentLength int, body string, contentEncoding ...string) {

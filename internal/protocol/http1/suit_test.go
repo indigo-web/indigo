@@ -164,7 +164,7 @@ func getSuit(client transport.Client, codecs ...codec.Codec) (*Suit, *http.Reque
 	cfg := config.Default()
 	r := getInbuiltRouter()
 	req := construct.Request(cfg, client)
-	suit := New(cfg, r, client, req, codecutil.NewCache(codecs))
+	suit := New(cfg, r, client, req, codecutil.NewCache(codecs, codecutil.AcceptEncoding(codecs)))
 	req.Body = http.NewBody(suit)
 
 	return suit, req
