@@ -55,7 +55,11 @@ func (b *Body) Callback(cb func([]byte) error) error {
 		switch b.error {
 		case nil:
 		case io.EOF:
-			return cb(data)
+			if len(data) > 0 {
+				return cb(data)
+			}
+
+			return nil
 		default:
 			return b.error
 		}
@@ -208,13 +212,9 @@ func (b *Body) Reset(request *Request) {
 func (b *Body) multipartBoundary() (boundary string, ok bool) {
 	for key, value := range strutil.WalkKV(strutil.CutParams(b.request.ContentType)) {
 		if key == "boundary" {
-			if len(boundary) != 0 {
-				return "", false
-			}
-
-			boundary = value
+			return value, true
 		}
 	}
 
-	return boundary, true
+	return "", false
 }
