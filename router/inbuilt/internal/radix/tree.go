@@ -3,9 +3,12 @@ package radix
 import (
 	"cmp"
 	"errors"
+	"fmt"
 	"slices"
+	"strconv"
 	"strings"
 
+	"github.com/indigo-web/indigo/internal/strutil"
 	"github.com/indigo-web/indigo/kv"
 )
 
@@ -130,7 +133,12 @@ func addWildcard(wildcard, value string, into *kv.Storage) {
 }
 
 func (n *Node[T]) Insert(key string, value T) error {
-	return n.insert(splitPath(key), value)
+	str, ok := strutil.URLDecode(key)
+	if !ok {
+		return fmt.Errorf("poorly encoded path: %s", strconv.Quote(key))
+	}
+
+	return n.insert(splitPath(str), value)
 }
 
 func (n *Node[T]) insert(segs []pathSegment, value T) error {
@@ -239,22 +247,11 @@ type pathSegment struct {
 }
 
 func splitPath(str string) (path []pathSegment) {
-	offset := 0
-
 	for len(str) > 0 {
-		colon := strings.IndexByte(str[offset:], ':')
+		colon := strings.IndexByte(str, ':')
 		if colon == -1 {
 			path = append(path, pathSegment{false, false, str})
 			break
-		}
-
-		colon += offset
-
-		if colon > 0 && str[colon-1] == '\\' {
-			// escaped colon: isn't a wildcard, skip
-			str = str[:colon-1] + str[colon:]
-			offset = colon
-			continue
 		}
 
 		path = append(path, pathSegment{false, false, str[:colon]})

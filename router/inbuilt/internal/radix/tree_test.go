@@ -228,40 +228,6 @@ func TestTree(t *testing.T) {
 		test(t, tree, "/prefix42", 1, "path", "42")
 		test(t, tree, "/prefixnowhere/like/this", 1, "path", "nowhere/like/this")
 	})
-
-	t.Run("escape wildcard", func(t *testing.T) {
-		t.Run("static leftmost", func(t *testing.T) {
-			tree := New[int]()
-			require.NoError(t, tree.Insert("\\:hello/\\:world", 1))
-			value, found := tree.Lookup(":hello/:world", nil)
-			require.True(t, found)
-			require.Equal(t, 1, value)
-		})
-
-		t.Run("static rightmost", func(t *testing.T) {
-			tree := New[int]()
-			require.NoError(t, tree.Insert("/\\:hello", 1))
-			value, found := tree.Lookup("/:hello", nil)
-			require.True(t, found)
-			require.Equal(t, 1, value)
-		})
-
-		t.Run("dynamic", func(t *testing.T) {
-			tree := New[int]()
-			require.NoError(t, tree.Insert("/\\:hello/:name", 1))
-			wildcards := kv.New()
-			value, found := tree.Lookup("/:hello/Pavlo", wildcards)
-			require.True(t, found)
-			require.Equal(t, 1, value)
-			require.Equal(t, "Pavlo", wildcards.Value("name"))
-		})
-	})
-
-	t.Run("path classifier", func(t *testing.T) {
-		require.False(t, IsDynamicTemplate("\\:hello/\\:world"))
-		require.False(t, IsDynamicTemplate("/\\:hello"))
-		require.True(t, IsDynamicTemplate("/\\:hello/:name"))
-	})
 }
 
 // isn't used anymore. Left just in case the tree needs to be debugged.

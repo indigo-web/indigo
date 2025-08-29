@@ -1,11 +1,14 @@
 package inbuilt
 
 import (
+	"fmt"
+	"strconv"
 	"strings"
 
 	"github.com/indigo-web/indigo/http"
 	"github.com/indigo-web/indigo/http/method"
 	"github.com/indigo-web/indigo/http/status"
+	"github.com/indigo-web/indigo/internal/strutil"
 	"github.com/indigo-web/indigo/router/inbuilt/internal/radix"
 )
 
@@ -26,10 +29,15 @@ type (
 )
 
 func (r routesMap) Add(path string, m method.Method, handler Handler) {
-	entry := r[path]
+	p, ok := strutil.URLDecode(path)
+	if !ok {
+		panic(fmt.Errorf("poorly encoded path: %s", strconv.Quote(path)))
+	}
+
+	entry := r[p]
 	entry.methods[m] = handler
 	entry.allow = getAllowString(entry.methods)
-	r[path] = entry
+	r[p] = entry
 }
 
 func getAllowString(methods methodLUT) (allowed string) {

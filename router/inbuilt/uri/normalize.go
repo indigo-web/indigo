@@ -1,7 +1,6 @@
 package uri
 
-// Normalize removes trailing slashes, as all request paths are also trimmed, resulting
-// in consensus between these two.
+// Normalize eliminates a trailing slash if presented.
 func Normalize(path string) string {
 	if len(path) > 1 && path[len(path)-1] == '/' {
 		return path[:len(path)-1]

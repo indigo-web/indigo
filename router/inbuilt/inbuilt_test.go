@@ -141,6 +141,38 @@ func TestRoute(t *testing.T) {
 		t.Run("server-wide", testOPTIONS("*", "GET, HEAD, OPTIONS", false))
 		t.Run("server-wide with TRACE", testOPTIONS("*", "GET, HEAD, OPTIONS, TRACE", true))
 	})
+
+	t.Run("escaping", func(t *testing.T) {
+		testRoute := func(r router.Router, path string) func(t *testing.T) {
+			return func(t *testing.T) {
+				request := getRequest(method.GET, path)
+				resp := r.OnRequest(request)
+				require.Equal(t, 200, int(resp.Expose().Code))
+			}
+		}
+
+		newRouter := func(dynamic bool) router.Router {
+			r := New().
+				Get("/foo%2fbar", http.Respond).
+				Get("/foo%3abar", http.Respond)
+
+			if dynamic {
+				r.Get("/unreachable route/:", http.Respond)
+			}
+
+			return r.Build()
+		}
+
+		test := func(r router.Router) func(t *testing.T) {
+			return func(t *testing.T) {
+				t.Run("escaped slash", testRoute(r, "/foo%2fbar"))
+				t.Run("unescaped colon", testRoute(r, "/foo:bar"))
+			}
+		}
+
+		t.Run("static", test(newRouter(false)))
+		t.Run("dynamic", test(newRouter(true)))
+	})
 }
 
 func TestDynamic(t *testing.T) {
