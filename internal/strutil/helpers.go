@@ -5,7 +5,6 @@ import "strings"
 func LStripWS(str string) string {
 	for i, c := range str {
 		switch c {
-		// TODO: consider adding more whitespace characters?
 		case ' ', '\t':
 		default:
 			return str[i:]

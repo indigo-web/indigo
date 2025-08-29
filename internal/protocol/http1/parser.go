@@ -53,10 +53,9 @@ type Parser struct {
 
 func NewParser(cfg *config.Config, request *http.Request, statusBuff, headers *buffer.Buffer) *Parser {
 	return &Parser{
-		cfg:     cfg,
-		state:   eMethod,
-		request: request,
-		// TODO: pass these through arguments instead of allocating in-place
+		cfg:             cfg,
+		state:           eMethod,
+		request:         request,
 		acceptEncodings: make([]string, 0, cfg.Headers.MaxAcceptEncodingTokens),
 		encodings:       make([]string, 0, cfg.Headers.MaxEncodingTokens),
 		requestLine:     statusBuff,

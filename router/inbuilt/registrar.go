@@ -25,7 +25,6 @@ func (r *registrar) Add(path string, m method.Method, handler Handler) error {
 		return fmt.Errorf("empty path")
 	}
 
-	// TODO: support urlencoded characters in endpoints.
 	path = uri.Normalize(path)
 	methodsMap := r.endpoints[path]
 	if methodsMap == nil {

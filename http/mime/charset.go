@@ -9,5 +9,5 @@ const (
 	ASCII  Charset = "ascii"
 	CP1251 Charset = "cp1251"
 	CP1252 Charset = "cp1252"
-	// TODO: adding more widespreaded charsets would be nice
+	// feel free to add more widespread charsets!
 )
