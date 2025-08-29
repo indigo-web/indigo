@@ -179,7 +179,7 @@ var (
 )
 
 func StringCode(code Code) string {
-	if code >= maxCodeValue {
+	if code < minCodeValue || code >= maxCodeValue {
 		return ""
 	}
 

@@ -12,6 +12,9 @@ func Test(t *testing.T) {
 	for _, code := range KnownCodes {
 		require.Equal(t, strconv.Itoa(int(code)), StringCode(code))
 	}
+
+	// it used to panic when passing codes <100
+	require.Equal(t, "", StringCode(99))
 }
 
 func Benchmark(b *testing.B) {
