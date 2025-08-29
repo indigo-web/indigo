@@ -206,7 +206,7 @@ func TestFirstPhase(t *testing.T) {
 
 	<-ch
 	// Ensure the server is ready to accept connections
-	waitForAvailability(t)
+	waitForAvailability(t, addr, altAddr, httpsAddr)
 
 	t.Run("root get", func(t *testing.T) {
 		resp, err := stdhttp.DefaultClient.Get(appURL + "/")
@@ -695,9 +695,7 @@ func TestSecondPhase(t *testing.T) {
 		s.NET.ReadTimeout = 1 * time.Second
 		_ = app.
 			Tune(s).
-			Codec(codec.NewGZIP()).
-			Codec(codec.NewDeflate()).
-			Codec(codec.NewZSTD()).
+			Codec(codec.Suit()...).
 			OnStart(func() {
 				ch <- struct{}{}
 			}).
@@ -708,7 +706,7 @@ func TestSecondPhase(t *testing.T) {
 	}(app)
 
 	<-ch
-	waitForAvailability(t)
+	waitForAvailability(t, addr)
 
 	t.Run("TRACE", func(t *testing.T) {
 		request := &stdhttp.Request{
@@ -834,18 +832,64 @@ func TestSecondPhase(t *testing.T) {
 	})
 }
 
-func waitForAvailability(t *testing.T) {
-	deadline := time.Now().Add(2 * time.Second)
-	for {
-		conn, err := net.Dial("tcp4", addr)
-		if err == nil {
-			_ = conn.Close()
-			break
+func TestEscaping(t *testing.T) {
+	runTest := func(dynamic bool) func(t *testing.T) {
+		return func(t *testing.T) {
+			app := New(addr)
+			go func(app *App) {
+				r := inbuilt.New().
+					Get("/foo%2fbar", func(request *http.Request) *http.Response {
+						return http.Code(request, 201)
+					}).
+					Get("/foo%3abar", func(request *http.Request) *http.Response {
+						return http.Code(request, 202)
+					})
+
+				if dynamic {
+					r.Get("/ :", http.Respond) // unreachable endpoint
+				}
+
+				_ = app.Serve(r)
+			}(app)
+
+			waitForAvailability(t, addr)
+
+			test := func(path string, wantCode int) func(t *testing.T) {
+				return func(t *testing.T) {
+					resp, err := stdhttp.Get(appURL + path)
+					require.NoError(t, err)
+					require.Equal(t, wantCode, resp.StatusCode)
+				}
+			}
+
+			t.Run("escaped slash", test("/foo%2fbar", 201))
+			t.Run("escaped unnormalized slash", test("/foo%2Fbar", 201))
+			t.Run("unescaped slash", test("/foo/bar", 404))
+
+			t.Run("escaped colon", test("/foo%3abar", 202))
+			t.Run("escaped unnormalized colon", test("/foo%3Abar", 202))
+			t.Run("unescaped colon", test("/foo:bar", 202))
 		}
-		if time.Now().After(deadline) {
-			t.Fatalf("server did not start listening on %s in time: %v", addr, err)
+	}
+
+	t.Run("static", runTest(false))
+	t.Run("dynamic", runTest(true))
+}
+
+func waitForAvailability(t *testing.T, addrs ...string) {
+	for _, addr := range addrs {
+		deadline := time.Now().Add(2 * time.Second)
+		for {
+			conn, err := net.Dial("tcp4", addr)
+			if err == nil {
+				_ = conn.Close()
+				break
+			}
+			if time.Now().After(deadline) {
+				t.Fatalf("server did not start listening on %s in time: %v", addr, err)
+			}
+			time.Sleep(50 * time.Millisecond)
 		}
-		time.Sleep(50 * time.Millisecond)
 	}
 }
 
