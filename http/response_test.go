@@ -1,6 +1,7 @@
 package http
 
 import (
+	"io"
 	"testing"
 
 	"github.com/indigo-web/indigo/kv"
@@ -17,4 +18,22 @@ func TestResponse(t *testing.T) {
 		contentType := kv.NewFromPairs(resp.fields.Headers).Value("Content-Type")
 		require.Equal(t, "application/json", contentType)
 	})
+}
+
+func TestSliceReader(t *testing.T) {
+	var message []byte
+	r := &sliceReader{data: []byte("Hello, world!")}
+	buff := make([]byte, 5)
+
+	for {
+		n, err := r.Read(buff)
+		message = append(message, buff[:n]...)
+		switch err {
+		case nil:
+		case io.EOF:
+			return
+		default:
+			require.Fail(t, err.Error())
+		}
+	}
 }

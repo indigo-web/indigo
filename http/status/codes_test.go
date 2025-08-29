@@ -25,3 +25,9 @@ func Benchmark(b *testing.B) {
 		_ = StringCode(code)
 	}
 }
+
+func TestString(t *testing.T) {
+	require.Equal(t, "Nonstandard", String(1))
+	require.Equal(t, "OK", String(200))
+	require.Equal(t, "Nonstandard", String(maxCodeValue))
+}
