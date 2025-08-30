@@ -152,9 +152,6 @@ path:
 				if len(data[i+1:]) >= 2 {
 					// fast path
 					c := (hexconv.Halfbyte[data[i+1]] << 4) | hexconv.Halfbyte[data[i+2]]
-					if strutil.IsASCIINonprintable(c) {
-						return true, nil, status.ErrBadRequest
-					}
 					if strutil.IsURLUnsafeChar(c) {
 						data[i+1] |= 0x20
 						data[i+2] |= 0x20
@@ -234,9 +231,6 @@ pathDecode2Char:
 		}
 
 		char := (hexconv.Halfbyte[p.urlEncodedChar] << 4) | hexconv.Halfbyte[data[0]]
-		if strutil.IsASCIINonprintable(char) {
-			return true, nil, status.ErrBadRequest
-		}
 		if strutil.IsURLUnsafeChar(char) {
 			if !requestLine.AppendBytes('%', p.urlEncodedChar|0x20, data[0]|0x20) {
 				return true, nil, status.ErrURITooLong
@@ -350,9 +344,6 @@ paramsValue:
 				if len(data[i+1:]) >= 2 {
 					// fast path
 					c := (hexconv.Halfbyte[data[i+1]] << 4) | hexconv.Halfbyte[data[i+2]]
-					if strutil.IsASCIINonprintable(c) {
-						return true, nil, status.ErrBadParams
-					}
 
 					if !requestLine.AppendByte(c) {
 						return true, nil, status.ErrTooLongRequestLine
@@ -412,9 +403,6 @@ paramsValueDecode2Char:
 		}
 
 		char := (hexconv.Halfbyte[p.urlEncodedChar] << 4) | hexconv.Halfbyte[data[0]]
-		if strutil.IsASCIINonprintable(char) {
-			return true, nil, status.ErrBadParams
-		}
 
 		if !requestLine.AppendByte(char) {
 			return true, nil, status.ErrTooLongRequestLine

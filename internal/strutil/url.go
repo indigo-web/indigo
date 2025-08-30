@@ -8,7 +8,7 @@ import (
 
 // IsURLUnsafeChar tells whether it's safe to decode an urlencoded character.
 func IsURLUnsafeChar(c byte) bool {
-	return c == '/'
+	return c == '/' || IsASCIINonprintable(c)
 }
 
 // URLDecode decodes an urlencoded string and tells whether the string was properly formed.
@@ -37,9 +37,6 @@ func URLDecode(str string) (string, bool) {
 		}
 
 		char := (x << 4) | y
-		if IsASCIINonprintable(char) {
-			return "", false
-		}
 		if IsURLUnsafeChar(char) {
 			b.Write([]byte{'%', c1 | 0x20, c2 | 0x20})
 			continue
