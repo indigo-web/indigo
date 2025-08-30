@@ -94,6 +94,16 @@ func TestBuffer(t *testing.T) {
 		testTrunc(t, 1)
 		testTrunc(t, 5)
 	})
+
+	t.Run("by single byte", func(t *testing.T) {
+		buff := New(5, 5)
+		for range 5 {
+			require.True(t, buff.AppendByte('a'))
+		}
+
+		require.False(t, buff.AppendByte('a'))
+		require.Equal(t, "aaaaa", string(buff.Finish()))
+	})
 }
 
 func testDiscard(t *testing.T, n int) {

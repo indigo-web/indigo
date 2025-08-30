@@ -285,7 +285,7 @@ func (s *serializer) appendStatus(fields *response.Fields) {
 
 	statusText := fields.Status
 	if len(statusText) == 0 {
-		statusText = status.FromCode(fields.Code)
+		statusText = status.String(fields.Code)
 	}
 
 	s.buff = append(s.buff, statusText...)

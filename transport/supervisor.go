@@ -2,6 +2,7 @@ package transport
 
 import (
 	"net"
+	"sync/atomic"
 
 	"github.com/indigo-web/indigo/config"
 )
@@ -15,12 +16,16 @@ type Transport interface {
 }
 
 type Supervisor struct {
-	ts     []boundTransport
-	stopch chan struct{}
+	stopped *atomic.Bool
+	ts      []boundTransport
+	stopch  chan struct{}
 }
 
 func NewSupervisor() Supervisor {
-	return Supervisor{stopch: make(chan struct{})}
+	return Supervisor{
+		stopped: new(atomic.Bool),
+		stopch:  make(chan struct{}),
+	}
 }
 
 func (s *Supervisor) Add(addr string, transport Transport, cb func(net.Conn)) error {
@@ -67,14 +72,19 @@ func (s *Supervisor) Run(cfg config.NET) error {
 }
 
 func (s *Supervisor) Stop() {
-	s.stopch <- struct{}{}
-	<-s.stopch
+	if !s.stopped.Load() {
+		s.stopch <- struct{}{}
+		<-s.stopch
+	}
 }
 
 func (s *Supervisor) stop() {
-	// TODO: add timer. If transports don't stop before the timeout, they must be
-	// TODO: brutally killed then. Also, probably should add some emergency stop
-	// TODO: signal, which will behave similarly
+	if s.stopped.Load() {
+		return
+	}
+
+	s.stopped.Store(true)
+
 	for _, t := range s.ts {
 		t.t.Stop()
 	}

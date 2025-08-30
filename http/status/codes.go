@@ -159,7 +159,7 @@ var Statuses = [maxCodeValue]string{
 	NetworkAuthenticationRequired: "Network Authentication Required",
 }
 
-func FromCode(code Code) string {
+func String(code Code) string {
 	const nonstandard = "Nonstandard"
 
 	if int(code) >= len(Statuses) {
