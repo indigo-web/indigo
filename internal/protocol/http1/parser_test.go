@@ -334,9 +334,19 @@ func TestParser(t *testing.T) {
 			require.Equal(t, "/AAA", path)
 		})
 
-		t.Run("path nonprintable", func(t *testing.T) {
-			_, err := parsePath("/%41%07")
-			require.EqualError(t, err, status.ErrBadRequest.Error())
+		t.Run("path urlencoded unicode", func(t *testing.T) {
+			t.Run("fastpath", func(t *testing.T) {
+				parser, request := getParser(config.Default())
+				_, _, err := parser.Parse([]byte("GET /%D0%9F%D0%B0%D0%B2%D0%BB%D0%BE "))
+				require.NoError(t, err)
+				require.Equal(t, "/%d0%9f%d0%b0%d0%b2%d0%bb%d0%be", request.Path)
+			})
+
+			t.Run("slowpath", func(t *testing.T) {
+				request, err := parseRequestLine("/%D0%9F%D0%B0%D0%B2%D0%BB%D0%BE")
+				require.NoError(t, err)
+				require.Equal(t, "/%d0%9f%d0%b0%d0%b2%d0%bb%d0%be", request.Path)
+			})
 		})
 
 		t.Run("unsafe", func(t *testing.T) {
@@ -395,14 +405,6 @@ func TestParser(t *testing.T) {
 				require.Equal(t, "Slava Ukraini", params.Value("hello world"))
 			})
 
-			t.Run("fastpath nonprintable", func(t *testing.T) {
-				_, err := parseParams("hello%07=world")
-				require.EqualError(t, err, status.ErrBadParams.Error())
-
-				_, err = parseParams("hello=wor%07ld")
-				require.EqualError(t, err, status.ErrBadParams.Error())
-			})
-
 			splitchars := func(str string) []string {
 				byChars := make([]string, len(str))
 				for i := range str {
@@ -420,12 +422,19 @@ func TestParser(t *testing.T) {
 				require.Equal(t, "Heroyam Slava", params.Value("Slava Ukraini"))
 			})
 
-			t.Run("slowpath nonprintable", func(t *testing.T) {
-				_, err := parseParams(splitchars("h%07ey=hello")...)
-				require.EqualError(t, err, status.ErrBadParams.Error())
+			t.Run("allow unicode values", func(t *testing.T) {
+				t.Run("fastpath", func(t *testing.T) {
+					parser, request := getParser(config.Default())
+					_, _, err := parser.Parse([]byte("GET /?n=Слава+Україні "))
+					require.NoError(t, err)
+					require.Equal(t, "Слава Україні", request.Params.Value("n"))
+				})
 
-				_, err = parseParams(splitchars("hey=he%07llo")...)
-				require.EqualError(t, err, status.ErrBadParams.Error())
+				t.Run("slowpath", func(t *testing.T) {
+					request, err := parseRequestLine("/?n=Слава+Україні")
+					require.NoError(t, err)
+					require.Equal(t, "Слава Україні", request.Params.Value("n"))
+				})
 			})
 		})
 	})
@@ -534,16 +543,11 @@ func TestParser(t *testing.T) {
 				{
 					Name:      "encoded nonprintable",
 					Sample:    "/%ff",
-					WantError: status.ErrBadRequest,
+					WantError: nil,
 				},
 				{
 					Name:      "param key nonprintable",
 					Sample:    "/?he%07llo=world",
-					WantError: status.ErrBadParams,
-				},
-				{
-					Name:      "param value nonprintable",
-					Sample:    "/?hello=wor%07ld",
 					WantError: status.ErrBadParams,
 				},
 				{

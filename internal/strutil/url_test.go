@@ -19,15 +19,9 @@ func TestURLDecode(t *testing.T) {
 		}
 	})
 
-	t.Run("unsafe char", func(t *testing.T) {
-		res, ok := URLDecode("%61%2f")
+	t.Run("unsafe char normalization", func(t *testing.T) {
+		res, ok := URLDecode("%61%2f%D0")
 		require.True(t, ok)
-		require.Equal(t, "a%2f", res)
-	})
-
-	t.Run("unsafe normalization", func(t *testing.T) {
-		res, ok := URLDecode("%61%2F")
-		require.True(t, ok)
-		require.Equal(t, "a%2f", res)
+		require.Equal(t, "a%2f%d0", res)
 	})
 }
