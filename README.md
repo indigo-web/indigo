@@ -4,7 +4,11 @@
 
 Elegance, conciseness, flexibility and extensibility — that’s what Indigo is about. The goal is to create a mini ecosystem in which you can focus on actual tasks rather than reimplementing the same things over and over again. Everything you need to get started is already included, and whatever isn’t is trivially pluggable.
 
-FastHTTP-grade performance, stream-based body processing, fine-tuning of nearly every parameter — including memory consumption control — and a full-fledged built-in router are the icing on the cake.
+- FastHTTP-grade performance
+- Stream-based body processing
+- Fine-tuning of parameters like memory consumption and timeouts
+- A full-fledged built-in router
+- Method chaining at its finest
 
 # Documentation
 
